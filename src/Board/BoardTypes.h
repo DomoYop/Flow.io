@@ -25,6 +25,10 @@ enum class BoardSignal : uint8_t {
     DigitalIn2, // Digital input channel 2.
     DigitalIn3, // Digital input channel 3.
     DigitalIn4, // Digital input channel 4.
+    DigitalIn5, // Digital input channel 5.
+    DigitalIn6, // Digital input channel 6.
+    DigitalIn7, // Digital input channel 7.
+    DigitalIn8, // Digital input channel 8.
     AnalogIn1, // Analog input channel 1.
     AnalogIn2, // Analog input channel 2.
     AnalogIn3, // Analog input channel 3.

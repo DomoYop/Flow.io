@@ -4,12 +4,15 @@
 #include "Board/FlowIODINBoards.h"
 #include "Board/MicronovaBoard.h"
 #include "Board/SupervisorBoardRev1.h"
+#include "Board/WaveshareS3ETHBoard.h"
 
 namespace BoardCapacityProfile {
 
 inline constexpr const BoardSpec& buildBoard()
 {
-#if FLOW_BUILD_IS_FLOWIO
+#if FLOW_BUILD_IS_FLOWIO && defined(FLOW_BOARD_WAVESHARE_S3_ETH)
+    return BoardProfiles::kWaveshareS3ETH8DI8RO;
+#elif FLOW_BUILD_IS_FLOWIO
     return BoardProfiles::kFlowIODINv1;
 #elif FLOW_BUILD_IS_SUPERVISOR
     return BoardProfiles::kSupervisorBoardRev1;

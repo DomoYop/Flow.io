@@ -9,6 +9,19 @@
 #include "Core/Services/IIO.h"
 #include "Core/WokwiDefaultOverrides.h"
 
+#ifndef FLOW_WIRDEF_IO_TCAEN
+#define FLOW_WIRDEF_IO_TCAEN false
+#endif
+#ifndef FLOW_WIRDEF_IO_TCAAD
+#define FLOW_WIRDEF_IO_TCAAD 0x20u
+#endif
+#ifndef FLOW_WIRDEF_IO_TCAMK
+#define FLOW_WIRDEF_IO_TCAMK 0u
+#endif
+#ifndef FLOW_WIRDEF_IO_TCAAL
+#define FLOW_WIRDEF_IO_TCAAL false
+#endif
+
 typedef uint16_t PhysicalPortId;
 constexpr PhysicalPortId IO_PORT_INVALID = 0xFFFFu;
 
@@ -40,6 +53,10 @@ struct IOModuleConfig {
     uint8_t pcfAddress = FLOW_WIRDEF_IO_PCFAD;
     uint8_t pcfMaskDefault = FLOW_WIRDEF_IO_PCFMK;
     bool pcfActiveLow = FLOW_WIRDEF_IO_PCFAL;
+    bool tca9554Enabled = FLOW_WIRDEF_IO_TCAEN;
+    uint8_t tca9554Address = FLOW_WIRDEF_IO_TCAAD;
+    uint8_t tca9554MaskDefault = FLOW_WIRDEF_IO_TCAMK;
+    bool tca9554ActiveLow = FLOW_WIRDEF_IO_TCAAL;
     bool traceEnabled = FLOW_MODDEF_IO_TREN;
     int32_t tracePeriodMs = FLOW_MODDEF_IO_TRMS;
 };
@@ -70,7 +87,8 @@ enum IOBindingPortKind : uint8_t {
     IO_PORT_KIND_INA226 = 8,
     IO_PORT_KIND_SHT40 = 9,
     IO_PORT_KIND_BMP280 = 10,
-    IO_PORT_KIND_BME680 = 11
+    IO_PORT_KIND_BME680 = 11,
+    IO_PORT_KIND_TCA9554_OUTPUT = 12 // TCA9554 I2C expander output; param0 = expander bit index 0-7.
 };
 
 struct IOBindingPortSpec {

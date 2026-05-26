@@ -73,6 +73,7 @@ static constexpr uint8_t kCfgBranchIoSht40 = 29;
 static constexpr uint8_t kCfgBranchIoBmp280 = 30;
 static constexpr uint8_t kCfgBranchIoBme680 = 31;
 static constexpr uint8_t kCfgBranchIoIna226 = 32;
+static constexpr uint8_t kCfgBranchIoTca9554 = 44;
 static constexpr char kLegacyCounterRuntimeKeyFmt[] = "ioi%02urt";
 #define FLOW_IO_ANALOG_ROUTE_ENTRY(ROUTE_ID, BRANCH_ID, SLOT_STR) \
     {ROUTE_ID, {(uint8_t)ConfigModuleId::Io, BRANCH_ID}, "io/input/a" SLOT_STR, "io/input/a" SLOT_STR, (uint8_t)MqttPublishPriority::Normal, nullptr}
@@ -109,6 +110,7 @@ static constexpr MqttConfigRouteProducer::Route kIoCfgRoutes[] = {
     {30, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoBmp280}, "io/drivers/bmp280", "io/drivers/bmp280", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {31, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoBme680}, "io/drivers/bme680", "io/drivers/bme680", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {32, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoIna226}, "io/drivers/ina226", "io/drivers/ina226", (uint8_t)MqttPublishPriority::Normal, nullptr},
+    {44, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoTca9554}, "io/drivers/tca9554", "io/drivers/tca9554", (uint8_t)MqttPublishPriority::Normal, nullptr},
     FLOW_IO_ANALOG_ROUTE_ENTRY(33, kCfgBranchIoA6, "06"),
     FLOW_IO_ANALOG_ROUTE_ENTRY(34, kCfgBranchIoA7, "07"),
     FLOW_IO_ANALOG_ROUTE_ENTRY(35, kCfgBranchIoA8, "08"),
@@ -1705,6 +1707,13 @@ bool IOModule::resolveDigitalOutputBinding_(PhysicalPortId portId,
         usesPcfOut = true;
         return true;
     }
+    if (spec->kind == IO_PORT_KIND_TCA9554_OUTPUT) {
+        pinOut = 0U;
+        backendOut = IO_BACKEND_TCA9554;
+        channelOut = spec->param0;
+        usesPcfOut = true;
+        return true;
+    }
     return false;
 }
 
@@ -1829,7 +1838,8 @@ bool IOModule::configureRuntime_()
             bindingPort = digitalCfg_[s.logicalIdx].bindingPort;
         }
         const IOBindingPortSpec* spec = bindingPortSpec_(bindingPort);
-        if (spec && spec->kind == IO_PORT_KIND_PCF8574_OUTPUT) {
+        if (spec && (spec->kind == IO_PORT_KIND_PCF8574_OUTPUT ||
+                     spec->kind == IO_PORT_KIND_TCA9554_OUTPUT)) {
             needPcfOutput = true;
             break;
         }
@@ -1974,7 +1984,26 @@ bool IOModule::configureRuntime_()
         s.channel = channel;
 
         IDigitalPinDriver* driver = nullptr;
-        if (usesPcfOut) {
+        if (usesPcfOut && backend == IO_BACKEND_TCA9554) {
+            if (!cfgData_.tca9554Enabled) {
+                LOGW("Digital output %s requires TCA9554 but module is disabled", s.endpointId);
+                continue;
+            }
+            if (!tcaDriver_) {
+                IMaskOutputDriver* tcaMaskDriver = allocTcaDriver_("tca9554", &i2cBus_, cfgData_.tca9554Address);
+                if (!tcaMaskDriver) {
+                    LOGW("TCA9554 pool exhausted");
+                    continue;
+                }
+                tcaDriver_ = static_cast<Tca9554Driver*>(tcaMaskDriver);
+                if (!makeMaskProvider(tcaDriver_).begin()) {
+                    LOGW("TCA9554 not detected at 0x%02X", cfgData_.tca9554Address);
+                    tcaDriver_ = nullptr;
+                    continue;
+                }
+            }
+            driver = allocTcaBitDriver_(s.outDef.id, tcaDriver_, channel, s.outDef.activeHigh);
+        } else if (usesPcfOut) {
             if (!cfgData_.pcfEnabled) {
                 LOGW("Digital output %s requires PCF8574 but module is disabled", s.endpointId);
                 continue;
@@ -2389,6 +2418,22 @@ IMaskOutputDriver* IOModule::allocPcfDriver_(const char* driverId, I2CBus* bus, 
     return new (mem) Pcf8574Driver(driverId, bus, address);
 }
 
+IDigitalPinDriver* IOModule::allocTcaBitDriver_(const char* driverId, Tca9554Driver* parent, uint8_t bit, bool activeHigh)
+{
+    if (tcaBitDriverPoolUsed_ >= MAX_DIGITAL_OUTPUTS) return nullptr;
+    void* mem = heap_caps_malloc(sizeof(Tca9554BitDriver), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!mem) return nullptr;
+    ++tcaBitDriverPoolUsed_;
+    return new (mem) Tca9554BitDriver(driverId, parent, bit, activeHigh);
+}
+
+IMaskOutputDriver* IOModule::allocTcaDriver_(const char* driverId, I2CBus* bus, uint8_t address)
+{
+    if (tcaDriverPoolUsed_ >= 1) return nullptr;
+    void* mem = tcaDriverPool_[tcaDriverPoolUsed_++];
+    return new (mem) Tca9554Driver(driverId, bus, address);
+}
+
 Pcf8574MaskEndpoint* IOModule::allocMaskEndpoint_(const char* endpointId, MaskWriteFn writeFn, MaskReadFn readFn, void* fnCtx)
 {
     if (maskEndpointPoolUsed_ >= 1) return nullptr;
@@ -2472,6 +2517,10 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(pcfAddressVar_, kCfgModuleId, kCfgBranchIoPcf857x);
     cfg.registerVar(pcfMaskDefaultVar_, kCfgModuleId, kCfgBranchIoPcf857x);
     cfg.registerVar(pcfActiveLowVar_, kCfgModuleId, kCfgBranchIoPcf857x);
+    cfg.registerVar(tca9554EnabledVar_, kCfgModuleId, kCfgBranchIoTca9554);
+    cfg.registerVar(tca9554AddressVar_, kCfgModuleId, kCfgBranchIoTca9554);
+    cfg.registerVar(tca9554MaskDefaultVar_, kCfgModuleId, kCfgBranchIoTca9554);
+    cfg.registerVar(tca9554ActiveLowVar_, kCfgModuleId, kCfgBranchIoTca9554);
     cfg.registerVar(traceEnabledVar_, kCfgModuleId, kCfgBranchIoDebug);
     cfg.registerVar(tracePeriodVar_, kCfgModuleId, kCfgBranchIoDebug);
 

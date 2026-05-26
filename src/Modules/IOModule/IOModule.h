@@ -23,6 +23,8 @@
 #include "Modules/IOModule/IODrivers/PcntCounterDriver.h"
 #include "Modules/IOModule/IODrivers/Pcf8574BitDriver.h"
 #include "Modules/IOModule/IODrivers/Pcf8574Driver.h"
+#include "Modules/IOModule/IODrivers/Tca9554BitDriver.h"
+#include "Modules/IOModule/IODrivers/Tca9554Driver.h"
 #include "Modules/IOModule/IODrivers/Sht40Driver.h"
 #include "Modules/IOModule/IOEndpoints/AnalogSensorEndpoint.h"
 #include "Modules/IOModule/IOEndpoints/DigitalActuatorEndpoint.h"
@@ -210,6 +212,8 @@ private:
     IAnalogSourceDriver* allocIna226Driver_(const char* driverId, I2CBus* bus, const Ina226DriverConfig& cfg);
     IDigitalPinDriver* allocPcfBitDriver_(const char* driverId, Pcf8574Driver* parent, uint8_t bit, bool activeHigh);
     IMaskOutputDriver* allocPcfDriver_(const char* driverId, I2CBus* bus, uint8_t address);
+    IDigitalPinDriver* allocTcaBitDriver_(const char* driverId, Tca9554Driver* parent, uint8_t bit, bool activeHigh);
+    IMaskOutputDriver* allocTcaDriver_(const char* driverId, I2CBus* bus, uint8_t address);
     Pcf8574MaskEndpoint* allocMaskEndpoint_(const char* endpointId, MaskWriteFn writeFn, MaskReadFn readFn, void* fnCtx);
 
     static constexpr uint8_t MAX_ANALOG_ENDPOINTS = Limits::Io::MaxAnalogEndpoints;
@@ -446,6 +450,7 @@ private:
     IOMaskProvider ledMaskProvider_{};
     Pcf8574MaskEndpoint* ledMaskEp_ = nullptr;
     Pcf8574Driver* pcfDriver_ = nullptr;
+    Tca9554Driver* tcaDriver_ = nullptr;
     IOServiceV2 ioSvc_{
         ServiceBinding::bind<&IOModule::ioCount_>,
         ServiceBinding::bind<&IOModule::ioIdAt_>,
@@ -483,12 +488,14 @@ private:
     alignas(Ina226Driver) uint8_t ina226DriverPool_[1][sizeof(Ina226Driver)]{};
     alignas(Pcf8574Driver) uint8_t pcfDriverPool_[1][sizeof(Pcf8574Driver)]{};
     alignas(Pcf8574MaskEndpoint) uint8_t maskEndpointPool_[1][sizeof(Pcf8574MaskEndpoint)]{};
+    alignas(Tca9554Driver) uint8_t tcaDriverPool_[1][sizeof(Tca9554Driver)]{};
     uint8_t analogEndpointPoolUsed_ = 0;
     uint8_t digitalSensorEndpointPoolUsed_ = 0;
     uint8_t digitalActuatorEndpointPoolUsed_ = 0;
     uint8_t gpioDriverPoolUsed_ = 0;
     uint8_t gpioCounterDriverPoolUsed_ = 0;
     uint8_t pcfBitDriverPoolUsed_ = 0;
+    uint8_t tcaBitDriverPoolUsed_ = 0;
     uint8_t adsDriverPoolUsed_ = 0;
     uint8_t dsDriverPoolUsed_ = 0;
     uint8_t sht40DriverPoolUsed_ = 0;
@@ -496,6 +503,7 @@ private:
     uint8_t bme680DriverPoolUsed_ = 0;
     uint8_t ina226DriverPoolUsed_ = 0;
     uint8_t pcfDriverPoolUsed_ = 0;
+    uint8_t tcaDriverPoolUsed_ = 0;
     uint8_t maskEndpointPoolUsed_ = 0;
     bool runtimeReady_ = false;
     bool runtimeInitAttempted_ = false;
@@ -537,6 +545,10 @@ private:
     ConfigVariable<uint8_t,0> pcfAddressVar_ { NVS_KEY(NvsKeys::Io::IO_PCFAD),"address","io/drivers/pcf857x",ConfigType::UInt8,&cfgData_.pcfAddress,ConfigPersistence::Persistent,0 };
     ConfigVariable<uint8_t,0> pcfMaskDefaultVar_ { NVS_KEY(NvsKeys::Io::IO_PCFMK),"mask_default","io/drivers/pcf857x",ConfigType::UInt8,&cfgData_.pcfMaskDefault,ConfigPersistence::Persistent,0 };
     ConfigVariable<bool,0> pcfActiveLowVar_ { NVS_KEY(NvsKeys::Io::IO_PCFAL),"active_low","io/drivers/pcf857x",ConfigType::Bool,&cfgData_.pcfActiveLow,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> tca9554EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_TCAEN),"enabled","io/drivers/tca9554",ConfigType::Bool,&cfgData_.tca9554Enabled,ConfigPersistence::Persistent,0 };
+    ConfigVariable<uint8_t,0> tca9554AddressVar_ { NVS_KEY(NvsKeys::Io::IO_TCAAD),"address","io/drivers/tca9554",ConfigType::UInt8,&cfgData_.tca9554Address,ConfigPersistence::Persistent,0 };
+    ConfigVariable<uint8_t,0> tca9554MaskDefaultVar_ { NVS_KEY(NvsKeys::Io::IO_TCAMK),"mask_default","io/drivers/tca9554",ConfigType::UInt8,&cfgData_.tca9554MaskDefault,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> tca9554ActiveLowVar_ { NVS_KEY(NvsKeys::Io::IO_TCAAL),"active_low","io/drivers/tca9554",ConfigType::Bool,&cfgData_.tca9554ActiveLow,ConfigPersistence::Persistent,0 };
     ConfigVariable<bool,0> traceEnabledVar_ { NVS_KEY(NvsKeys::Io::IO_TREN),"trace_enabled","io/debug",ConfigType::Bool,&cfgData_.traceEnabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> tracePeriodVar_ { NVS_KEY(NvsKeys::Io::IO_TRMS),"trace_period_ms","io/debug",ConfigType::Int32,&cfgData_.tracePeriodMs,ConfigPersistence::Persistent,0 };
 
