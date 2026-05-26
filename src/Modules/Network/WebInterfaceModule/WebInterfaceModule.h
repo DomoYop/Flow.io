@@ -51,7 +51,13 @@ public:
         if (i == 3) return ModuleId::DataStore;
         if (i == 4) return ModuleId::Command;
 #if !defined(FLOW_PROFILE_MICRONOVA)
+        // Standalone: FlowCfgRemoteService is provided locally by I2CCfgServerModule.
+        // Supervisor: it is provided remotely by I2CCfgClientModule.
+#if defined(FLOW_WAVESHARE_STANDALONE)
+        if (i == 5) return ModuleId::I2cCfgServer;
+#else
         if (i == 5) return ModuleId::I2cCfgClient;
+#endif
 #endif
         return ModuleId::Unknown;
     }

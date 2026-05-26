@@ -17,6 +17,11 @@
 #include "Modules/Network/MQTTModule/MQTTModule.h"
 #include "Modules/Network/TimeModule/TimeModule.h"
 #include "Modules/Network/WifiModule/WifiModule.h"
+#if defined(FLOW_WAVESHARE_STANDALONE)
+#include "Modules/Network/FirmwareUpdateModule/FirmwareUpdateModule.h"
+#include "Modules/Network/WebInterfaceModule/WebInterfaceModule.h"
+#include "Modules/Network/WifiProvisioningModule/WifiProvisioningModule.h"
+#endif
 #include "Modules/PoolDeviceModule/PoolDeviceModule.h"
 #include "Modules/PoolLogicModule/PoolLogicModule.h"
 #include "Modules/Stores/ConfigStoreModule/ConfigStoreModule.h"
@@ -55,6 +60,11 @@ struct ModuleInstances {
     PoolLogicModule poolLogicModule{};
     OneWireBus oneWireWater{19};
     OneWireBus oneWireAir{18};
+#if defined(FLOW_WAVESHARE_STANDALONE)
+    WifiProvisioningModule wifiProvisioningModule{};
+    WebInterfaceModule webInterfaceModule;
+    FirmwareUpdateModule firmwareUpdateModule;
+#endif
     DataStore* ioDataStore = nullptr;
     const HAService* haService = nullptr;
     char topicNetworkState[Limits::TopicBuf] = {0};

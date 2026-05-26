@@ -16,6 +16,9 @@
 #include "Core/ConfigTypes.h"
 #include "Core/NvsKeys.h"
 #include "Core/Services/Services.h"
+#if defined(FLOW_WAVESHARE_STANDALONE)
+#include "Core/Services/IFlowCfg.h"
+#endif
 
 struct BoardSpec;
 
@@ -153,4 +156,19 @@ private:
     static void actionTaskStatic_(void* ctx);
     void buildResponse_(uint8_t op, uint8_t seq, uint8_t status, const uint8_t* payload, size_t payloadLen);
     void handleRequest_(uint8_t op, uint8_t seq, const uint8_t* payload, size_t payloadLen);
+
+#if defined(FLOW_WAVESHARE_STANDALONE)
+    // Local FlowCfgRemoteService: backs the web interface without an I2C Supervisor link.
+    bool localIsReady_() const;
+    bool localSetPaused_(bool paused);
+    bool localListModulesJson_(char* out, size_t outLen) const;
+    bool localListChildrenJson_(const char* prefix, char* out, size_t outLen) const;
+    bool localGetModuleJson_(const char* module, char* out, size_t outLen, bool* truncated) const;
+    bool localRuntimeStatusDomainJson_(FlowStatusDomain domain, char* out, size_t outLen);
+    bool localRuntimeStatusJson_(char* out, size_t outLen);
+    bool localRuntimeAlarmSnapshotJson_(char* out, size_t outLen);
+    bool localRuntimeUiValues_(const RuntimeUiId* ids, uint8_t count, uint8_t* out, size_t outLen, size_t* writtenOut) const;
+    bool localApplyPatchJson_(const char* patch, char* out, size_t outLen);
+    FlowCfgRemoteService localFlowCfgSvc_{};
+#endif
 };

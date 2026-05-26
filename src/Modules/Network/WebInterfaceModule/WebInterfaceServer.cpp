@@ -13,9 +13,9 @@
 #include "Core/I2cCfgProtocol.h"
 #include "Core/SystemLimits.h"
 #include "Core/SystemStats.h"
-#if !defined(FLOW_PROFILE_MICRONOVA)
+#if !defined(FLOW_PROFILE_MICRONOVA) && !defined(FLOW_WAVESHARE_STANDALONE)
 #include "Modules/Network/I2CCfgClientModule/I2CCfgClientRuntime.h"
-#else
+#elif defined(FLOW_PROFILE_MICRONOVA)
 #include "Modules/Micronova/MicronovaBoilerModule/MicronovaBoilerModuleDataModel.h"
 #include "Modules/Network/MQTTModule/MQTTRuntime.h"
 #endif
@@ -1249,7 +1249,7 @@ bool dashboardSlotDegreeCUnit_(const char* unit)
     return (uint8_t)unit[0] == 0xC2 && (uint8_t)unit[1] == 0xB0 && unit[2] == 'C' && unit[3] == '\0';
 }
 
-#if !defined(FLOW_PROFILE_MICRONOVA)
+#if !defined(FLOW_PROFILE_MICRONOVA) && !defined(FLOW_WAVESHARE_STANDALONE)
 void dashboardSlotBgColorHex_(uint16_t color565, char* out, size_t outLen)
 {
     if (!out || outLen < 8U) return;
@@ -3301,7 +3301,7 @@ void WebInterfaceModule::startServer_()
         addNoCacheHeaders_(response);
         response->print("{\"ok\":true,\"slots\":[");
         bool first = true;
-#if !defined(FLOW_PROFILE_MICRONOVA)
+#if !defined(FLOW_PROFILE_MICRONOVA) && !defined(FLOW_WAVESHARE_STANDALONE)
         if (dataStore_) {
             const FlowRemoteRuntimeData& flow = flowRemoteRuntime(*dataStore_);
             for (uint8_t i = 0U; i < kFlowRemoteDashboardSlotCount; ++i) {

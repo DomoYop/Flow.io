@@ -9,6 +9,10 @@ ModuleInstances::ModuleInstances(const BoardSpec& board)
     : wifiModule(board),
       i2cCfgServerModule(board),
       ioModule(board)
+#if defined(FLOW_WAVESHARE_STANDALONE)
+    , webInterfaceModule(board)
+    , firmwareUpdateModule(board)
+#endif
 {
 }
 

@@ -24,7 +24,7 @@ def _run_step(cmd):
     subprocess.run(cmd, cwd=str(project_dir), check=True)
 
 if src_dir.exists():
-    is_supervisor_env = pio_env.startswith("Supervisor")
+    is_supervisor_env = pio_env.startswith("Supervisor") or pio_env.startswith("WaveshareS3ETHStandalone")
     if is_supervisor_env:
         transients = (
             project_dir / "data" / "webinterface" / "cfgdocs.json",

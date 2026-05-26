@@ -5,6 +5,9 @@
 
 #include "I2CCfgServerModule.h"
 #include "Board/BoardSpec.h"
+#if defined(FLOW_WAVESHARE_STANDALONE)
+#include "Core/ServiceBinding.h"
+#endif
 #include "Core/ErrorCodes.h"
 #include "Core/FirmwareVersion.h"
 #include "Core/SystemStats.h"
@@ -332,6 +335,26 @@ void I2CCfgServerModule::init(ConfigStore& cfg, ServiceRegistry& services)
     (void)logHub_;
 
     resetPatchState_();
+
+#if defined(FLOW_WAVESHARE_STANDALONE)
+    localFlowCfgSvc_ = {
+        ServiceBinding::bind<&I2CCfgServerModule::localIsReady_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localSetPaused_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localListModulesJson_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localListChildrenJson_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localGetModuleJson_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localRuntimeStatusDomainJson_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localRuntimeStatusJson_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localRuntimeAlarmSnapshotJson_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localRuntimeUiValues_>,
+        ServiceBinding::bind<&I2CCfgServerModule::localApplyPatchJson_>,
+        this
+    };
+    if (!services.add(ServiceId::FlowCfg, &localFlowCfgSvc_)) {
+        LOGE("local FlowCfg service registration failed");
+    }
+#endif
+
     LOGI("I2C cfg server config registered");
 }
 
@@ -1470,3 +1493,144 @@ void I2CCfgServerModule::handleRequest_(uint8_t op, uint8_t seq, const uint8_t* 
 
     buildResponse_(op, seq, I2cCfgProtocol::StatusBadRequest, nullptr, 0);
 }
+
+// ─── Local FlowCfgRemoteService (standalone — no Supervisor I2C link) ──────────
+
+#if defined(FLOW_WAVESHARE_STANDALONE)
+
+bool I2CCfgServerModule::localIsReady_() const
+{
+    return cfgSvc_ != nullptr;
+}
+
+bool I2CCfgServerModule::localSetPaused_(bool)
+{
+    return true;
+}
+
+bool I2CCfgServerModule::localListModulesJson_(char* out, size_t outLen) const
+{
+    if (!out || outLen == 0 || !cfgSvc_ || !cfgSvc_->listModules) return false;
+    const char* modules[Limits::Config::Capacity::ModuleListMax] = {nullptr};
+    const uint8_t count = cfgSvc_->listModules(cfgSvc_->ctx, modules, Limits::Config::Capacity::ModuleListMax);
+
+    size_t pos = 0;
+    int w = snprintf(out + pos, outLen - pos, "{\"ok\":true,\"modules\":[");
+    if (!(w > 0 && (size_t)w < outLen - pos)) return false;
+    pos += (size_t)w;
+    for (uint8_t i = 0; i < count; ++i) {
+        w = snprintf(out + pos, outLen - pos, "%s\"%s\"", i == 0 ? "" : ",", modules[i] ? modules[i] : "");
+        if (!(w > 0 && (size_t)w < outLen - pos)) return false;
+        pos += (size_t)w;
+    }
+    w = snprintf(out + pos, outLen - pos, "]}");
+    return (w > 0 && (size_t)w < outLen - pos);
+}
+
+bool I2CCfgServerModule::localListChildrenJson_(const char* prefix, char* out, size_t outLen) const
+{
+    if (!out || outLen == 0 || !cfgSvc_ || !cfgSvc_->listModules) return false;
+
+    char prefixNorm[64] = {0};
+    if (prefix && prefix[0] != '\0') snprintf(prefixNorm, sizeof(prefixNorm), "%s", prefix);
+    size_t prefixLen = strnlen(prefixNorm, sizeof(prefixNorm));
+    while (prefixLen > 0 && prefixNorm[0] == '/') { memmove(prefixNorm, prefixNorm + 1, prefixLen); --prefixLen; }
+    while (prefixLen > 0 && prefixNorm[prefixLen - 1] == '/') { prefixNorm[prefixLen - 1] = '\0'; --prefixLen; }
+
+    const char* modules[Limits::Config::Capacity::ModuleListMax] = {nullptr};
+    const uint8_t countModules = cfgSvc_->listModules(cfgSvc_->ctx, modules, Limits::Config::Capacity::ModuleListMax);
+
+    struct Child { const char* start; size_t len; };
+    Child children[Limits::Config::Capacity::ModuleListMax] = {};
+    uint8_t childCount = 0;
+    bool hasExact = false;
+
+    for (uint8_t i = 0; i < countModules; ++i) {
+        const char* childStart = nullptr;
+        size_t childLen = 0;
+        bool exact = false;
+        if (!childTokenForPrefix_(modules[i], prefixNorm, prefixLen, childStart, childLen, exact)) {
+            if (exact) hasExact = true;
+            continue;
+        }
+        bool duplicate = false;
+        for (uint8_t j = 0; j < childCount; ++j) {
+            if (tokensEqual_(childStart, childLen, children[j].start, children[j].len)) { duplicate = true; break; }
+        }
+        if (!duplicate && childCount < Limits::Config::Capacity::ModuleListMax) {
+            children[childCount++] = {childStart, childLen};
+        }
+    }
+
+    size_t pos = 0;
+    int w = snprintf(out + pos, outLen - pos,
+                     "{\"ok\":true,\"prefix\":\"%s\",\"has_exact\":%s,\"children\":[",
+                     prefixNorm,
+                     hasExact ? "true" : "false");
+    if (!(w > 0 && (size_t)w < outLen - pos)) return false;
+    pos += (size_t)w;
+
+    for (uint8_t i = 0; i < childCount; ++i) {
+        char token[64] = {0};
+        const size_t n = (children[i].len < sizeof(token) - 1) ? children[i].len : sizeof(token) - 1;
+        memcpy(token, children[i].start, n);
+        w = snprintf(out + pos, outLen - pos, "%s\"%s\"", i == 0 ? "" : ",", token);
+        if (!(w > 0 && (size_t)w < outLen - pos)) return false;
+        pos += (size_t)w;
+    }
+
+    w = snprintf(out + pos, outLen - pos, "]}");
+    return (w > 0 && (size_t)w < outLen - pos);
+}
+
+bool I2CCfgServerModule::localGetModuleJson_(const char* module, char* out, size_t outLen, bool* truncated) const
+{
+    if (truncated) *truncated = false;
+    if (!out || outLen == 0 || !module || module[0] == '\0') return false;
+    if (!cfgSvc_ || !cfgSvc_->toJsonModule) return false;
+    return cfgSvc_->toJsonModule(cfgSvc_->ctx, module, out, outLen, truncated);
+}
+
+bool I2CCfgServerModule::localRuntimeStatusDomainJson_(FlowStatusDomain domain, char* out, size_t outLen)
+{
+    if (!out || outLen == 0) return false;
+    bool truncated = false;
+    if (!buildRuntimeStatusDomainJson_(domain, truncated)) return false;
+    const size_t len = strnlen(statusJson_, sizeof(statusJson_));
+    if (len == 0 || len >= outLen) return false;
+    memcpy(out, statusJson_, len + 1U);
+    return true;
+}
+
+bool I2CCfgServerModule::localRuntimeStatusJson_(char* out, size_t outLen)
+{
+    if (!out || outLen == 0) return false;
+    const int w = snprintf(out, outLen, "{\"ok\":true}");
+    return (w > 0 && (size_t)w < outLen);
+}
+
+bool I2CCfgServerModule::localRuntimeAlarmSnapshotJson_(char* out, size_t outLen)
+{
+    if (!out || outLen == 0) return false;
+    if (!alarmSvc_ || !alarmSvc_->buildSnapshot) return false;
+    return alarmSvc_->buildSnapshot(alarmSvc_->ctx, out, outLen);
+}
+
+bool I2CCfgServerModule::localRuntimeUiValues_(const RuntimeUiId* ids, uint8_t count,
+                                               uint8_t* out, size_t outLen, size_t* writtenOut) const
+{
+    return runtimeUiSvc_.readValues(ids, count, out, outLen, *writtenOut);
+}
+
+bool I2CCfgServerModule::localApplyPatchJson_(const char* patch, char* out, size_t outLen)
+{
+    if (!out || outLen == 0 || !patch || !cfgSvc_ || !cfgSvc_->applyJson) return false;
+    const bool ok = cfgSvc_->applyJson(cfgSvc_->ctx, patch);
+    const int w = snprintf(out, outLen,
+                           ok ? "{\"ok\":true,\"where\":\"local/cfg/apply\"}"
+                              : "{\"ok\":false,\"err\":{\"code\":\"CfgApplyFailed\","
+                                "\"where\":\"local/cfg/apply\",\"retryable\":false}}");
+    return (w > 0 && (size_t)w < outLen);
+}
+
+#endif // FLOW_WAVESHARE_STANDALONE

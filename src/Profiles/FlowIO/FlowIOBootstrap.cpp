@@ -132,6 +132,9 @@ void registerModules(AppContext& ctx, ModuleInstances& modules)
     ctx.moduleManager.add(&modules.hmiModule);
     ctx.moduleManager.add(&modules.alarmModule);
     ctx.moduleManager.add(&modules.wifiModule);
+#if defined(FLOW_WAVESHARE_STANDALONE)
+    ctx.moduleManager.add(&modules.wifiProvisioningModule);
+#endif
     ctx.moduleManager.add(&modules.timeModule);
     ctx.moduleManager.add(&modules.mqttModule);
     ctx.moduleManager.add(&modules.haModule);
@@ -139,6 +142,10 @@ void registerModules(AppContext& ctx, ModuleInstances& modules)
     ctx.moduleManager.add(&modules.ioModule);
     ctx.moduleManager.add(&modules.poolLogicModule);
     ctx.moduleManager.add(&modules.poolDeviceModule);
+#if defined(FLOW_WAVESHARE_STANDALONE)
+    ctx.moduleManager.add(&modules.webInterfaceModule);
+    ctx.moduleManager.add(&modules.firmwareUpdateModule);
+#endif
 
     modules.systemMonitorModule.setModuleManager(&ctx.moduleManager);
     ctx.moduleManager.add(&modules.systemMonitorModule);
