@@ -18,7 +18,11 @@ struct SerialSinkCtx {
 };
 
 static SerialSinkCtx gSerialSinkCtx{};
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+static Stream* gLogSerial = &Serial;
+#else
 static HardwareSerial* gLogSerial = &Serial;
+#endif
 
 static const char* lvlStr(LogLevel lvl) {
     switch (lvl) {
@@ -144,6 +148,10 @@ void LogSerialSinkModule::init(ConfigStore& cfg, ServiceRegistry& services) {
     (void)cfg;
 
     gLogSerial = &Board::SerialMap::logSerial();
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+    // Serial is HWCDC — begin() must be called directly (baud rate is ignored by USB CDC).
+    Serial.begin(Board::SerialMap::LogBaud);
+#else
     const int8_t rx = Board::SerialMap::logRxPin();
     const int8_t tx = Board::SerialMap::logTxPin();
     if (rx >= 0 && tx >= 0) {
@@ -151,6 +159,7 @@ void LogSerialSinkModule::init(ConfigStore& cfg, ServiceRegistry& services) {
     } else {
         gLogSerial->begin(Board::SerialMap::LogBaud);
     }
+#endif
 
     auto sinks = services.get<LogSinkRegistryService>(ServiceId::LogSinks);
     if (!sinks) return;

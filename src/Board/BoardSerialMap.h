@@ -19,6 +19,16 @@ static constexpr int8_t NoPin = -1;
 static constexpr int8_t Uart2Rx = 16;
 static constexpr int8_t Uart2Tx = 17;
 
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+// When USB CDC-on-boot is enabled, Serial is HWCDC (not HardwareSerial).
+// FLOW_SWAP_LOG_HMI_SERIAL cannot be combined with ARDUINO_USB_CDC_ON_BOOT.
+static_assert(!SwapLogAndHmi, "FLOW_SWAP_LOG_HMI_SERIAL is incompatible with ARDUINO_USB_CDC_ON_BOOT");
+
+inline Stream& logSerial() { return Serial; }
+inline HardwareSerial& hmiSerial() { return Serial2; }
+
+#else
+
 inline HardwareSerial& logSerial()
 {
     return SwapLogAndHmi ? Serial2 : Serial;
@@ -28,6 +38,8 @@ inline HardwareSerial& hmiSerial()
 {
     return SwapLogAndHmi ? Serial : Serial2;
 }
+
+#endif
 
 inline int8_t logRxPin()
 {

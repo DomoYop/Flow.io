@@ -203,7 +203,13 @@ void setupProfile(AppContext& ctx)
     ModuleInstances& modules = moduleInstances();
 
     Serial.begin(Board::SerialMap::uart0Baud());
+#if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
+    delay(3000);
+    Serial.println("\r\n=== FlowIO " FIRMW " ===");
+    Serial.flush();
+#else
     delay(50);
+#endif
 
     ctx.preferences.begin(NvsKeys::StorageNamespace, false);
     ctx.registry.setPreferences(ctx.preferences);
