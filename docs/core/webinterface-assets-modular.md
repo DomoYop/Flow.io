@@ -38,10 +38,10 @@ Le pipeline compresse désormais aussi:
 - `wc/*.j(.gz)`
 
 Scripts:
-- `scripts/gzip_web_assets.sh`
-- `scripts/prepare_spiffs_data.py`
+- `scripts/prepare_spiffs_data.py` (automatique au build PlatformIO : gzippe les sources vers le staging `$BUILD_DIR/spiffs_data`)
+- `scripts/gzip_web_assets.sh` (optionnel, usage manuel : produit des `.gz` locaux à côté des sources, p. ex. pour inspection)
+
+Les fichiers `.gz` ne sont pas suivis par git (`data/**/*.gz` est ignoré) : la version servie est toujours régénérée depuis les sources au moment du build, jamais lue depuis le repo.
 
 ## Régénération
-1. `scripts/generate_cfgdoc_chunks.py`
-2. `scripts/gzip_web_assets.sh`
-3. build/upload SPIFFS habituel
+1. build/upload SPIFFS habituel (`prepare_spiffs_data.py` gère la génération cfgdoc et la compression)
