@@ -196,7 +196,7 @@ body.web-icons-disabled .measure-domain-chip.active .measure-domain-chip-check{w
 .status-toggle-readonly{pointer-events:none;opacity:0.96;transform:scale(0.92);transform-origin:center right;}
 .status-toggle-readonly input{cursor:default;}
 .status-state-grid{margin-top:2px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;}
-.status-card-runtime-group-mode > h3 + .status-state-grid,.status-card-runtime-group-sondes > h3 + .status-sonde-slot-grid,.status-card-runtime-group-alarmes > h3 + .status-alarm-slot-grid,.status-card-runtime-group-systeme > h3 + .status-kv{margin-top:14px;}
+.status-card-runtime-group-mode > h3 + .status-state-grid,.status-card-runtime-group-equipements > h3 + .status-state-grid,.status-card-runtime-group-sondes > h3 + .status-sonde-slot-grid,.status-card-runtime-group-alarmes > h3 + .status-alarm-slot-grid,.status-card-runtime-group-systeme > h3 + .status-kv{margin-top:14px;}
 .status-sonde-slot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;}
 .status-sonde-slot{min-width:0;min-height:60px;border:1px solid var(--panel-frame-border);border-radius:12px;background:var(--panel-soft-bg);padding:9px 11px;display:grid;grid-template-rows:auto 1fr;gap:8px;}
 .status-sonde-slot.is-empty{background:linear-gradient(135deg,rgba(162,184,201,0.08),rgba(162,184,201,0.02));border-style:dashed;opacity:0.72;}
@@ -205,6 +205,8 @@ body.web-icons-disabled .measure-domain-chip.active .measure-domain-chip-check{w
 .status-sonde-slot-value{min-width:0;font-size:17px;font-weight:800;line-height:1;letter-spacing:0;color:var(--panel-frame-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .status-sonde-slot-unit{flex:0 0 auto;font-size:11px;font-weight:700;line-height:1;color:var(--panel-frame-title);white-space:nowrap;}
 .status-sonde-slot.is-empty .status-sonde-slot-value{color:var(--state-muted-fg);}
+.status-sonde-toggle{margin-top:10px;align-self:flex-start;border:none;background:none;padding:0;font-size:11px;font-weight:700;color:var(--panel-frame-title);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.status-sonde-toggle:hover{color:var(--panel-frame-text);}
 .status-alarm-slot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;}
 .status-alarm-slot-state.is-empty,.status-state-tile.is-empty .status-state-value{color:var(--state-muted-fg);}
 .status-alarm-slot{min-width:0;min-height:60px;border:1px solid var(--panel-frame-border);border-radius:12px;background:var(--panel-soft-bg);padding:9px 11px;display:grid;grid-template-rows:auto 1fr;gap:6px;}

@@ -262,6 +262,18 @@
         {
           "value": 1003,
           "label_t": "cfgmods_meta.tftmodules3.enum_sets.tft_s3_dashboard_runtime_ui.29.label"
+        },
+        {
+          "value": 2215,
+          "label_t": "cfgmods_meta.tftmodules3.enum_sets.tft_s3_dashboard_runtime_ui.30.label"
+        },
+        {
+          "value": 2216,
+          "label_t": "cfgmods_meta.tftmodules3.enum_sets.tft_s3_dashboard_runtime_ui.31.label"
+        },
+        {
+          "value": 2217,
+          "label_t": "cfgmods_meta.tftmodules3.enum_sets.tft_s3_dashboard_runtime_ui.32.label"
         }
       ],
       "tft_s3_alarm_id": [

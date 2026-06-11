@@ -207,6 +207,42 @@
       "order": 140,
       "label_t": "runtimeui.io.v14.label",
       "group_t": "runtimeui.io.v14.group"
+    },
+    {
+      "valueId": 15,
+      "key": "ina226.voltage",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "V",
+      "decimals": 2,
+      "order": 150,
+      "label_t": "runtimeui.io.v15.label",
+      "group_t": "runtimeui.io.v15.group"
+    },
+    {
+      "valueId": 16,
+      "key": "ina226.current",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "mA",
+      "decimals": 1,
+      "order": 160,
+      "label_t": "runtimeui.io.v16.label",
+      "group_t": "runtimeui.io.v16.group"
+    },
+    {
+      "valueId": 17,
+      "key": "ina226.power",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "mW",
+      "decimals": 0,
+      "order": 170,
+      "label_t": "runtimeui.io.v17.label",
+      "group_t": "runtimeui.io.v17.group"
     }
   ]
 }

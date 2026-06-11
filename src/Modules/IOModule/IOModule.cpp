@@ -643,6 +643,12 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_BME680, 2U, writer);
         case RuntimeUiBme680Gaz:
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_BME680, 3U, writer);
+        case RuntimeUiIna226Voltage:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA226, 1U, writer);
+        case RuntimeUiIna226Current:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA226, 2U, writer);
+        case RuntimeUiIna226Power:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA226, 3U, writer);
         case RuntimeUiWaterTemp:
             runtimeIndex = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].runtimeIndex;
             break;

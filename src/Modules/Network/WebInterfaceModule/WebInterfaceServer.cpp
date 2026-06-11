@@ -2521,6 +2521,9 @@ bool flowios3ReadDashboardRuntimeValue_(DataStore* dataStore,
             if (valueId == 12U) return flowios3ReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_BME680, 1U, out);
             if (valueId == 13U) return flowios3ReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_BME680, 2U, out);
             if (valueId == 14U) return flowios3ReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_BME680, 3U, out);
+            if (valueId == 15U) return flowios3ReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_INA226, 1U, out);
+            if (valueId == 16U) return flowios3ReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_INA226, 2U, out);
+            if (valueId == 17U) return flowios3ReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_INA226, 3U, out);
             return false;
 
         case ModuleId::System:

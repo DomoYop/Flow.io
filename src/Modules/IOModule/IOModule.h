@@ -129,6 +129,9 @@ private:
         RuntimeUiBme680Humidity = 12,
         RuntimeUiBme680Pressure = 13,
         RuntimeUiBme680Gaz = 14,
+        RuntimeUiIna226Voltage = 15,
+        RuntimeUiIna226Current = 16,
+        RuntimeUiIna226Power = 17,
     };
 
     static bool tickFastAds_(void* ctx, uint32_t nowMs);

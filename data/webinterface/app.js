@@ -548,7 +548,7 @@
     function runtimeDomainsForProfile() {
       return isMicronovaProfile()
         ? ['micronova', 'alarm']
-        : ['mode', 'sondes', 'alarm'];
+        : ['mode', 'equipements', 'sondes', 'alarm'];
     }
 
     function createRuntimeDomainState() {
@@ -1954,11 +1954,14 @@
     let runtimeManifestDomainLoadPromise = null;
     const poolMeasureDomainState = {
       mode: createRuntimeDomainState(),
+      equipements: createRuntimeDomainState(),
       sondes: createRuntimeDomainState(),
       micronova: createRuntimeDomainState(),
       alarm: createRuntimeDomainState()
     };
     const poolMeasureDomainAnimations = {};
+    const poolSondesShowUnavailableStorageKey = 'flow_dashboard_sondes_show_unavailable';
+    let poolSondesShowUnavailable = getStorageValue(localStorage, poolSondesShowUnavailableStorageKey) === '1';
     const upgradeReconnectFetchTimeoutMs = 1400;
     const upgradeTargetDefs = {
       flowio: { manifestKey: 'flowio', target: 'flowio', endpoint: '/fwupdate/flowio', label: 'flow.io', order: 10 },
@@ -4442,6 +4445,7 @@
     function formatRuntimeDomainLabel(domain) {
       const key = String(domain || '').trim().toLowerCase();
       if (key === 'mode') return 'Mode';
+      if (key === 'equipements') return 'Équipements';
       if (key === 'sondes') return 'Sondes';
       if (key === 'micronova') return 'Micronova';
       if (key === 'mqtt') return 'MQTT';
@@ -4593,6 +4597,21 @@
       return { value: valueRaw, unit: unit };
     }
 
+    function isPoolSondeSlotAvailable(slot) {
+      return !!(slot && slot.enabled !== false && slot.available);
+    }
+
+    function countUnavailablePoolSondeSlots(slots) {
+      const cleanSlots = Array(8).fill(null);
+      if (Array.isArray(slots)) {
+        slots.forEach((slot) => {
+          const idx = Number(slot && slot.slot);
+          if (Number.isInteger(idx) && idx >= 0 && idx < 8) cleanSlots[idx] = slot;
+        });
+      }
+      return cleanSlots.filter((slot) => !isPoolSondeSlotAvailable(slot)).length;
+    }
+
     function buildPoolSondeSlotsGrid(slots) {
       const cleanSlots = Array(8).fill(null);
       if (Array.isArray(slots)) {
@@ -4601,14 +4620,24 @@
           if (Number.isInteger(idx) && idx >= 0 && idx < 8) cleanSlots[idx] = slot;
         });
       }
+      const visibleIndexes = [];
+      for (let i = 0; i < 8; i += 1) {
+        if (poolSondesShowUnavailable || isPoolSondeSlotAvailable(cleanSlots[i])) visibleIndexes.push(i);
+      }
+      if (!visibleIndexes.length) {
+        const empty = document.createElement('p');
+        empty.className = 'status-card-summary';
+        empty.textContent = tr('dashboard.sondes.allUnavailable', 'Aucune mesure disponible.');
+        return empty;
+      }
       const grid = document.createElement('div');
       grid.className = 'status-sonde-slot-grid';
 
-      for (let i = 0; i < 8; i += 1) {
+      visibleIndexes.forEach((i) => {
         const slot = cleanSlots[i] || null;
         const tile = document.createElement('div');
         tile.className = 'status-sonde-slot';
-        const available = !!(slot && slot.enabled !== false && slot.available);
+        const available = isPoolSondeSlotAvailable(slot);
         if (!available) tile.classList.add('is-empty');
 
         const bgColor = slot && isValidHexColor(slot.bgColor) ? slot.bgColor : '';
@@ -4637,7 +4666,7 @@
 
         tile.appendChild(metric);
         grid.appendChild(tile);
-      }
+      });
 
       return grid;
     }
@@ -5097,10 +5126,12 @@
         const isPoolModeGroup =
           String(group.domainKey || '').trim().toLowerCase() === 'mode' &&
           String(group.groupKey || '').trim().localeCompare('Mode', 'fr', { sensitivity: 'base' }) === 0;
+        const isPoolEquipementsGroup =
+          String(group.domainKey || '').trim().toLowerCase() === 'equipements';
         const isPoolSondesGroup = isPoolSondesGroupKey(group.domainKey, group.groupKey);
         const groupDisplayOptions = {
           displayLabelResolver: (entry) => runtimeMeasureDisplayLabel(entry),
-          booleanTexts: isPoolModeGroup
+          booleanTexts: (isPoolModeGroup || isPoolEquipementsGroup)
             ? {
               activeText: 'Marche',
               inactiveText: 'Arrêt'
@@ -5114,6 +5145,21 @@
 
         if (isPoolSondesGroup) {
           card.appendChild(buildPoolSondeSlotsGrid(sondeSlots));
+          const hiddenCount = countUnavailablePoolSondeSlots(sondeSlots);
+          if (hiddenCount > 0 || poolSondesShowUnavailable) {
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'status-sonde-toggle';
+            toggle.textContent = poolSondesShowUnavailable
+              ? tr('dashboard.sondes.hideUnavailable', 'Masquer les indisponibles')
+              : tr('dashboard.sondes.showUnavailable', 'Afficher les indisponibles') + ' (' + hiddenCount + ')';
+            toggle.addEventListener('click', () => {
+              poolSondesShowUnavailable = !poolSondesShowUnavailable;
+              setStorageValue(localStorage, poolSondesShowUnavailableStorageKey, poolSondesShowUnavailable ? '1' : '0');
+              renderPoolMeasuresGrid();
+            });
+            card.appendChild(toggle);
+          }
           fragment.appendChild(card);
           return;
         }

@@ -129,13 +129,13 @@
     "cfgdocs.wildcard.tank_init_ml.label": "Niveau initial cuve (mL)",
     "runtimeui.pooldev.v01.display.activeText": "En marche",
     "runtimeui.pooldev.v01.display.inactiveText": "Off",
-    "runtimeui.pooldev.v01.group": "Mode",
+    "runtimeui.pooldev.v01.group": "Equipment",
     "runtimeui.pooldev.v01.label": "Filtration",
-    "runtimeui.pooldev.v02.group": "Mode",
+    "runtimeui.pooldev.v02.group": "Equipment",
     "runtimeui.pooldev.v02.label": "Pompe pH",
-    "runtimeui.pooldev.v03.group": "Mode",
+    "runtimeui.pooldev.v03.group": "Equipment",
     "runtimeui.pooldev.v03.label": "Pompe chlore",
-    "runtimeui.pooldev.v04.group": "Mode",
+    "runtimeui.pooldev.v04.group": "Equipment",
     "runtimeui.pooldev.v04.label": "Robot"
   }
 }
