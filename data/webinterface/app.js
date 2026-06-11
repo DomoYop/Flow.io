@@ -5664,6 +5664,52 @@
       return card;
     }
 
+    function buildIoValueTile(label, valueText) {
+      const tile = document.createElement('div');
+      tile.className = 'status-state-tile is-value';
+      tile.setAttribute('role', 'img');
+      tile.setAttribute('aria-label', label + ' : ' + valueText);
+
+      const title = document.createElement('div');
+      title.className = 'status-state-title';
+      title.textContent = label;
+      tile.appendChild(title);
+
+      const state = document.createElement('div');
+      state.className = 'status-state-value';
+      state.textContent = valueText;
+      tile.appendChild(state);
+      return tile;
+    }
+
+    function buildIoTable(headers, rows) {
+      const table = document.createElement('table');
+      table.className = 'io-table';
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      headers.forEach((header) => {
+        const th = document.createElement('th');
+        th.textContent = String(header && header.text !== undefined ? header.text : header);
+        if (header && header.cls) th.className = header.cls;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      rows.forEach((cells) => {
+        const tr = document.createElement('tr');
+        cells.forEach((cell) => {
+          const td = document.createElement('td');
+          td.textContent = String(cell && cell.text !== undefined ? cell.text : cell);
+          if (cell && cell.cls) td.className = cell.cls;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
     function renderIoSnapshot(data) {
       if (!ioSnapshotGrid) return;
       ioSnapshotGrid.innerHTML = '';
@@ -5696,40 +5742,39 @@
 
       if (inputs.length) {
         const card = buildIoSnapshotCard(tr('io.inputs', 'Entrées binaires'));
-        const tiles = [];
-        const numericRows = [];
-        inputs.forEach((ep) => {
+        const tiles = inputs.map((ep) => {
           if (ep.valid && ep.type !== 'bool') {
-            numericRows.push([ioEndpointLabel(ep), formatIoNumericValue(ep, deviceNowMs)]);
-            return;
+            return buildIoValueTile(ioEndpointLabel(ep), formatIoNumericValue(ep, deviceNowMs));
           }
-          tiles.push(buildFlowReadonlyStateTile(
+          return buildFlowReadonlyStateTile(
             ioEndpointLabel(ep),
             ioEndpointBoolState(ep),
             { activeText: 'Actif', inactiveText: 'Inactif' }
-          ));
+          );
         });
-        if (tiles.length) {
-          const grid = buildFlowReadonlyStateGrid(tiles);
-          if (grid) card.appendChild(grid);
-        }
-        if (numericRows.length) {
-          const kv = document.createElement('div');
-          kv.className = 'status-kv';
-          numericRows.forEach((row) => appendFlowStatusRow(kv, row[0], row[1]));
-          card.appendChild(kv);
-        }
+        const grid = buildFlowReadonlyStateGrid(tiles);
+        if (grid) card.appendChild(grid);
         ioSnapshotGrid.appendChild(card);
       }
 
       if (analogs.length) {
         const card = buildIoSnapshotCard(tr('io.analog', 'Entrées analogiques'));
-        const kv = document.createElement('div');
-        kv.className = 'status-kv';
-        analogs.forEach((ep) => {
-          appendFlowStatusRow(kv, ioEndpointLabel(ep) + ' [' + String(ep.backend || '?') + ']', formatIoNumericValue(ep, deviceNowMs));
+        const rows = analogs.map((ep) => {
+          const code = ioEndpointCode(ep);
+          const name = String(ep && ep.name ? ep.name : '').trim();
+          return [
+            { text: code || '-', cls: 'io-code' },
+            (name && name !== code) ? name : '-',
+            String(ep.backend || '?'),
+            { text: formatIoNumericValue(ep, deviceNowMs), cls: ep.valid ? 'io-col-num' : 'io-col-num io-muted' }
+          ];
         });
-        card.appendChild(kv);
+        card.appendChild(buildIoTable([
+          tr('io.table.endpoint', 'Endpoint'),
+          tr('io.table.name', 'Nom'),
+          tr('io.table.source', 'Source'),
+          { text: tr('io.table.value', 'Valeur'), cls: 'io-col-num' }
+        ], rows));
         ioSnapshotGrid.appendChild(card);
       }
 
@@ -5746,15 +5791,21 @@
       });
       if (byBackend.size) {
         const card = buildIoSnapshotCard(tr('io.drivers', 'Capteurs / bus'));
-        const kv = document.createElement('div');
-        kv.className = 'status-kv';
+        const rows = [];
         byBackend.forEach((entry, backend) => {
-          const stateText = entry.valid > 0
-            ? tr('io.driver.ok', 'OK') + ' (' + entry.valid + '/' + entry.total + ')'
-            : tr('io.driver.noData', 'Aucune donnée') + ' (0/' + entry.total + ')';
-          appendFlowStatusRow(kv, backend, stateText);
+          rows.push([
+            { text: backend, cls: 'io-code' },
+            { text: entry.valid + '/' + entry.total, cls: 'io-col-num' },
+            entry.valid > 0
+              ? { text: tr('io.driver.ok', 'OK'), cls: 'io-ok' }
+              : { text: tr('io.driver.noData', 'Aucune donnée'), cls: 'io-muted' }
+          ]);
         });
-        card.appendChild(kv);
+        card.appendChild(buildIoTable([
+          tr('io.table.bus', 'Bus / capteur'),
+          { text: tr('io.table.endpoints', 'Endpoints'), cls: 'io-col-num' },
+          tr('io.table.state', 'État')
+        ], rows));
         ioSnapshotGrid.appendChild(card);
       }
     }
