@@ -1972,6 +1972,8 @@
     const poolMeasureDomainAnimations = {};
     const poolSondesShowUnavailableStorageKey = 'flow_dashboard_sondes_show_unavailable';
     let poolSondesShowUnavailable = getStorageValue(localStorage, poolSondesShowUnavailableStorageKey) === '1';
+    const poolMeasureActiveDomainsStorageKey = 'flow_dashboard_active_domains';
+    let poolMeasureDomainPrefsRestored = false;
     const upgradeReconnectFetchTimeoutMs = 1400;
     const upgradeTargetDefs = {
       flowio: { manifestKey: 'flowio', target: 'flowio', endpoint: '/fwupdate/flowio', label: 'flow.io', order: 10 },
@@ -5550,6 +5552,32 @@
       }
     }
 
+    function savePoolMeasureDomainPrefs() {
+      const keys = activePoolMeasureDomainKeys();
+      // '-' = tout desactive volontairement (distinct de "jamais sauvegarde").
+      setStorageValue(localStorage, poolMeasureActiveDomainsStorageKey, keys.length ? keys.join(',') : '-');
+    }
+
+    function restorePoolMeasureDomainPrefs() {
+      if (poolMeasureDomainPrefsRestored) return;
+      poolMeasureDomainPrefsRestored = true;
+      ensureRuntimeDomainState();
+      const raw = getStorageValue(localStorage, poolMeasureActiveDomainsStorageKey);
+      if (raw === '-') return;
+      if (!raw) {
+        runtimeMeasureDomainKeys.forEach((domainKey) => {
+          if (poolMeasureDomainState[domainKey]) poolMeasureDomainState[domainKey].active = true;
+        });
+        return;
+      }
+      raw.split(',').forEach((key) => {
+        const cleanDomain = normalizeRuntimeMeasureDomainKey(key);
+        if (cleanDomain && poolMeasureDomainState[cleanDomain]) {
+          poolMeasureDomainState[cleanDomain].active = true;
+        }
+      });
+    }
+
     async function togglePoolMeasureDomain(domainKey) {
       const cleanDomain = normalizeRuntimeMeasureDomainKey(domainKey);
       if (!cleanDomain) return;
@@ -5560,10 +5588,12 @@
         state.error = '';
         state.sondeSlots = [];
         state.requestSeq += 1;
+        savePoolMeasureDomainPrefs();
         refreshPoolMeasuresView();
         return;
       }
       state.active = true;
+      savePoolMeasureDomainPrefs();
       await loadPoolMeasureDomain(cleanDomain, false);
     }
 
@@ -5572,6 +5602,7 @@
     }
 
     async function onPoolMeasuresPageShown() {
+      restorePoolMeasureDomainPrefs();
       refreshPoolMeasuresView();
       startPoolMeasuresTimer();
       if (activePoolMeasureDomainKeys().length) {
@@ -5607,10 +5638,21 @@
       return !!ep.value;
     }
 
-    function formatIoNumericValue(ep) {
+    const ioStaleValueAgeMs = 10000;
+
+    function formatIoNumericValue(ep, nowMs) {
       if (!ep || !ep.valid) return tr('io.unavailable', 'Indisponible');
       if (ep.value === null || ep.value === undefined) return '-';
-      return String(ep.value);
+      let text = String(ep.value);
+      const ts = Number(ep.ts);
+      const now = Number(nowMs);
+      if (Number.isFinite(ts) && Number.isFinite(now) && now >= ts) {
+        const age = now - ts;
+        if (age > ioStaleValueAgeMs) {
+          text += ' (' + fmtFlowRelativeAge(age) + ')';
+        }
+      }
+      return text;
     }
 
     function buildIoSnapshotCard(title) {
@@ -5626,6 +5668,7 @@
       if (!ioSnapshotGrid) return;
       ioSnapshotGrid.innerHTML = '';
       const endpoints = Array.isArray(data && data.endpoints) ? data.endpoints : [];
+      const deviceNowMs = Number(data && data.now);
 
       if (!endpoints.length) {
         const empty = document.createElement('div');
@@ -5657,7 +5700,7 @@
         const numericRows = [];
         inputs.forEach((ep) => {
           if (ep.valid && ep.type !== 'bool') {
-            numericRows.push([ioEndpointLabel(ep), formatIoNumericValue(ep)]);
+            numericRows.push([ioEndpointLabel(ep), formatIoNumericValue(ep, deviceNowMs)]);
             return;
           }
           tiles.push(buildFlowReadonlyStateTile(
@@ -5684,7 +5727,7 @@
         const kv = document.createElement('div');
         kv.className = 'status-kv';
         analogs.forEach((ep) => {
-          appendFlowStatusRow(kv, ioEndpointLabel(ep) + ' [' + String(ep.backend || '?') + ']', formatIoNumericValue(ep));
+          appendFlowStatusRow(kv, ioEndpointLabel(ep) + ' [' + String(ep.backend || '?') + ']', formatIoNumericValue(ep, deviceNowMs));
         });
         card.appendChild(kv);
         ioSnapshotGrid.appendChild(card);
