@@ -17,6 +17,7 @@
       <nav class="menu-group">
         <button class="menu-item active" data-page="page-pool-measures"><span class="ico icon-measures" aria-hidden="true"></span><span class="label" data-i18n="menu.dashboard">Tableau de bord</span></button>
         <button class="menu-item" data-page="page-calibration"><span class="ico icon-calibration" aria-hidden="true"></span><span class="label" data-i18n="menu.calibration">Étalonnage</span></button>
+        <button class="menu-item" data-page="page-io"><span class="ico icon-io" aria-hidden="true"></span><span class="label" data-i18n="menu.io">Entrées / Sorties</span></button>
         <button class="menu-item" data-page="page-terminal"><span class="ico icon-terminal" aria-hidden="true"></span><span class="label" data-i18n="menu.terminal">Journal d’activité</span></button>
         <button class="menu-item" data-page="page-system"><span class="ico icon-system" aria-hidden="true"></span><span class="label" data-i18n="menu.updates">Mises à Jour</span></button>
         <button class="menu-item" data-page="page-control"><span class="ico icon-flowcfg" aria-hidden="true"></span><span class="label" data-i18n="menu.config">Configuration</span></button>
@@ -305,6 +306,20 @@
             </section>
           </div>
         </div>
+      </section>
+
+      <section id="page-io" class="page">
+        <div class="topbar">
+          <h1 class="ui-heading-inline"><span class="ui-msr" aria-hidden="true">cable</span><span data-i18n="menu.io">Entrées / Sorties</span></h1>
+          <div class="topbar-actions">
+            <span id="ioSnapshotAge" class="status-chip" hidden></span>
+            <button id="ioSnapshotRefresh" class="btn-tonal btn-icon-only btn-refresh-icon" aria-label="Rafraîchir les entrées/sorties" title="Rafraîchir les entrées/sorties" data-i18n-aria-label="io.refresh" data-i18n-title="io.refresh"><span class="refresh-icon-glyph" aria-hidden="true"></span></button>
+          </div>
+        </div>
+        <div class="measure-results-shell">
+          <div id="ioSnapshotGrid" class="status-grid measure-status-grid"></div>
+        </div>
+        <div id="ioSnapshotStatus" class="config-status" data-i18n="io.loading">Chargement des entrées/sorties...</div>
       </section>
 
       <section id="page-control" class="page">

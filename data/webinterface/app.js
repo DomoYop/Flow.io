@@ -32,6 +32,7 @@
     const remoteMenuIconLigatures = {
       'icon-measures': 'water_damage',
       'icon-calibration': 'science',
+      'icon-io': 'cable',
       'icon-terminal': 'list_alt',
       'icon-system': 'system_update_alt',
       'icon-flowcfg': 'settings',
@@ -1624,6 +1625,11 @@
       } else {
         stopPoolMeasuresTimer();
       }
+      if (pageId === 'page-io') {
+        schedulePageTask(pageId, pageToken, deferredHeavyMs, () => onIoPageShown());
+      } else {
+        stopIoSnapshotTimer();
+      }
       if (pageId === 'page-calibration') {
         schedulePageTask(pageId,
                          pageToken,
@@ -1759,6 +1765,10 @@
     const poolMeasuresDomains = document.getElementById('poolMeasuresDomains');
     const poolMeasuresStatus = document.getElementById('poolMeasuresStatus');
     const poolMeasuresGrid = document.getElementById('poolMeasuresGrid');
+    const ioSnapshotRefreshBtn = document.getElementById('ioSnapshotRefresh');
+    const ioSnapshotGrid = document.getElementById('ioSnapshotGrid');
+    const ioSnapshotStatus = document.getElementById('ioSnapshotStatus');
+    const ioSnapshotAgeChip = document.getElementById('ioSnapshotAge');
     const calibrationSensorSelect = document.getElementById('calibrationSensorSelect');
     const calibrationLoadBtn = document.getElementById('calibrationLoadBtn');
     const calibrationComputeBtn = document.getElementById('calibrationComputeBtn');
@@ -5573,6 +5583,194 @@
       }
     }
 
+    let ioSnapshotTimer = null;
+    let ioSnapshotLoading = false;
+    const ioSnapshotRefreshMs = 4000;
+
+    function ioEndpointCode(ep) {
+      const id = Number(ep && ep.id);
+      if (!Number.isFinite(id) || id < 0) return '';
+      if (id < 64) return 'd' + String(id).padStart(2, '0');
+      if (id < 192) return 'i' + String(id - 64).padStart(2, '0');
+      return 'a' + String(id - 192).padStart(2, '0');
+    }
+
+    function ioEndpointLabel(ep) {
+      const code = ioEndpointCode(ep);
+      const name = String(ep && ep.name ? ep.name : '').trim();
+      if (!name || name === code) return code || '-';
+      return code ? (code + ' · ' + name) : name;
+    }
+
+    function ioEndpointBoolState(ep) {
+      if (!ep || !ep.valid || ep.type !== 'bool') return null;
+      return !!ep.value;
+    }
+
+    function formatIoNumericValue(ep) {
+      if (!ep || !ep.valid) return tr('io.unavailable', 'Indisponible');
+      if (ep.value === null || ep.value === undefined) return '-';
+      return String(ep.value);
+    }
+
+    function buildIoSnapshotCard(title) {
+      const card = document.createElement('div');
+      card.className = 'status-card';
+      const heading = document.createElement('h3');
+      heading.textContent = title;
+      card.appendChild(heading);
+      return card;
+    }
+
+    function renderIoSnapshot(data) {
+      if (!ioSnapshotGrid) return;
+      ioSnapshotGrid.innerHTML = '';
+      const endpoints = Array.isArray(data && data.endpoints) ? data.endpoints : [];
+
+      if (!endpoints.length) {
+        const empty = document.createElement('div');
+        empty.className = 'measure-domain-empty';
+        empty.textContent = tr('io.empty', 'Aucun endpoint E/S exposé.');
+        ioSnapshotGrid.appendChild(empty);
+        return;
+      }
+
+      const outputs = endpoints.filter((ep) => ep && ep.kind === 'do');
+      const inputs = endpoints.filter((ep) => ep && ep.kind === 'di');
+      const analogs = endpoints.filter((ep) => ep && ep.kind === 'ai');
+
+      if (outputs.length) {
+        const card = buildIoSnapshotCard(tr('io.outputs', 'Sorties (relais)'));
+        const tiles = outputs.map((ep) => buildFlowReadonlyStateTile(
+          ioEndpointLabel(ep),
+          ioEndpointBoolState(ep),
+          { activeText: 'Marche', inactiveText: 'Arrêt' }
+        ));
+        const grid = buildFlowReadonlyStateGrid(tiles);
+        if (grid) card.appendChild(grid);
+        ioSnapshotGrid.appendChild(card);
+      }
+
+      if (inputs.length) {
+        const card = buildIoSnapshotCard(tr('io.inputs', 'Entrées binaires'));
+        const tiles = [];
+        const numericRows = [];
+        inputs.forEach((ep) => {
+          if (ep.valid && ep.type !== 'bool') {
+            numericRows.push([ioEndpointLabel(ep), formatIoNumericValue(ep)]);
+            return;
+          }
+          tiles.push(buildFlowReadonlyStateTile(
+            ioEndpointLabel(ep),
+            ioEndpointBoolState(ep),
+            { activeText: 'Actif', inactiveText: 'Inactif' }
+          ));
+        });
+        if (tiles.length) {
+          const grid = buildFlowReadonlyStateGrid(tiles);
+          if (grid) card.appendChild(grid);
+        }
+        if (numericRows.length) {
+          const kv = document.createElement('div');
+          kv.className = 'status-kv';
+          numericRows.forEach((row) => appendFlowStatusRow(kv, row[0], row[1]));
+          card.appendChild(kv);
+        }
+        ioSnapshotGrid.appendChild(card);
+      }
+
+      if (analogs.length) {
+        const card = buildIoSnapshotCard(tr('io.analog', 'Entrées analogiques'));
+        const kv = document.createElement('div');
+        kv.className = 'status-kv';
+        analogs.forEach((ep) => {
+          appendFlowStatusRow(kv, ioEndpointLabel(ep) + ' [' + String(ep.backend || '?') + ']', formatIoNumericValue(ep));
+        });
+        card.appendChild(kv);
+        ioSnapshotGrid.appendChild(card);
+      }
+
+      const byBackend = new Map();
+      endpoints.forEach((ep) => {
+        const key = String(ep && ep.backend ? ep.backend : '?');
+        let entry = byBackend.get(key);
+        if (!entry) {
+          entry = { total: 0, valid: 0 };
+          byBackend.set(key, entry);
+        }
+        entry.total += 1;
+        if (ep && ep.valid) entry.valid += 1;
+      });
+      if (byBackend.size) {
+        const card = buildIoSnapshotCard(tr('io.drivers', 'Capteurs / bus'));
+        const kv = document.createElement('div');
+        kv.className = 'status-kv';
+        byBackend.forEach((entry, backend) => {
+          const stateText = entry.valid > 0
+            ? tr('io.driver.ok', 'OK') + ' (' + entry.valid + '/' + entry.total + ')'
+            : tr('io.driver.noData', 'Aucune donnée') + ' (0/' + entry.total + ')';
+          appendFlowStatusRow(kv, backend, stateText);
+        });
+        card.appendChild(kv);
+        ioSnapshotGrid.appendChild(card);
+      }
+    }
+
+    function refreshIoSnapshotStatusLine(endpoints) {
+      if (!ioSnapshotStatus) return;
+      const counts = { do: 0, di: 0, ai: 0 };
+      (endpoints || []).forEach((ep) => {
+        if (ep && Object.prototype.hasOwnProperty.call(counts, ep.kind)) counts[ep.kind] += 1;
+      });
+      ioSnapshotStatus.textContent =
+        tr('io.outputs', 'Sorties (relais)') + ': ' + counts.do + ' | ' +
+        tr('io.inputs', 'Entrées binaires') + ': ' + counts.di + ' | ' +
+        tr('io.analog', 'Entrées analogiques') + ': ' + counts.ai;
+    }
+
+    async function refreshIoSnapshot() {
+      if (ioSnapshotLoading) return;
+      ioSnapshotLoading = true;
+      try {
+        const data = await fetchOkJson(
+          '/api/io/snapshot',
+          { cache: 'no-store' },
+          'lecture E/S indisponible'
+        );
+        renderIoSnapshot(data);
+        refreshIoSnapshotStatusLine(data && data.endpoints);
+        if (ioSnapshotAgeChip) {
+          ioSnapshotAgeChip.textContent = new Date().toLocaleTimeString();
+          ioSnapshotAgeChip.hidden = false;
+        }
+      } catch (err) {
+        if (ioSnapshotStatus) {
+          ioSnapshotStatus.textContent = tr('io.error', 'Lecture E/S échouée') + ': ' + err;
+        }
+      } finally {
+        ioSnapshotLoading = false;
+      }
+    }
+
+    function stopIoSnapshotTimer() {
+      if (!ioSnapshotTimer) return;
+      clearInterval(ioSnapshotTimer);
+      ioSnapshotTimer = null;
+    }
+
+    function startIoSnapshotTimer() {
+      stopIoSnapshotTimer();
+      ioSnapshotTimer = setInterval(() => {
+        if (document.hidden || !isPageActive('page-io')) return;
+        refreshIoSnapshot();
+      }, ioSnapshotRefreshMs);
+    }
+
+    async function onIoPageShown() {
+      await refreshIoSnapshot();
+      startIoSnapshotTimer();
+    }
+
     async function onUpgradePageShown() {
       renderUpgradeJourney(readUpgradeUiSession() || { phase: 'idle', target: '', detail: tr('updates.none', 'Aucune opération en cours.') });
       renderUpgradeCatalog();
@@ -9305,6 +9503,9 @@
         } catch (err) {
           flowStatusChip.textContent = 'erreur lecture statut';
         }
+      });
+      bindClickAction(ioSnapshotRefreshBtn, async () => {
+        await refreshIoSnapshot();
       });
       bindClickAction(poolMeasuresRefreshBtn, async () => {
         try {

@@ -2775,6 +2775,84 @@ void sendFlowios3AlarmDashboardSlotsResponse_(AsyncResponseStream& response,
         firstSlot = false;
     }
 }
+
+const char* flowios3IoBackendName_(uint8_t backend)
+{
+    switch (backend) {
+        case IO_BACKEND_GPIO: return "GPIO";
+        case IO_BACKEND_PCF8574: return "PCF8574";
+        case IO_BACKEND_ADS1115_INT: return "ADS1115 int";
+        case IO_BACKEND_ADS1115_EXT_DIFF: return "ADS1115 ext";
+        case IO_BACKEND_DS18B20: return "DS18B20";
+        case IO_BACKEND_SHT40: return "SHT40";
+        case IO_BACKEND_BMP280: return "BMP280";
+        case IO_BACKEND_BME680: return "BME680";
+        case IO_BACKEND_INA226: return "INA226";
+        case IO_BACKEND_TCA9554: return "TCA9554";
+        default: return "?";
+    }
+}
+
+void sendFlowios3IoSnapshotResponse_(AsyncResponseStream& response, const IOServiceV2* ioSvc)
+{
+    response.print("{\"ok\":true,\"now\":");
+    response.print((unsigned long)millis());
+    response.print(",\"endpoints\":[");
+    bool first = true;
+    if (ioSvc && ioSvc->count && ioSvc->idAt && ioSvc->meta && ioSvc->readValue) {
+        const uint8_t count = ioSvc->count(ioSvc->ctx);
+        for (uint8_t i = 0U; i < count; ++i) {
+            IoId ioId = IO_ID_INVALID;
+            if (ioSvc->idAt(ioSvc->ctx, i, &ioId) != IO_OK) continue;
+            IoEndpointMeta meta{};
+            if (ioSvc->meta(ioSvc->ctx, ioId, &meta) != IO_OK) continue;
+
+            IoValue value{};
+            const bool readOk = ioSvc->readValue(ioSvc->ctx, ioId, &value) == IO_OK;
+            const bool valid = readOk && value.valid != 0U;
+
+            if (!first) response.print(',');
+            response.print("{\"id\":");
+            response.print((unsigned)ioId);
+            response.print(",\"kind\":\"");
+            response.print(meta.kind == IO_KIND_DIGITAL_OUT ? "do" : (meta.kind == IO_KIND_DIGITAL_IN ? "di" : "ai"));
+            response.print("\",\"name\":");
+            printJsonEscaped_(response, meta.name);
+            response.print(",\"backend\":\"");
+            response.print(flowios3IoBackendName_(meta.backend));
+            response.print("\",\"ch\":");
+            response.print((unsigned)meta.channel);
+            response.print(",\"writable\":");
+            response.print((meta.capabilities & IO_CAP_W) ? "true" : "false");
+            response.print(",\"valid\":");
+            response.print(valid ? "true" : "false");
+            if (valid) {
+                if (value.type == IO_VAL_BOOL) {
+                    response.print(",\"type\":\"bool\",\"value\":");
+                    response.print(value.v.b ? "true" : "false");
+                } else if (value.type == IO_VAL_INT32) {
+                    response.print(",\"type\":\"int\",\"value\":");
+                    response.print((long)value.v.i32);
+                } else {
+                    response.print(",\"type\":\"float\",\"value\":");
+                    if (isfinite(value.v.f)) {
+                        char buf[24] = {0};
+                        snprintf(buf, sizeof(buf), "%.3f", (double)value.v.f);
+                        flowios3TrimDashboardSlotFloat_(buf);
+                        response.print(buf);
+                    } else {
+                        response.print("null");
+                    }
+                }
+                response.print(",\"ts\":");
+                response.print((unsigned long)value.tsMs);
+            }
+            response.print('}');
+            first = false;
+        }
+    }
+    response.print("]}");
+}
 #endif
 
 bool parseRuntimeUiIdsCsv_(const char* raw, RuntimeUiId* idsOut, size_t capacity, size_t& countOut)
@@ -5541,6 +5619,23 @@ void WebInterfaceModule::startServer_()
 #endif
         response->print("]}");
         request->send(response);
+    });
+
+    server_.on("/api/io/snapshot", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/io/snapshot");
+        LOGD("runtime.call route=/api/io/snapshot");
+#if defined(FLOW_PROFILE_FLOWIOS3)
+        if (!ioSvc_ && services_) {
+            ioSvc_ = services_->get<IOServiceV2>(ServiceId::Io);
+        }
+        AsyncResponseStream* response = request->beginResponseStream("application/json");
+        addNoCacheHeaders_(response);
+        sendFlowios3IoSnapshotResponse_(*response, ioSvc_);
+        request->send(response);
+#else
+        request->send(503, "application/json",
+                      "{\"ok\":false,\"err\":{\"code\":\"Disabled\",\"where\":\"io.snapshot.disabled\"}}");
+#endif
     });
 
     server_.on("/api/runtime/values", HTTP_GET, [this](AsyncWebServerRequest* request) {
