@@ -60,7 +60,10 @@ public:
     void init(ConfigStore& cfg, ServiceRegistry& services) override;
     void onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services) override;
     void loop() override;
-    uint16_t taskStackSize() const override { return 2560; }
+    // 4096 (au lieu de 2560) : la comptabilite jour/semaine (computeAccountingDate_
+    // -> weekStartMondayFromConfig_ : toJsonModule + deserializeJson + mktime/localtime_r)
+    // est gourmande en pile et faisait deborder le canari de la tache pooldev au boot.
+    uint16_t taskStackSize() const override { return 4096; }
     uint32_t startDelayMs() const override {
 #if defined(FLOW_PROFILE_FLOWIOS3)
         return 5000U;
