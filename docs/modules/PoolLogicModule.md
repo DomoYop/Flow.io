@@ -108,7 +108,7 @@ En mode `Chlore/Brome`, la pompe de désinfection est pilotée par le PID ORP: s
 
 En mode `Oxygène actif`, la même sortie de pompe de désinfection est pilotée autrement:
 - la sonde ORP n'est pas utilisée pour décider l'injection
-- `orp_auto_mode` et les paramètres PID ORP ne déclenchent pas la pompe
+- `dis_auto_mode` et les paramètres PID de désinfection liquide ne déclenchent pas la pompe
 - la pompe injecte le volume O2 restant à doser (`pending_ml`)
 - la filtration est demandée automatiquement quand une dose O2 est en attente
 
@@ -202,7 +202,7 @@ Exemple avec une pompe à `1.5 L/h`:
 
 ### Paramètres à régler
 
-Dans `poollogic/mode`:
+Dans `poollogic/modes`:
 
 - `disinfection_type`: choisir `Oxygène actif`
 - `auto_mode`: doit être actif pour que Flow.io pilote le protocole
@@ -291,14 +291,19 @@ Après redémarrage, Flow.io ne repart donc pas aveuglément de zéro. Si une do
 Module config: `poollogic`
 Identité config: `moduleId = ConfigModuleId::PoolLogic`
 Branches locales utilisées:
-- `1`: `mode`
+- `1`: `modes`
 - `2`: `filtration`
 - `3`: `sensors`
-- `4`: `pid`
-- `5`: `delay`
-- `6`: `device`
-- `7`: `swg`
-- `8`: `o2`
+- `4`: `safety`
+- `5`: `regulation`
+- `6`: `ph`
+- `7`: `chlorine`
+- `8`: `swg`
+- `9`: `o2`
+- `10`: `devices`
+- `11`: `heater`
+- `12`: `robot`
+- `13`: `refill`
 
 Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 
@@ -307,17 +312,38 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 - `enabled`
 - `auto_mode`
 - `winter_mode`
-- `ph_auto_mode`
-- `orp_auto_mode`
 - `disinfection_type`
   - `0`: `Chlore/Brome`
   - `1`: `Electrolyse`
   - `2`: `Oxygène actif`
   - `3`: `Désactivé` (aucune désinfection automatique)
 
+### Régulation pH (`poollogic/ph`)
+
+- `ph_auto_mode`
+- `ph_dose_plus`
+- `ph_setpoint`
+- `ph_kp`, `ph_ki`, `ph_kd`
+- `ph_window_ms`
+
+### Désinfection chlore/brome liquide (`poollogic/chlorine`)
+
+- `dis_auto_mode`
+- `dis_setpoint`
+- `dis_kp`, `dis_ki`, `dis_kd`
+- `dis_window_ms`
+
+### Régulation commune (`poollogic/regulation`)
+
+- `dly_pid_min`
+- `pid_min_on_ms`
+- `pid_sample_ms`
+
 ### Paramètres électrolyse (`poollogic/swg`)
 
 - `swg_control_mode`
+- `secure_elec_t`
+- `dly_electro_min`
 
 ### Paramètres oxygène actif (`poollogic/o2`)
 
@@ -360,7 +386,7 @@ Les curseurs `protocol_state`, `last_dose_day`, `weekly_done_ml` et `pending_ml`
 ### Bindings capteurs IO
 
 - `ph_io_id`
-- `orp_io_id`
+- `dis_io_id`
 - `psi_io_id`
 - `wat_temp_io_id`
 - `air_temp_io_id`
@@ -368,40 +394,37 @@ Les curseurs `protocol_state`, `last_dose_day`, `weekly_done_ml` et `pending_ml`
 - `ph_lvl_io_id`
 - `chl_lvl_io_id`
 
-### Seuils métier
+### Sécurités (`poollogic/safety`)
 
 - `psi_low_th`
 - `psi_high_th`
+- `psi_start_dly_s`
 - `winter_start_t`
 - `freeze_hold_t`
-- `secure_elec_t`
-- `ph_setpoint`
-- `orp_setpoint`
 
-### PID pH / ORP (temporel)
+### Robot (`poollogic/robot`)
 
-- `ph_kp`, `ph_ki`, `ph_kd`
-- `orp_kp`, `orp_ki`, `orp_kd`
-- `ph_window_ms`
-- `orp_window_ms`
-- `pid_min_on_ms`
-- `pid_sample_ms`
-
-### Délais / temporisations
-
-- `psi_start_dly_s`
-- `delay_pids_min`
-- `dly_electro_min`
 - `robot_delay_min`
 - `robot_dur_min`
+
+### Remplissage (`poollogic/refill`)
+
 - `fill_min_on_s`
 
-### Slots équipements (PoolDevice)
+### Chauffage (`poollogic/heater`)
+
+- `heater_auto_mode`
+- `heater_setpoint`
+
+### Slots équipements (PoolDevice) (`poollogic/devices`)
 
 - `filtration_slot`
 - `swg_slot`
 - `robot_slot`
 - `filling_slot`
+- `ph_pump_slot`
+- `dis_pump_slot`
+- `heater_slot`
 
 ## Commandes
 
@@ -421,11 +444,11 @@ Commandes modes:
   - persiste et applique `ph_auto_mode`
 - `poollogic.ph_auto_mode.toggle`
   - inverse `ph_auto_mode`
-- `poollogic.orp_auto_mode.set`
+- `poollogic.dis_auto_mode.set` / alias `poollogic.orp_auto_mode.set`
   - args: `{"value":true|false}`
-  - persiste et applique `orp_auto_mode`
-- `poollogic.orp_auto_mode.toggle`
-  - inverse `orp_auto_mode`
+  - persiste et applique `dis_auto_mode`
+- `poollogic.dis_auto_mode.toggle` / alias `poollogic.orp_auto_mode.toggle`
+  - inverse `dis_auto_mode`
 - `poollogic.winter_mode.set`
   - args: `{"value":true|false}`
   - persiste et applique `winter_mode`
@@ -447,11 +470,11 @@ Commandes actionneurs:
 - `poollogic.ph_pump.toggle`
   - inverse l'état réel pompe pH
   - si passage ON, force `ph_auto_mode=false`
-- `poollogic.orp_pump.write`
+- `poollogic.dis_pump.write` / alias `poollogic.orp_pump.write`
   - args: `{"value":true|false}`
   - écrit la consigne de pompe ORP/chlore liquide
   - si `value=true`, force `disinfection_type=3` (`Désactivé`, aligné avec `pooldevice.write`)
-- `poollogic.orp_pump.toggle`
+- `poollogic.dis_pump.toggle` / alias `poollogic.orp_pump.toggle`
   - inverse l'état réel pompe ORP/chlore liquide
   - si passage ON, force `disinfection_type=3` (`Désactivé`)
 - `poollogic.light.write` / `poollogic.lights.write`
@@ -596,11 +619,11 @@ La régulation est implémentée dans `PoolLogicModule` avec deux états interne
 Le mode PID est autorisé seulement si:
 - filtration en marche
 - pas de mode hiver
-- délai de stabilisation atteint (`delay_pids_min`)
-- mode auto de la boucle activé (`ph_auto_mode` / `orp_auto_mode`)
+- délai de stabilisation atteint (`dly_pid_min`)
+- mode auto de la boucle activé (`ph_auto_mode` / `dis_auto_mode`)
 
 Le calcul et la commande sont ensuite conditionnés par:
-- capteur disponible (`ph_io_id` / `orp_io_id`)
+- capteur disponible (`ph_io_id` / `dis_io_id`)
 - pas de défaut PSI latched (`psiError_==false`)
 - pas de niveau bas cuve actif:
   - pH: `phTankLowError_==false`
@@ -611,7 +634,7 @@ Le calcul et la commande sont ensuite conditionnés par:
 
 - pH: `error = ph_input - ph_setpoint`
   - injection acide seulement si `error > 0`
-- ORP: `error = orp_setpoint - orp_input`
+- désinfection liquide: `error = dis_setpoint - orp_input`
   - injection chlore liquide seulement si `error > 0`
 
 ### Calcul périodique
@@ -629,7 +652,7 @@ Le calcul et la commande sont ensuite conditionnés par:
 
 ### Fenêtre temporelle (PWM temporel)
 
-Chaque boucle a une fenêtre cyclique fixe (`ph_window_ms` / `orp_window_ms`):
+Chaque boucle a une fenêtre cyclique fixe (`ph_window_ms` / `dis_window_ms`):
 - la fenêtre est avancée par pas de `window_ms`
 - `output_on_ms` représente la durée ON au début de la fenêtre
 - demande pompe:
@@ -714,14 +737,19 @@ Sémantique importante:
 
 Publication autoportée via `MqttConfigRouteProducer` local:
 - `cfg/poollogic` (agrégat base)
-- `cfg/poollogic/mode`
+- `cfg/poollogic/modes`
 - `cfg/poollogic/filtration`
 - `cfg/poollogic/sensors`
-- `cfg/poollogic/pid`
-- `cfg/poollogic/delay`
-- `cfg/poollogic/device`
+- `cfg/poollogic/safety`
+- `cfg/poollogic/regulation`
+- `cfg/poollogic/ph`
+- `cfg/poollogic/chlorine`
 - `cfg/poollogic/swg`
 - `cfg/poollogic/o2`
+- `cfg/poollogic/devices`
+- `cfg/poollogic/heater`
+- `cfg/poollogic/robot`
+- `cfg/poollogic/refill`
 
 Le mapping `ConfigChanged -> messageId -> topic` est local au module.
 
@@ -732,17 +760,17 @@ Entités enregistrées par `PoolLogicModule`:
   - `pool_auto_mode` (`Pool Auto-regulation`)
   - `pool_winter_mode`
   - `pool_ph_auto_mode` (`pH Auto-regulation`)
-  - `pool_orp_auto_mode` (`Orp Auto-regulation`)
+  - `pool_dis_auto_mode` (`Disinfection Auto-regulation`)
 - sensors:
   - `calculated_filtration_start`
   - `calculated_filtration_stop`
   - `heat_assist_status`
 - numbers (section configuration):
-  - `delay_pids_min`
+  - `dly_pid_min`
   - `ph_setpoint`
-  - `orp_setpoint`
+  - `dis_setpoint`
   - `ph_pid_window_min` (conversion vers `ph_window_ms`)
-  - `orp_pid_window_min` (conversion vers `orp_window_ms`)
+  - `dis_pid_window_min` (conversion vers `dis_window_ms`)
   - `psi_low_threshold`
   - `psi_high_threshold`
 - button:

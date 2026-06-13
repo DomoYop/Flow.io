@@ -15,10 +15,17 @@ inline constexpr DomainIoBinding kIoBindings[] = {
     {BoardSignal::Relay6, DomainRole::Lights},
     {BoardSignal::Relay7, DomainRole::FillPump},
     {BoardSignal::Relay8, DomainRole::WaterHeater},
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    {BoardSignal::DigitalIn1, DomainRole::PhLevelSensor},
+    {BoardSignal::DigitalIn2, DomainRole::ChlorineLevelSensor},
+    {BoardSignal::DigitalIn3, DomainRole::PoolLevelSensor},
+    {BoardSignal::DigitalIn4, DomainRole::WaterCounterSensor},
+#else
     {BoardSignal::DigitalIn1, DomainRole::WaterCounterSensor},
     {BoardSignal::DigitalIn2, DomainRole::PhLevelSensor},
     {BoardSignal::DigitalIn3, DomainRole::ChlorineLevelSensor},
     {BoardSignal::DigitalIn4, DomainRole::PoolLevelSensor},
+#endif
     {BoardSignal::AnalogIn1, DomainRole::OrpSensor},
     {BoardSignal::AnalogIn2, DomainRole::PhSensor},
     {BoardSignal::AnalogIn3, DomainRole::PsiSensor},

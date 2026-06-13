@@ -49,7 +49,6 @@ struct PoolDeviceRuntimeMetricsEntry {
 struct PoolDeviceSlotDescriptor {
     const char* id;
     const char* configModuleName;
-    const char* runtimeModuleName;
     const char* enabledKey;
     const char* dependsKey;
     const char* flowKey;

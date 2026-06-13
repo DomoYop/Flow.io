@@ -24,7 +24,6 @@
 #include "Core/Services/IFlowCfg.h"
 #include "Domain/Pool/PoolBehaviors.h"
 #include "Domain/Pool/PoolBindings.h"
-#include "Modules/IOModule/IOModuleTypes.h"
 
 #undef snprintf
 #define snprintf(OUT, LEN, FMT, ...) \
@@ -58,41 +57,6 @@ void requireSetup(bool ok, const char* step)
 bool mqttEnabledInPreferences(Preferences& prefs)
 {
     return prefs.getBool(NvsKeys::Mqtt::Enabled, false);
-}
-
-void seedFlowIos3DigitalOutputPolarityDefaults(Preferences& prefs)
-{
-    constexpr const char* kActiveHighKeys[] = {
-        NvsKeys::Io::IO_D0AH,
-        NvsKeys::Io::IO_D1AH,
-        NvsKeys::Io::IO_D2AH,
-        NvsKeys::Io::IO_D3AH,
-        NvsKeys::Io::IO_D4AH,
-        NvsKeys::Io::IO_D5AH,
-        NvsKeys::Io::IO_D6AH,
-        NvsKeys::Io::IO_D7AH,
-    };
-
-    for (const char* key : kActiveHighKeys) {
-        if (!prefs.isKey(key)) {
-            (void)prefs.putBool(key, false);
-        }
-    }
-}
-
-void seedFlowIos3DigitalInputPullDefaults(Preferences& prefs)
-{
-    constexpr const char* kPullModeKeys[] = {
-        NvsKeys::Io::IO_I0PU,
-        NvsKeys::Io::IO_I1PU,
-        NvsKeys::Io::IO_I2PU,
-    };
-
-    for (const char* key : kPullModeKeys) {
-        if (!prefs.isKey(key)) {
-            (void)prefs.putUChar(key, IO_PULL_UP);
-        }
-    }
 }
 
 bool buildNetworkSnapshot(MQTTModule* mqtt, char* out, size_t len)
@@ -175,6 +139,7 @@ void registerModules(AppContext& ctx, ModuleInstances& modules)
     ctx.moduleManager.add(&modules.commandModule);
     ctx.moduleManager.add(&modules.hmiUdpServerModule);
     ctx.moduleManager.add(&modules.hmiModule);
+    ctx.moduleManager.add(&modules.hmiBuzzerModule);
     ctx.moduleManager.add(&modules.alarmModule);
     ctx.moduleManager.add(&modules.ethernetModule);
     ctx.moduleManager.add(&modules.wifiModule);
@@ -271,8 +236,6 @@ void setupProfile(AppContext& ctx)
     ctx.preferences.begin(NvsKeys::StorageNamespace, false);
     ctx.registry.setPreferences(ctx.preferences);
     ctx.registry.runMigrations(CURRENT_CFG_VERSION, steps, MIGRATION_COUNT);
-    seedFlowIos3DigitalOutputPolarityDefaults(ctx.preferences);
-    seedFlowIos3DigitalInputPullDefaults(ctx.preferences);
 
     registerModules(ctx, modules);
     modules.hmiModule.setRemoteUdpServer(&modules.hmiUdpServerModule);

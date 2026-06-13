@@ -636,6 +636,12 @@
       "label_t": "cfgdocs.io.input.i00.counter_total.label",
       "help_t": "cfgdocs.io.input.i00.counter_total.help"
     },
+    "io/input/i00/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i00.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i00.counter_debounce_us.help",
+      "unit": "us"
+    },
     "io/input/i00/edge_mode": {
       "type": "UInt8",
       "label_t": "cfgdocs.io.input.i00.edge_mode.label",
@@ -678,6 +684,12 @@
       "type": "Float",
       "label_t": "cfgdocs.io.input.i01.counter_total.label",
       "help_t": "cfgdocs.io.input.i01.counter_total.help"
+    },
+    "io/input/i01/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i01.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i01.counter_debounce_us.help",
+      "unit": "us"
     },
     "io/input/i01/edge_mode": {
       "type": "UInt8",
@@ -722,6 +734,12 @@
       "label_t": "cfgdocs.io.input.i02.counter_total.label",
       "help_t": "cfgdocs.io.input.i02.counter_total.help"
     },
+    "io/input/i02/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i02.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i02.counter_debounce_us.help",
+      "unit": "us"
+    },
     "io/input/i02/edge_mode": {
       "type": "UInt8",
       "label_t": "cfgdocs.io.input.i02.edge_mode.label",
@@ -764,6 +782,12 @@
       "type": "Float",
       "label_t": "cfgdocs.io.input.i03.counter_total.label",
       "help_t": "cfgdocs.io.input.i03.counter_total.help"
+    },
+    "io/input/i03/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i03.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i03.counter_debounce_us.help",
+      "unit": "us"
     },
     "io/input/i03/edge_mode": {
       "type": "UInt8",
@@ -808,6 +832,12 @@
       "label_t": "cfgdocs.io.input.i04.counter_total.label",
       "help_t": "cfgdocs.io.input.i04.counter_total.help"
     },
+    "io/input/i04/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i04.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i04.counter_debounce_us.help",
+      "unit": "us"
+    },
     "io/input/i04/edge_mode": {
       "type": "UInt8",
       "label_t": "cfgdocs.io.input.i04.edge_mode.label",
@@ -850,6 +880,12 @@
       "type": "Float",
       "label_t": "cfgdocs.io.input.i05.counter_total.label",
       "help_t": "cfgdocs.io.input.i05.counter_total.help"
+    },
+    "io/input/i05/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i05.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i05.counter_debounce_us.help",
+      "unit": "us"
     },
     "io/input/i05/edge_mode": {
       "type": "UInt8",
@@ -894,6 +930,12 @@
       "label_t": "cfgdocs.io.input.i06.counter_total.label",
       "help_t": "cfgdocs.io.input.i06.counter_total.help"
     },
+    "io/input/i06/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i06.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i06.counter_debounce_us.help",
+      "unit": "us"
+    },
     "io/input/i06/edge_mode": {
       "type": "UInt8",
       "label_t": "cfgdocs.io.input.i06.edge_mode.label",
@@ -936,6 +978,12 @@
       "type": "Float",
       "label_t": "cfgdocs.io.input.i07.counter_total.label",
       "help_t": "cfgdocs.io.input.i07.counter_total.help"
+    },
+    "io/input/i07/counter_debounce_us": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.i07.counter_debounce_us.label",
+      "help_t": "cfgdocs.io.input.i07.counter_debounce_us.help",
+      "unit": "us"
     },
     "io/input/i07/edge_mode": {
       "type": "UInt8",

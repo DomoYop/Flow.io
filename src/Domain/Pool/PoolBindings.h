@@ -69,10 +69,17 @@ inline constexpr PoolSensorBinding kSensorBindings[kSensorBindingCount] = {
     {PoolDomain::kSensors[3].legacySlot, POOL_SENSOR_KIND_ANALOG, (IoId)(IO_ID_AI_BASE + 3), PoolDomain::kSensors[3].endpointId, PoolDomain::kSensors[3].displayName, PoolDomain::kSensors[3].runtimeIndex},
     {PoolDomain::kSensors[4].legacySlot, POOL_SENSOR_KIND_ANALOG, (IoId)(IO_ID_AI_BASE + 4), PoolDomain::kSensors[4].endpointId, PoolDomain::kSensors[4].displayName, PoolDomain::kSensors[4].runtimeIndex},
     {PoolDomain::kSensors[5].legacySlot, POOL_SENSOR_KIND_ANALOG, (IoId)(IO_ID_AI_BASE + 5), PoolDomain::kSensors[5].endpointId, PoolDomain::kSensors[5].displayName, PoolDomain::kSensors[5].runtimeIndex},
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    {PoolDomain::kSensors[6].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 2), PoolDomain::kSensors[6].endpointId, PoolDomain::kSensors[6].displayName, PoolDomain::kSensors[6].runtimeIndex},
+    {PoolDomain::kSensors[7].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 0), PoolDomain::kSensors[7].endpointId, PoolDomain::kSensors[7].displayName, PoolDomain::kSensors[7].runtimeIndex},
+    {PoolDomain::kSensors[8].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 1), PoolDomain::kSensors[8].endpointId, PoolDomain::kSensors[8].displayName, PoolDomain::kSensors[8].runtimeIndex},
+    {PoolDomain::kSensors[9].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 3), PoolDomain::kSensors[9].endpointId, PoolDomain::kSensors[9].displayName, PoolDomain::kSensors[9].runtimeIndex},
+#else
     {PoolDomain::kSensors[6].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 0), PoolDomain::kSensors[6].endpointId, PoolDomain::kSensors[6].displayName, PoolDomain::kSensors[6].runtimeIndex},
     {PoolDomain::kSensors[7].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 1), PoolDomain::kSensors[7].endpointId, PoolDomain::kSensors[7].displayName, PoolDomain::kSensors[7].runtimeIndex},
     {PoolDomain::kSensors[8].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 2), PoolDomain::kSensors[8].endpointId, PoolDomain::kSensors[8].displayName, PoolDomain::kSensors[8].runtimeIndex},
     {PoolDomain::kSensors[9].legacySlot, POOL_SENSOR_KIND_DIGITAL, (IoId)(IO_ID_DI_BASE + 3), PoolDomain::kSensors[9].endpointId, PoolDomain::kSensors[9].displayName, PoolDomain::kSensors[9].runtimeIndex},
+#endif
 };
 
 inline constexpr const PoolIoBinding* ioBindingBySlot(uint8_t slot)

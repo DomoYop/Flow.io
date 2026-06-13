@@ -69,12 +69,25 @@ constexpr FlowIoAnalogHaSpec kAnalogHaSpecs[kFlowIoAnalogHaSlots] = {
     {nullptr, nullptr, "mdi:sine-wave", nullptr},
 };
 
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+constexpr FlowIoDigitalHaSpec kDigitalHaSpecs[] = {
+    {0, "io_ph_lvl", "pH Level", "mdi:flask-outline", nullptr},
+    {1, "io_dis_lvl", "Disinfectant Level", "mdi:test-tube", nullptr},
+    {2, "io_pool_lvl", "Pool Level", "mdi:waves-arrow-up", nullptr},
+    {3, "io_wat_cnt", "Water Counter", "mdi:water-sync", "L"},
+    {4, "io_di5", "Digital Input 5", "mdi:electric-switch", nullptr},
+    {5, "io_di6", "Digital Input 6", "mdi:electric-switch", nullptr},
+    {6, "io_di7", "Digital Input 7", "mdi:electric-switch", nullptr},
+    {7, "io_di8", "Digital Input 8", "mdi:electric-switch", nullptr},
+};
+#else
 constexpr FlowIoDigitalHaSpec kDigitalHaSpecs[] = {
     {0, "io_pool_lvl", "Pool Level", "mdi:waves-arrow-up", nullptr},
     {1, "io_ph_lvl", "pH Level", "mdi:flask-outline", nullptr},
     {2, "io_chl_lvl", "Chlorine Level", "mdi:test-tube", nullptr},
     {3, "io_wat_cnt", "Water Counter", "mdi:water-sync", "L"},
 };
+#endif
 
 struct FlowIoDiscoveryHeap {
     char analogObjectSuffix[kFlowIoAnalogHaSlots][24]{};
@@ -172,6 +185,21 @@ uint8_t digitalInputOrdinalFromPort(PhysicalPortId port)
     }
 }
 
+PhysicalPortId digitalInputPortFromOrdinal(uint8_t ordinal)
+{
+    switch (ordinal) {
+        case 1: return FlowIoLayout::PortDigitalIn1;
+        case 2: return FlowIoLayout::PortDigitalIn2;
+        case 3: return FlowIoLayout::PortDigitalIn3;
+        case 4: return FlowIoLayout::PortDigitalIn4;
+        case 5: return FlowIoLayout::PortDigitalIn5;
+        case 6: return FlowIoLayout::PortDigitalIn6;
+        case 7: return FlowIoLayout::PortDigitalIn7;
+        case 8: return FlowIoLayout::PortDigitalIn8;
+        default: return IO_PORT_INVALID;
+    }
+}
+
 uint8_t exioOrdinalFromPort(PhysicalPortId port)
 {
     switch (port) {
@@ -221,11 +249,26 @@ void applyDigitalDefaultsForRole(DomainRole role, IODigitalInputDefinition& def)
 const char* waveshareDigitalInputNameForRole(DomainRole role)
 {
     switch (role) {
-        case DomainRole::PoolLevelSensor: return "Pool Level";
-        case DomainRole::PhLevelSensor: return "pH Level";
-        case DomainRole::ChlorineLevelSensor: return "Chlorine Level";
-        case DomainRole::WaterCounterSensor: return "Water Meter";
+        case DomainRole::PoolLevelSensor: return "DigitalInput3 Piscine";
+        case DomainRole::PhLevelSensor: return "DigitalInput1 pH";
+        case DomainRole::ChlorineLevelSensor: return "DigitalInput2 Desinf";
+        case DomainRole::WaterCounterSensor: return "DigitalInput4 Compteur Eau";
         default: return nullptr;
+    }
+}
+
+const char* waveshareDigitalInputNameForLogical(uint8_t logicalIdx)
+{
+    switch (logicalIdx) {
+        case 0: return "DigitalInput1 pH";
+        case 1: return "DigitalInput2 Desinf";
+        case 2: return "DigitalInput3 Piscine";
+        case 3: return "DigitalInput4 Compteur Eau";
+        case 4: return "DigitalInput5 Unused";
+        case 5: return "DigitalInput6 Unused";
+        case 6: return "DigitalInput7 Unused";
+        case 7: return "DigitalInput8 Unused";
+        default: return "DigitalInput Unused";
     }
 }
 #endif
@@ -479,7 +522,21 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         requireSetup(modules.ioModule.defineAnalogInput(def), "define analog input");
     }
 
-#if !defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    for (uint8_t i = 0; i < 8; ++i) {
+        if (modules.ioModule.digitalInputSlotUsed(i)) continue;
+        IODigitalInputDefinition def{};
+        snprintf(def.id, sizeof(def.id), "%s", waveshareDigitalInputNameForLogical(i));
+        def.ioId = (IoId)(IO_ID_DI_BASE + i);
+        def.activeHigh = false;
+        def.pullMode = IO_PULL_UP;
+        def.mode = IO_DIGITAL_INPUT_STATE;
+        def.edgeMode = IO_EDGE_RISING;
+        def.counterDebounceUs = 0U;
+        def.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
+        requireSetup(modules.ioModule.defineDigitalInput(def), "define waveshare digital input");
+    }
+#else
     for (uint8_t i = 4; i < 8; ++i) {
         IODigitalInputDefinition def{};
         snprintf(def.id, sizeof(def.id), "DI Pin %u", (unsigned)(i + 1));
@@ -489,10 +546,7 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         def.mode = IO_DIGITAL_INPUT_STATE;
         def.edgeMode = IO_EDGE_RISING;
         def.counterDebounceUs = 0U;
-        def.bindingPort = (i == 4) ? FlowIoLayout::PortDigitalIn5 :
-                         (i == 5) ? FlowIoLayout::PortDigitalIn6 :
-                         (i == 6) ? FlowIoLayout::PortDigitalIn7 :
-                                    FlowIoLayout::PortDigitalIn8;
+        def.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
         requireSetup(modules.ioModule.defineDigitalInput(def), "define extra digital input");
     }
 #endif

@@ -19,14 +19,19 @@ namespace {
 // The aggregated cfg payload republishes the same branch split used by the
 // config routes so MQTT consumers can fetch one coherent snapshot.
 static constexpr const char* kPoolLogicCfgTopicBase = "cfg/poollogic";
-static constexpr const char* kCfgModuleMode = "poollogic/mode";
+static constexpr const char* kCfgModuleModes = "poollogic/modes";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
-static constexpr const char* kCfgModulePid = "poollogic/pid";
-static constexpr const char* kCfgModuleDelay = "poollogic/delay";
-static constexpr const char* kCfgModuleDevice = "poollogic/device";
+static constexpr const char* kCfgModuleSafety = "poollogic/safety";
+static constexpr const char* kCfgModuleRegulation = "poollogic/regulation";
+static constexpr const char* kCfgModulePh = "poollogic/ph";
+static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
 static constexpr const char* kCfgModuleSwg = "poollogic/swg";
 static constexpr const char* kCfgModuleO2 = "poollogic/o2";
+static constexpr const char* kCfgModuleDevices = "poollogic/devices";
+static constexpr const char* kCfgModuleHeater = "poollogic/heater";
+static constexpr const char* kCfgModuleRobot = "poollogic/robot";
+static constexpr const char* kCfgModuleRefill = "poollogic/refill";
 }
 
 MqttBuildResult PoolLogicModule::buildCfgBaseStatic_(void* ctx, uint16_t, MqttBuildContext& buildCtx)
@@ -61,14 +66,19 @@ MqttBuildResult PoolLogicModule::buildCfgBase_(MqttBuildContext& buildCtx)
         const char* moduleName;
     };
     static constexpr Entry kEntries[] = {
-        {"mode", kCfgModuleMode},
+        {"modes", kCfgModuleModes},
         {"filtration", kCfgModuleFiltration},
         {"sensors", kCfgModuleSensors},
-        {"pid", kCfgModulePid},
-        {"delay", kCfgModuleDelay},
-        {"device", kCfgModuleDevice},
+        {"safety", kCfgModuleSafety},
+        {"regulation", kCfgModuleRegulation},
+        {"ph", kCfgModulePh},
+        {"chlorine", kCfgModuleChlorine},
         {"swg", kCfgModuleSwg},
         {"o2", kCfgModuleO2},
+        {"devices", kCfgModuleDevices},
+        {"heater", kCfgModuleHeater},
+        {"robot", kCfgModuleRobot},
+        {"refill", kCfgModuleRefill},
     };
 
     buildCtx.payload[0] = '{';

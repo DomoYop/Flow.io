@@ -45,7 +45,7 @@ constexpr uint8_t EventSubscribersMax = 50;
 namespace Core {
 namespace Capacity {
 /** @brief Maximum number of modules registered in `ModuleManager`. */
-constexpr size_t MaxModules = 25;
+constexpr size_t MaxModules = 28;
 /** @brief Maximum number of declared tasks tracked by `ModuleManager`. */
 constexpr size_t MaxModuleTasks = 32;
 }  // namespace Capacity
@@ -304,7 +304,6 @@ constexpr uint8_t MaxSwitches = BoardCapacityProfile::kHaCapacity.switches;
 constexpr uint8_t MaxNumbers = BoardCapacityProfile::kHaCapacity.numbers;
 constexpr uint8_t MaxButtons = BoardCapacityProfile::kHaCapacity.buttons;
 constexpr uint8_t MaxSelects = BoardCapacityProfile::kHaCapacity.selects;
-constexpr uint8_t MaxDiscoveryCleanups = BoardCapacityProfile::kHaCapacity.discoveryCleanups;
 
 static_assert(MaxSensors > 0, "HA sensors capacity must be at least 1");
 static_assert(MaxBinarySensors > 0, "HA binarySensors capacity must be at least 1");
@@ -312,7 +311,6 @@ static_assert(MaxSwitches > 0, "HA switches capacity must be at least 1");
 static_assert(MaxNumbers > 0, "HA numbers capacity must be at least 1");
 static_assert(MaxButtons > 0, "HA buttons capacity must be at least 1");
 static_assert(MaxSelects > 0, "HA selects capacity must be at least 1");
-static_assert(MaxDiscoveryCleanups > 0, "HA cleanup capacity must be at least 1");
 }  // namespace Capacity
 
 namespace Timing {

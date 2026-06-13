@@ -8,7 +8,7 @@ WebSocket ni JSON côté `FlowIO`.
 ## Profils
 
 - `FlowIO` garde le `NextionDriver` local par défaut.
-- `FlowIO` peut utiliser le driver distant avec `hmi/fcd_udp/enabled=true`
+- `FlowIO` peut utiliser le driver distant avec `hmi/nextion_udp/enabled=true`
   ou le define `FLOW_HMI_REMOTE_UDP=1`.
 - `FlowConnectDisplay` contient seulement Wi-Fi, logs série, config minimale,
   `NextionDriver` et `FlowConnectDisplayUdpClientModule`.
@@ -80,7 +80,7 @@ Quand `Welcome.accepted=1` est reçu, `FlowConnectDisplay` affiche `tFConnectSta
 
 ## Token
 
-Le token partagé optionnel côté `FlowIO` est configuré dans `hmi/fcd_udp/token`.
+Le token partagé optionnel côté `FlowIO` est configuré dans `hmi/nextion_udp/token`.
 Côté `FlowConnectDisplay`, il est configuré dans `fcd/udp/token`. Il n'est
 jamais envoyé en clair: `FlowConnectDisplay` place seulement `tokenCrc` dans
 `Hello`. Si le token `FlowIO` est vide, tout Flow Connect Display est accepté;

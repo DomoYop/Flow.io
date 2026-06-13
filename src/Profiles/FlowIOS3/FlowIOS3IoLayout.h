@@ -72,10 +72,14 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortIna226PowerMw, IO_PORT_KIND_INA226, 3, 0}, // INA226 puissance.
     {PortIna226LoadV, IO_PORT_KIND_INA226, 4, 0}, // INA226 tension charge.
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {PortDigitalIn1, IO_PORT_KIND_GPIO_INPUT, 7, 0}, // Compteur eau (GPIO7).
-    {PortDigitalIn2, IO_PORT_KIND_GPIO_INPUT, 4, 0}, // Niveau pH (GPIO4).
-    {PortDigitalIn3, IO_PORT_KIND_GPIO_INPUT, 5, 0}, // Niveau chlore (GPIO5).
-    {PortDigitalIn4, IO_PORT_KIND_GPIO_INPUT, 6, 0}, // Niveau piscine (GPIO6).
+    {PortDigitalIn1, IO_PORT_KIND_GPIO_INPUT, 4, 0}, // Niveau pH (GPIO4).
+    {PortDigitalIn2, IO_PORT_KIND_GPIO_INPUT, 5, 0}, // Niveau desinfectant (GPIO5).
+    {PortDigitalIn3, IO_PORT_KIND_GPIO_INPUT, 6, 0}, // Niveau piscine (GPIO6).
+    {PortDigitalIn4, IO_PORT_KIND_GPIO_INPUT, 7, 0}, // Compteur eau (GPIO7).
+    {PortDigitalIn5, IO_PORT_KIND_GPIO_INPUT, 8, 0}, // Non utilise (GPIO8).
+    {PortDigitalIn6, IO_PORT_KIND_GPIO_INPUT, 9, 0}, // Non utilise (GPIO9).
+    {PortDigitalIn7, IO_PORT_KIND_GPIO_INPUT, 10, 0}, // Non utilise (GPIO10).
+    {PortDigitalIn8, IO_PORT_KIND_GPIO_INPUT, 11, 0}, // Non utilise (GPIO11).
 #else
     {PortDigitalIn1, IO_PORT_KIND_GPIO_INPUT, 4, 0}, // Entree digitale 1 (GPIO4).
     {PortDigitalIn2, IO_PORT_KIND_GPIO_INPUT, 5, 0}, // Entree digitale 2 (GPIO5).
@@ -144,10 +148,10 @@ struct DigitalInputRoleDefault {
 inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {
     // {role, bindingPort, mode, edgeMode, debounceUs}
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {DomainRole::PoolLevelSensor, PortDigitalIn4, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine (GPIO6).
-    {DomainRole::PhLevelSensor, PortDigitalIn2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH (GPIO4).
-    {DomainRole::ChlorineLevelSensor, PortDigitalIn3, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore (GPIO5).
-    {DomainRole::WaterCounterSensor, PortDigitalIn1, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (GPIO7).
+    {DomainRole::PoolLevelSensor, PortDigitalIn3, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine (GPIO6).
+    {DomainRole::PhLevelSensor, PortDigitalIn1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH (GPIO4).
+    {DomainRole::ChlorineLevelSensor, PortDigitalIn2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau desinfectant (GPIO5).
+    {DomainRole::WaterCounterSensor, PortDigitalIn4, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (GPIO7, 100 ms debounce).
 #else
     {DomainRole::PoolLevelSensor, PortDigitalIn1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
     {DomainRole::PhLevelSensor, PortDigitalIn2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.

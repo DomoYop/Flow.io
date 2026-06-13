@@ -20,7 +20,6 @@ static void poolDeviceCfgDocsAnchor_(PoolDeviceModule& self)
     self.cfgTankCapVar_[0].jsonName = "tank_cap_ml";
     self.cfgTankInitVar_[0].jsonName = "tank_init_ml";
     self.cfgMaxUptimeVar_[0].jsonName = "max_uptime_day_s";
-    self.cfgRuntimeVar_[0].jsonName = "metrics_blob";
 
     self.cfgEnabledVar_[0].moduleName = "pdm/pd0";
     self.cfgEnabledVar_[1].moduleName = "pdm/pd1";
@@ -76,13 +75,5 @@ static void poolDeviceCfgDocsAnchor_(PoolDeviceModule& self)
     self.cfgMaxUptimeVar_[6].moduleName = "pdm/pd6";
     self.cfgMaxUptimeVar_[7].moduleName = "pdm/pd7";
 
-    self.cfgRuntimeVar_[0].moduleName = "pdmrt/pd0";
-    self.cfgRuntimeVar_[1].moduleName = "pdmrt/pd1";
-    self.cfgRuntimeVar_[2].moduleName = "pdmrt/pd2";
-    self.cfgRuntimeVar_[3].moduleName = "pdmrt/pd3";
-    self.cfgRuntimeVar_[4].moduleName = "pdmrt/pd4";
-    self.cfgRuntimeVar_[5].moduleName = "pdmrt/pd5";
-    self.cfgRuntimeVar_[6].moduleName = "pdmrt/pd6";
-    self.cfgRuntimeVar_[7].moduleName = "pdmrt/pd7";
 }
 #endif

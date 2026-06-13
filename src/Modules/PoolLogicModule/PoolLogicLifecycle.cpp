@@ -20,33 +20,48 @@ namespace {
 // routes used by HA, MQTT config sync, and tooling.
 static constexpr uint8_t kPoolLogicCfgProducerId = 44;
 static constexpr const char* kPoolLogicCfgTopicBase = "cfg/poollogic";
-static constexpr uint8_t kCfgBranchMode = 1;
+static constexpr uint8_t kCfgBranchModes = 1;
 static constexpr uint8_t kCfgBranchFiltration = 2;
 static constexpr uint8_t kCfgBranchSensors = 3;
-static constexpr uint8_t kCfgBranchPid = 4;
-static constexpr uint8_t kCfgBranchDelay = 5;
-static constexpr uint8_t kCfgBranchDevice = 6;
-static constexpr uint8_t kCfgBranchSwg = 7;
-static constexpr uint8_t kCfgBranchO2 = 8;
-static constexpr const char* kCfgModuleMode = "poollogic/mode";
+static constexpr uint8_t kCfgBranchSafety = 4;
+static constexpr uint8_t kCfgBranchRegulation = 5;
+static constexpr uint8_t kCfgBranchPh = 6;
+static constexpr uint8_t kCfgBranchChlorine = 7;
+static constexpr uint8_t kCfgBranchSwg = 8;
+static constexpr uint8_t kCfgBranchO2 = 9;
+static constexpr uint8_t kCfgBranchDevices = 10;
+static constexpr uint8_t kCfgBranchHeater = 11;
+static constexpr uint8_t kCfgBranchRobot = 12;
+static constexpr uint8_t kCfgBranchRefill = 13;
+static constexpr const char* kCfgModuleModes = "poollogic/modes";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
-static constexpr const char* kCfgModulePid = "poollogic/pid";
-static constexpr const char* kCfgModuleDelay = "poollogic/delay";
-static constexpr const char* kCfgModuleDevice = "poollogic/device";
+static constexpr const char* kCfgModuleSafety = "poollogic/safety";
+static constexpr const char* kCfgModuleRegulation = "poollogic/regulation";
+static constexpr const char* kCfgModulePh = "poollogic/ph";
+static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
 static constexpr const char* kCfgModuleSwg = "poollogic/swg";
 static constexpr const char* kCfgModuleO2 = "poollogic/o2";
+static constexpr const char* kCfgModuleDevices = "poollogic/devices";
+static constexpr const char* kCfgModuleHeater = "poollogic/heater";
+static constexpr const char* kCfgModuleRobot = "poollogic/robot";
+static constexpr const char* kCfgModuleRefill = "poollogic/refill";
 
 enum : uint16_t {
     kCfgMsgBase = 1,
-    kCfgMsgMode = 2,
+    kCfgMsgModes = 2,
     kCfgMsgFiltration = 3,
     kCfgMsgSensors = 4,
-    kCfgMsgPid = 5,
-    kCfgMsgDelay = 6,
-    kCfgMsgDevice = 7,
-    kCfgMsgSwg = 8,
-    kCfgMsgO2 = 9,
+    kCfgMsgSafety = 5,
+    kCfgMsgRegulation = 6,
+    kCfgMsgPh = 7,
+    kCfgMsgChlorine = 8,
+    kCfgMsgSwg = 9,
+    kCfgMsgO2 = 10,
+    kCfgMsgDevices = 11,
+    kCfgMsgHeater = 12,
+    kCfgMsgRobot = 13,
+    kCfgMsgRefill = 14,
 };
 
 static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
@@ -57,10 +72,10 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      (uint8_t)MqttPublishPriority::Normal,
      &PoolLogicModule::buildCfgBaseStatic_,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgMode,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchMode},
-     kCfgModuleMode,
-     "mode",
+    {kCfgMsgModes,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchModes},
+     kCfgModuleModes,
+     "modes",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
@@ -78,24 +93,31 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgPid,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchPid},
-     kCfgModulePid,
-     "pid",
+    {kCfgMsgSafety,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchSafety},
+     kCfgModuleSafety,
+     "safety",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgDelay,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchDelay},
-     kCfgModuleDelay,
-     "delay",
+    {kCfgMsgRegulation,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchRegulation},
+     kCfgModuleRegulation,
+     "regulation",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgDevice,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchDevice},
-     kCfgModuleDevice,
-     "device",
+    {kCfgMsgPh,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchPh},
+     kCfgModulePh,
+     "ph",
+     (uint8_t)MqttPublishPriority::Normal,
+     nullptr,
+     kPoolLogicCfgTopicBase},
+    {kCfgMsgChlorine,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchChlorine},
+     kCfgModuleChlorine,
+     "chlorine",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
@@ -113,6 +135,34 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
+    {kCfgMsgDevices,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchDevices},
+     kCfgModuleDevices,
+     "devices",
+     (uint8_t)MqttPublishPriority::Normal,
+     nullptr,
+     kPoolLogicCfgTopicBase},
+    {kCfgMsgHeater,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchHeater},
+     kCfgModuleHeater,
+     "heater",
+     (uint8_t)MqttPublishPriority::Normal,
+     nullptr,
+     kPoolLogicCfgTopicBase},
+    {kCfgMsgRobot,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchRobot},
+     kCfgModuleRobot,
+     "robot",
+     (uint8_t)MqttPublishPriority::Normal,
+     nullptr,
+     kPoolLogicCfgTopicBase},
+    {kCfgMsgRefill,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchRefill},
+     kCfgModuleRefill,
+     "refill",
+     (uint8_t)MqttPublishPriority::Normal,
+     nullptr,
+     kPoolLogicCfgTopicBase},
 };
 }
 
@@ -124,14 +174,14 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     // Runtime moduleName reassignment keeps the config tree grouped by branch
     // even though the variables are declared on a single facade class.
-    enabledVar_.moduleName = kCfgModuleMode;
-    autoModeVar_.moduleName = kCfgModuleMode;
-    winterModeVar_.moduleName = kCfgModuleMode;
-    phAutoModeVar_.moduleName = kCfgModuleMode;
-    orpAutoModeVar_.moduleName = kCfgModuleMode;
-    heaterAutoModeVar_.moduleName = kCfgModuleMode;
-    phDosePlusVar_.moduleName = kCfgModuleMode;
-    disinfectionTypeVar_.moduleName = kCfgModuleMode;
+    enabledVar_.moduleName = kCfgModuleModes;
+    autoModeVar_.moduleName = kCfgModuleModes;
+    winterModeVar_.moduleName = kCfgModuleModes;
+    phAutoModeVar_.moduleName = kCfgModulePh;
+    orpAutoModeVar_.moduleName = kCfgModuleChlorine;
+    heaterAutoModeVar_.moduleName = kCfgModuleHeater;
+    phDosePlusVar_.moduleName = kCfgModulePh;
+    disinfectionTypeVar_.moduleName = kCfgModuleModes;
     swgControlModeVar_.moduleName = kCfgModuleSwg;
 
     tempLowVar_.moduleName = kCfgModuleFiltration;
@@ -150,31 +200,31 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     phLevelIdVar_.moduleName = kCfgModuleSensors;
     chlorineLevelIdVar_.moduleName = kCfgModuleSensors;
 
-    psiLowVar_.moduleName = kCfgModulePid;
-    psiHighVar_.moduleName = kCfgModulePid;
-    winterStartVar_.moduleName = kCfgModulePid;
-    freezeHoldVar_.moduleName = kCfgModulePid;
-    secureElectroVar_.moduleName = kCfgModulePid;
-    phSetpointVar_.moduleName = kCfgModulePid;
-    orpSetpointVar_.moduleName = kCfgModulePid;
-    heaterSetpointVar_.moduleName = kCfgModulePid;
-    phKpVar_.moduleName = kCfgModulePid;
-    phKiVar_.moduleName = kCfgModulePid;
-    phKdVar_.moduleName = kCfgModulePid;
-    orpKpVar_.moduleName = kCfgModulePid;
-    orpKiVar_.moduleName = kCfgModulePid;
-    orpKdVar_.moduleName = kCfgModulePid;
-    phWindowMsVar_.moduleName = kCfgModulePid;
-    orpWindowMsVar_.moduleName = kCfgModulePid;
-    pidMinOnMsVar_.moduleName = kCfgModulePid;
-    pidSampleMsVar_.moduleName = kCfgModulePid;
+    psiLowVar_.moduleName = kCfgModuleSafety;
+    psiHighVar_.moduleName = kCfgModuleSafety;
+    winterStartVar_.moduleName = kCfgModuleSafety;
+    freezeHoldVar_.moduleName = kCfgModuleSafety;
+    secureElectroVar_.moduleName = kCfgModuleSwg;
+    phSetpointVar_.moduleName = kCfgModulePh;
+    orpSetpointVar_.moduleName = kCfgModuleChlorine;
+    heaterSetpointVar_.moduleName = kCfgModuleHeater;
+    phKpVar_.moduleName = kCfgModulePh;
+    phKiVar_.moduleName = kCfgModulePh;
+    phKdVar_.moduleName = kCfgModulePh;
+    orpKpVar_.moduleName = kCfgModuleChlorine;
+    orpKiVar_.moduleName = kCfgModuleChlorine;
+    orpKdVar_.moduleName = kCfgModuleChlorine;
+    phWindowMsVar_.moduleName = kCfgModulePh;
+    orpWindowMsVar_.moduleName = kCfgModuleChlorine;
+    pidMinOnMsVar_.moduleName = kCfgModuleRegulation;
+    pidSampleMsVar_.moduleName = kCfgModuleRegulation;
 
-    psiDelayVar_.moduleName = kCfgModuleDelay;
-    delayPidsVar_.moduleName = kCfgModuleDelay;
-    delayElectroVar_.moduleName = kCfgModuleDelay;
-    robotDelayVar_.moduleName = kCfgModuleDelay;
-    robotDurationVar_.moduleName = kCfgModuleDelay;
-    fillingMinOnVar_.moduleName = kCfgModuleDelay;
+    psiDelayVar_.moduleName = kCfgModuleSafety;
+    delayPidsVar_.moduleName = kCfgModuleRegulation;
+    delayElectroVar_.moduleName = kCfgModuleSwg;
+    robotDelayVar_.moduleName = kCfgModuleRobot;
+    robotDurationVar_.moduleName = kCfgModuleRobot;
+    fillingMinOnVar_.moduleName = kCfgModuleRefill;
 
     o2PoolVolumeVar_.moduleName = kCfgModuleO2;
     o2DoseVar_.moduleName = kCfgModuleO2;
@@ -188,25 +238,25 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     o2WeeklyDoneVar_.moduleName = kCfgModuleO2;
     o2PendingVar_.moduleName = kCfgModuleO2;
 
-    filtrationDeviceVar_.moduleName = kCfgModuleDevice;
-    swgDeviceVar_.moduleName = kCfgModuleDevice;
-    robotDeviceVar_.moduleName = kCfgModuleDevice;
-    fillingDeviceVar_.moduleName = kCfgModuleDevice;
-    phPumpDeviceVar_.moduleName = kCfgModuleDevice;
-    orpPumpDeviceVar_.moduleName = kCfgModuleDevice;
-    heaterDeviceVar_.moduleName = kCfgModuleDevice;
+    filtrationDeviceVar_.moduleName = kCfgModuleDevices;
+    swgDeviceVar_.moduleName = kCfgModuleDevices;
+    robotDeviceVar_.moduleName = kCfgModuleDevices;
+    fillingDeviceVar_.moduleName = kCfgModuleDevices;
+    phPumpDeviceVar_.moduleName = kCfgModuleDevices;
+    orpPumpDeviceVar_.moduleName = kCfgModuleDevices;
+    heaterDeviceVar_.moduleName = kCfgModuleDevices;
 
     // Registration order mirrors the published config branches so init remains
     // easy to diff against the generated cfgdocs and MQTT routes.
-    cfg.registerVar(enabledVar_, kCfgModuleId, kCfgBranchMode);
+    cfg.registerVar(enabledVar_, kCfgModuleId, kCfgBranchModes);
 
-    cfg.registerVar(autoModeVar_, kCfgModuleId, kCfgBranchMode);
-    cfg.registerVar(winterModeVar_, kCfgModuleId, kCfgBranchMode);
-    cfg.registerVar(phAutoModeVar_, kCfgModuleId, kCfgBranchMode);
-    cfg.registerVar(orpAutoModeVar_, kCfgModuleId, kCfgBranchMode);
-    cfg.registerVar(heaterAutoModeVar_, kCfgModuleId, kCfgBranchMode);
-    cfg.registerVar(phDosePlusVar_, kCfgModuleId, kCfgBranchMode);
-    cfg.registerVar(disinfectionTypeVar_, kCfgModuleId, kCfgBranchMode);
+    cfg.registerVar(autoModeVar_, kCfgModuleId, kCfgBranchModes);
+    cfg.registerVar(winterModeVar_, kCfgModuleId, kCfgBranchModes);
+    cfg.registerVar(phAutoModeVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(orpAutoModeVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(heaterAutoModeVar_, kCfgModuleId, kCfgBranchHeater);
+    cfg.registerVar(phDosePlusVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(disinfectionTypeVar_, kCfgModuleId, kCfgBranchModes);
     cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchSwg);
 
     cfg.registerVar(tempLowVar_, kCfgModuleId, kCfgBranchFiltration);
@@ -225,31 +275,31 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(phLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(chlorineLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
 
-    cfg.registerVar(psiLowVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(psiHighVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(winterStartVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(phSetpointVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(heaterSetpointVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(phKpVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(phKiVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(phKdVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(phWindowMsVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(pidMinOnMsVar_, kCfgModuleId, kCfgBranchPid);
-    cfg.registerVar(pidSampleMsVar_, kCfgModuleId, kCfgBranchPid);
+    cfg.registerVar(psiLowVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(psiHighVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(winterStartVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(phSetpointVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(heaterSetpointVar_, kCfgModuleId, kCfgBranchHeater);
+    cfg.registerVar(phKpVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phKiVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phKdVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(phWindowMsVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(pidMinOnMsVar_, kCfgModuleId, kCfgBranchRegulation);
+    cfg.registerVar(pidSampleMsVar_, kCfgModuleId, kCfgBranchRegulation);
 
-    cfg.registerVar(psiDelayVar_, kCfgModuleId, kCfgBranchDelay);
-    cfg.registerVar(delayPidsVar_, kCfgModuleId, kCfgBranchDelay);
-    cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchDelay);
-    cfg.registerVar(robotDelayVar_, kCfgModuleId, kCfgBranchDelay);
-    cfg.registerVar(robotDurationVar_, kCfgModuleId, kCfgBranchDelay);
-    cfg.registerVar(fillingMinOnVar_, kCfgModuleId, kCfgBranchDelay);
+    cfg.registerVar(psiDelayVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(delayPidsVar_, kCfgModuleId, kCfgBranchRegulation);
+    cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(robotDelayVar_, kCfgModuleId, kCfgBranchRobot);
+    cfg.registerVar(robotDurationVar_, kCfgModuleId, kCfgBranchRobot);
+    cfg.registerVar(fillingMinOnVar_, kCfgModuleId, kCfgBranchRefill);
 
     cfg.registerVar(o2PoolVolumeVar_, kCfgModuleId, kCfgBranchO2);
     cfg.registerVar(o2DoseVar_, kCfgModuleId, kCfgBranchO2);
@@ -263,13 +313,13 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchO2);
     cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchO2);
 
-    cfg.registerVar(filtrationDeviceVar_, kCfgModuleId, kCfgBranchDevice);
-    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchDevice);
-    cfg.registerVar(robotDeviceVar_, kCfgModuleId, kCfgBranchDevice);
-    cfg.registerVar(fillingDeviceVar_, kCfgModuleId, kCfgBranchDevice);
-    cfg.registerVar(phPumpDeviceVar_, kCfgModuleId, kCfgBranchDevice);
-    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchDevice);
-    cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchDevice);
+    cfg.registerVar(filtrationDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    cfg.registerVar(robotDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    cfg.registerVar(fillingDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    cfg.registerVar(phPumpDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchDevices);
 
     const EventBusService* ebSvc = services.get<EventBusService>(ServiceId::EventBus);
     eventBus_ = ebSvc ? ebSvc->bus : nullptr;
@@ -291,73 +341,73 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     if (haSvc && haSvc->addSwitch) {
         const HASwitchEntry autoModeSwitch{
             "poollogic",
-            "pl_auto",
+            "pl_modes_auto",
             "Pool Auto-regulation",
-            "cfg/poollogic/mode",
+            "cfg/poollogic/modes",
             "{% if value_json.auto_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/mode\\\":{\\\"auto_mode\\\":true}}",
-            "{\\\"poollogic/mode\\\":{\\\"auto_mode\\\":false}}",
+            "{\\\"poollogic/modes\\\":{\\\"auto_mode\\\":true}}",
+            "{\\\"poollogic/modes\\\":{\\\"auto_mode\\\":false}}",
             "mdi:calendar-clock",
             "config"
         };
         const HASwitchEntry winterModeSwitch{
             "poollogic",
-            "pl_winter",
+            "pl_modes_winter",
             "Winter Mode",
-            "cfg/poollogic/mode",
+            "cfg/poollogic/modes",
             "{% if value_json.winter_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/mode\\\":{\\\"winter_mode\\\":true}}",
-            "{\\\"poollogic/mode\\\":{\\\"winter_mode\\\":false}}",
+            "{\\\"poollogic/modes\\\":{\\\"winter_mode\\\":true}}",
+            "{\\\"poollogic/modes\\\":{\\\"winter_mode\\\":false}}",
             "mdi:snowflake",
             "config"
         };
         const HASwitchEntry phAutoModeSwitch{
             "poollogic",
-            "pl_ph_auto",
+            "pl_ph_auto_mode",
             "pH Auto-regulation",
-            "cfg/poollogic/mode",
+            "cfg/poollogic/ph",
             "{% if value_json.ph_auto_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/mode\\\":{\\\"ph_auto_mode\\\":true}}",
-            "{\\\"poollogic/mode\\\":{\\\"ph_auto_mode\\\":false}}",
+            "{\\\"poollogic/ph\\\":{\\\"ph_auto_mode\\\":true}}",
+            "{\\\"poollogic/ph\\\":{\\\"ph_auto_mode\\\":false}}",
             "mdi:beaker-check-outline",
             "config"
         };
         const HASwitchEntry orpAutoModeSwitch{
             "poollogic",
-            "pl_orp_auto",
+            "pl_dis_auto",
             "Orp Auto-regulation",
-            "cfg/poollogic/mode",
-            "{% if value_json.orp_auto_mode %}ON{% else %}OFF{% endif %}",
+            "cfg/poollogic/chlorine",
+            "{% if value_json.dis_auto_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/mode\\\":{\\\"orp_auto_mode\\\":true}}",
-            "{\\\"poollogic/mode\\\":{\\\"orp_auto_mode\\\":false}}",
+            "{\\\"poollogic/chlorine\\\":{\\\"dis_auto_mode\\\":true}}",
+            "{\\\"poollogic/chlorine\\\":{\\\"dis_auto_mode\\\":false}}",
             "mdi:water-check-outline",
             "config"
         };
         const HASwitchEntry heaterAutoModeSwitch{
             "poollogic",
-            "pl_heater_auto",
+            "pl_heat_auto",
             "Heater Auto-regulation",
-            "cfg/poollogic/mode",
+            "cfg/poollogic/heater",
             "{% if value_json.heater_auto_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/mode\\\":{\\\"heater_auto_mode\\\":true}}",
-            "{\\\"poollogic/mode\\\":{\\\"heater_auto_mode\\\":false}}",
+            "{\\\"poollogic/heater\\\":{\\\"heater_auto_mode\\\":true}}",
+            "{\\\"poollogic/heater\\\":{\\\"heater_auto_mode\\\":false}}",
             "mdi:radiator",
             "config"
         };
         const HASwitchEntry phDosePlusSwitch{
             "poollogic",
-            "pl_ph_plus",
+            "pl_ph_dose_plus",
             "pH Dosing uses pH+",
-            "cfg/poollogic/mode",
+            "cfg/poollogic/ph",
             "{% if value_json.ph_dose_plus %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/mode\\\":{\\\"ph_dose_plus\\\":true}}",
-            "{\\\"poollogic/mode\\\":{\\\"ph_dose_plus\\\":false}}",
+            "{\\\"poollogic/ph\\\":{\\\"ph_dose_plus\\\":true}}",
+            "{\\\"poollogic/ph\\\":{\\\"ph_dose_plus\\\":false}}",
             "mdi:beaker-plus-outline",
             "config"
         };
@@ -385,12 +435,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         static const char* kDisinfectionTypeStateTpl =
             R"({% set v = value_json.disinfection_type | int(0) %}{% if v == 1 %}Electrolyse{% elif v == 2 %}Oxygène actif{% elif v == 3 %}Désactivé{% else %}Chlore/Brome{% endif %})";
         static const char* kDisinfectionTypeCmdTpl =
-            R"({% if value == 'Electrolyse' %}{\"poollogic/mode\":{\"disinfection_type\":1}}{% elif value == 'Oxygène actif' %}{\"poollogic/mode\":{\"disinfection_type\":2}}{% elif value == 'Désactivé' %}{\"poollogic/mode\":{\"disinfection_type\":3}}{% else %}{\"poollogic/mode\":{\"disinfection_type\":0}}{% endif %})";
+            R"({% if value == 'Electrolyse' %}{\"poollogic/modes\":{\"disinfection_type\":1}}{% elif value == 'Oxygène actif' %}{\"poollogic/modes\":{\"disinfection_type\":2}}{% elif value == 'Désactivé' %}{\"poollogic/modes\":{\"disinfection_type\":3}}{% else %}{\"poollogic/modes\":{\"disinfection_type\":0}}{% endif %})";
         const HASelectEntry disinfectionTypeSelect{
             "poollogic",
-            "pl_disinfection",
+            "pl_modes_dis",
             "Disinfection Type",
-            "cfg/poollogic/mode",
+            "cfg/poollogic/modes",
             kDisinfectionTypeStateTpl,
             MqttTopics::SuffixCfgSet,
             kDisinfectionTypeCmdTpl,
@@ -610,12 +660,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry delayPidsMin{
             "poollogic",
-            "pl_dly_pid",
+            "pl_reg_dly_pid",
             "Delay PIDs",
-            "cfg/poollogic/delay",
+            "cfg/poollogic/regulation",
             "{{ value_json.dly_pid_min | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/delay\\\":{\\\"dly_pid_min\\\":{{ value | int(0) }}}}",
+            "{\\\"poollogic/regulation\\\":{\\\"dly_pid_min\\\":{{ value | int(0) }}}}",
             0.0f,
             30.0f,
             1.0f,
@@ -626,12 +676,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry delayElectroMin{
             "poollogic",
-            "pl_dly_elec",
+            "pl_swg_dly_elec",
             "Delay Chlorine Generator",
-            "cfg/poollogic/delay",
+            "cfg/poollogic/swg",
             "{{ value_json.dly_electro_min | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/delay\\\":{\\\"dly_electro_min\\\":{{ value | int(0) }}}}",
+            "{\\\"poollogic/swg\\\":{\\\"dly_electro_min\\\":{{ value | int(0) }}}}",
             0.0f,
             120.0f,
             1.0f,
@@ -642,12 +692,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry fillMinUptime{
             "poollogic",
-            "pl_fill_min_upt",
+            "pl_refill_min_on",
             "Min Uptime Fill Pump",
-            "cfg/poollogic/delay",
+            "cfg/poollogic/refill",
             "{{ ((value_json.fill_min_on_s | float(0)) / 60) | round(1) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/delay\\\":{\\\"fill_min_on_s\\\":{{ (value | float(0) * 60) | round(0) | int(0) }}}}",
+            "{\\\"poollogic/refill\\\":{\\\"fill_min_on_s\\\":{{ (value | float(0) * 60) | round(0) | int(0) }}}}",
             0.0f,
             4.0f,
             0.5f,
@@ -658,12 +708,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry phSetpoint{
             "poollogic",
-            "pl_ph_sp",
+            "pl_ph_setpoint",
             "pH Setpoint",
-            "cfg/poollogic/pid",
+            "cfg/poollogic/ph",
             "{{ value_json.ph_setpoint | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"ph_setpoint\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/ph\\\":{\\\"ph_setpoint\\\":{{ value | float(0) }}}}",
             6.0f,
             8.0f,
             0.01f,
@@ -674,12 +724,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry orpSetpoint{
             "poollogic",
-            "pl_orp_sp",
+            "pl_dis_setpoint",
             "Orp Setpoint",
-            "cfg/poollogic/pid",
-            "{{ value_json.orp_setpoint | float(0) }}",
+            "cfg/poollogic/chlorine",
+            "{{ value_json.dis_setpoint | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"orp_setpoint\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/chlorine\\\":{\\\"dis_setpoint\\\":{{ value | float(0) }}}}",
             300.0f,
             900.0f,
             1.0f,
@@ -690,12 +740,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry heaterSetpoint{
             "poollogic",
-            "pl_heater_sp",
+            "pl_heat_setpoint",
             "Water Heater Setpoint",
-            "cfg/poollogic/pid",
+            "cfg/poollogic/heater",
             "{{ value_json.heater_setpoint | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"heater_setpoint\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/heater\\\":{\\\"heater_setpoint\\\":{{ value | float(0) }}}}",
             10.0f,
             35.0f,
             0.1f,
@@ -706,12 +756,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry chlorineGeneratorMinTemp{
             "poollogic",
-            "pl_chl_gen_min_temp",
+            "pl_swg_min_temp",
             "Min Temperature Chlorine Generator",
-            "cfg/poollogic/pid",
+            "cfg/poollogic/swg",
             "{{ value_json.secure_elec_t | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"secure_elec_t\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/swg\\\":{\\\"secure_elec_t\\\":{{ value | float(0) }}}}",
             5.0f,
             35.0f,
             0.1f,
@@ -722,12 +772,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry phWindowMin{
             "poollogic",
-            "pl_ph_win",
+            "pl_ph_window",
             "pH PID Window Size",
-            "cfg/poollogic/pid",
+            "cfg/poollogic/ph",
             "{{ ((value_json.ph_window_ms | float(0)) / 60000) | round(0) | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"ph_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
+            "{\\\"poollogic/ph\\\":{\\\"ph_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
             1.0f,
             180.0f,
             1.0f,
@@ -738,12 +788,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry orpWindowMin{
             "poollogic",
-            "pl_orp_win",
+            "pl_dis_window",
             "Orp PID Window Size",
-            "cfg/poollogic/pid",
-            "{{ ((value_json.orp_window_ms | float(0)) / 60000) | round(0) | int(0) }}",
+            "cfg/poollogic/chlorine",
+            "{{ ((value_json.dis_window_ms | float(0)) / 60000) | round(0) | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"orp_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
+            "{\\\"poollogic/chlorine\\\":{\\\"dis_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
             1.0f,
             180.0f,
             1.0f,
@@ -754,12 +804,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry psiLowThreshold{
             "poollogic",
-            "pl_psi_low",
+            "pl_safe_psi_low",
             "PSI Low Threshold",
-            "cfg/poollogic/pid",
+            "cfg/poollogic/safety",
             "{{ value_json.psi_low_th | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"psi_low_th\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/safety\\\":{\\\"psi_low_th\\\":{{ value | float(0) }}}}",
             0.0f,
             5.0f,
             0.01f,
@@ -770,12 +820,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         const HANumberEntry psiHighThreshold{
             "poollogic",
-            "pl_psi_high",
+            "pl_safe_psi_high",
             "PSI High Threshold",
-            "cfg/poollogic/pid",
+            "cfg/poollogic/safety",
             "{{ value_json.psi_high_th | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/pid\\\":{\\\"psi_high_th\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/safety\\\":{\\\"psi_high_th\\\":{{ value | float(0) }}}}",
             0.0f,
             5.0f,
             0.01f,
@@ -906,6 +956,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic.ph_auto_mode.toggle",
             "poollogic.orp_auto_mode.set",
             "poollogic.orp_auto_mode.toggle",
+            "poollogic.dis_auto_mode.set",
+            "poollogic.dis_auto_mode.toggle",
             "poollogic.heater_auto_mode.set",
             "poollogic.heater_auto_mode.toggle",
             "poollogic.winter_mode.set",
@@ -915,6 +967,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic.ph_pump.toggle",
             "poollogic.orp_pump.write",
             "poollogic.orp_pump.toggle",
+            "poollogic.dis_pump.write",
+            "poollogic.dis_pump.toggle",
             "poollogic.lights.write",
             "poollogic.lights.toggle",
             "poollogic.robot.write",
@@ -1204,32 +1258,12 @@ void PoolLogicModule::onEvent_(const Event& e)
             return;
         }
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
-            p->localBranchId == kCfgBranchMode &&
+            p->localBranchId == kCfgBranchModes &&
             p->nvsKey) {
             if (strcmp(p->nvsKey, NvsKeys::PoolLogic::AutoMode) == 0 && autoMode_) {
                 portENTER_CRITICAL(&pendingMux_);
                 pendingFiltrationReconcile_ = true;
                 portEXIT_CRITICAL(&pendingMux_);
-            } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::PhAutoMode) == 0 && phAutoMode_) {
-                // Global business rule: entering pH auto starts from a safe stopped pump.
-                if (!writeDeviceDesired_(phPumpDeviceSlot_, false)) {
-                    LOGW("PoolLogic failed to stop pH pump on ph_auto_mode enable (slot=%u)",
-                         (unsigned)phPumpDeviceSlot_);
-                }
-                resetTemporalPidState_(phPidState_, millis());
-            } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::OrpAutoMode) == 0 && orpAutoMode_) {
-                // Global business rule: entering ORP auto starts from a safe stopped pump.
-                if (!writeDeviceDesired_(orpPumpDeviceSlot_, false)) {
-                    LOGW("PoolLogic failed to stop ORP pump on orp_auto_mode enable (slot=%u)",
-                         (unsigned)orpPumpDeviceSlot_);
-                }
-                resetTemporalPidState_(orpPidState_, millis());
-            } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::HeaterAutoMode) == 0 && heaterAutoMode_) {
-                // Entering heater auto starts from a safe stopped heater relay.
-                if (!writeDeviceDesired_(heaterDeviceSlot_, false)) {
-                    LOGW("PoolLogic failed to stop heater on heater_auto_mode enable (slot=%u)",
-                         (unsigned)heaterDeviceSlot_);
-                }
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisinfectionType) == 0) {
                 if (disinfectionType_ > DisinfectionDisabled) disinfectionType_ = DisinfectionChlorineBromine;
                 (void)writeDeviceDesired_(orpPumpDeviceSlot_, false);
@@ -1241,6 +1275,44 @@ void PoolLogicModule::onEvent_(const Event& e)
                 resetTemporalPidState_(orpPidState_, millis());
                 orpPidEnabled_ = false;
                 LOGI("PoolLogic disinfection changed: %s", disinfectionTypeStr_(disinfectionType_));
+            }
+            return;
+        }
+        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
+            p->localBranchId == kCfgBranchPh &&
+            p->nvsKey) {
+            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::PhAutoMode) == 0 && phAutoMode_) {
+                // Global business rule: entering pH auto starts from a safe stopped pump.
+                if (!writeDeviceDesired_(phPumpDeviceSlot_, false)) {
+                    LOGW("PoolLogic failed to stop pH pump on ph_auto_mode enable (slot=%u)",
+                         (unsigned)phPumpDeviceSlot_);
+                }
+                resetTemporalPidState_(phPidState_, millis());
+            }
+            return;
+        }
+        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
+            p->localBranchId == kCfgBranchChlorine &&
+            p->nvsKey) {
+            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::OrpAutoMode) == 0 && orpAutoMode_) {
+                // Global business rule: entering disinfection auto starts from a safe stopped pump.
+                if (!writeDeviceDesired_(orpPumpDeviceSlot_, false)) {
+                    LOGW("PoolLogic failed to stop disinfection pump on dis_auto_mode enable (slot=%u)",
+                         (unsigned)orpPumpDeviceSlot_);
+                }
+                resetTemporalPidState_(orpPidState_, millis());
+            }
+            return;
+        }
+        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
+            p->localBranchId == kCfgBranchHeater &&
+            p->nvsKey) {
+            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::HeaterAutoMode) == 0 && heaterAutoMode_) {
+                // Entering heater auto starts from a safe stopped heater relay.
+                if (!writeDeviceDesired_(heaterDeviceSlot_, false)) {
+                    LOGW("PoolLogic failed to stop heater on heater_auto_mode enable (slot=%u)",
+                         (unsigned)heaterDeviceSlot_);
+                }
             }
             return;
         }
@@ -1315,13 +1387,13 @@ void PoolLogicModule::normalizeDeviceSlots_()
     normalize(robotDeviceSlot_, PoolBinding::kDeviceSlotRobot, robotDeviceVar_, "robot");
     normalize(fillingDeviceSlot_, PoolBinding::kDeviceSlotFillPump, fillingDeviceVar_, "filling");
     normalize(phPumpDeviceSlot_, PoolBinding::kDeviceSlotPhPump, phPumpDeviceVar_, "ph_pump");
-    normalize(orpPumpDeviceSlot_, PoolBinding::kDeviceSlotChlorinePump, orpPumpDeviceVar_, "orp_pump");
+    normalize(orpPumpDeviceSlot_, PoolBinding::kDeviceSlotChlorinePump, orpPumpDeviceVar_, "dis_pump");
     normalize(heaterDeviceSlot_, PoolBinding::kDeviceSlotWaterHeater, heaterDeviceVar_, "heater");
 }
 
 void PoolLogicModule::logDeviceSlotConfig_() const
 {
-    LOGI("PoolLogic slots filtr=%u swg=%u robot=%u fill=%u ph=%u orp=%u heater=%u",
+    LOGI("PoolLogic slots filtr=%u swg=%u robot=%u fill=%u ph=%u dis=%u heater=%u",
          (unsigned)filtrationDeviceSlot_,
          (unsigned)swgDeviceSlot_,
          (unsigned)robotDeviceSlot_,
@@ -1335,7 +1407,7 @@ void PoolLogicModule::logDeviceSlotConfig_() const
     logDeviceSlotBinding_("robot", robotDeviceSlot_, -1);
     logDeviceSlotBinding_("filling", fillingDeviceSlot_, -1);
     logDeviceSlotBinding_("ph_pump", phPumpDeviceSlot_, 1);
-    logDeviceSlotBinding_("orp_pump", orpPumpDeviceSlot_, 1);
+    logDeviceSlotBinding_("dis_pump", orpPumpDeviceSlot_, 1);
     logDeviceSlotBinding_("heater", heaterDeviceSlot_, -1);
 }
 

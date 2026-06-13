@@ -864,7 +864,16 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     forceFiltrationReconcile = pendingFiltrationReconcile_;
     pendingFiltrationReconcile_ = false;
     portEXIT_CRITICAL(&pendingMux_);
-    if (forceFiltrationReconcile && schedSvc_ && schedSvc_->isActive) {
+
+    bool clockWindowActive = false;
+    if (currentFiltrationWindowActive_(filtrationCalcStart_, filtrationCalcStop_, clockWindowActive)) {
+        if (clockWindowActive != windowActive || forceFiltrationReconcile) {
+            windowActive = clockWindowActive;
+            portENTER_CRITICAL(&pendingMux_);
+            filtrationWindowActive_ = windowActive;
+            portEXIT_CRITICAL(&pendingMux_);
+        }
+    } else if (forceFiltrationReconcile && schedSvc_ && schedSvc_->isActive) {
         windowActive = schedSvc_->isActive(schedSvc_->ctx, SLOT_FILTR_WINDOW);
         portENTER_CRITICAL(&pendingMux_);
         filtrationWindowActive_ = windowActive;

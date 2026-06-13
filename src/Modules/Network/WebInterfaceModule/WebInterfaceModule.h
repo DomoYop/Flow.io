@@ -117,6 +117,7 @@ private:
     void handleUpdateRequest_(AsyncWebServerRequest* request, FirmwareUpdateTarget target);
     bool isWebReachable_() const;
     bool getNetworkIp_(char* out, size_t len, NetworkAccessMode* modeOut) const;
+    const char* networkTransport_(NetworkAccessMode mode) const;
 
     // WebSocket transport
     void onWsLogEvent_(AsyncWebSocket* server,

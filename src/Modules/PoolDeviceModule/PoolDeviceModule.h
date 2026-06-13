@@ -165,9 +165,7 @@ private:
     // Runtime
     bool configureRuntime_();
     static MqttBuildResult buildCfgBasePdmStatic_(void* ctx, uint16_t messageId, MqttBuildContext& buildCtx);
-    static MqttBuildResult buildCfgBasePdmrtStatic_(void* ctx, uint16_t messageId, MqttBuildContext& buildCtx);
     MqttBuildResult buildCfgBasePdm_(MqttBuildContext& buildCtx);
-    MqttBuildResult buildCfgBasePdmrt_(MqttBuildContext& buildCtx);
     bool snapshotRouteFromIndex_(uint8_t snapshotIdx, uint8_t& slotIdxOut, bool& metricsOut) const;
     bool buildStateSnapshot_(uint8_t slotIdx, char* out, size_t len, uint32_t& maxTsOut) const;
     bool buildMetricsSnapshot_(uint8_t slotIdx, char* out, size_t len, uint32_t& maxTsOut) const;
@@ -214,6 +212,7 @@ private:
     EventBus* eventBus_ = nullptr;
     DataStore* dataStore_ = nullptr;
     ConfigStore* cfgStore_ = nullptr;
+    const ConfigStoreService* cfgSvc_ = nullptr;
     MqttConfigRouteProducer* cfgMqttPub_ = nullptr;
 
     ConfigVariable<bool,0> cfgEnabledVar_[POOL_DEVICE_MAX]{};
@@ -222,5 +221,4 @@ private:
     ConfigVariable<float,0> cfgTankCapVar_[POOL_DEVICE_MAX]{};
     ConfigVariable<float,0> cfgTankInitVar_[POOL_DEVICE_MAX]{};
     ConfigVariable<int32_t,0> cfgMaxUptimeVar_[POOL_DEVICE_MAX]{};
-    ConfigVariable<char,0> cfgRuntimeVar_[POOL_DEVICE_MAX]{};
 };

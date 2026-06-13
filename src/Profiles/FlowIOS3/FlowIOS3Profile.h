@@ -6,6 +6,7 @@
 #include "Modules/CommandModule/CommandModule.h"
 #include "Modules/EventBusModule/EventBusModule.h"
 #include "Modules/HMIModule/HMIModule.h"
+#include "Modules/HMIBuzzerModule/HMIBuzzerModule.h"
 #include "Modules/IOModule/IOBus/OneWireBus.h"
 #include "Modules/IOModule/IOModule.h"
 #if FLOW_ENABLE_BOOT_LOG_CAPTURE
@@ -74,6 +75,7 @@ struct ModuleInstances {
     AlarmModule alarmModule{};
     HmiUdpServerModule hmiUdpServerModule{};
     HMIModule hmiModule;
+    HMIBuzzerModule hmiBuzzerModule;
     IOModule ioModule;
     PoolDeviceModule poolDeviceModule{};
     PoolLogicModule poolLogicModule{};

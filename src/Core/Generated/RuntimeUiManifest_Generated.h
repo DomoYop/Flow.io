@@ -27,7 +27,7 @@ inline constexpr RuntimeUiManifestItem kRuntimeUiManifestItems[] = {
     {2401, "pool.auto_mode", "bool", nullptr},
     {2402, "pool.winter_mode", "bool", nullptr},
     {2403, "pool.ph_auto_mode", "bool", nullptr},
-    {2404, "pool.orp_auto_mode", "bool", nullptr},
+    {2404, "pool.dis_auto_mode", "bool", nullptr},
     {2101, "mqtt.ready", "bool", nullptr},
     {2102, "mqtt.server", "string", nullptr},
     {2103, "mqtt.rx_drop", "uint32", nullptr},

@@ -63,6 +63,12 @@ public:
 private:
     struct ConfigData {
         bool ledsEnabled = true;
+        bool waveshareLedEnabled =
+#if FLOW_BUILD_IS_FLOWIOS3
+            true;
+#else
+            false;
+#endif
         bool nextionEnabled = true;
         bool remoteUdpEnabled =
 #ifdef FLOW_HMI_REMOTE_UDP
@@ -78,12 +84,16 @@ private:
         NVS_KEY(NvsKeys::Hmi::LedsEnabled), "enabled", "hmi/leds",
         ConfigType::Bool, &cfgData_.ledsEnabled, ConfigPersistence::Persistent, 0
     };
+    ConfigVariable<bool,0> waveshareLedEnabledVar_{
+        NVS_KEY(NvsKeys::Hmi::WaveshareLedEnabled), "waveshare_enabled", "hmi/leds",
+        ConfigType::Bool, &cfgData_.waveshareLedEnabled, ConfigPersistence::Persistent, 0
+    };
     ConfigVariable<bool,0> nextionEnabledVar_{
         NVS_KEY(NvsKeys::Hmi::NextionEnabled), "enabled", "hmi/nextion",
         ConfigType::Bool, &cfgData_.nextionEnabled, ConfigPersistence::Persistent, 0
     };
     ConfigVariable<bool,0> remoteUdpEnabledVar_{
-        NVS_KEY(NvsKeys::Hmi::FlowConnectUdpEnabled), "enabled", "hmi/fcd_udp",
+        NVS_KEY(NvsKeys::Hmi::FlowConnectUdpEnabled), "enabled", "hmi/nextion_udp",
         ConfigType::Bool, &cfgData_.remoteUdpEnabled, ConfigPersistence::Persistent, 0
     };
     ConfigVariable<bool,0> veniceEnabledVar_{
@@ -127,6 +137,7 @@ private:
     bool configMenuActive_ = false;
     uint32_t lastRenderMs_ = 0;
     uint32_t lastConfigValueRefreshMs_ = 0;
+    uint32_t lastHmiLedDebugMs_ = 0;
     uint8_t ledPage_ = 1;
     uint8_t ledMaskLast_ = 0;
     bool ledMaskValid_ = false;
@@ -153,6 +164,9 @@ private:
     IoId airTempIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotAirTemp].ioId;
     IoId poolLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPoolLevel].ioId;
     IoId waterTempIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].ioId;
+    IoId phLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPhLevel].ioId;
+    IoId chlorineLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotChlorineLevel].ioId;
+    IoId waterCounterIoId_ = IO_ID_INVALID;
     uint8_t filtrationDeviceSlot_ = PoolBinding::kDeviceSlotFiltrationPump;
     uint8_t phPumpDeviceSlot_ = PoolBinding::kDeviceSlotPhPump;
     uint8_t orpPumpDeviceSlot_ = PoolBinding::kDeviceSlotChlorinePump;
@@ -166,6 +180,11 @@ private:
     uint8_t waterTempRuntimeIndex_ = 0xFFU;
     uint8_t airTempRuntimeIndex_ = 0xFFU;
     uint8_t poolLevelRuntimeIndex_ = 0xFFU;
+    uint8_t phLevelRuntimeIndex_ = 0xFFU;
+    uint8_t chlorineLevelRuntimeIndex_ = 0xFFU;
+    uint8_t waterCounterRuntimeIndex_ = 0xFFU;
+    bool wifiNetworkExpected_ = true;
+    bool ethernetNetworkExpected_ = false;
     uint32_t lastLedApplyTryMs_ = 0;
     uint32_t lastLedPageToggleMs_ = 0;
     uint32_t lastWifiBlinkToggleMs_ = 0;
@@ -207,7 +226,14 @@ private:
     bool getStatusLedState_(HmiStatusLedState* out) const;
     bool setStatusLedAutoWifiMode_(bool enabled);
     bool isStatusLedAutoWifiMode_() const;
+    bool setLedCondition_(HmiLedCondition condition, bool active);
+    void clearLedConditions_();
+    void setBootComplete_();
+    bool setLedEnabled_(bool enabled);
+    bool setLedBrightness_(uint8_t brightness);
     bool getDisplayVersion_(char* out, size_t outLen) const;
+    bool readRtcSvc_(HmiRtcDateTime* out, uint16_t timeoutMs);
+    bool writeRtcSvc_(const HmiRtcDateTime* value);
     bool refreshCurrentModule_();
     bool render_();
     bool renderAlarmPage_();
@@ -257,7 +283,14 @@ private:
     bool isAlarmPageId_(uint8_t pageId) const;
     bool isDisplaySleeping_() const;
     void refreshMqttConfig_();
+    void refreshNetworkExpectations_();
     void applyWs2812AutoWifiProfile_();
+    void updateHmiLedConditions_();
+    bool hasSensorFault_() const;
+    bool configuredSensorUnknown_(IoId ioId, uint8_t runtimeIndex) const;
+    bool firstSensorFaultRef_(char* out, size_t outLen) const;
+    void logHmiLedDebug_(uint32_t nowMs);
+    static const char* hmiLedDisplayStateName_(HmiLedDisplayState state);
     void applyOutputConfig_();
     void applyLedMask_(bool force = false);
 
@@ -272,7 +305,15 @@ private:
         ServiceBinding::bind<&HMIModule::getStatusLedState_>,
         ServiceBinding::bind<&HMIModule::setStatusLedAutoWifiMode_>,
         ServiceBinding::bind<&HMIModule::isStatusLedAutoWifiMode_>,
+        ServiceBinding::bind<&HMIModule::setLedCondition_>,
+        ServiceBinding::bind<&HMIModule::clearLedConditions_>,
+        ServiceBinding::bind<&HMIModule::setBootComplete_>,
+        ServiceBinding::bind<&HMIModule::setLedEnabled_>,
+        ServiceBinding::bind<&HMIModule::setLedBrightness_>,
         ServiceBinding::bind<&HMIModule::getDisplayVersion_>,
+        ServiceBinding::bind<&HMIModule::readRtcSvc_>,
+        ServiceBinding::bind<&HMIModule::writeRtcSvc_>,
+        ServiceBinding::bind<&HMIModule::isDisplaySleeping_>,
         this
     };
 };

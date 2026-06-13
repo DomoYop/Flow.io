@@ -2,11 +2,11 @@
   "translations": {
     "cfgmods.log.levels.m10_lvl.help": "Niveau minimal de logs pour le moteur d'alarmes.",
     "cfgmods.log.levels.m10_lvl.label": "alarms",
-    "cfgmods.log.levels.m11_lvl.help": "Niveau minimal de logs pour la connexion Wi-Fi.",
+    "cfgmods.log.levels.m11_lvl.help": "Niveau minimal de logs pour la connexion réseau.",
     "cfgmods.log.levels.m11_lvl.label": "wifi",
     "cfgmods.log.levels.m12_lvl.help": "Niveau minimal de logs pour Ethernet.",
     "cfgmods.log.levels.m12_lvl.label": "ethernet",
-    "cfgmods.log.levels.m13_lvl.help": "Niveau minimal de logs pour le portail d'autoconfiguration Wi-Fi.",
+    "cfgmods.log.levels.m13_lvl.help": "Niveau minimal de logs pour le portail d'autoconfiguration réseau.",
     "cfgmods.log.levels.m13_lvl.label": "wifiprov",
     "cfgmods.log.levels.m14_lvl.help": "Niveau minimal de logs pour la synchronisation horaire.",
     "cfgmods.log.levels.m14_lvl.label": "time",

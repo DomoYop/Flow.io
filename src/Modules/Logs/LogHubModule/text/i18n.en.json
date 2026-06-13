@@ -3,11 +3,11 @@
   "translations": {
     "cfgmods.log.levels.m10_lvl.help": "Alarm module minimum log level.",
     "cfgmods.log.levels.m10_lvl.label": "alarms",
-    "cfgmods.log.levels.m11_lvl.help": "Wi-Fi module minimum log level.",
+    "cfgmods.log.levels.m11_lvl.help": "Network module minimum log level.",
     "cfgmods.log.levels.m11_lvl.label": "wifi",
     "cfgmods.log.levels.m12_lvl.help": "Ethernet module minimum log level.",
     "cfgmods.log.levels.m12_lvl.label": "ethernet",
-    "cfgmods.log.levels.m13_lvl.help": "Wi-Fi autoconfiguration portal minimum log level.",
+    "cfgmods.log.levels.m13_lvl.help": "Network autoconfiguration portal minimum log level.",
     "cfgmods.log.levels.m13_lvl.label": "wifiprov",
     "cfgmods.log.levels.m14_lvl.help": "Time synchronisation minimum log level.",
     "cfgmods.log.levels.m14_lvl.label": "time",

@@ -267,11 +267,29 @@ void FirmwareUpdateModule::setStatus_(UpdateState state, FirmwareUpdateTarget ta
     if (!msg) msg = "";
     snprintf(status_.msg, sizeof(status_.msg), "%s", msg);
     portEXIT_CRITICAL(&lock_);
+
+    const bool otaActive = state == UpdateState::Queued ||
+                           state == UpdateState::Downloading ||
+                           state == UpdateState::Flashing ||
+                           state == UpdateState::Rebooting;
+    setHmiOtaCondition_(otaActive);
 }
 
 void FirmwareUpdateModule::setError_(FirmwareUpdateTarget target, const char* msg)
 {
     setStatus_(UpdateState::Error, target, 0, msg ? msg : "failed");
+}
+
+void FirmwareUpdateModule::setHmiOtaCondition_(bool active)
+{
+    if (hmiOtaActive_ == active) return;
+    if (!hmiSvc_ && services_) {
+        hmiSvc_ = services_->get<HmiService>(ServiceId::Hmi);
+    }
+    if (hmiSvc_ && hmiSvc_->setLedCondition) {
+        (void)hmiSvc_->setLedCondition(hmiSvc_->ctx, HmiLedCondition::OtaInProgress, active);
+    }
+    hmiOtaActive_ = active;
 }
 
 void FirmwareUpdateModule::onProgressChunk_(uint32_t chunkBytes)
@@ -1278,6 +1296,7 @@ void FirmwareUpdateModule::init(ConfigStore& cfg, ServiceRegistry& services)
     netAccessSvc_ = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
     webInterfaceSvc_ = services.get<WebInterfaceService>(ServiceId::WebInterface);
     flowCfgSvc_ = services.get<FlowCfgRemoteService>(ServiceId::FlowCfg);
+    hmiSvc_ = services.get<HmiService>(ServiceId::Hmi);
 
     cfg.registerVar(updateHostVar_);
     cfg.registerVar(updatePathVar_);

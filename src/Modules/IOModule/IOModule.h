@@ -148,6 +148,8 @@ private:
     IoStatus ioReadAnalog_(IoId id, float* outValue, uint32_t* outTsMs, IoSeq* outSeq) const;
     IoStatus ioTick_(uint32_t nowMs);
     IoStatus ioLastCycle_(IoCycleInfo* outCycle) const;
+    IoStatus ioSensorStatus_(IoId id, IoSensorStatus* outStatus) const;
+    IoStatus ioListInvalidSensors_(IoId* outIds, uint8_t maxIds, uint8_t* outCount) const;
 
     bool setLedMask_(uint8_t mask, uint32_t tsMs);
     bool turnLedOn_(uint8_t bit, uint32_t tsMs);
@@ -490,6 +492,8 @@ private:
         ServiceBinding::bind<&IOModule::ioReadAnalog_>,
         ServiceBinding::bind<&IOModule::ioTick_>,
         ServiceBinding::bind<&IOModule::ioLastCycle_>,
+        ServiceBinding::bind<&IOModule::ioSensorStatus_>,
+        ServiceBinding::bind<&IOModule::ioListInvalidSensors_>,
         this
     };
     StatusLedsService statusLedsSvc_{
@@ -605,6 +609,7 @@ private:
     ConfigVariable<bool,0> i0ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I0AH),"i00_active_high","io/input/i00",ConfigType::Bool,&digitalInCfg_[0].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i0PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I0PU),"i00_pull_mode","io/input/i00",ConfigType::UInt8,&digitalInCfg_[0].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i0EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I0ED),"edge_mode","io/input/i00",ConfigType::UInt8,&digitalInCfg_[0].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i0CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I0DB),"counter_debounce_us","io/input/i00",ConfigType::Int32,&digitalInCfg_[0].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i0C0Var_{NVS_KEY(NvsKeys::Io::IO_I0C0),"i00_c0","io/input/i00",ConfigType::Float,&digitalInCfg_[0].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i0PrecVar_{NVS_KEY(NvsKeys::Io::IO_I0P),"i00_prec","io/input/i00",ConfigType::Int32,&digitalInCfg_[0].precision,ConfigPersistence::Persistent,0};
 
@@ -613,6 +618,7 @@ private:
     ConfigVariable<bool,0> i1ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I1AH),"i01_active_high","io/input/i01",ConfigType::Bool,&digitalInCfg_[1].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i1PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I1PU),"i01_pull_mode","io/input/i01",ConfigType::UInt8,&digitalInCfg_[1].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i1EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I1ED),"edge_mode","io/input/i01",ConfigType::UInt8,&digitalInCfg_[1].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i1CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I1DB),"counter_debounce_us","io/input/i01",ConfigType::Int32,&digitalInCfg_[1].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i1C0Var_{NVS_KEY(NvsKeys::Io::IO_I1C0),"i01_c0","io/input/i01",ConfigType::Float,&digitalInCfg_[1].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i1PrecVar_{NVS_KEY(NvsKeys::Io::IO_I1P),"i01_prec","io/input/i01",ConfigType::Int32,&digitalInCfg_[1].precision,ConfigPersistence::Persistent,0};
 
@@ -621,6 +627,7 @@ private:
     ConfigVariable<bool,0> i2ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I2AH),"i02_active_high","io/input/i02",ConfigType::Bool,&digitalInCfg_[2].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i2PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I2PU),"i02_pull_mode","io/input/i02",ConfigType::UInt8,&digitalInCfg_[2].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i2EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I2ED),"edge_mode","io/input/i02",ConfigType::UInt8,&digitalInCfg_[2].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i2CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I2DB),"counter_debounce_us","io/input/i02",ConfigType::Int32,&digitalInCfg_[2].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i2C0Var_{NVS_KEY(NvsKeys::Io::IO_I2C0),"i02_c0","io/input/i02",ConfigType::Float,&digitalInCfg_[2].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i2PrecVar_{NVS_KEY(NvsKeys::Io::IO_I2P),"i02_prec","io/input/i02",ConfigType::Int32,&digitalInCfg_[2].precision,ConfigPersistence::Persistent,0};
 
@@ -629,6 +636,7 @@ private:
     ConfigVariable<bool,0> i3ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I3AH),"i03_active_high","io/input/i03",ConfigType::Bool,&digitalInCfg_[3].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i3PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I3PU),"i03_pull_mode","io/input/i03",ConfigType::UInt8,&digitalInCfg_[3].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i3EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I3ED),"edge_mode","io/input/i03",ConfigType::UInt8,&digitalInCfg_[3].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i3CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I3DB),"counter_debounce_us","io/input/i03",ConfigType::Int32,&digitalInCfg_[3].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i3C0Var_{NVS_KEY(NvsKeys::Io::IO_I3C0),"i03_c0","io/input/i03",ConfigType::Float,&digitalInCfg_[3].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i3PrecVar_{NVS_KEY(NvsKeys::Io::IO_I3P),"i03_prec","io/input/i03",ConfigType::Int32,&digitalInCfg_[3].precision,ConfigPersistence::Persistent,0};
 
@@ -637,6 +645,7 @@ private:
     ConfigVariable<bool,0> i4ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I4AH),"i04_active_high","io/input/i04",ConfigType::Bool,&digitalInCfg_[4].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i4PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I4PU),"i04_pull_mode","io/input/i04",ConfigType::UInt8,&digitalInCfg_[4].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i4EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I4ED),"edge_mode","io/input/i04",ConfigType::UInt8,&digitalInCfg_[4].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i4CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I4DB),"counter_debounce_us","io/input/i04",ConfigType::Int32,&digitalInCfg_[4].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i4C0Var_{NVS_KEY(NvsKeys::Io::IO_I4C0),"i04_c0","io/input/i04",ConfigType::Float,&digitalInCfg_[4].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i4PrecVar_{NVS_KEY(NvsKeys::Io::IO_I4P),"i04_prec","io/input/i04",ConfigType::Int32,&digitalInCfg_[4].precision,ConfigPersistence::Persistent,0};
     ConfigVariable<char,0> i5NameVar_{NVS_KEY(NvsKeys::Io::IO_I5NM),"i05_name","io/input/i05",ConfigType::CharArray,(char*)digitalInCfg_[5].name,ConfigPersistence::Persistent,sizeof(digitalInCfg_[5].name)};
@@ -644,6 +653,7 @@ private:
     ConfigVariable<bool,0> i5ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I5AH),"i05_active_high","io/input/i05",ConfigType::Bool,&digitalInCfg_[5].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i5PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I5PU),"i05_pull_mode","io/input/i05",ConfigType::UInt8,&digitalInCfg_[5].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i5EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I5ED),"edge_mode","io/input/i05",ConfigType::UInt8,&digitalInCfg_[5].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i5CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I5DB),"counter_debounce_us","io/input/i05",ConfigType::Int32,&digitalInCfg_[5].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i5C0Var_{NVS_KEY(NvsKeys::Io::IO_I5C0),"i05_c0","io/input/i05",ConfigType::Float,&digitalInCfg_[5].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i5PrecVar_{NVS_KEY(NvsKeys::Io::IO_I5P),"i05_prec","io/input/i05",ConfigType::Int32,&digitalInCfg_[5].precision,ConfigPersistence::Persistent,0};
 
@@ -652,6 +662,7 @@ private:
     ConfigVariable<bool,0> i6ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I6AH),"i06_active_high","io/input/i06",ConfigType::Bool,&digitalInCfg_[6].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i6PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I6PU),"i06_pull_mode","io/input/i06",ConfigType::UInt8,&digitalInCfg_[6].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i6EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I6ED),"edge_mode","io/input/i06",ConfigType::UInt8,&digitalInCfg_[6].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i6CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I6DB),"counter_debounce_us","io/input/i06",ConfigType::Int32,&digitalInCfg_[6].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i6C0Var_{NVS_KEY(NvsKeys::Io::IO_I6C0),"i06_c0","io/input/i06",ConfigType::Float,&digitalInCfg_[6].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i6PrecVar_{NVS_KEY(NvsKeys::Io::IO_I6P),"i06_prec","io/input/i06",ConfigType::Int32,&digitalInCfg_[6].precision,ConfigPersistence::Persistent,0};
 
@@ -660,6 +671,7 @@ private:
     ConfigVariable<bool,0> i7ActiveHighVar_{NVS_KEY(NvsKeys::Io::IO_I7AH),"i07_active_high","io/input/i07",ConfigType::Bool,&digitalInCfg_[7].activeHigh,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i7PullModeVar_{NVS_KEY(NvsKeys::Io::IO_I7PU),"i07_pull_mode","io/input/i07",ConfigType::UInt8,&digitalInCfg_[7].pullMode,ConfigPersistence::Persistent,0};
     ConfigVariable<uint8_t,0> i7EdgeModeVar_{NVS_KEY(NvsKeys::Io::IO_I7ED),"edge_mode","io/input/i07",ConfigType::UInt8,&digitalInCfg_[7].edgeMode,ConfigPersistence::Persistent,0};
+    ConfigVariable<int32_t,0> i7CounterDebounceVar_{NVS_KEY(NvsKeys::Io::IO_I7DB),"counter_debounce_us","io/input/i07",ConfigType::Int32,&digitalInCfg_[7].counterDebounceUs,ConfigPersistence::Persistent,0};
     ConfigVariable<float,0> i7C0Var_{NVS_KEY(NvsKeys::Io::IO_I7C0),"i07_c0","io/input/i07",ConfigType::Float,&digitalInCfg_[7].c0,ConfigPersistence::Persistent,0};
     ConfigVariable<int32_t,0> i7PrecVar_{NVS_KEY(NvsKeys::Io::IO_I7P),"i07_prec","io/input/i07",ConfigType::Int32,&digitalInCfg_[7].precision,ConfigPersistence::Persistent,0};
 

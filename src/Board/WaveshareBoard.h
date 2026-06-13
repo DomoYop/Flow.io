@@ -7,8 +7,8 @@
  *
  * This file is the hardware description for the Waveshare ESP32-S3 based
  * FlowIOS3 target. It is intentionally kept as a single, editable map of the
- * board: serial ports, I2C buses, 1-Wire probes, IO points, TFT wiring,
- * supervisor inputs, MQTT/Home Assistant sizing, and Ethernet wiring.
+ * board: serial ports, I2C buses, 1-Wire probes, IO points, disabled TFT
+ * wiring, supervisor inputs, MQTT/Home Assistant sizing, and Ethernet wiring.
  *
  * When adapting the firmware to a modified board, change the values here
  * first. The rest of the application consumes this profile through BoardSpec.
@@ -55,7 +55,7 @@ inline constexpr uint32_t kWaveshareESP32S3InterlinkI2cHz = 400000U;
  *   Not stored in NVS. These are compile-time sizing limits, so the compiled
  *   values always apply.
  */
-inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{11, 4, 8, 11, 4, 8};
+inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{11, 8, 8, 11, 8, 8};
 
 /*
  * MQTT task and queue capacities.
@@ -97,8 +97,7 @@ inline constexpr MqttBufferSpec kWaveshareESP32S3MqttBuffers{
  * Home Assistant discovery/entity capacities.
  *
  * Field order:
- *   sensors, binarySensors, switches, numbers, buttons, selects,
- *   discoveryCleanups.
+ *   sensors, binarySensors, switches, numbers, buttons, selects.
  *
  * Increase these counts when the board/profile publishes more HA entities than
  * the current configuration.
@@ -108,7 +107,7 @@ inline constexpr MqttBufferSpec kWaveshareESP32S3MqttBuffers{
  *   Home Assistant naming/identity options are handled by separate persistent
  *   module config, not by this capacity block.
  */
-inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 6, 16, 30, 24, 6, 12};
+inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 6, 16, 30, 24, 6};
 
 /*
  * UART definitions.
@@ -189,8 +188,8 @@ inline constexpr I2cBusSpec kWaveshareESP32S3I2c[] = {
  *   bus GPIO pins are not.
  */
 inline constexpr OneWireBusSpec kWaveshareESP32S3OneWire[] = {
-    {"temp_probe_1", BoardSignal::TempProbe1, 20}, // Water DS18B20 probe bus on GPIO20.
-    {"temp_probe_2", BoardSignal::TempProbe2, 19}, // Air DS18B20 probe bus on GPIO19.
+    {"temp_probe_1", BoardSignal::TempProbe1, 47}, // Water DS18B20 probe bus on GPIO47.
+    {"temp_probe_2", BoardSignal::TempProbe2, 48}, // Air DS18B20 probe bus on GPIO48.
 };
 
 /*
@@ -218,6 +217,26 @@ inline constexpr EthernetW5500Spec kWaveshareESP32S3EthernetW5500{
     39,         // rstPin: ETH_RST.
     1,          // phyAddr: W5500 PHY address.
     8000000U    // spiClockHz: conservative SPI clock for reliable DHCP bring-up.
+};
+
+/*
+ * Local active buzzer wiring.
+ *
+ * Field order:
+ *   enabled, pin, activeHigh.
+ *
+ * The Waveshare ESP32-S3 board exposes an active buzzer on GPIO46. The buzzer
+ * is driven directly by HMIBuzzerModule and is intentionally not registered as
+ * a generic IO output, so it remains reserved for local HMI feedback.
+ *
+ * NVS behavior:
+ *   The GPIO and polarity are compiled hardware settings. Only the
+ *   hmi/buzzer/enable module setting is persistent.
+ */
+inline constexpr HmiBuzzerSpec kWaveshareESP32S3HmiBuzzer{
+    true,
+    46,
+    true
 };
 
 /*
@@ -263,17 +282,26 @@ inline constexpr IoPointSpec kWaveshareESP32S3IoPoints[] = {
     {"exio6", IoCapability::DigitalOut, BoardSignal::Relay6, 5, false, 0},
     {"exio7", IoCapability::DigitalOut, BoardSignal::Relay7, 6, false, 0},
     {"exio8", IoCapability::DigitalOut, BoardSignal::Relay8, 7, false, 0},
-    {"water_counter", IoCapability::DigitalIn, BoardSignal::DigitalIn1, 7, false, 0},
-    {"ph_level", IoCapability::DigitalIn, BoardSignal::DigitalIn2, 4, false, 0},
-    {"chlorine_level", IoCapability::DigitalIn, BoardSignal::DigitalIn3, 5, false, 0},
-    {"pool_level", IoCapability::DigitalIn, BoardSignal::DigitalIn4, 6, false, 0},
-    {"water_temperature_ds18b20", IoCapability::OneWireTemp, BoardSignal::TempProbe1, 20, false, 0},
-    {"air_temperature_ds18b20", IoCapability::OneWireTemp, BoardSignal::TempProbe2, 19, false, 0},
-    {"venice_tx433", IoCapability::DigitalOut, BoardSignal::Tx433, 10, false, 0},
+    {"digital_in1_ph_level", IoCapability::DigitalIn, BoardSignal::DigitalIn1, 4, false, 0},
+    {"digital_in2_disinfectant_level", IoCapability::DigitalIn, BoardSignal::DigitalIn2, 5, false, 0},
+    {"digital_in3_pool_level", IoCapability::DigitalIn, BoardSignal::DigitalIn3, 6, false, 0},
+    {"digital_in4_water_counter", IoCapability::DigitalIn, BoardSignal::DigitalIn4, 7, false, 0},
+    {"digital_in5_unused", IoCapability::DigitalIn, BoardSignal::DigitalIn5, 8, false, 0},
+    {"digital_in6_unused", IoCapability::DigitalIn, BoardSignal::DigitalIn6, 9, false, 0},
+    {"digital_in7_unused", IoCapability::DigitalIn, BoardSignal::DigitalIn7, 10, false, 0},
+    {"digital_in8_unused", IoCapability::DigitalIn, BoardSignal::DigitalIn8, 11, false, 0},
+    {"water_temperature_ds18b20", IoCapability::OneWireTemp, BoardSignal::TempProbe1, 47, false, 0},
+    {"air_temperature_ds18b20", IoCapability::OneWireTemp, BoardSignal::TempProbe2, 48, false, 0},
+    {"venice_tx433", IoCapability::DigitalOut, BoardSignal::Tx433, 45, false, 0},
 };
 
 /*
  * Local ST7789 TFT display wiring and timing.
+ *
+ * TFT support is intentionally disabled on the Waveshare ESP32-S3 target. Keep
+ * the pin entries at -1 so these ESP32 GPIOs are not reserved by this board
+ * profile. The previous TFT wiring is kept in comments next to each disabled
+ * field for reference.
  *
  * Field order:
  *   resX, resY, rotation, colStart, rowStart, backlightPin, csPin, dcPin,
@@ -290,7 +318,8 @@ inline constexpr IoPointSpec kWaveshareESP32S3IoPoints[] = {
  *   Controller pixel offsets. Keep 0 unless the rendered image is shifted.
  *
  * backlightPin / csPin / dcPin / rstPin / misoPin / mosiPin / sclkPin:
- *   GPIO wiring for the TFT backlight and SPI bus. Use -1 for an unwired MISO.
+ *   GPIO wiring for the TFT backlight and SPI bus. Use -1 when TFT support is
+ *   disabled or the signal is unwired.
  *
  * swapColorBytes / invertColors:
  *   Color-format corrections required by some ST7789 panels.
@@ -304,7 +333,9 @@ inline constexpr IoPointSpec kWaveshareESP32S3IoPoints[] = {
  *
  * NVS behavior:
  *   Not stored in NVS. The display resolution, SPI pins, color flags, SPI clock,
- *   and render gap are compiled hardware settings and always apply.
+ *   and render gap are compiled hardware settings and always apply. The
+ *   disabled pin values below therefore release the old TFT GPIO reservations at
+ *   build time.
  */
 inline constexpr St7789DisplaySpec kWaveshareESP32S3Display{
     240,       // resX: horizontal pixels.
@@ -312,13 +343,13 @@ inline constexpr St7789DisplaySpec kWaveshareESP32S3Display{
     1,         // rotation.
     0,         // colStart.
     0,         // rowStart.
-    1,         // backlightPin: TFT_BL.
-    21,        // csPin: SPI_CS.
-    45,        // dcPin: TFT_DC.
-    2,         // rstPin: TFT_RES.
-    -1,        // misoPin: not wired for this TFT.
-    47,        // mosiPin: SPI_MOSI.
-    48,        // sclkPin: SPI_SCL.
+    -1,        // backlightPin disabled; was GPIO1 / TFT_BL.
+    -1,        // csPin disabled; was GPIO21 / SPI_CS.
+    -1,        // dcPin disabled; was GPIO45 / TFT_DC.
+    -1,        // rstPin disabled; was GPIO2 / TFT_RES.
+    -1,        // misoPin disabled; was not wired for this TFT.
+    -1,        // mosiPin disabled; was GPIO47 / SPI_MOSI.
+    -1,        // sclkPin disabled; was GPIO48 / SPI_SCL.
     false,     // swapColorBytes.
     true,      // invertColors.
     40000000U, // spiHz.
@@ -333,7 +364,7 @@ inline constexpr St7789DisplaySpec kWaveshareESP32S3Display{
  *   factoryResetDebounceMs.
  *
  * pirPin:
- *   GPIO connected to the local motion sensor used to wake the TFT.
+ *   Optional local motion sensor GPIO. Kept disabled while TFT support is off.
  *
  * pirDebounceMs / pirActiveHigh:
  *   Debounce time and polarity for the PIR input.
@@ -346,13 +377,10 @@ inline constexpr St7789DisplaySpec kWaveshareESP32S3Display{
  *   Debounce time for the factory-reset input if it is enabled.
  *
  * NVS behavior:
- *   pirPin is copied into the TFTModuleS3 "motion_gpio" persistent config as
- *   the boot default; if NVS already contains tft/s3 motion_gpio, the NVS value
- *   overrides pirPin. pirDebounceMs, pirActiveHigh, factoryResetPin, and
- *   factoryResetDebounceMs are not stored in NVS by this profile.
+ *   Not stored in NVS while TFTModuleS3 support is disabled for this profile.
  */
 inline constexpr SupervisorInputSpec kWaveshareESP32S3Inputs{
-    11,   // pirPin: motion sensor for TFT wake.
+    -1,   // pirPin disabled; was GPIO11 motion sensor for TFT wake.
     120,  // pirDebounceMs.
     true, // pirActiveHigh.
     -1,   // factoryResetPin: not assigned on this board.
@@ -407,7 +435,7 @@ inline constexpr SupervisorBoardSpec kWaveshareESP32S3Supervisor{
  * Field order:
  *   name, mdnsHost, uarts, uartCount, i2cBuses, i2cCount, oneWireBuses,
  *   oneWireCount, ioPoints, ioPointCount, ioCapacity, mqttCapacity,
- *   mqttBuffers, haCapacity, supervisor, provisioning, ethernetW5500.
+ *   mqttBuffers, haCapacity, supervisor, provisioning, ethernetW5500, hmiBuzzer.
  *
  * name:
  *   Board identifier exposed to logs/runtime.
@@ -450,7 +478,8 @@ inline constexpr BoardSpec kWaveshareESP32S3{
     kWaveshareESP32S3HaCapacity,
     &kWaveshareESP32S3Supervisor,
     {},
-    &kWaveshareESP32S3EthernetW5500
+    &kWaveshareESP32S3EthernetW5500,
+    &kWaveshareESP32S3HmiBuzzer
 };
 
 }  // namespace BoardProfiles

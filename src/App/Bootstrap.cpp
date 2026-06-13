@@ -1,6 +1,7 @@
 #include "App/Bootstrap.h"
 
 #include "App/BuildFlags.h"
+#include "Core/Services/IHmi.h"
 #include "Core/Services/ILogger.h"
 
 #ifndef FLOW_ENABLE_BOOT_LOG_CAPTURE
@@ -89,6 +90,9 @@ void run()
     }
 
     gContext.bootCompleted = true;
+    if (const HmiService* hmi = gContext.services.get<HmiService>(ServiceId::Hmi)) {
+        if (hmi->setBootComplete) hmi->setBootComplete(hmi->ctx);
+    }
     gStarted = true;
 #if FLOW_ENABLE_BOOT_LOG_CAPTURE
     markBootLogCaptureCompleteIfReady();

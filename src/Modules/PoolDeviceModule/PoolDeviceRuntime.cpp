@@ -18,7 +18,6 @@
 
 namespace {
 static constexpr const char* kPoolDeviceCfgTopicBase = "cfg/pdm";
-static constexpr const char* kPoolDeviceCfgRuntimeTopicBase = "cfg/pdmrt";
 
 template <size_t Rows, size_t Cols>
 size_t charTableUsage_(const char (&table)[Rows][Cols])
@@ -360,12 +359,6 @@ MqttBuildResult PoolDeviceModule::buildCfgBasePdmStatic_(void* ctx, uint16_t, Mq
     return self ? self->buildCfgBasePdm_(buildCtx) : MqttBuildResult::PermanentError;
 }
 
-MqttBuildResult PoolDeviceModule::buildCfgBasePdmrtStatic_(void* ctx, uint16_t, MqttBuildContext& buildCtx)
-{
-    PoolDeviceModule* self = static_cast<PoolDeviceModule*>(ctx);
-    return self ? self->buildCfgBasePdmrt_(buildCtx) : MqttBuildResult::PermanentError;
-}
-
 MqttBuildResult PoolDeviceModule::buildCfgBasePdm_(MqttBuildContext& buildCtx)
 {
     if (!cfgStore_) return MqttBuildResult::RetryLater;
@@ -435,87 +428,6 @@ MqttBuildResult PoolDeviceModule::buildCfgBasePdm_(MqttBuildContext& buildCtx)
 
     if (!any) {
         LOGW("cfg base skipped: no data for %s", kPoolDeviceCfgTopicBase);
-        return MqttBuildResult::NoLongerNeeded;
-    }
-
-    buildCtx.payload[pos++] = '}';
-    buildCtx.payload[pos] = '\0';
-    buildCtx.topicLen = (uint16_t)topicLen;
-    buildCtx.payloadLen = (uint16_t)pos;
-    buildCtx.qos = 1;
-    buildCtx.retain = true;
-    return MqttBuildResult::Ready;
-}
-
-MqttBuildResult PoolDeviceModule::buildCfgBasePdmrt_(MqttBuildContext& buildCtx)
-{
-    if (!cfgStore_) return MqttBuildResult::RetryLater;
-    if (!buildCtx.topic || buildCtx.topicCapacity == 0U || !buildCtx.payload || buildCtx.payloadCapacity == 0U) {
-        return MqttBuildResult::PermanentError;
-    }
-    if (!mqttSvc_ || !mqttSvc_->formatTopic) return MqttBuildResult::RetryLater;
-
-    char relativeTopic[Limits::Mqtt::Buffers::DynamicTopic] = {0};
-    size_t topicLen = 0U;
-    if (!MqttConfigRouteProducer::buildRelativeTopic(relativeTopic,
-                                                     sizeof(relativeTopic),
-                                                     kPoolDeviceCfgRuntimeTopicBase,
-                                                     "",
-                                                     topicLen)) {
-        return MqttBuildResult::PermanentError;
-    }
-    mqttSvc_->formatTopic(mqttSvc_->ctx, relativeTopic, buildCtx.topic, buildCtx.topicCapacity);
-    if (buildCtx.topic[0] == '\0') return MqttBuildResult::PermanentError;
-    topicLen = strnlen(buildCtx.topic, buildCtx.topicCapacity);
-
-    buildCtx.payload[0] = '{';
-    buildCtx.payload[1] = '\0';
-    size_t pos = 1U;
-    bool any = false;
-    bool truncatedPayload = false;
-
-    for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
-        if (!slots_[i].used) continue;
-
-        char moduleJson[640] = {0};
-        bool truncatedModule = false;
-        const bool hasAny = cfgStore_->toJsonModule(PoolDeviceSlots::kSlots[i].runtimeModuleName,
-                                                    moduleJson,
-                                                    sizeof(moduleJson),
-                                                    &truncatedModule);
-        if (truncatedModule) {
-            truncatedPayload = true;
-            break;
-        }
-        if (!hasAny) continue;
-
-        const int w = snprintf(buildCtx.payload + pos,
-                               buildCtx.payloadCapacity - pos,
-                               "%s\"%s\":%s",
-                               any ? "," : "",
-                               slots_[i].id,
-                               moduleJson);
-        if (!(w > 0 && (size_t)w < (buildCtx.payloadCapacity - pos))) {
-            truncatedPayload = true;
-            break;
-        }
-        pos += (size_t)w;
-        any = true;
-    }
-
-    if (truncatedPayload || pos + 2U > buildCtx.payloadCapacity) {
-        if (!writeErrorJson(buildCtx.payload, buildCtx.payloadCapacity, ErrorCode::CfgTruncated, "cfg/pdmrt")) {
-            snprintf(buildCtx.payload, buildCtx.payloadCapacity, "{\"ok\":false}");
-        }
-        buildCtx.topicLen = (uint16_t)topicLen;
-        buildCtx.payloadLen = (uint16_t)strnlen(buildCtx.payload, buildCtx.payloadCapacity);
-        buildCtx.qos = 1;
-        buildCtx.retain = true;
-        return MqttBuildResult::Ready;
-    }
-
-    if (!any) {
-        LOGW("cfg base skipped: no data for %s", kPoolDeviceCfgRuntimeTopicBase);
         return MqttBuildResult::NoLongerNeeded;
     }
 

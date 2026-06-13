@@ -117,6 +117,7 @@ Trois branches de config dédiées sont exposées:
   - `enabled`: active/désactive l'écriture vers l'écran Nextion
 - `hmi/leds`
   - `enabled`: active/désactive les écritures de masque logique vers `StatusLedsService`
+  - `waveshare_enabled`: active/désactive la LED WS2812 Waveshare d'état système
 - `hmi/venice`
   - `enabled`: active/désactive l'émetteur RF433 Venice
   - `tx_gpio`: GPIO TX du module 433 MHz
@@ -125,3 +126,28 @@ Trois branches de config dédiées sont exposées:
 Quand `hmi/leds/enabled=false`, le `HMIModule` cesse simplement d'écrire le
 masque LEDs. Cela laisse le PCF8574 disponible pour d'autres usages côté
 `IOModule`.
+
+## Identité visuelle LED WS2812 Waveshare
+
+La LED WS2812 Waveshare affiche un seul état système à la fois. Les services ne
+pilotent pas directement la LED: ils déclarent des conditions actives ou
+inactives, puis le HMI choisit l'état visible selon une priorité fixe.
+
+Priorité d'affichage:
+
+| Priorité | État | Signification | Couleur / animation |
+| --- | --- | --- | --- |
+| 1 | `AlarmActive` | Au moins une alarme active | Rouge, clignotement rapide |
+| 2 | `SensorFault` | Au moins un capteur configuré est invalide ou inconnu | Orange, breathe lent |
+| 3 | `CaptivePortalActive` | Portail captif actif, action utilisateur attendue | Cyan/turquoise, breathe lent |
+| 4 | `OtaInProgress` | Mise à jour OTA en cours | Violet, breathe |
+| 5 | `NetworkLost` | Aucun réseau attendu n'est opérationnel | Bleu, pulse rapide |
+| 6 | `Booting` | Démarrage en cours | Blanc, breathe lent |
+| 7 | `Normal` | Aucun état prioritaire actif | Vert, breathe très lent et faible luminosité |
+
+Le mode `Booting` est actif par défaut au démarrage et disparaît après
+`setBootComplete()`. Le mode `Normal` n'est pas demandé par les services: il est
+calculé automatiquement quand aucune condition prioritaire n'est active.
+
+Les transitions entre états se font par fondu non bloquant. Les animations sont
+basées sur `millis()` et ne doivent pas utiliser `delay()`.

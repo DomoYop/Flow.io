@@ -5,10 +5,14 @@
     const pages = Array.from(document.querySelectorAll('.page'));
     const mobileTopbarTitle = document.getElementById('mobileTopbarTitle');
     const desktopPageTitle = document.getElementById('desktopPageTitle');
+    const headerNetworkIcon = document.getElementById('headerNetworkIcon');
+    const networkConfigIcon = document.getElementById('networkConfigIcon');
+    const applyNetworkIcon = document.getElementById('applyNetworkIcon');
     const headerWifiDot = document.getElementById('headerWifiDot');
     const headerWifiStatus = document.getElementById('headerWifiStatus');
     const headerReachabilityDot = document.getElementById('headerReachabilityDot');
     const headerDeviceStatus = document.getElementById('headerDeviceStatus');
+    const headerClockLabel = document.getElementById('headerClockLabel');
     const headerClockStatus = document.getElementById('headerClockStatus');
     const flowWebAssetVersionStorageKey = 'flow_web_asset_version';
     const deferredVisualAssetsStateKey = 'flow_web_deferred_visual_assets';
@@ -68,6 +72,8 @@
     let deferredMenuAssetsArmed = false;
     let fieldApplyCheckIcon = '✓';
     let networkMode = 'none';
+    let networkTransport = 'none';
+    let currentFlowTimeSourceLabel = '';
     let useRemoteMenuIcons = false;
     let remoteMenuIconFontReady = false;
     let remoteMenuIconFontPromise = null;
@@ -348,7 +354,20 @@
       const raw = String(value || '').trim().toLowerCase();
       if (raw === 'ap' || raw === 'accesspoint' || raw === 'access_point') return 'ap';
       if (raw === 'station' || raw === 'sta') return 'station';
+      if (raw === 'ethernet') return 'ethernet';
       return 'none';
+    }
+
+    function normalizeNetworkType(value) {
+      const raw = String(value || '').trim().toLowerCase();
+      if (raw === 'ethernet' || raw === 'eth' || raw === 'wired') return 'ethernet';
+      if (raw === 'wifi' || raw === 'wi-fi' || raw === 'station' || raw === 'sta') return 'wifi';
+      return '';
+    }
+
+    function normalizeNetworkTransport(value) {
+      const raw = normalizeNetworkType(value);
+      return raw || 'none';
     }
 
     function isAccessPointMode() {
@@ -520,6 +539,7 @@
     async function applyMenuIconModeFromMeta(data) {
       const mode = normalizeNetworkMode(data && data.network_mode);
       networkMode = mode;
+      networkTransport = normalizeNetworkTransport(data && (data.network_transport || data.transport));
       const remoteReady = await ensureRemoteMenuIconFontLoaded().catch(() => false);
       applyMenuIconSourcePreference(remoteReady);
     }
@@ -673,6 +693,7 @@
         webLocalRuntime = initialMeta.local_runtime === true;
         webRemoteConfigEnabled = initialMeta.remote_config_enabled !== false;
         networkMode = normalizeNetworkMode(initialMeta.network_mode);
+        networkTransport = normalizeNetworkTransport(initialMeta.network_transport || initialMeta.transport);
       }
     } catch (err) {
     }
@@ -1019,9 +1040,51 @@
       }
       const mode = normalizeNetworkMode(networkMode);
       if (mode === 'ap') return 'AP';
-      if (mode === 'sta') return tr('info.netType.wifi', 'Wifi');
+      const type = currentFlowNetworkType();
+      if (type) return formatInfoNetworkType(type);
+      if (mode === 'station') return tr('info.netType.wifi', 'Wifi');
       if (mode === 'ethernet') return tr('info.netType.ethernet', 'Ethernet');
       return '-';
+    }
+
+    function effectiveNetworkType(wifi, domainReady) {
+      const transport = normalizeNetworkType(networkTransport);
+      if (transport) return transport;
+
+      const ready = wifi && typeof wifi.rdy === 'boolean'
+        ? wifi.rdy
+        : !!domainReady;
+      if (!ready) return '';
+
+      const runtimeType = normalizeNetworkType(wifi && wifi.typ);
+      if (runtimeType) return runtimeType;
+
+      const mode = normalizeNetworkMode(networkMode);
+      if (mode === 'ethernet') return 'ethernet';
+      if (mode === 'station') return 'wifi';
+      return '';
+    }
+
+    function currentFlowNetworkType() {
+      try {
+        const wifiDomain = (flowStatusDomainCache.wifi && flowStatusDomainCache.wifi.data && flowStatusDomainCache.wifi.data.ok === true)
+          ? flowStatusDomainCache.wifi.data
+          : null;
+        const wifi = (wifiDomain && wifiDomain.wifi && typeof wifiDomain.wifi === 'object') ? wifiDomain.wifi : null;
+        const type = effectiveNetworkType(wifi, !!wifiDomain);
+        if (type) return type;
+      } catch (err) {
+      }
+      const transport = normalizeNetworkType(networkTransport);
+      if (transport) return transport;
+      const mode = normalizeNetworkMode(networkMode);
+      if (mode === 'ethernet') return 'ethernet';
+      if (mode === 'station') return 'wifi';
+      return '';
+    }
+
+    function currentFlowNetworkIcon() {
+      return currentFlowNetworkType() === 'ethernet' ? 'settings_ethernet' : 'wifi';
     }
 
     function isHeaderWifiConnected() {
@@ -1033,8 +1096,9 @@
         if (wifi && typeof wifi.rdy === 'boolean') return wifi.rdy;
       } catch (err) {
       }
+      if (normalizeNetworkType(networkTransport)) return true;
       const mode = normalizeNetworkMode(networkMode);
-      return mode === 'sta' || mode === 'ethernet';
+      return mode === 'station' || mode === 'ethernet';
     }
 
     function refreshAppHeader(pageId) {
@@ -1046,6 +1110,15 @@
       if (headerWifiStatus) {
         headerWifiStatus.textContent = formatHeaderNetworkStatus();
       }
+      if (headerNetworkIcon) {
+        headerNetworkIcon.textContent = currentFlowNetworkIcon();
+      }
+      if (networkConfigIcon) {
+        networkConfigIcon.textContent = currentFlowNetworkIcon();
+      }
+      if (applyNetworkIcon) {
+        applyNetworkIcon.textContent = currentFlowNetworkType() === 'ethernet' ? 'settings_ethernet' : 'wifi_protected_setup';
+      }
       if (headerWifiDot) {
         headerWifiDot.classList.toggle('is-connected', isHeaderWifiConnected());
       }
@@ -1053,6 +1126,12 @@
     }
 
     function refreshAppHeaderClock() {
+      if (headerClockLabel) {
+        const baseLabel = tr('header.time', 'Heure');
+        headerClockLabel.textContent = currentFlowTimeSourceLabel
+          ? baseLabel + ' (' + currentFlowTimeSourceLabel + ')'
+          : baseLabel;
+      }
       if (!headerClockStatus) return;
       headerClockStatus.textContent = new Date().toLocaleTimeString(currentWebLocaleTag());
     }
@@ -1061,6 +1140,21 @@
       refreshAppHeaderClock();
       if (appHeaderClockTimer || !headerClockStatus) return;
       appHeaderClockTimer = setInterval(refreshAppHeaderClock, 1000);
+    }
+
+    function syncHeaderTimeSourceFromSystemDomain() {
+      try {
+        const systemDomain = (flowStatusDomainCache.system && flowStatusDomainCache.system.data && flowStatusDomainCache.system.data.ok === true)
+          ? flowStatusDomainCache.system.data
+          : null;
+        const time = (systemDomain && systemDomain.time && typeof systemDomain.time === 'object') ? systemDomain.time : null;
+        const nextTimeLabel = flowTimeHeaderLabel(time);
+        if (nextTimeLabel) {
+          currentFlowTimeSourceLabel = nextTimeLabel;
+          refreshAppHeaderClock();
+        }
+      } catch (err) {
+      }
     }
 
     function renderHeaderReachability() {
@@ -1124,6 +1218,7 @@
       deviceReachabilityTimer = setInterval(() => {
         if (document.hidden) return;
         probeHeaderReachability().catch(() => {});
+        refreshAppHeaderTime(false).catch(() => {});
       }, deviceReachabilityProbeMs);
     }
 
@@ -1133,6 +1228,15 @@
       } catch (err) {
       }
       refreshAppHeader(getActivePageId());
+    }
+
+    async function refreshAppHeaderTime(forceRefresh) {
+      try {
+        await fetchFlowStatusDomain('system', !!forceRefresh, 'header');
+        syncHeaderTimeSourceFromSystemDomain();
+      } catch (err) {
+      }
+      refreshAppHeaderClock();
     }
 
     function syncMobileTopbarTitle(pageId) {
@@ -1295,6 +1399,11 @@
           ok: true,
           fw: infoRuntimeValue(valueById, 1801, ''),
           upms: infoRuntimeValue(valueById, 1802, 0),
+          time: {
+            rdy: !!infoRuntimeValue(valueById, 1301, false),
+            src: infoRuntimeValue(valueById, 1302, 'none'),
+            qlt: infoRuntimeValue(valueById, 1303, '')
+          },
           heap: {
             free: infoRuntimeValue(valueById, 1803, 0),
             min_free: infoRuntimeValue(valueById, 1804, 0)
@@ -1422,10 +1531,14 @@
     }
 
     function formatInfoNetworkType(value) {
-      const normalized = String(value || '').trim().toLowerCase();
+      const normalized = normalizeNetworkType(value);
       if (normalized === 'ethernet') return tr('info.netType.ethernet', 'Ethernet');
-      if (normalized === 'wifi' || normalized === 'wi-fi') return tr('info.netType.wifi', 'Wifi');
-      return normalized ? normalized : '-';
+      if (normalized === 'wifi') return tr('info.netType.wifi', 'Wifi');
+      const raw = String(value || '').trim().toLowerCase();
+      if (!raw || raw === 'none' || raw === 'ap' || raw === 'accesspoint' || raw === 'access_point') {
+        return tr('info.state.disconnected', 'Déconnecté');
+      }
+      return raw ? raw : '-';
     }
 
     function renderInfoPanel() {
@@ -1443,12 +1556,17 @@
         ? flowStatusDomainCache.mqtt.data
         : null;
       const mqtt = (mqttDomain && mqttDomain.mqtt && typeof mqttDomain.mqtt === 'object') ? mqttDomain.mqtt : {};
+      const time = (systemDomain && systemDomain.time && typeof systemDomain.time === 'object') ? systemDomain.time : null;
+      if (time) {
+        syncHeaderTimeSourceFromSystemDomain();
+      }
       const fullFirmware = systemDomain ? fmtFlowStatusVal(systemDomain.fw) : (supervisorFirmwareVersion || '-');
       const firmwareParts = splitInfoFirmwareVersion(fullFirmware);
       const currentMac = wifiDomain ? normalizeInfoMac(wifi.mac) : '-';
       if (currentMac !== '-') infoLastMac = currentMac;
       const mac = currentMac !== '-' ? currentMac : infoLastMac;
       const deviceName = String(systemDomain && systemDomain.devicename ? systemDomain.devicename : webDeviceName || 'flowio').trim() || 'flowio';
+      const infoNetworkType = effectiveNetworkType(wifi, !!wifiDomain);
       const infoRows = [
         [tr('info.row.deviceName', 'Nom de l’appareil'), deviceName],
         [tr('info.row.firmwareVersion', 'Version firmware'), firmwareParts.version],
@@ -1456,9 +1574,10 @@
         [tr('info.row.uptime', 'Uptime'), systemDomain ? formatInfoUptime(systemDomain.upms) : formatInfoUptime(supervisorUptimeMs)],
         [tr('info.row.ip', 'Adresse IP'), wifiDomain ? normalizeIpValue(wifi.ip) : '-'],
         [tr('info.row.mac', 'Adresse MAC'), mac],
-        [tr('info.row.networkType', 'Type réseau'), wifiDomain ? formatInfoNetworkType(wifi.typ) : '-'],
+        [tr('info.row.networkType', 'Type réseau'), wifiDomain ? formatInfoNetworkType(infoNetworkType) : '-'],
         [tr('info.row.signal', 'Signal'), (wifiDomain && wifi.hrss) ? formatInfoDbm(wifi.rssi) : '-'],
-        [tr('info.row.mqtt', 'MQTT'), mqttDomain ? formatInfoBoolean(!!mqtt.rdy, tr('info.state.connected', 'Connecté'), tr('info.state.disconnected', 'Déconnecté')) : '-']
+        [tr('info.row.mqtt', 'MQTT'), mqttDomain ? formatInfoBoolean(!!mqtt.rdy, tr('info.state.connected', 'Connecté'), tr('info.state.disconnected', 'Déconnecté')) : '-'],
+        [tr('info.row.time', 'Heure'), time ? flowTimeStatusLabel(time) : '-']
       ];
       if (systemDomain) {
         infoRows.push([tr('info.row.heapFree', 'Heap libre'), formatInfoBytes(flowHeap.free)]);
@@ -1882,7 +2001,7 @@
         key: 'orp',
         label: 'ORP',
         mode: 'two',
-        poollogicKey: 'orp_io_id',
+        poollogicKey: 'dis_io_id',
         runtimeUiId: 2104,
         recommendedSpan: 120,
         warningOffset: 120
@@ -1926,6 +2045,9 @@
     const infoFlowDomainKeys = ['system', 'wifi', 'mqtt'];
     const infoRuntimeDomainEntries = Object.freeze({
       system: Object.freeze([
+        Object.freeze({ id: 1301 }),
+        Object.freeze({ id: 1302 }),
+        Object.freeze({ id: 1303 }),
         Object.freeze({ id: 1801 }),
         Object.freeze({ id: 1802 }),
         Object.freeze({ id: 1803 }),
@@ -3458,6 +3580,47 @@
       return String(v);
     }
 
+    function flowTimeSourceLabel(src) {
+      const key = String(src || '').trim().toLowerCase();
+      if (key === 'ntp') return 'NTP';
+      if (key === 'internal_rtc') return 'RTC';
+      if (key === 'manual') return 'manuel';
+      return '';
+    }
+
+    function flowTimeQualityLabel(quality) {
+      const key = String(quality || '').trim().toLowerCase();
+      if (key === 'ntp_synced') return 'NTP';
+      if (key === 'rtc_trusted') return currentWebLocaleTag().toLowerCase().startsWith('en') ? 'RTC' : 'RTC';
+      if (key === 'manual') return currentWebLocaleTag().toLowerCase().startsWith('en') ? 'manual' : 'manuel';
+      if (key === 'rtc_untrusted') return 'RTC?';
+      if (key === 'invalid') return '';
+      return '';
+    }
+
+    function flowTimeIsReady(time) {
+      if (!time || typeof time !== 'object') return false;
+      return !!time.rdy || !!flowTimeQualityLabel(time.qlt) || !!flowTimeSourceLabel(time.src);
+    }
+
+    function flowTimeHeaderLabel(time) {
+      if (!time || typeof time !== 'object') return '';
+      const quality = flowTimeQualityLabel(time.qlt);
+      if (quality) return quality;
+      const source = flowTimeSourceLabel(time.src);
+      if (source) return source;
+      return flowTimeIsReady(time) ? tr('info.state.synced', 'Synchronisée') : tr('info.state.unsynced', 'Non synchronisée');
+    }
+
+    function flowTimeStatusLabel(time) {
+      if (!time || typeof time !== 'object') return '';
+      if (!flowTimeIsReady(time)) return tr('info.state.unsynced', 'Non synchronisée');
+      const source = flowTimeQualityLabel(time.qlt) || flowTimeSourceLabel(time.src);
+      return source
+        ? tr('info.state.synced', 'Synchronisée') + ' (' + source + ')'
+        : tr('info.state.synced', 'Synchronisée');
+    }
+
     function fmtFlowCount(v) {
       const n = Number(v);
       return Number.isFinite(n) ? String(Math.max(0, Math.round(n))) : '-';
@@ -3787,7 +3950,8 @@
 
     function buildFlowStatusCardIcon(iconKey, ok, label) {
       const iconText = {
-        wifi: 'WF',
+        wifi: 'wifi',
+        ethernet: 'settings_ethernet',
         supervisor: 'SUP',
         system: 'SYS',
         mqtt: 'MQ',
@@ -3796,6 +3960,9 @@
       };
       const span = document.createElement('span');
       span.className = ok ? 'status-card-icon is-true' : 'status-card-icon is-false';
+      if (iconKey === 'wifi' || iconKey === 'ethernet') {
+        span.classList.add('status-card-icon-msr');
+      }
       span.setAttribute('role', 'img');
       span.setAttribute('aria-label', label || (ok ? 'OK' : 'NOK'));
       span.title = label || (ok ? 'OK' : 'NOK');
@@ -3861,6 +4028,9 @@
         merged.fw = system.fw || '';
         merged.upms = system.upms ?? 0;
         merged.heap = (system.heap && typeof system.heap === 'object') ? system.heap : {};
+        if (system.time && typeof system.time === 'object') {
+          merged.time = system.time;
+        }
       }
 
       const wifi = domainData.wifi;
@@ -3945,6 +4115,15 @@
       if (data.i2c && typeof data.i2c === 'object') {
         flowStatusDomainCache.i2c.data = { ok: true, i2c: data.i2c };
         flowStatusDomainCache.i2c.fetchedAt = stamp;
+      }
+
+      if (data.time && typeof data.time === 'object') {
+        const systemData = flowStatusDomainCache.system.data && typeof flowStatusDomainCache.system.data === 'object'
+          ? flowStatusDomainCache.system.data
+          : { ok: true };
+        systemData.time = data.time;
+        flowStatusDomainCache.system.data = systemData;
+        flowStatusDomainCache.system.fetchedAt = stamp;
       }
     }
 
@@ -4094,6 +4273,7 @@
       const wifi = (data && typeof data.wifi === 'object') ? data.wifi : {};
       const mqtt = (data && typeof data.mqtt === 'object') ? data.mqtt : {};
       const pool = (data && typeof data.pool === 'object') ? data.pool : {};
+      const time = (data && typeof data.time === 'object') ? data.time : {};
       const heap = (data && data.heap && typeof data.heap === 'object') ? data.heap : {};
       const i2c = (data && data.i2c && typeof data.i2c === 'object') ? data.i2c : {};
       const firmware = fmtFlowStatusVal(data.fw);
@@ -4103,7 +4283,13 @@
       const wifiIp = normalizeIpValue(wifi.ip);
       const wifiHasRssi = !!wifi.hrss;
       const wifiRssi = wifi.rssi ?? '-';
+      const networkType = effectiveNetworkType(wifi, true);
+      const networkIsEthernet = networkType === 'ethernet';
       const mqttReady = !!mqtt.rdy;
+      if (data && Object.prototype.hasOwnProperty.call(data, 'time')) {
+        currentFlowTimeSourceLabel = flowTimeHeaderLabel(time);
+      }
+      refreshAppHeaderClock();
       const mqttServer = fmtFlowStatusVal(mqtt.srv);
       const mqttRxDrop = mqtt.rxdrp ?? 0;
       const mqttParseFail = mqtt.prsf ?? 0;
@@ -4229,15 +4415,19 @@
       ]);
 
       flowStatusGrid.innerHTML = '';
+      const networkRows = [
+        [tr('info.row.ip', 'Adresse IP'), wifiIp],
+        [tr('info.row.networkType', 'Type réseau'), formatInfoNetworkType(networkType)]
+      ];
+      if (!networkIsEthernet) {
+        networkRows.push([tr('info.row.signal', 'Signal'), buildFlowRssiGauge(wifiRssi, wifiHasRssi)]);
+      }
       appendFlowStatusCard({
-        title: 'WiFi',
-        icon: 'wifi',
+        title: tr('header.wifi', 'Réseau'),
+        icon: networkIsEthernet ? 'ethernet' : 'wifi',
         ok: wifiReady,
-        iconLabel: wifiReady ? 'WiFi connecte' : 'WiFi deconnecte',
-        rows: [
-          ['Adresse IP', wifiIp],
-          ['Signal', buildFlowRssiGauge(wifiRssi, wifiHasRssi)]
-        ]
+        iconLabel: wifiReady ? tr('info.state.connected', 'Connecté') : tr('info.state.disconnected', 'Déconnecté'),
+        rows: networkRows
       });
       appendFlowStatusCard({
         title: 'MQTT',
@@ -4461,7 +4651,7 @@
       if (key === 'sondes') return 'Sondes';
       if (key === 'micronova') return 'Micronova';
       if (key === 'mqtt') return 'MQTT';
-      if (key === 'wifi') return 'WiFi';
+      if (key === 'wifi') return tr('header.wifi', 'Réseau');
       if (key === 'i2c') return 'I2C';
       if (key === 'system') return 'Système';
       if (key === 'alarm') return 'Alarmes';
@@ -6478,11 +6668,11 @@
 
     function updateWifiScanStatusText(data, reqError) {
       if (reqError) {
-        wifiConfigStatus.textContent = 'Scan WiFi indisponible: ' + reqError;
+        wifiConfigStatus.textContent = 'Scan réseau indisponible: ' + reqError;
         return;
       }
       if (!data || data.ok !== true) {
-        wifiConfigStatus.textContent = 'Scan WiFi : réponse invalide.';
+        wifiConfigStatus.textContent = 'Scan réseau : réponse invalide.';
         return;
       }
 
@@ -6491,11 +6681,11 @@
       const count = Number.isFinite(data.count) ? data.count : 0;
       const totalFound = Number.isFinite(data.total_found) ? data.total_found : count;
       if (running || requested) {
-        wifiConfigStatus.textContent = 'Scan WiFi en cours...';
+        wifiConfigStatus.textContent = 'Scan réseau en cours...';
         return;
       }
       if (count > 0) {
-        wifiConfigStatus.textContent = 'Scan WiFi terminé : ' + count + ' réseaux affichés (' + totalFound + ' détectés).';
+        wifiConfigStatus.textContent = 'Scan réseau terminé : ' + count + ' réseaux affichés (' + totalFound + ' détectés).';
         return;
       }
       wifiConfigStatus.textContent = 'Aucun réseau visible détecté.';
@@ -6540,13 +6730,13 @@
 
     async function loadWifiConfig() {
       try {
-        const data = await fetchOkJson('/api/wifi/config', { cache: 'no-store' }, 'chargement wifi indisponible');
+        const data = await fetchOkJson('/api/wifi/config', { cache: 'no-store' }, 'chargement réseau indisponible');
         wifiEnabled.checked = toBool(data.enabled);
         wifiSsid.value = data.ssid || '';
         wifiPass.value = data.pass || '';
-        wifiConfigStatus.textContent = 'Configuration WiFi chargée.';
+        wifiConfigStatus.textContent = 'Configuration réseau chargée.';
       } catch (err) {
-        wifiConfigStatus.textContent = 'Chargement WiFi échoué: ' + err;
+        wifiConfigStatus.textContent = 'Chargement réseau échoué: ' + err;
       }
     }
 
@@ -6556,7 +6746,7 @@
         ssid: wifiSsid.value.trim(),
         pass: wifiPass.value
       }), 'échec application');
-      wifiConfigStatus.textContent = 'Configuration WiFi appliquée (reconnexion en cours).';
+      wifiConfigStatus.textContent = 'Configuration réseau appliquée (reconnexion en cours).';
     }
 
     function nettoyerNomFlowCfg(moduleName) {
@@ -9657,15 +9847,15 @@
         mettreAJourEtatVisibiliteMotDePasse(
           wifiPass,
           toggleWifiPassBtn,
-          tr('wifi.password.show', 'Afficher le mot de passe WiFi'),
-          tr('wifi.password.hide', 'Masquer le mot de passe WiFi')
+          tr('wifi.password.show', 'Afficher le mot de passe réseau'),
+          tr('wifi.password.hide', 'Masquer le mot de passe réseau')
         );
         toggleWifiPassBtn.addEventListener('click', () => {
           basculerVisibiliteMotDePasse(
             wifiPass,
             toggleWifiPassBtn,
-            tr('wifi.password.show', 'Afficher le mot de passe WiFi'),
-            tr('wifi.password.hide', 'Masquer le mot de passe WiFi')
+            tr('wifi.password.show', 'Afficher le mot de passe réseau'),
+            tr('wifi.password.hide', 'Masquer le mot de passe réseau')
           );
         });
       }
@@ -9680,7 +9870,7 @@
         try {
           await saveWifiConfig();
         } catch (err) {
-          wifiConfigStatus.textContent = tr('system.action.wifiApplyFailed', 'Application WiFi échouée') + ': ' + err;
+          wifiConfigStatus.textContent = tr('system.action.wifiApplyFailed', 'Application réseau échouée') + ': ' + err;
         }
       });
     }
@@ -9786,6 +9976,7 @@
         if (!document.hidden) {
           refreshWebUiLocale(true).catch(() => {});
           refreshAppHeaderWifi(true).catch(() => {});
+          refreshAppHeaderTime(true).catch(() => {});
           probeHeaderReachability().catch(() => {});
         }
       });
@@ -9812,6 +10003,7 @@
     const startInitialUi = async () => {
       await loadWebMeta().catch(() => {});
       refreshAppHeaderWifi(true).catch(() => {});
+      refreshAppHeaderTime(true).catch(() => {});
       showPage(initialPageId, { deferHeavyMs: 260 });
     };
     if (typeof window.requestAnimationFrame === 'function') {

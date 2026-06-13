@@ -294,13 +294,17 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
         if (requested && clearDosingModeKey && cfgStore_) {
             char patch[96]{};
             if (strcmp(clearDosingModeKey, "disinfection_type") == 0) {
-                snprintf(patch, sizeof(patch), "{\"poollogic/mode\":{\"disinfection_type\":%u}}", (unsigned)DisinfectionDisabled);
+                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"disinfection_type\":%u}}", (unsigned)DisinfectionDisabled);
+            } else if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) {
+                snprintf(patch, sizeof(patch), "{\"poollogic/ph\":{\"ph_auto_mode\":false}}");
+            } else if (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) {
+                snprintf(patch, sizeof(patch), "{\"poollogic/chlorine\":{\"dis_auto_mode\":false}}");
             } else {
-                snprintf(patch, sizeof(patch), "{\"poollogic/mode\":{\"%s\":false}}", clearDosingModeKey);
+                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"%s\":false}}", clearDosingModeKey);
             }
             if (cfgStore_->applyJson(patch)) {
                 if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) phAutoMode_ = false;
-                else if (strcmp(clearDosingModeKey, "orp_auto_mode") == 0) orpAutoMode_ = false;
+                else if (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) orpAutoMode_ = false;
                 else if (strcmp(clearDosingModeKey, "disinfection_type") == 0) {
                     disinfectionType_ = DisinfectionDisabled;
                     const PoolDeviceSvcStatus rest = poolSvc_->writeDesired(poolSvc_->ctx, slot, 1U);
@@ -430,11 +434,11 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
     if (strcmp(cmdName, "poollogic.ph_auto_mode.toggle") == 0) {
         return toggleModeValue("poollogic.ph_auto_mode.toggle", phAutoModeVar_, phAutoMode_);
     }
-    if (strcmp(cmdName, "poollogic.orp_auto_mode.set") == 0) {
-        return setModeValue("poollogic.orp_auto_mode.set", orpAutoModeVar_, orpAutoMode_);
+    if (strcmp(cmdName, "poollogic.orp_auto_mode.set") == 0 || strcmp(cmdName, "poollogic.dis_auto_mode.set") == 0) {
+        return setModeValue("poollogic.dis_auto_mode.set", orpAutoModeVar_, orpAutoMode_);
     }
-    if (strcmp(cmdName, "poollogic.orp_auto_mode.toggle") == 0) {
-        return toggleModeValue("poollogic.orp_auto_mode.toggle", orpAutoModeVar_, orpAutoMode_);
+    if (strcmp(cmdName, "poollogic.orp_auto_mode.toggle") == 0 || strcmp(cmdName, "poollogic.dis_auto_mode.toggle") == 0) {
+        return toggleModeValue("poollogic.dis_auto_mode.toggle", orpAutoModeVar_, orpAutoMode_);
     }
     if (strcmp(cmdName, "poollogic.heater_auto_mode.set") == 0) {
         return setModeValue("poollogic.heater_auto_mode.set", heaterAutoModeVar_, heaterAutoMode_);
@@ -457,11 +461,11 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
     if (strcmp(cmdName, "poollogic.ph_pump.toggle") == 0) {
         return toggleDeviceValue("poollogic.ph_pump.toggle", phPumpDeviceSlot_, false, "ph_auto_mode");
     }
-    if (strcmp(cmdName, "poollogic.orp_pump.write") == 0) {
-        return writeDeviceFromArgs("poollogic.orp_pump.write", orpPumpDeviceSlot_, false, "disinfection_type");
+    if (strcmp(cmdName, "poollogic.orp_pump.write") == 0 || strcmp(cmdName, "poollogic.dis_pump.write") == 0) {
+        return writeDeviceFromArgs("poollogic.dis_pump.write", orpPumpDeviceSlot_, false, "disinfection_type");
     }
-    if (strcmp(cmdName, "poollogic.orp_pump.toggle") == 0) {
-        return toggleDeviceValue("poollogic.orp_pump.toggle", orpPumpDeviceSlot_, false, "disinfection_type");
+    if (strcmp(cmdName, "poollogic.orp_pump.toggle") == 0 || strcmp(cmdName, "poollogic.dis_pump.toggle") == 0) {
+        return toggleDeviceValue("poollogic.dis_pump.toggle", orpPumpDeviceSlot_, false, "disinfection_type");
     }
     if (strcmp(cmdName, "poollogic.light.write") == 0 || strcmp(cmdName, "poollogic.lights.write") == 0) {
         return writeDeviceFromArgs("poollogic.lights.write", PoolBinding::kDeviceSlotLights, false, nullptr);

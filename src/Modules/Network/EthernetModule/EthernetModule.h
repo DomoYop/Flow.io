@@ -15,6 +15,10 @@
 #include <ESPmDNS.h>
 #include <NetworkEvents.h>
 
+#ifndef ENABLE_ETHERNET
+#define ENABLE_ETHERNET 1
+#endif
+
 enum class EthernetState : uint8_t {
     Disabled = 0,
     Starting,
@@ -35,7 +39,7 @@ public:
     ModuleId moduleId() const override { return ModuleId::Ethernet; }
     const char* taskName() const override { return "ethernet"; }
     BaseType_t taskCore() const override { return 0; }
-    uint16_t taskStackSize() const override { return 3584; }
+    uint16_t taskStackSize() const override { return 5120; }
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
 
@@ -50,6 +54,7 @@ public:
     void init(ConfigStore& cfg, ServiceRegistry& services) override;
     void onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services) override;
     void loop() override;
+    bool hasEthernetIP() const { return gotIp_; }
 
 private:
     static constexpr uint32_t kErrorRetryMs = 3000U;
@@ -83,6 +88,10 @@ private:
     volatile bool gotIp_ = false;
     volatile bool ipDirty_ = false;
     volatile bool linkDirty_ = false;
+    volatile bool hostnameDirty_ = false;
+    volatile bool linkInfoDirty_ = false;
+    volatile bool mdnsStartDirty_ = false;
+    volatile bool mdnsStopDirty_ = false;
     volatile uint32_t ipAddr_ = 0U;
 
     ConfigVariable<bool,0> enabledVar_{
@@ -103,10 +112,13 @@ private:
     void noteStartFailure_(const char* stage, int err);
     void logEthLinkInfo_() const;
     void loadSystemDeviceName_();
+    void handleDeferredDriverActions_();
     void startMdns_();
     void stopMdns_();
     void syncRuntimeState_();
 
+    bool wifiStaConnected_() const;
+    bool wifiApActive_() const;
     bool isWebReachable_() const;
     NetworkAccessMode mode_() const;
     bool getIp_(char* out, size_t len) const;

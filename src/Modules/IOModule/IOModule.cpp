@@ -12,6 +12,7 @@
 #include <Preferences.h>
 #include <esp_rom_sys.h>
 #include <esp_heap_caps.h>
+#include <limits.h>
 #include <new>
 #include <stdlib.h>
 #include <string.h>
@@ -235,6 +236,17 @@ static const char* ioEdgeModeLabelLocal(uint8_t edgeMode)
     }
 }
 
+static int32_t counterDebounceConfigFromUsLocal(uint32_t value)
+{
+    if (value > (uint32_t)INT32_MAX) return INT32_MAX;
+    return (int32_t)value;
+}
+
+static uint32_t counterDebounceUsFromConfigLocal(int32_t value)
+{
+    return (value <= 0) ? 0U : (uint32_t)value;
+}
+
 void IOModule::setOneWireBuses(OneWireBus* water, OneWireBus* air)
 {
     oneWireWater_ = water;
@@ -450,7 +462,7 @@ bool IOModule::defineDigitalInput(const IODigitalInputDefinition& def)
             digitalInCfg_[logicalIdx].pullMode = def.pullMode;
             digitalInCfg_[logicalIdx].mode = def.mode;
             digitalInCfg_[logicalIdx].edgeMode = def.edgeMode;
-            digitalInCfg_[logicalIdx].counterDebounceUs = def.counterDebounceUs;
+            digitalInCfg_[logicalIdx].counterDebounceUs = counterDebounceConfigFromUsLocal(def.counterDebounceUs);
         }
         return true;
     }
@@ -1635,6 +1647,157 @@ IoStatus IOModule::ioLastCycle_(IoCycleInfo* outCycle) const
     return IO_OK;
 }
 
+IoStatus IOModule::ioSensorStatus_(IoId id, IoSensorStatus* outStatus) const
+{
+    if (!outStatus) return IO_ERR_INVALID_ARG;
+    *outStatus = IoSensorStatus{};
+    outStatus->id = id;
+
+    if (!cfgData_.enabled) {
+        outStatus->invalidReasons = IO_SENSOR_INVALID_DISABLED;
+        return IO_OK;
+    }
+
+    if (id >= IO_ID_AI_BASE && id < IO_ID_AI_MAX) {
+        const uint8_t analogIdx = (uint8_t)(id - IO_ID_AI_BASE);
+        outStatus->kind = IO_KIND_ANALOG_IN;
+
+        if (!analogSlots_[analogIdx].used) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_UNKNOWN_ID;
+            return IO_ERR_UNKNOWN_ID;
+        }
+
+        if (!analogSlotPublished_(analogIdx)) {
+            outStatus->enabled = 0U;
+            outStatus->invalidReasons = IO_SENSOR_INVALID_DISABLED;
+
+            if (analogIdx < ANALOG_CFG_SLOTS) {
+                if (analogCfg_[analogIdx].bindingPort == IO_PORT_INVALID) {
+                    outStatus->invalidReasons |= IO_SENSOR_INVALID_NO_BINDING;
+                } else {
+                    uint8_t source = IO_ANALOG_SOURCE_INVALID;
+                    if (!resolveConfiguredAnalogSource_(analogIdx, source)) {
+                        outStatus->invalidReasons |= IO_SENSOR_INVALID_NO_BINDING;
+                    } else if (analogSourceRequiresDriverEnable_(source) && !analogSourceDriverEnabled_(source)) {
+                        outStatus->invalidReasons |= IO_SENSOR_INVALID_DRIVER_DISABLED;
+                    }
+                }
+            }
+
+            return IO_OK;
+        }
+
+        outStatus->enabled = 1U;
+        if (!analogSlots_[analogIdx].endpoint) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NOT_READY;
+            return IO_OK;
+        }
+
+        IOEndpointValue v{};
+        if (!analogSlots_[analogIdx].endpoint->read(v)) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NOT_READY;
+            return IO_OK;
+        }
+        if (!v.valid) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NO_VALUE;
+            outStatus->tsMs = v.timestampMs;
+            return IO_OK;
+        }
+        if (v.valueType != IO_EP_VALUE_FLOAT) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_TYPE;
+            outStatus->tsMs = v.timestampMs;
+            return IO_OK;
+        }
+
+        outStatus->valid = 1U;
+        outStatus->invalidReasons = IO_SENSOR_INVALID_NONE;
+        outStatus->tsMs = v.timestampMs;
+        return IO_OK;
+    }
+
+    if (id >= IO_ID_DI_BASE && id < IO_ID_DI_MAX) {
+        const uint8_t logicalIdx = (uint8_t)(id - IO_ID_DI_BASE);
+        outStatus->kind = IO_KIND_DIGITAL_IN;
+
+        if (logicalIdx < DIGITAL_INPUT_CFG_SLOTS &&
+            digitalInCfg_[logicalIdx].bindingPort == IO_PORT_INVALID) {
+            outStatus->enabled = 0U;
+            outStatus->invalidReasons = IO_SENSOR_INVALID_DISABLED | IO_SENSOR_INVALID_NO_BINDING;
+            return IO_OK;
+        }
+
+        uint8_t slotIdx = 0xFF;
+        if (!findDigitalSlotByIoId_(id, slotIdx)) {
+            outStatus->enabled = 0U;
+            outStatus->invalidReasons = IO_SENSOR_INVALID_DISABLED;
+            outStatus->invalidReasons |= IO_SENSOR_INVALID_UNKNOWN_ID;
+            return IO_OK;
+        }
+
+        const DigitalSlot& s = digitalSlots_[slotIdx];
+        if (!s.used || s.kind != DIGITAL_SLOT_INPUT) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NOT_SENSOR;
+            return IO_ERR_TYPE_MISMATCH;
+        }
+
+        outStatus->enabled = 1U;
+        if (!s.endpoint) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NOT_READY;
+            return IO_OK;
+        }
+
+        IOEndpointValue v{};
+        if (!s.endpoint->read(v)) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NOT_READY;
+            return IO_OK;
+        }
+        if (!v.valid) {
+            outStatus->invalidReasons = IO_SENSOR_INVALID_NO_VALUE;
+            outStatus->tsMs = v.timestampMs;
+            return IO_OK;
+        }
+
+        outStatus->valid = 1U;
+        outStatus->invalidReasons = IO_SENSOR_INVALID_NONE;
+        outStatus->tsMs = v.timestampMs;
+        return IO_OK;
+    }
+
+    if (id >= IO_ID_DO_BASE && id < IO_ID_DO_MAX) {
+        outStatus->kind = IO_KIND_DIGITAL_OUT;
+        outStatus->invalidReasons = IO_SENSOR_INVALID_NOT_SENSOR;
+        return IO_ERR_TYPE_MISMATCH;
+    }
+
+    outStatus->invalidReasons = IO_SENSOR_INVALID_UNKNOWN_ID;
+    return IO_ERR_UNKNOWN_ID;
+}
+
+IoStatus IOModule::ioListInvalidSensors_(IoId* outIds, uint8_t maxIds, uint8_t* outCount) const
+{
+    if (!outCount) return IO_ERR_INVALID_ARG;
+    *outCount = 0U;
+
+    uint8_t written = 0U;
+    for (uint8_t i = 0; i < MAX_ANALOG_ENDPOINTS; ++i) {
+        IoSensorStatus st{};
+        if (ioSensorStatus_((IoId)(IO_ID_AI_BASE + i), &st) != IO_OK) continue;
+        if (!st.enabled || st.valid) continue;
+        if (outIds && written < maxIds) outIds[written++] = st.id;
+        if (*outCount < 0xFFU) ++(*outCount);
+    }
+
+    for (uint8_t logical = 0; logical < MAX_DIGITAL_INPUTS; ++logical) {
+        IoSensorStatus st{};
+        if (ioSensorStatus_((IoId)(IO_ID_DI_BASE + logical), &st) != IO_OK) continue;
+        if (!st.enabled || st.valid) continue;
+        if (outIds && written < maxIds) outIds[written++] = st.id;
+        if (*outCount < 0xFFU) ++(*outCount);
+    }
+
+    return IO_OK;
+}
+
 bool IOModule::getLedMaskSvc_(uint8_t* mask) const
 {
     if (!mask) return false;
@@ -2051,7 +2214,7 @@ bool IOModule::configureRuntime_()
                 s.inDef.pullMode = pull;
                 s.inDef.mode = digitalInCfg_[cfgIdx].mode;
                 s.inDef.edgeMode = digitalInCfg_[cfgIdx].edgeMode;
-                s.inDef.counterDebounceUs = digitalInCfg_[cfgIdx].counterDebounceUs;
+                s.inDef.counterDebounceUs = counterDebounceUsFromConfigLocal(digitalInCfg_[cfgIdx].counterDebounceUs);
             }
 
             snprintf(s.endpointId, sizeof(s.endpointId), "i%02u", (unsigned)s.logicalIdx);
@@ -2809,14 +2972,14 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
         LOGE("failed to allocate extra analog config vars");
     }
 
-    cfg.registerVar(i0NameVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0BindingVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0ActiveHighVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0PullModeVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0EdgeModeVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0C0Var_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0PrecVar_, kCfgModuleId, kCfgBranchIoI0);
-    cfg.registerVar(i1NameVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1BindingVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1ActiveHighVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1PullModeVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1EdgeModeVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1C0Var_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1PrecVar_, kCfgModuleId, kCfgBranchIoI1);
-    cfg.registerVar(i2NameVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2BindingVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2ActiveHighVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2PullModeVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2EdgeModeVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2C0Var_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2PrecVar_, kCfgModuleId, kCfgBranchIoI2);
-    cfg.registerVar(i3NameVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3BindingVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3ActiveHighVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3PullModeVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3EdgeModeVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3C0Var_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3PrecVar_, kCfgModuleId, kCfgBranchIoI3);
-    cfg.registerVar(i4NameVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4BindingVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4ActiveHighVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4PullModeVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4EdgeModeVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4C0Var_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4PrecVar_, kCfgModuleId, kCfgBranchIoI4);
-    if (DIGITAL_INPUT_CFG_SLOTS > 5U) { cfg.registerVar(i5NameVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5BindingVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5ActiveHighVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5PullModeVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5EdgeModeVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5C0Var_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5PrecVar_, kCfgModuleId, kCfgBranchIoI5); }
-    if (DIGITAL_INPUT_CFG_SLOTS > 6U) { cfg.registerVar(i6NameVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6BindingVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6ActiveHighVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6PullModeVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6EdgeModeVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6C0Var_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6PrecVar_, kCfgModuleId, kCfgBranchIoI6); }
-    if (DIGITAL_INPUT_CFG_SLOTS > 7U) { cfg.registerVar(i7NameVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7BindingVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7ActiveHighVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7PullModeVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7EdgeModeVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7C0Var_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7PrecVar_, kCfgModuleId, kCfgBranchIoI7); }
+    cfg.registerVar(i0NameVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0BindingVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0ActiveHighVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0PullModeVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0EdgeModeVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0C0Var_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0PrecVar_, kCfgModuleId, kCfgBranchIoI0);
+    cfg.registerVar(i1NameVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1BindingVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1ActiveHighVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1PullModeVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1EdgeModeVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1C0Var_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1PrecVar_, kCfgModuleId, kCfgBranchIoI1);
+    cfg.registerVar(i2NameVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2BindingVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2ActiveHighVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2PullModeVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2EdgeModeVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2C0Var_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2PrecVar_, kCfgModuleId, kCfgBranchIoI2);
+    cfg.registerVar(i3NameVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3BindingVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3ActiveHighVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3PullModeVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3EdgeModeVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3C0Var_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3PrecVar_, kCfgModuleId, kCfgBranchIoI3);
+    cfg.registerVar(i4NameVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4BindingVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4ActiveHighVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4PullModeVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4EdgeModeVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4C0Var_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4PrecVar_, kCfgModuleId, kCfgBranchIoI4);
+    if (DIGITAL_INPUT_CFG_SLOTS > 5U) { cfg.registerVar(i5NameVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5BindingVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5ActiveHighVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5PullModeVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5EdgeModeVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5C0Var_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5PrecVar_, kCfgModuleId, kCfgBranchIoI5); }
+    if (DIGITAL_INPUT_CFG_SLOTS > 6U) { cfg.registerVar(i6NameVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6BindingVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6ActiveHighVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6PullModeVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6EdgeModeVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6C0Var_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6PrecVar_, kCfgModuleId, kCfgBranchIoI6); }
+    if (DIGITAL_INPUT_CFG_SLOTS > 7U) { cfg.registerVar(i7NameVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7BindingVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7ActiveHighVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7PullModeVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7EdgeModeVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7C0Var_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7PrecVar_, kCfgModuleId, kCfgBranchIoI7); }
 
     if (ensureDigitalInputModeCfgVars_()) {
         ExtraDigitalInputModeConfigVars& modes = *extraDigitalInputModeCfgVars_;

@@ -80,10 +80,9 @@ private:
     static constexpr uint8_t MAX_HA_NUMBERS = Limits::Ha::Capacity::MaxNumbers;
     static constexpr uint8_t MAX_HA_BUTTONS = Limits::Ha::Capacity::MaxButtons;
     static constexpr uint8_t MAX_HA_SELECTS = Limits::Ha::Capacity::MaxSelects;
-    static constexpr uint8_t MAX_HA_DISCOVERY_CLEANUPS = Limits::Ha::Capacity::MaxDiscoveryCleanups;
     static constexpr uint16_t MAX_HA_ENTITIES =
         MAX_HA_SENSORS + MAX_HA_BINARY_SENSORS + MAX_HA_SWITCHES + MAX_HA_NUMBERS + MAX_HA_BUTTONS + MAX_HA_SELECTS;
-    static constexpr uint16_t MAX_HA_MESSAGES = MAX_HA_ENTITIES + MAX_HA_DISCOVERY_CLEANUPS;
+    static constexpr uint16_t MAX_HA_MESSAGES = MAX_HA_ENTITIES;
     static constexpr uint16_t HA_PENDING_WORDS = (MAX_HA_MESSAGES + 31U) / 32U;
 
     struct HAConfig {
@@ -213,7 +212,6 @@ private:
     void markBootLogCaptureCompleteAfterDiscovery_();
 
     bool buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCtx);
-    bool buildLegacyCleanupMessage_(uint16_t cleanupId, MqttBuildContext& buildCtx);
     bool resolveMqttTopicDeviceId_(char* out, size_t outLen) const;
 
     bool buildObjectId(const char* suffix, char* out, size_t outLen) const;

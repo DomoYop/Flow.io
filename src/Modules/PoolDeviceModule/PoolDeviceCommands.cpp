@@ -152,7 +152,7 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
 
         char modeJson[160]{};
         bool truncated = false;
-        if (cfgStore_->toJsonModule("poollogic/device", modeJson, sizeof(modeJson), &truncated) && !truncated) {
+        if (cfgStore_->toJsonModule("poollogic/devices", modeJson, sizeof(modeJson), &truncated) && !truncated) {
             StaticJsonDocument<192> modeDoc;
             const DeserializationError modeErr = deserializeJson(modeDoc, modeJson);
             if (!modeErr && modeDoc.is<JsonObjectConst>()) {
@@ -161,8 +161,8 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
                     const uint16_t v = obj["ph_pump_slot"].as<uint16_t>();
                     if (v < POOL_DEVICE_MAX) phPumpSlot = (uint8_t)v;
                 }
-                if (obj["orp_pump_slot"].is<uint16_t>()) {
-                    const uint16_t v = obj["orp_pump_slot"].as<uint16_t>();
+                if (obj["dis_pump_slot"].is<uint16_t>()) {
+                    const uint16_t v = obj["dis_pump_slot"].as<uint16_t>();
                     if (v < POOL_DEVICE_MAX) orpPumpSlot = (uint8_t)v;
                 }
             }
@@ -175,9 +175,11 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
         if (modeKey) {
             char patch[96]{};
             if (strcmp(modeKey, "disinfection_type") == 0) {
-                snprintf(patch, sizeof(patch), "{\"poollogic/mode\":{\"disinfection_type\":3}}");
+                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"disinfection_type\":3}}");
+            } else if (strcmp(modeKey, "ph_auto_mode") == 0) {
+                snprintf(patch, sizeof(patch), "{\"poollogic/ph\":{\"ph_auto_mode\":false}}");
             } else {
-                snprintf(patch, sizeof(patch), "{\"poollogic/mode\":{\"%s\":false}}", modeKey);
+                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"%s\":false}}", modeKey);
             }
             if (!cfgStore_->applyJson(patch)) {
                 LOGW("Manual pump start slot=%u failed to clear %s",

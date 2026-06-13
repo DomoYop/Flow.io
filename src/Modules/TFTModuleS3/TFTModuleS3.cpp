@@ -1724,7 +1724,7 @@ bool TFTModuleS3::loadPoolModeFlags_(bool& autoMode,
 
     char moduleJson[320] = {0};
     bool truncated = false;
-    if (!cfgStore_->toJsonModule("poollogic/mode", moduleJson, sizeof(moduleJson), &truncated, true) || truncated) return false;
+    if (!cfgStore_->toJsonModule("poollogic/modes", moduleJson, sizeof(moduleJson), &truncated, true) || truncated) return false;
 
     StaticJsonDocument<384> doc;
     if (deserializeJson(doc, moduleJson)) return false;
@@ -1732,9 +1732,27 @@ bool TFTModuleS3::loadPoolModeFlags_(bool& autoMode,
     if (root.isNull()) return false;
     autoMode = root["auto_mode"] | false;
     winterMode = root["winter_mode"] | false;
-    phAutoMode = root["ph_auto_mode"] | false;
-    orpAutoMode = root["orp_auto_mode"] | false;
     swgAutoMode = ((root["disinfection_type"] | 0) == 1);
+
+    memset(moduleJson, 0, sizeof(moduleJson));
+    truncated = false;
+    if (cfgStore_->toJsonModule("poollogic/ph", moduleJson, sizeof(moduleJson), &truncated, true) && !truncated) {
+        StaticJsonDocument<128> phDoc;
+        if (!deserializeJson(phDoc, moduleJson)) {
+            JsonObjectConst phRoot = phDoc.as<JsonObjectConst>();
+            if (!phRoot.isNull()) phAutoMode = phRoot["ph_auto_mode"] | false;
+        }
+    }
+
+    memset(moduleJson, 0, sizeof(moduleJson));
+    truncated = false;
+    if (cfgStore_->toJsonModule("poollogic/chlorine", moduleJson, sizeof(moduleJson), &truncated, true) && !truncated) {
+        StaticJsonDocument<128> disDoc;
+        if (!deserializeJson(disDoc, moduleJson)) {
+            JsonObjectConst disRoot = disDoc.as<JsonObjectConst>();
+            if (!disRoot.isNull()) orpAutoMode = disRoot["dis_auto_mode"] | false;
+        }
+    }
     return true;
 }
 

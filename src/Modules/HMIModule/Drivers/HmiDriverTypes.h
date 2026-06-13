@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "Core/Services/IHmi.h"
 #include "Modules/HMIModule/ConfigMenuModel.h"
 
 enum class HmiEventType : uint8_t {
@@ -60,15 +61,6 @@ struct HmiEvent {
     int8_t direction = 1;
     float sliderValue = 0.0f;
     char text[48]{};
-};
-
-struct HmiRtcDateTime {
-    uint16_t year = 0;
-    uint8_t month = 0;
-    uint8_t day = 0;
-    uint8_t hour = 0;
-    uint8_t minute = 0;
-    uint8_t second = 0;
 };
 
 struct NextionV2NeedlePublish {

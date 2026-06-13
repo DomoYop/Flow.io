@@ -73,7 +73,7 @@ private:
     } cfgData_{};
 
     ConfigVariable<char,0> tokenVar_{
-        NVS_KEY(NvsKeys::Hmi::FlowConnectUdpToken), "token", "hmi/fcd_udp",
+        NVS_KEY(NvsKeys::Hmi::FlowConnectUdpToken), "token", "hmi/nextion_udp",
         ConfigType::CharArray, cfgData_.token, ConfigPersistence::Persistent, sizeof(cfgData_.token)
     };
 

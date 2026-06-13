@@ -32,9 +32,9 @@
         </div>
         <div class="app-header-status">
           <div class="header-status-item">
-            <span class="ui-msr header-status-icon" aria-hidden="true">wifi</span>
+            <span id="headerNetworkIcon" class="ui-msr header-status-icon" aria-hidden="true">wifi</span>
             <span class="header-status-copy">
-              <span class="header-status-label" data-i18n="header.wifi">WiFi</span>
+              <span class="header-status-label" data-i18n="header.wifi">Réseau</span>
               <span class="header-wifi-line"><span id="headerWifiDot" class="header-wifi-dot" aria-hidden="true"></span><span id="headerWifiStatus" class="header-status-value">-</span></span>
             </span>
           </div>
@@ -48,7 +48,7 @@
           <div class="header-status-item">
             <span class="ui-msr header-status-icon" aria-hidden="true">schedule</span>
             <span class="header-status-copy">
-              <span class="header-status-label" data-i18n="header.time">Heure</span>
+              <span id="headerClockLabel" class="header-status-label" data-i18n="header.time">Heure</span>
               <span id="headerClockStatus" class="header-status-value">--:--:--</span>
             </span>
           </div>
@@ -159,12 +159,12 @@
 
       <section id="page-wifi" class="page">
         <div class="topbar">
-          <h1 class="ui-heading-inline"><span class="ui-msr" aria-hidden="true">wifi</span><span data-i18n="wifi.title">Configuration WiFi</span></h1>
+          <h1 class="ui-heading-inline"><span id="networkConfigIcon" class="ui-msr" aria-hidden="true">wifi</span><span data-i18n="wifi.title">Configuration réseau</span></h1>
         </div>
         <div class="card">
           <div class="config-section">
             <div class="config-section-head wifi-section-head">
-              <h2 class="ui-heading-inline"><span class="ui-msr ui-msr-sm" aria-hidden="true">router</span><span data-i18n="wifi.section">WiFi</span></h2>
+              <h2 class="ui-heading-inline"><span class="ui-msr ui-msr-sm" aria-hidden="true">router</span><span data-i18n="wifi.section">Réseau</span></h2>
               <div class="wifi-section-toggle">
                 <span data-i18n="wifi.enable">Activer</span>
                 <label class="md3-switch">
@@ -177,7 +177,7 @@
             <div class="form-grid">
               <div class="field">
                 <label for="wifiSsid" data-i18n="wifi.ssid.label">SSID</label>
-                <input id="wifiSsid" placeholder="Nom du réseau WiFi" data-i18n-placeholder="wifi.ssid.placeholder" />
+                <input id="wifiSsid" placeholder="Nom du réseau" data-i18n-placeholder="wifi.ssid.placeholder" />
               </div>
               <div class="field">
                 <label for="wifiSsidList" data-i18n="wifi.networksDetected">Réseaux détectés</label>
@@ -191,15 +191,15 @@
               <div class="field full">
                 <label for="wifiPass" data-i18n="wifi.password.label">Mot de passe</label>
                 <div class="password-wrap">
-                  <input id="wifiPass" type="password" placeholder="Mot de passe WiFi" data-i18n-placeholder="wifi.password.placeholder" />
-                  <button id="toggleWifiPass" class="password-toggle" type="button" aria-label="Afficher le mot de passe WiFi" aria-pressed="false" data-i18n="wifi.password.showShort" data-i18n-aria-label="wifi.password.show">Voir</button>
+                  <input id="wifiPass" type="password" placeholder="Mot de passe réseau" data-i18n-placeholder="wifi.password.placeholder" />
+                  <button id="toggleWifiPass" class="password-toggle" type="button" aria-label="Afficher le mot de passe réseau" aria-pressed="false" data-i18n="wifi.password.showShort" data-i18n-aria-label="wifi.password.show">Voir</button>
                 </div>
               </div>
             </div>
             <div class="btn-row">
-              <button id="applyWifiCfg" class="btn-primary"><span class="ui-msr btn-msr" aria-hidden="true">wifi_protected_setup</span><span data-i18n="wifi.apply">Appliquer WiFi</span></button>
+              <button id="applyWifiCfg" class="btn-primary"><span id="applyNetworkIcon" class="ui-msr btn-msr" aria-hidden="true">wifi_protected_setup</span><span data-i18n="wifi.apply">Appliquer réseau</span></button>
             </div>
-            <div id="wifiConfigStatus" class="config-status" data-i18n="wifi.ready">Configuration WiFi prête.</div>
+            <div id="wifiConfigStatus" class="config-status" data-i18n="wifi.ready">Configuration réseau prête.</div>
           </div>
         </div>
       </section>

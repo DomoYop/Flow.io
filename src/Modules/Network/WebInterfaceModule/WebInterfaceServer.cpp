@@ -38,6 +38,7 @@
 #include <time.h>
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ETH.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <SPIFFS.h>
@@ -46,6 +47,7 @@
 #include <memory>
 #include "Core/DataKeys.h"
 #include "Core/EventBus/EventPayloads.h"
+#include "Modules/Network/TimeModule/TimeRuntime.h"
 #include "Modules/Network/WifiModule/WifiRuntime.h"
 
 #ifndef FLOW_WEB_UNIFY_STATUS_CARD_ICONS
@@ -1389,9 +1391,9 @@ const char kMicronovaRuntimeManifestJson[] PROGMEM = R"json({
     {"id":1702,"runtimeId":1702,"moduleId":17,"module":"system","valueId":2,"key":"system.uptime_ms","label":"Uptime","type":"uint32","domain":"system","group":"Système","unit":"ms","decimals":0,"order":20},
     {"id":1703,"runtimeId":1703,"moduleId":17,"module":"system","valueId":3,"key":"system.heap_free","label":"Heap libre","type":"uint32","domain":"system","group":"Mémoire","unit":"B","decimals":0,"order":30},
     {"id":1704,"runtimeId":1704,"moduleId":17,"module":"system","valueId":4,"key":"system.heap_min_free","label":"Heap minimum","type":"uint32","domain":"system","group":"Mémoire","unit":"B","decimals":0,"order":40},
-    {"id":1001,"runtimeId":1001,"moduleId":10,"module":"wifi","valueId":1,"key":"wifi.ready","label":"WiFi connecté","type":"bool","domain":"wifi","group":"WiFi","unit":null,"decimals":null,"order":10,"display":"boolean"},
-    {"id":1002,"runtimeId":1002,"moduleId":10,"module":"wifi","valueId":2,"key":"wifi.ip","label":"Adresse IP","type":"string","domain":"wifi","group":"WiFi","unit":null,"decimals":null,"order":20},
-    {"id":1003,"runtimeId":1003,"moduleId":10,"module":"wifi","valueId":3,"key":"wifi.rssi","label":"RSSI","type":"int32","domain":"wifi","group":"WiFi","unit":"dBm","decimals":0,"order":30},
+    {"id":1001,"runtimeId":1001,"moduleId":10,"module":"wifi","valueId":1,"key":"wifi.ready","label":"Réseau connecté","type":"bool","domain":"wifi","group":"Réseau","unit":null,"decimals":null,"order":10,"display":"boolean"},
+    {"id":1002,"runtimeId":1002,"moduleId":10,"module":"wifi","valueId":2,"key":"wifi.ip","label":"Adresse IP","type":"string","domain":"wifi","group":"Réseau","unit":null,"decimals":null,"order":20},
+    {"id":1003,"runtimeId":1003,"moduleId":10,"module":"wifi","valueId":3,"key":"wifi.rssi","label":"RSSI","type":"int32","domain":"wifi","group":"Réseau","unit":"dBm","decimals":0,"order":30},
     {"id":1004,"runtimeId":1004,"moduleId":10,"module":"wifi","valueId":4,"key":"network.type","label":"Type","type":"string","domain":"wifi","group":"Réseau","unit":null,"decimals":null,"order":40}
   ]
 })json";
@@ -1559,7 +1561,7 @@ bool flowios3LoadPoolModeFlags_(ConfigStore* cfgStore,
 
     char moduleJson[320] = {0};
     bool truncated = false;
-    if (!cfgStore->toJsonModule("poollogic/mode", moduleJson, sizeof(moduleJson), &truncated, true)) {
+    if (!cfgStore->toJsonModule("poollogic/modes", moduleJson, sizeof(moduleJson), &truncated, true)) {
         return false;
     }
 
@@ -1571,8 +1573,26 @@ bool flowios3LoadPoolModeFlags_(ConfigStore* cfgStore,
     hasMode = true;
     autoMode = root["auto_mode"] | false;
     winterMode = root["winter_mode"] | false;
-    phAutoMode = root["ph_auto_mode"] | false;
-    orpAutoMode = root["orp_auto_mode"] | false;
+
+    memset(moduleJson, 0, sizeof(moduleJson));
+    truncated = false;
+    if (cfgStore->toJsonModule("poollogic/ph", moduleJson, sizeof(moduleJson), &truncated, true)) {
+        StaticJsonDocument<128> phDoc;
+        if (!deserializeJson(phDoc, moduleJson)) {
+            JsonObjectConst phRoot = phDoc.as<JsonObjectConst>();
+            if (!phRoot.isNull()) phAutoMode = phRoot["ph_auto_mode"] | false;
+        }
+    }
+
+    memset(moduleJson, 0, sizeof(moduleJson));
+    truncated = false;
+    if (cfgStore->toJsonModule("poollogic/chlorine", moduleJson, sizeof(moduleJson), &truncated, true)) {
+        StaticJsonDocument<128> disDoc;
+        if (!deserializeJson(disDoc, moduleJson)) {
+            JsonObjectConst disRoot = disDoc.as<JsonObjectConst>();
+            if (!disRoot.isNull()) orpAutoMode = disRoot["dis_auto_mode"] | false;
+        }
+    }
     return true;
 }
 
@@ -1743,7 +1763,7 @@ bool appendFlowios3LocalRuntimeValue_(Print& out,
             if (!ctx.poolModeAvailable) {
                 flowios3PrintUnavailableByManifestType_(out, firstValue, id);
             } else {
-                printRuntimeBool_(out, firstValue, id, "pool.orp_auto_mode", ctx.poolOrpAutoMode);
+                printRuntimeBool_(out, firstValue, id, "pool.dis_auto_mode", ctx.poolOrpAutoMode);
             }
             return true;
         case 2301:
@@ -1867,6 +1887,15 @@ bool appendFlowios3LocalRuntimeValue_(Print& out,
             flowios3EnsureSystemStats_(ctx);
             printRuntimeU32_(out, firstValue, id, "system.heap_min_free", ctx.systemStats.heap.minFreeBytes, "B");
             return true;
+        case 1301:
+            printRuntimeBool_(out, firstValue, id, "time.ready", timeReady(*dataStore) || timeSource(*dataStore) != TimeSource::None);
+            return true;
+        case 1302:
+            printRuntimeString_(out, firstValue, id, "time.source", timeSourceText(*dataStore));
+            return true;
+        case 1303:
+            printRuntimeString_(out, firstValue, id, "time.quality", timeQualityText(*dataStore));
+            return true;
         case 1001:
             printRuntimeBool_(out, firstValue, id, "wifi.ready", networkReady(*dataStore));
             return true;
@@ -1942,6 +1971,14 @@ bool flowios3BuildStatusDomainJson_(FlowStatusDomain domain,
         doc["devicename"] = deviceName;
         doc["fw"] = FirmwareVersion::Full;
         doc["upms"] = (uint64_t)ctx.systemStats.uptimeMs64;
+        JsonObject time = doc.createNestedObject("time");
+        time["rdy"] = dataStore ? (timeReady(*dataStore) || timeSource(*dataStore) != TimeSource::None) : false;
+        time["src"] = dataStore ? timeSourceText(*dataStore) : "none";
+        time["src_id"] = dataStore ? (uint8_t)timeSource(*dataStore) : 0U;
+        time["qlt"] = dataStore ? timeQualityText(*dataStore) : "invalid";
+        time["qlt_id"] = dataStore ? (uint8_t)timeQuality(*dataStore) : 0U;
+        time["last_ntp"] = dataStore ? (uint32_t)timeLastNtpSyncUtc(*dataStore) : 0U;
+        time["last_rtc"] = dataStore ? (uint32_t)timeLastRtcSyncUtc(*dataStore) : 0U;
         JsonObject heap = doc.createNestedObject("heap");
         heap["free"] = ctx.systemStats.heap.freeBytes;
         heap["min_free"] = ctx.systemStats.heap.minFreeBytes;
@@ -2116,6 +2153,24 @@ bool sendFlowios3StatusCompactResponse_(AsyncWebServerRequest* request,
     if (!poolRoot["pool"].isNull()) appendJsonFieldValue_(*response, "pool", poolRoot["pool"]);
     JsonObjectConst i2cRoot = i2cDoc.as<JsonObjectConst>();
     if (!i2cRoot["i2c"].isNull()) appendJsonFieldValue_(*response, "i2c", i2cRoot["i2c"]);
+    if (dataStore) {
+        response->print(",\"time\":{");
+        response->print("\"rdy\":");
+        response->print((timeReady(*dataStore) || timeSource(*dataStore) != TimeSource::None) ? "true" : "false");
+        response->print(",\"src\":");
+        printJsonEscaped_(*response, timeSourceText(*dataStore));
+        response->print(",\"src_id\":");
+        response->print((unsigned)timeSource(*dataStore));
+        response->print(",\"qlt\":");
+        printJsonEscaped_(*response, timeQualityText(*dataStore));
+        response->print(",\"qlt_id\":");
+        response->print((unsigned)timeQuality(*dataStore));
+        response->print(",\"last_ntp\":");
+        response->print((unsigned long)timeLastNtpSyncUtc(*dataStore));
+        response->print(",\"last_rtc\":");
+        response->print((unsigned long)timeLastRtcSyncUtc(*dataStore));
+        response->print('}');
+    }
 
     response->print("}");
     request->send(response);
@@ -3184,7 +3239,7 @@ static const char kWebInterfaceFallbackPage[] PROGMEM = R"HTML(
     <h2>Etat</h2>
     <div class="row">
       <button class="secondary" id="refresh" type="button">Rafraichir</button>
-      <button class="secondary" id="scan" type="button">Scanner Wi-Fi</button>
+      <button class="secondary" id="scan" type="button">Scanner le réseau</button>
       <a href="/webinterface?full=1" style="align-self:center">Essayer l'interface complete</a>
     </div>
     <div class="status" id="status">Chargement...</div>
@@ -3192,8 +3247,8 @@ static const char kWebInterfaceFallbackPage[] PROGMEM = R"HTML(
 
   <div class="grid">
     <section>
-      <h2>Wi-Fi Supervisor</h2>
-      <label><input id="wifiEnabled" type="checkbox" checked />Activer le Wi-Fi station</label>
+      <h2>Réseau Supervisor</h2>
+      <label><input id="wifiEnabled" type="checkbox" checked />Activer le réseau station</label>
       <label for="wifiList">Reseaux detectes</label>
       <select id="wifiList"><option value="">Saisie manuelle</option></select>
       <label for="ssid">SSID</label>
@@ -3201,7 +3256,7 @@ static const char kWebInterfaceFallbackPage[] PROGMEM = R"HTML(
       <label for="pass">Mot de passe</label>
       <input id="pass" type="password" autocomplete="off" />
       <div class="row">
-        <button id="saveWifi" type="button">Enregistrer Wi-Fi</button>
+        <button id="saveWifi" type="button">Enregistrer réseau</button>
       </div>
       <div class="status" id="wifiMsg">-</div>
     </section>
@@ -3338,7 +3393,7 @@ static const char kWebInterfaceFallbackPage[] PROGMEM = R"HTML(
           pass: $("pass").value
         })
       });
-      put(wifiMsg, out.reboot_scheduled ? "Wi-Fi enregistre. Redemarrage planifie." : "Wi-Fi enregistre.", "ok");
+      put(wifiMsg, out.reboot_scheduled ? "Réseau enregistre. Redemarrage planifie." : "Réseau enregistre.", "ok");
       await refreshAll();
     } catch (e) {
       put(wifiMsg, e.message, "bad");
@@ -4615,6 +4670,7 @@ void WebInterfaceModule::startServer_()
         const char* modeTxt = "none";
         if (mode == NetworkAccessMode::Station) modeTxt = "station";
         else if (mode == NetworkAccessMode::AccessPoint) modeTxt = "ap";
+        const char* transportTxt = networkTransport_(mode);
 
         doc["ok"] = true;
         doc["web_asset_version"] = webAssetVersion_();
@@ -4625,6 +4681,7 @@ void WebInterfaceModule::startServer_()
         loadConfiguredDeviceName_(cfgStore_, deviceName, sizeof(deviceName));
         doc["devicename"] = deviceName;
         doc["network_mode"] = modeTxt;
+        doc["network_transport"] = transportTxt;
         doc["is_ap_portal"] = (mode == NetworkAccessMode::AccessPoint);
         doc["provisioning_only"] = provisioningOnly_;
         doc["full_ui_enabled"] = !provisioningOnly_;
@@ -4661,7 +4718,7 @@ void WebInterfaceModule::startServer_()
         heap["largest"] = snap.heap.largestFreeBlock;
         heap["frag"] = snap.heap.fragPercent;
 
-        char out[896] = {0};
+        char out[960] = {0};
         const size_t n = serializeJson(doc, out, sizeof(out));
         if (n == 0 || n >= sizeof(out)) {
             request->send(500, "application/json",
@@ -4811,15 +4868,17 @@ void WebInterfaceModule::startServer_()
         const char* modeTxt = "none";
         if (mode == NetworkAccessMode::Station) modeTxt = "station";
         else if (mode == NetworkAccessMode::AccessPoint) modeTxt = "ap";
+        const char* transportTxt = networkTransport_(mode);
 
         char ip[16] = {0};
         (void)getNetworkIp_(ip, sizeof(ip), nullptr);
 
-        char out[96] = {0};
+        char out[128] = {0};
         const int n = snprintf(out,
                                sizeof(out),
-                               "{\"ok\":true,\"mode\":\"%s\",\"ip\":\"%s\"}",
+                               "{\"ok\":true,\"mode\":\"%s\",\"transport\":\"%s\",\"ip\":\"%s\"}",
                                modeTxt,
+                               transportTxt,
                                ip);
         if (n <= 0 || (size_t)n >= sizeof(out)) {
             request->send(500, "application/json",
@@ -6585,4 +6644,17 @@ bool WebInterfaceModule::getNetworkIp_(char* out, size_t len, NetworkAccessMode*
     }
 
     return false;
+}
+
+const char* WebInterfaceModule::networkTransport_(NetworkAccessMode mode) const
+{
+    if (mode != NetworkAccessMode::Station) return "none";
+
+    const IPAddress ethIp = ETH.localIP();
+    if (ethIp[0] != 0 || ethIp[1] != 0 || ethIp[2] != 0 || ethIp[3] != 0) {
+        return "ethernet";
+    }
+
+    if (WiFi.isConnected()) return "wifi";
+    return "none";
 }

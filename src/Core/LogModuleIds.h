@@ -85,6 +85,7 @@ static inline LogModuleId logModuleIdFromModuleId(ModuleId moduleId)
         case ModuleId::MicronovaBoiler: return (LogModuleId)LogModuleIdValue::MicronovaBoilerModule;
         case ModuleId::MicronovaMqttBridge: return (LogModuleId)LogModuleIdValue::MicronovaMqttBridgeModule;
         case ModuleId::BootLogCapture: return (LogModuleId)LogModuleIdValue::BootLogCaptureModule;
+        case ModuleId::HmiBuzzer: return (LogModuleId)LogModuleIdValue::HMIModule;
         case ModuleId::Hmi:
         case ModuleId::SupervisorHmi:
         case ModuleId::TftS3:

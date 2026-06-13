@@ -107,6 +107,30 @@ struct IoCycleInfo {
     IoId changedIds[IO_MAX_CHANGED_IDS] = {0};
 };
 
+/** Sensor validity reason bitmask. Disabled sensors are not considered faults. */
+enum IoSensorInvalidReason : uint16_t {
+    IO_SENSOR_INVALID_NONE = 0,
+    IO_SENSOR_INVALID_DISABLED = 1U << 0,
+    IO_SENSOR_INVALID_UNKNOWN_ID = 1U << 1,
+    IO_SENSOR_INVALID_NOT_SENSOR = 1U << 2,
+    IO_SENSOR_INVALID_NO_BINDING = 1U << 3,
+    IO_SENSOR_INVALID_DRIVER_DISABLED = 1U << 4,
+    IO_SENSOR_INVALID_NOT_READY = 1U << 5,
+    IO_SENSOR_INVALID_NO_VALUE = 1U << 6,
+    IO_SENSOR_INVALID_TYPE = 1U << 7
+};
+
+/** Status of a sensor-like IO endpoint. */
+struct IoSensorStatus {
+    IoId id = IO_ID_INVALID;
+    uint8_t kind = IO_KIND_ANALOG_IN;
+    uint8_t enabled = 0;
+    uint8_t valid = 0;
+    uint8_t reserved = 0;
+    uint16_t invalidReasons = IO_SENSOR_INVALID_NONE;
+    uint32_t tsMs = 0;
+};
+
 /**
  * @brief Unified static I/O service contract.
  *
@@ -134,6 +158,10 @@ struct IOServiceV2 {
     IoStatus (*tick)(void* ctx, uint32_t nowMs);
     /** Retrieve last completed cycle information. */
     IoStatus (*lastCycle)(void* ctx, IoCycleInfo* outCycle);
+    /** Evaluate whether one sensor endpoint is enabled and currently valid. */
+    IoStatus (*sensorStatus)(void* ctx, IoId id, IoSensorStatus* outStatus);
+    /** List enabled sensor endpoints that are currently invalid. */
+    IoStatus (*listInvalidSensors)(void* ctx, IoId* outIds, uint8_t maxIds, uint8_t* outCount);
 
     /** Opaque implementation context. */
     void* ctx;

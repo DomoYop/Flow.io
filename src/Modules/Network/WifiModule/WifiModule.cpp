@@ -809,6 +809,7 @@ void WifiModule::init(ConfigStore& cfg,
 
     const DataStoreService* dsSvc = services.get<DataStoreService>(ServiceId::DataStore);
     dataStore = dsSvc ? dsSvc->store : nullptr;
+    netAccessSvc_ = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
     const EventBusService* eventBusSvc = services.get<EventBusService>(ServiceId::EventBus);
     eventBus_ = eventBusSvc ? eventBusSvc->bus : nullptr;
 
@@ -860,6 +861,7 @@ void WifiModule::init(ConfigStore& cfg,
 void WifiModule::onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services)
 {
     refreshEthernetConfig_(cfg);
+    netAccessSvc_ = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
     loadSystemDeviceName_();
     if (!cfgMqttPub_) {
         cfgMqttPub_ = new (std::nothrow) MqttConfigRouteProducer();
@@ -876,14 +878,6 @@ void WifiModule::onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services)
     cfgData.ssid[sizeof(cfgData.ssid) - 1U] = '\0';
     cfgData.pass[sizeof(cfgData.pass) - 1U] = '\0';
     logConfigSummary_();
-    if (ethernetEnabled_) {
-        LOGW("WiFi disabled because ethernet.enabled=true");
-        if (WiFi.isConnected()) {
-            WiFi.disconnect(false, false);
-        }
-        setState(WifiState::Disabled);
-        return;
-    }
     if (!cfgData.enabled) {
         LOGW("WiFi disabled in config, disconnecting STA");
         if (WiFi.isConnected()) {
@@ -892,9 +886,15 @@ void WifiModule::onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services)
         setState(WifiState::Disabled);
         return;
     }
-    initialConnectNotBeforeMs_ = isBlank_(cfgData.ssid, sizeof(cfgData.ssid))
-        ? 0U
-        : millis() + kInitialConnectDelayMs;
+    if (ethernetEnabled_ && !isBlank_(cfgData.ssid, sizeof(cfgData.ssid))) {
+        initialConnectNotBeforeMs_ = millis() + ETH_TIMEOUT_MS;
+        LOGI("[NET] Ethernet preferred; WiFi STA fallback armed after %lu ms",
+             (unsigned long)ETH_TIMEOUT_MS);
+    } else {
+        initialConnectNotBeforeMs_ = isBlank_(cfgData.ssid, sizeof(cfgData.ssid))
+            ? 0U
+            : millis() + kInitialConnectDelayMs;
+    }
     startupTransientLogUntilMs_ = millis() + kStartupTransientLogWindowMs;
     setState(WifiState::Idle);
 }
@@ -912,6 +912,14 @@ void WifiModule::refreshEthernetConfig_(ConfigStore& cfg)
 
     JsonObjectConst root = doc.as<JsonObjectConst>();
     ethernetEnabled_ = root["enabled"] | false;
+}
+
+bool WifiModule::preferredEthernetAvailable_() const
+{
+    if (!ethernetEnabled_) return false;
+    if (WiFi.isConnected()) return false;
+    if (!netAccessSvc_ || !netAccessSvc_->mode) return false;
+    return netAccessSvc_->mode(netAccessSvc_->ctx) == NetworkAccessMode::Station;
 }
 
 void WifiModule::onEventStatic_(const Event& e, void* user)
@@ -1031,6 +1039,10 @@ void WifiModule::loop() {
     case WifiState::Idle:
         if (!staRetryEnabled_) {
             vTaskDelay(pdMS_TO_TICKS(Limits::Wifi::Timing::IdleRetryDisabledLoopDelayMs));
+            break;
+        }
+        if (preferredEthernetAvailable_()) {
+            vTaskDelay(pdMS_TO_TICKS(Limits::Wifi::Timing::IdleConnectPollDelayMs));
             break;
         }
         if (initialConnectNotBeforeMs_ != 0U && millis() < initialConnectNotBeforeMs_) {

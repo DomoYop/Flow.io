@@ -10,6 +10,11 @@
       "label_t": "cfgdocs.hmi.leds.enabled.label",
       "help_t": "cfgdocs.hmi.leds.enabled.help"
     },
+    "hmi/leds/waveshare_enabled": {
+      "type": "Bool",
+      "label_t": "cfgdocs.hmi.leds.waveshare_enabled.label",
+      "help_t": "cfgdocs.hmi.leds.waveshare_enabled.help"
+    },
     "hmi/nextion/enabled": {
       "type": "Bool",
       "label_t": "cfgdocs.hmi.nextion.enabled.label",

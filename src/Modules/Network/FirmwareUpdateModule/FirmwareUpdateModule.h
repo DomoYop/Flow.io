@@ -97,6 +97,7 @@ private:
     const NetworkAccessService* netAccessSvc_ = nullptr;
     const WebInterfaceService* webInterfaceSvc_ = nullptr;
     const FlowCfgRemoteService* flowCfgSvc_ = nullptr;
+    const HmiService* hmiSvc_ = nullptr;
 
     int8_t flowIoEnablePin_ = -1;
     int8_t flowIoBootPin_ = -1;
@@ -111,6 +112,7 @@ private:
     bool nextionRebootQueued_ = false;
     bool flowIoHardwareRebootQueued_ = false;
     bool busy_ = false;
+    bool hmiOtaActive_ = false;
     uint32_t activeTotalBytes_ = 0;
     uint32_t activeSentBytes_ = 0;
 
@@ -155,6 +157,7 @@ private:
     bool parseUrlArg_(const CommandRequest& req, char* out, size_t outLen) const;
     void setStatus_(UpdateState state, FirmwareUpdateTarget target, uint8_t progress, const char* msg);
     void setError_(FirmwareUpdateTarget target, const char* msg);
+    void setHmiOtaCondition_(bool active);
     void onProgressChunk_(uint32_t chunkBytes);
     void attachWebInterfaceSvcIfNeeded_();
     void attachFlowCfgSvcIfNeeded_();

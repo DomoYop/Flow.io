@@ -87,8 +87,11 @@ const char* wifiCipherName_(wifi_cipher_type_t cipher)
 void WifiProvisioningModule::init(ConfigStore& cfg, ServiceRegistry& services)
 {
     cfgStore_ = &cfg;
+    services_ = &services;
     wifiSvc_ = services.get<WifiService>(ServiceId::Wifi);
+    hmiSvc_ = services.get<HmiService>(ServiceId::Hmi);
     bootMs_ = millis();
+    networkManager_.begin(bootMs_);
     lastCfgPollMs_ = 0;
     buildApCredentials_();
 
@@ -99,30 +102,34 @@ void WifiProvisioningModule::init(ConfigStore& cfg, ServiceRegistry& services)
     }
     wifiEventHandlerId_ = WiFi.onEvent(WifiProvisioningModule::onWifiEventSys_);
 
-    LOGI("Provisioning overlay initialized (timeout=%lu ms, AP SSID=%s)",
-         (unsigned long)kConnectTimeoutMs,
+    LOGI("[NET] Provisioning overlay initialized (eth_timeout=%lu ms, wifi_timeout=%lu ms, AP SSID=%s)",
+         (unsigned long)ETH_TIMEOUT_MS,
+         (unsigned long)WIFI_TIMEOUT_MS,
          apSsid_);
 }
 
 void WifiProvisioningModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
 {
+    services_ = &services;
+    hmiSvc_ = services.get<HmiService>(ServiceId::Hmi);
     refreshWifiConfig_();
+    observedNetAccessSvc_ = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
     if (!ethernetEnabled_ && !services.has(ServiceId::NetworkAccess)) {
         if (!services.add(ServiceId::NetworkAccess, &netAccessSvc_)) {
             LOGE("service registration failed: %s", toString(ServiceId::NetworkAccess));
         }
+        observedNetAccessSvc_ = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
     }
-    LOGI("Provisioning config loaded: ethernet=%d wifi_enabled=%d wifi_configured=%d ssid_len=%u pass_len=%u grace_ms=%lu",
+    syncNetworkManagerState_();
+    LOGI("[NET] Provisioning config loaded: ethernet=%d wifi_enabled=%d wifi_configured=%d ssid_len=%u pass_len=%u eth_timeout_ms=%lu wifi_timeout_ms=%lu",
          (int)ethernetEnabled_,
          (int)wifiEnabled_,
          (int)wifiConfigured_,
          (unsigned)wifiSsidLen_,
          (unsigned)wifiPassLen_,
-         (unsigned long)kConnectTimeoutMs);
-    if (ethernetEnabled_) return;
-#if defined(FLOW_PROFILE_MICRONOVA)
-    LOGI("Provisioning portal start deferred");
-#else
+         (unsigned long)ETH_TIMEOUT_MS,
+         (unsigned long)WIFI_TIMEOUT_MS);
+#if !defined(FLOW_PROFILE_MICRONOVA)
     ensurePortalStarted_();
 #endif
 }
@@ -144,6 +151,8 @@ void WifiProvisioningModule::loop()
         stopLightPortal_();
 #endif
         apActive_ = false;
+        networkManager_.setCaptivePortalRunning(false);
+        setHmiCaptivePortalCondition_(false);
         portalLatched_ = false;
         apClientCount_ = 0;
         nextApStartAttemptMs_ = millis() + kApStartRetryMs;
@@ -160,19 +169,18 @@ void WifiProvisioningModule::loop()
         configDirty_ = false;
         refreshWifiConfig_();
     }
+    syncNetworkManagerState_();
+    const bool forceHmiPortalSync = apActive_ &&
+        ((uint32_t)(now - lastHmiCaptivePortalSyncMs_) >= kHmiPortalResyncMs);
+    setHmiCaptivePortalCondition_(apActive_, forceHmiPortalSync);
 
-    if (ethernetEnabled_) {
-        if (apActive_) stopCaptivePortal_();
-        portalLatched_ = false;
-        vTaskDelay(pdMS_TO_TICKS(250));
-        return;
-    }
-
-    const bool staConnected = isStaConnected_();
-    if (staConnected) {
+    if (hasStationNetwork_()) {
         if (apActive_) {
-            stopCaptivePortal_();
+            stopCaptivePortal_(networkManager_.hasEthernetIP()
+                                   ? "Ethernet is available"
+                                   : "STA connected");
         }
+        networkManager_.setNormalServicesStarted(true);
         portalLatched_ = false;
         vTaskDelay(pdMS_TO_TICKS(250));
         return;
@@ -197,11 +205,11 @@ void WifiProvisioningModule::loop()
 void WifiProvisioningModule::ensurePortalStarted_()
 {
     if (apActive_ || portalLatched_) return;
-    if (ethernetEnabled_) return;
-    if (isStaConnected_()) return;
+    syncNetworkManagerState_();
+    if (networkManager_.hasNetwork()) return;
 
-    const PortalReason reason = evaluatePortalReason_();
-    if (reason == PortalReason::None) return;
+    const NetworkPortalReason reason = evaluatePortalReason_();
+    if (reason == NetworkPortalReason::None) return;
 
     if (startCaptivePortal_(reason)) {
         portalLatched_ = true;
@@ -235,7 +243,6 @@ bool WifiProvisioningModule::getIP_(char* out, size_t len) const
 
 bool WifiProvisioningModule::notifyWifiConfigChanged_()
 {
-    if (ethernetEnabled_) return false;
     configDirty_ = true;
     if (wifiSvc_ && wifiSvc_->setStaRetryEnabled) {
         (void)wifiSvc_->setStaRetryEnabled(wifiSvc_->ctx, true);
@@ -271,14 +278,9 @@ void WifiProvisioningModule::refreshWifiConfig_()
     }
 
     if (ethernetEnabled_) {
-        wifiConfigured_ = false;
-        wifiEnabled_ = false;
-        wifiSsidLen_ = 0;
-        wifiPassLen_ = 0;
 #if defined(FLOW_PROFILE_FLOWIOS3)
         fastPortalStart_ = false;
 #endif
-        return;
     }
 
     char wifiJson[320] = {0};
@@ -288,8 +290,9 @@ void WifiProvisioningModule::refreshWifiConfig_()
         wifiSsidLen_ = 0;
         wifiPassLen_ = 0;
 #if defined(FLOW_PROFILE_FLOWIOS3)
-        fastPortalStart_ = true;
+        fastPortalStart_ = !ethernetEnabled_;
 #endif
+        networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
         return;
     }
 
@@ -302,8 +305,9 @@ void WifiProvisioningModule::refreshWifiConfig_()
         wifiSsidLen_ = 0;
         wifiPassLen_ = 0;
 #if defined(FLOW_PROFILE_FLOWIOS3)
-        fastPortalStart_ = true;
+        fastPortalStart_ = !ethernetEnabled_;
 #endif
+        networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
         return;
     }
 
@@ -315,25 +319,21 @@ void WifiProvisioningModule::refreshWifiConfig_()
     wifiPassLen_ = (uint8_t)strnlen(pass ? pass : "", 64U);
     wifiConfigured_ = wifiEnabled_ && ssid && ssid[0] != '\0';
 #if defined(FLOW_PROFILE_FLOWIOS3)
-    fastPortalStart_ = wifiEnabled_ && !wifiConfigured_;
+    fastPortalStart_ = !ethernetEnabled_ && wifiEnabled_ && !wifiConfigured_;
 #endif
+    networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
 }
 
-WifiProvisioningModule::PortalReason WifiProvisioningModule::evaluatePortalReason_() const
+NetworkPortalReason WifiProvisioningModule::evaluatePortalReason_() const
 {
-    if (!wifiConfigured_) {
-        return PortalReason::MissingCredentials;
-    }
-    if ((millis() - bootMs_) >= kConnectTimeoutMs) {
-        return PortalReason::ConnectTimeout;
-    }
-    return PortalReason::None;
+    return networkManager_.portalReason(millis());
 }
 
-bool WifiProvisioningModule::startCaptivePortal_(PortalReason reason)
+bool WifiProvisioningModule::startCaptivePortal_(NetworkPortalReason reason)
 {
     if (apActive_) return true;
-    if (ethernetEnabled_) return false;
+    syncNetworkManagerState_();
+    if (networkManager_.hasNetwork()) return false;
 
     const uint32_t now = millis();
     if ((int32_t)(now - nextApStartAttemptMs_) < 0) {
@@ -470,6 +470,8 @@ bool WifiProvisioningModule::startCaptivePortal_(PortalReason reason)
     portalCredentialsSaved_ = false;
 #endif
     apActive_ = true;
+    networkManager_.setCaptivePortalRunning(true);
+    setHmiCaptivePortalCondition_(true);
     staProbeActive_ = false;
     apClientEverSeen_ = false;
     lastStaProbeStartMs_ = millis();
@@ -477,8 +479,8 @@ bool WifiProvisioningModule::startCaptivePortal_(PortalReason reason)
     apStartDeferredCount_ = 0;
     refreshApClientState_(lastStaProbeStartMs_, false);
 
-    const char* reasonTxt = (reason == PortalReason::MissingCredentials) ? "missing credentials" : "connect timeout";
-    LOGW("Provisioning AP started (%s) SSID=%s pass_len=%u auth=%s cipher=%s channel=%u max_conn=%u IP=%u.%u.%u.%u",
+    const char* reasonTxt = (reason == NetworkPortalReason::MissingCredentials) ? "missing credentials" : "connect timeout";
+    LOGW("[NET] No network available, starting captive portal (%s) SSID=%s pass_len=%u auth=%s cipher=%s channel=%u max_conn=%u IP=%u.%u.%u.%u",
          reasonTxt,
          apSsid_,
          (unsigned)strlen(apPass_),
@@ -490,11 +492,11 @@ bool WifiProvisioningModule::startCaptivePortal_(PortalReason reason)
     return true;
 }
 
-void WifiProvisioningModule::stopCaptivePortal_()
+void WifiProvisioningModule::stopCaptivePortal_(const char* reason)
 {
     if (!apActive_) return;
 
-    stopStaProbe_("sta connected");
+    stopStaProbe_(reason ? reason : "network available");
     if (wifiSvc_ && wifiSvc_->setStaRetryEnabled) {
         (void)wifiSvc_->setStaRetryEnabled(wifiSvc_->ctx, true);
     }
@@ -507,7 +509,9 @@ void WifiProvisioningModule::stopCaptivePortal_()
     apClientCount_ = 0;
     lastApClientSeenMs_ = 0;
     lastApClientPollMs_ = 0;
-    LOGI("Provisioning AP stopped (STA connected)");
+    networkManager_.setCaptivePortalRunning(false);
+    setHmiCaptivePortalCondition_(false);
+    LOGI("[NET] Captive portal stopped because %s", reason ? reason : "network is available");
 }
 
 void WifiProvisioningModule::onWifiEventSys_(arduino_event_t* event)
@@ -647,6 +651,53 @@ bool WifiProvisioningModule::isStaConnected_() const
 {
     if (!wifiSvc_ || !wifiSvc_->isConnected) return false;
     return wifiSvc_->isConnected(wifiSvc_->ctx);
+}
+
+bool WifiProvisioningModule::hasStationNetwork_() const
+{
+    if (isStaConnected_()) return true;
+    const NetworkAccessService* net = observedNetAccessSvc_;
+    if (!net || !net->mode) return false;
+    return net->mode(net->ctx) == NetworkAccessMode::Station;
+}
+
+void WifiProvisioningModule::syncNetworkManagerState_()
+{
+    const bool wifiHasIP = isStaConnected_();
+    bool stationNetwork = wifiHasIP;
+    if (observedNetAccessSvc_ && observedNetAccessSvc_->mode) {
+        stationNetwork = observedNetAccessSvc_->mode(observedNetAccessSvc_->ctx) == NetworkAccessMode::Station;
+    }
+    const bool ethHasIP = ethernetEnabled_ && stationNetwork && !wifiHasIP;
+    networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
+    networkManager_.updateInterfaces(ethHasIP, wifiHasIP);
+    networkManager_.setCaptivePortalRunning(apActive_);
+}
+
+void WifiProvisioningModule::setHmiCaptivePortalCondition_(bool active, bool force)
+{
+    const uint32_t now = millis();
+    if (!force &&
+        hmiCaptivePortalConditionSynced_ &&
+        hmiCaptivePortalActive_ == active) {
+        return;
+    }
+    if (!hmiSvc_ && services_) {
+        hmiSvc_ = services_->get<HmiService>(ServiceId::Hmi);
+    }
+    if (!hmiSvc_) {
+        hmiCaptivePortalConditionSynced_ = false;
+        return;
+    }
+    if (hmiSvc_->setLedCondition) {
+        (void)hmiSvc_->setLedCondition(hmiSvc_->ctx, HmiLedCondition::CaptivePortalActive, active);
+        hmiCaptivePortalConditionSynced_ = true;
+        lastHmiCaptivePortalSyncMs_ = now;
+    } else {
+        hmiCaptivePortalConditionSynced_ = false;
+        return;
+    }
+    hmiCaptivePortalActive_ = active;
 }
 
 bool WifiProvisioningModule::getStaIp_(char* out, size_t len) const

@@ -11,6 +11,88 @@
 #include <DNSServer.h>
 #include <WiFi.h>
 
+#ifndef ETH_TIMEOUT_MS
+#define ETH_TIMEOUT_MS 7000UL
+#endif
+
+#ifndef WIFI_TIMEOUT_MS
+#define WIFI_TIMEOUT_MS 12000UL
+#endif
+
+enum class NetworkPortalReason : uint8_t {
+    None = 0,
+    MissingCredentials = 1,
+    ConnectTimeout = 2
+};
+
+namespace FlowNetwork {
+
+class NetworkManager {
+public:
+    void begin(uint32_t bootMs) { bootMs_ = bootMs; }
+    void updateConfig(bool ethernetEnabled, bool wifiEnabled, bool wifiConfigured) {
+        ethernetEnabled_ = ethernetEnabled;
+        wifiEnabled_ = wifiEnabled;
+        wifiConfigured_ = wifiConfigured;
+    }
+    void updateInterfaces(bool ethHasIP, bool wifiHasIP) {
+        const bool hadNetworkBefore = hasNetwork();
+        ethHasIP_ = ethHasIP;
+        wifiHasIP_ = wifiHasIP;
+        const bool hasNetworkNow = hasNetwork();
+        if (hasNetworkNow) {
+            hadUsableNetwork_ = true;
+            lastNetworkLostMs_ = 0;
+        } else if (hadNetworkBefore) {
+            lastNetworkLostMs_ = millis();
+        }
+    }
+    void setCaptivePortalRunning(bool running) { captivePortalRunning_ = running; }
+    void setNormalServicesStarted(bool started) { normalServicesStarted_ = started; }
+
+    bool hasNetwork() const { return ethHasIP_ || wifiHasIP_; }
+    bool hasEthernetIP() const { return ethHasIP_; }
+    bool hasWifiIP() const { return wifiHasIP_; }
+    bool isCaptivePortalRunning() const { return captivePortalRunning_; }
+    bool normalServicesStarted() const { return normalServicesStarted_; }
+
+    NetworkPortalReason portalReason(uint32_t nowMs) const {
+        if (hasNetwork()) return NetworkPortalReason::None;
+
+        if (hadUsableNetwork_ && lastNetworkLostMs_ != 0U &&
+            (nowMs - lastNetworkLostMs_) < (uint32_t)ETH_TIMEOUT_MS) {
+            return NetworkPortalReason::None;
+        }
+
+        const uint32_t ethWaitMs = ethernetEnabled_ ? (uint32_t)ETH_TIMEOUT_MS : 0U;
+        const uint32_t elapsedMs = nowMs - bootMs_;
+        if (elapsedMs < ethWaitMs) return NetworkPortalReason::None;
+
+        if (!wifiEnabled_ || !wifiConfigured_) {
+            return NetworkPortalReason::MissingCredentials;
+        }
+
+        if (elapsedMs < (ethWaitMs + (uint32_t)WIFI_TIMEOUT_MS)) {
+            return NetworkPortalReason::None;
+        }
+        return NetworkPortalReason::ConnectTimeout;
+    }
+
+private:
+    volatile bool ethHasIP_ = false;
+    volatile bool wifiHasIP_ = false;
+    bool captivePortalRunning_ = false;
+    bool normalServicesStarted_ = false;
+    bool hadUsableNetwork_ = false;
+    bool ethernetEnabled_ = false;
+    bool wifiEnabled_ = true;
+    bool wifiConfigured_ = false;
+    uint32_t bootMs_ = 0;
+    uint32_t lastNetworkLostMs_ = 0;
+};
+
+}  // namespace FlowNetwork
+
 class WifiProvisioningModule : public Module {
 public:
     ModuleId moduleId() const override { return ModuleId::WifiProvisioning; }
@@ -46,21 +128,6 @@ public:
     }
 
 private:
-    enum class PortalReason : uint8_t {
-        None = 0,
-        MissingCredentials = 1,
-        ConnectTimeout = 2
-    };
-
-#if defined(FLOW_PROFILE_MICRONOVA)
-    static constexpr uint32_t kConnectTimeoutMs = 8000U;
-#elif defined(FLOW_PROFILE_FLOWIOS3)
-    // Leave enough time for several STA retry cycles before AP provisioning
-    // takes over. A single WPA 4-way timeout can otherwise force STA_STOP.
-    static constexpr uint32_t kConnectTimeoutMs = 65000U;
-#else
-    static constexpr uint32_t kConnectTimeoutMs = 25000U;
-#endif
     static constexpr uint32_t kConfigPollMs = 1000U;
     static constexpr uint16_t kDnsPort = 53;
     static constexpr uint32_t kApClientPollMs = 1000U;
@@ -74,9 +141,14 @@ private:
     static constexpr uint32_t kStaStopWaitMs = 700U;
     static constexpr uint32_t kModeResetSettleMs = 120U;
     static constexpr uint32_t kApStartStableDelayMs = 450U;
+    static constexpr uint32_t kHmiPortalResyncMs = 2000U;
 
     ConfigStore* cfgStore_ = nullptr;
+    ServiceRegistry* services_ = nullptr;
     const WifiService* wifiSvc_ = nullptr;
+    const NetworkAccessService* observedNetAccessSvc_ = nullptr;
+    const HmiService* hmiSvc_ = nullptr;
+    FlowNetwork::NetworkManager networkManager_{};
 
     DNSServer dns_;
     bool apActive_ = false;
@@ -88,6 +160,8 @@ private:
     bool configDirty_ = false;
     bool fastPortalStart_ = false;
     bool portalLatched_ = false;
+    bool hmiCaptivePortalActive_ = false;
+    bool hmiCaptivePortalConditionSynced_ = false;
     bool staProbeActive_ = false;
     bool apStarting_ = false;
     volatile bool apRestartPending_ = false;
@@ -101,6 +175,7 @@ private:
     uint32_t lastApStartPrecheckLogMs_ = 0;
     uint32_t lastApStartDeferredLogMs_ = 0;
     uint32_t lastApProbeLogMs_ = 0;
+    uint32_t lastHmiCaptivePortalSyncMs_ = 0;
     uint32_t nextApStartAttemptMs_ = 0;
     uint32_t apProbeCount_ = 0;
     uint8_t apStartDeferredCount_ = 0;
@@ -138,13 +213,16 @@ private:
     void startStaProbe_(uint32_t nowMs);
     void stopStaProbe_(const char* reason);
     void refreshWifiConfig_();
-    PortalReason evaluatePortalReason_() const;
+    NetworkPortalReason evaluatePortalReason_() const;
     void ensurePortalStarted_();
     static void onWifiEventSys_(arduino_event_t* event);
     void onWifiEvent_(arduino_event_t* event);
-    bool startCaptivePortal_(PortalReason reason);
-    void stopCaptivePortal_();
+    bool startCaptivePortal_(NetworkPortalReason reason);
+    void stopCaptivePortal_(const char* reason);
     bool isStaConnected_() const;
+    bool hasStationNetwork_() const;
+    void syncNetworkManagerState_();
+    void setHmiCaptivePortalCondition_(bool active, bool force = false);
     bool getStaIp_(char* out, size_t len) const;
     bool getApIp_(char* out, size_t len) const;
 #if defined(FLOW_PROFILE_FLOW_CONNECT_DISPLAY)

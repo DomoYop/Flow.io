@@ -14,7 +14,7 @@ inline constexpr MqttCapacitySpec kFlowIODINMqttCapacity{5712, 8, 8, 48, 24, 16,
 inline constexpr MqttBufferSpec kFlowIODINMqttBuffers{
     64, 32, 32, 15, 15, 70, 160, 128, 384, 1536, 1024, 1536, 1536, 64, 320, 32
 };
-inline constexpr HaCapacitySpec kFlowIODINHaCapacity{48, 6, 16, 30, 24, 6, 12};
+inline constexpr HaCapacitySpec kFlowIODINHaCapacity{48, 6, 16, 30, 24, 6};
 
 inline constexpr UartSpec kFlowIODINv1Uarts[] = {
     // {name, uartIndex, rxPin, txPin, baud, primary, enableRxPin}

@@ -417,14 +417,14 @@ bool I2CCfgServerModule::collectPoolModeFlags_(bool& hasModeOut,
     bool truncated = false;
     bool ok = false;
     if (cfgStore_) {
-        ok = cfgStore_->toJsonModule("poollogic/mode",
+        ok = cfgStore_->toJsonModule("poollogic/modes",
                                      poolModeJsonScratch_,
                                      sizeof(poolModeJsonScratch_),
                                      &truncated,
                                      true);
     } else if (cfgSvc_ && cfgSvc_->toJsonModule) {
         ok = cfgSvc_->toJsonModule(cfgSvc_->ctx,
-                                   "poollogic/mode",
+                                   "poollogic/modes",
                                    poolModeJsonScratch_,
                                    sizeof(poolModeJsonScratch_),
                                    &truncated);
@@ -435,8 +435,46 @@ bool I2CCfgServerModule::collectPoolModeFlags_(bool& hasModeOut,
     hasModeOut = true;
     (void)parseJsonBoolField_(poolModeJsonScratch_, "auto_mode", autoModeOut);
     (void)parseJsonBoolField_(poolModeJsonScratch_, "winter_mode", winterModeOut);
-    (void)parseJsonBoolField_(poolModeJsonScratch_, "ph_auto_mode", phAutoModeOut);
-    (void)parseJsonBoolField_(poolModeJsonScratch_, "orp_auto_mode", orpAutoModeOut);
+
+    memset(poolModeJsonScratch_, 0, sizeof(poolModeJsonScratch_));
+    truncated = false;
+    ok = false;
+    if (cfgStore_) {
+        ok = cfgStore_->toJsonModule("poollogic/ph",
+                                     poolModeJsonScratch_,
+                                     sizeof(poolModeJsonScratch_),
+                                     &truncated,
+                                     true);
+    } else if (cfgSvc_ && cfgSvc_->toJsonModule) {
+        ok = cfgSvc_->toJsonModule(cfgSvc_->ctx,
+                                   "poollogic/ph",
+                                   poolModeJsonScratch_,
+                                   sizeof(poolModeJsonScratch_),
+                                   &truncated);
+    }
+    if (ok) {
+        (void)parseJsonBoolField_(poolModeJsonScratch_, "ph_auto_mode", phAutoModeOut);
+    }
+
+    memset(poolModeJsonScratch_, 0, sizeof(poolModeJsonScratch_));
+    truncated = false;
+    ok = false;
+    if (cfgStore_) {
+        ok = cfgStore_->toJsonModule("poollogic/chlorine",
+                                     poolModeJsonScratch_,
+                                     sizeof(poolModeJsonScratch_),
+                                     &truncated,
+                                     true);
+    } else if (cfgSvc_ && cfgSvc_->toJsonModule) {
+        ok = cfgSvc_->toJsonModule(cfgSvc_->ctx,
+                                   "poollogic/chlorine",
+                                   poolModeJsonScratch_,
+                                   sizeof(poolModeJsonScratch_),
+                                   &truncated);
+    }
+    if (ok) {
+        (void)parseJsonBoolField_(poolModeJsonScratch_, "dis_auto_mode", orpAutoModeOut);
+    }
     return true;
 }
 

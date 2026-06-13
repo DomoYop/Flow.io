@@ -37,6 +37,7 @@ ModuleInstances::ModuleInstances(const BoardSpec& board)
       tftModuleS3(board),
 #endif
       hmiModule(board),
+      hmiBuzzerModule(board),
       ioModule(board),
       oneWireWater(oneWirePinForSignal(board, BoardSignal::TempProbe1, 3)),
       oneWireAir(oneWirePinForSignal(board, BoardSignal::TempProbe2, 2))

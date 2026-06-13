@@ -29,7 +29,7 @@
     "poollogic/filtration/filtr_stop_max": {
       "enum_set": "hours_of_day"
     },
-    "poollogic/mode/disinfection_type": {
+    "poollogic/modes/disinfection_type": {
       "enum_set": "poollogic_disinfection_type"
     },
     "poollogic/o2/main_hour": {

@@ -15,14 +15,10 @@
 namespace {
 static constexpr uint8_t kPoolDeviceCfgProducerId = 48;
 static constexpr const char* kPoolDeviceCfgTopicBase = "cfg/pdm";
-static constexpr const char* kPoolDeviceCfgRuntimeTopicBase = "cfg/pdmrt";
 static constexpr uint8_t kPoolDeviceCfgBranchBase = 1;
-static constexpr uint8_t kPoolDeviceCfgRuntimeBranchBase = (uint8_t)(kPoolDeviceCfgBranchBase + POOL_DEVICE_MAX);
 static constexpr uint8_t kTimeCfgBranch = 1;
 static constexpr uint16_t kCfgMsgBasePdm = 1;
-static constexpr uint16_t kCfgMsgBasePdmrt = 2;
 static constexpr uint16_t kCfgMsgPdmSlotBase = 16;
-static constexpr uint16_t kCfgMsgPdmrtSlotBase = 32;
 
 template <size_t Rows, size_t Cols>
 size_t charTableUsage_(const char (&table)[Rows][Cols])
@@ -40,10 +36,6 @@ static constexpr uint8_t poolDeviceCfgBranchFromSlot_(uint8_t slot)
     return (slot < POOL_DEVICE_MAX) ? (uint8_t)(kPoolDeviceCfgBranchBase + slot) : 0;
 }
 
-static constexpr uint8_t poolDeviceCfgRuntimeBranchFromSlot_(uint8_t slot)
-{
-    return (slot < POOL_DEVICE_MAX) ? (uint8_t)(kPoolDeviceCfgRuntimeBranchBase + slot) : 0;
-}
 } // namespace
 
 void PoolDeviceModule::onEventStatic_(const Event& e, void* user)
@@ -99,6 +91,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
 {
     constexpr uint8_t kCfgModuleId = (uint8_t)ConfigModuleId::PoolDevice;
     cfgStore_ = &cfg;
+    cfgSvc_ = services.get<ConfigStoreService>(ServiceId::ConfigStore);
     logHub_ = services.get<LogHubService>(ServiceId::LogHub);
     mqttSvc_ = services.get<MqttService>(ServiceId::Mqtt);
     ioSvc_ = services.get<IOServiceV2>(ServiceId::Io);
@@ -122,12 +115,11 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         eventBus_->subscribe(EventId::ConfigChanged, &PoolDeviceModule::onEventStatic_, this);
     }
 
-    // Each slot owns one config branch and one runtime-persist branch.
+    // Each slot owns one config branch; runtime metrics use ConfigStore runtime blob APIs.
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
         PoolDeviceSlot& s = slots_[i];
         if (!s.used) continue;
         const uint8_t localBranchId = poolDeviceCfgBranchFromSlot_(i);
-        const uint8_t runtimeBranchId = poolDeviceCfgRuntimeBranchFromSlot_(i);
 
         const PoolDeviceSlotDescriptor& slot = PoolDeviceSlots::kSlots[i];
 
@@ -184,15 +176,6 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         cfgMaxUptimeVar_[i].persistence = ConfigPersistence::Persistent;
         cfgMaxUptimeVar_[i].size = 0;
         cfg.registerVar(cfgMaxUptimeVar_[i], kCfgModuleId, localBranchId);
-
-        cfgRuntimeVar_[i].nvsKey = slot.runtimeKey;
-        cfgRuntimeVar_[i].jsonName = "metrics_blob";
-        cfgRuntimeVar_[i].moduleName = slot.runtimeModuleName;
-        cfgRuntimeVar_[i].type = ConfigType::CharArray;
-        cfgRuntimeVar_[i].value = runtimePersistBuf_[i];
-        cfgRuntimeVar_[i].persistence = ConfigPersistence::Persistent;
-        cfgRuntimeVar_[i].size = sizeof(runtimePersistBuf_[i]);
-        cfg.registerVar(cfgRuntimeVar_[i], kCfgModuleId, runtimeBranchId);
     }
 
     if (cmdSvc_ && cmdSvc_->registerHandler) {
@@ -448,13 +431,6 @@ void PoolDeviceModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
          (uint8_t)MqttPublishPriority::Low,
          &PoolDeviceModule::buildCfgBasePdmStatic_,
          kPoolDeviceCfgTopicBase},
-        {kCfgMsgBasePdmrt,
-         {(uint8_t)ConfigModuleId::PoolDevice, ConfigBranchRef::UnknownLocalBranch},
-         nullptr,
-         "",
-         (uint8_t)MqttPublishPriority::Low,
-         &PoolDeviceModule::buildCfgBasePdmrtStatic_,
-         kPoolDeviceCfgRuntimeTopicBase},
 #define FLOW_POOLDEVICE_CFG_ROUTES(SLOT) \
         {(uint16_t)(kCfgMsgPdmSlotBase + (SLOT)), \
          {(uint8_t)ConfigModuleId::PoolDevice, poolDeviceCfgBranchFromSlot_(SLOT)}, \
@@ -462,14 +438,7 @@ void PoolDeviceModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
          PoolDeviceSlots::kSlots[SLOT].id, \
          (uint8_t)MqttPublishPriority::Normal, \
          nullptr, \
-         kPoolDeviceCfgTopicBase}, \
-        {(uint16_t)(kCfgMsgPdmrtSlotBase + (SLOT)), \
-         {(uint8_t)ConfigModuleId::PoolDevice, poolDeviceCfgRuntimeBranchFromSlot_(SLOT)}, \
-         PoolDeviceSlots::kSlots[SLOT].runtimeModuleName, \
-         PoolDeviceSlots::kSlots[SLOT].id, \
-         (uint8_t)MqttPublishPriority::Normal, \
-         nullptr, \
-         kPoolDeviceCfgRuntimeTopicBase}
+         kPoolDeviceCfgTopicBase}
         FLOW_POOLDEVICE_CFG_ROUTES(0),
         FLOW_POOLDEVICE_CFG_ROUTES(1),
         FLOW_POOLDEVICE_CFG_ROUTES(2),
@@ -498,6 +467,7 @@ void PoolDeviceModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
         PoolDeviceSlot& s = slots_[i];
         if (!s.used) continue;
+        (void)loadPersistedMetrics_(i, s);
         if (runtimePersistBuf_[i][0] != '\0') {
             BufferUsageTracker::note(TrackedBufferId::PoolDeviceRuntimePersistTable,
                                      charTableUsage_(runtimePersistBuf_),
@@ -505,7 +475,6 @@ void PoolDeviceModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
                                      s.id,
                                      runtimePersistBuf_[i]);
         }
-        (void)loadPersistedMetrics_(i, s);
     }
     requestPeriodReconcile_();
 }

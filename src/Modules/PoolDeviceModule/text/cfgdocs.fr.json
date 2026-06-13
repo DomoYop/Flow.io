@@ -27,11 +27,6 @@
       "help_t": "cfgdocs.wildcard.max_uptime_day_s.help",
       "unit": "s"
     },
-    "*/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.wildcard.metrics_blob.label",
-      "help_t": "cfgdocs.wildcard.metrics_blob.help"
-    },
     "*/tank_cap_ml": {
       "type": "float",
       "label_t": "cfgdocs.wildcard.tank_cap_ml.label",
@@ -315,46 +310,6 @@
       "label_t": "cfgdocs.pdm.pd7.tank_init_ml.label",
       "help_t": "cfgdocs.pdm.pd7.tank_init_ml.help",
       "unit": "mL"
-    },
-    "pdmrt/pd0/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd0.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd0.metrics_blob.help"
-    },
-    "pdmrt/pd1/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd1.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd1.metrics_blob.help"
-    },
-    "pdmrt/pd2/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd2.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd2.metrics_blob.help"
-    },
-    "pdmrt/pd3/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd3.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd3.metrics_blob.help"
-    },
-    "pdmrt/pd4/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd4.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd4.metrics_blob.help"
-    },
-    "pdmrt/pd5/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd5.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd5.metrics_blob.help"
-    },
-    "pdmrt/pd6/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd6.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd6.metrics_blob.help"
-    },
-    "pdmrt/pd7/metrics_blob": {
-      "type": "char",
-      "label_t": "cfgdocs.pdmrt.pd7.metrics_blob.label",
-      "help_t": "cfgdocs.pdmrt.pd7.metrics_blob.help"
     }
   }
 }

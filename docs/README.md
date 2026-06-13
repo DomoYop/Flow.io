@@ -1,4 +1,4 @@
-# Documentation Flow.io
+# Documentation flow.io
 
 Cette documentation est organisée pour deux usages distincts:
 
@@ -7,7 +7,7 @@ Cette documentation est organisée pour deux usages distincts:
 
 Le projet est prévu pour fonctionner avec deux ESP32 distincts, chacun avec son propre firmware:
 
-- `FlowIO`: ESP32 principal qui exécute la logique métier et pilote les entrées/sorties
+- `flowIO`: ESP32 principal qui exécute la logique métier et pilote les entrées/sorties
 - `Supervisor`: ESP32 de supervision qui configure le système, assure le provisioning Wi-Fi, gère l'écran TFT, permet la consultation des logs et pilote les mises à jour
 
 Le projet compile aujourd'hui deux firmwares ESP32:
@@ -64,7 +64,7 @@ Le projet compile aujourd'hui deux firmwares ESP32:
 
 Les tableaux ci-dessous décrivent le câblage actuellement reflété par les sources du dépôt.
 
-### Flow.io
+### flow.io
 
 Références principales:
 

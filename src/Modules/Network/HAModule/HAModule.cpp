@@ -35,31 +35,10 @@
 
 namespace {
 static constexpr uint8_t kHaCfgBranch = 1;
-struct HaDiscoveryCleanupEntry {
-    const char* component;
-    const char* objectSuffix;
-};
-static constexpr HaDiscoveryCleanupEntry kLegacyDiscoveryCleanupEntries[] = {
-    {"sensor", "sys_upt_s"},
-    {"button", "alm_ack_all"},
-    {"button", "alm_ack_slot_0"},
-    {"button", "alm_ack_slot_1"},
-    {"button", "alm_ack_slot_2"},
-    {"button", "alm_ack_slot_3"},
-    {"button", "alm_ack_slot_4"},
-    {"button", "alm_ack_slot_5"},
-    {"button", "alm_ack_slot_6"},
-    {"button", "alm_ack_slot_7"},
-    {"switch", "pl_chl_gen_mode"},
-    {"switch", "pl_chl_gen_orp"},
-};
 static constexpr MqttConfigRouteProducer::Route kHaCfgRoutes[] = {
     {1, {(uint8_t)ConfigModuleId::Ha, kHaCfgBranch}, "ha", "ha", (uint8_t)MqttPublishPriority::Normal, nullptr},
 };
 static constexpr const char* kHaDeviceConfigUrl = "http://flowio.local";
-static_assert(Limits::Ha::Capacity::MaxDiscoveryCleanups <=
-                  (uint8_t)(sizeof(kLegacyDiscoveryCleanupEntries) / sizeof(kLegacyDiscoveryCleanupEntries[0])),
-              "Board HA cleanup capacity exceeds built-in legacy cleanup entries");
 }
 
 static void buildAvailabilityField(const MqttService* mqttSvc_,
@@ -1010,7 +989,7 @@ uint16_t HAModule::entityCount_() const
 
 uint16_t HAModule::messageCount_() const
 {
-    return (uint16_t)(entityCount_() + MAX_HA_DISCOVERY_CLEANUPS);
+    return entityCount_();
 }
 
 bool HAModule::isPending_(uint16_t messageId) const
@@ -1041,10 +1020,9 @@ void HAModule::markAllPending_()
     for (uint16_t i = 0; i < count; ++i) {
         setPending_(i, true);
     }
-    HA_BOOT_TRACE_D("ha boot trace: mark all pending messages=%u entities=%u cleanups=%u",
+    HA_BOOT_TRACE_D("ha boot trace: mark all pending messages=%u entities=%u",
                     (unsigned)count,
-                    (unsigned)entityCount_(),
-                    (unsigned)MAX_HA_DISCOVERY_CLEANUPS);
+                    (unsigned)entityCount_());
 }
 
 bool HAModule::anyPending_() const
@@ -1083,9 +1061,7 @@ bool HAModule::discoveryReady_() const
     if (!startupReady_) return false;
     if (!dsSvc_ || !dsSvc_->store) return false;
     const DataStore& ds = *dsSvc_->store;
-    return networkReady(ds) &&
-           mqttReady(ds) &&
-           mqttRuntimeFullSnapshotPublished(ds);
+    return networkReady(ds) && mqttReady(ds);
 }
 
 MqttBuildResult HAModule::producerBuildStatic_(void* ctx, uint16_t messageId, MqttBuildContext& buildCtx)
@@ -1179,22 +1155,6 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
     return true;
 }
 
-bool HAModule::buildLegacyCleanupMessage_(uint16_t cleanupId, MqttBuildContext& buildCtx)
-{
-    if (cleanupId >= (uint16_t)(sizeof(kLegacyDiscoveryCleanupEntries) / sizeof(kLegacyDiscoveryCleanupEntries[0]))) {
-        return false;
-    }
-    const HaDiscoveryCleanupEntry& cleanup = kLegacyDiscoveryCleanupEntries[cleanupId];
-    if (!buildObjectId(cleanup.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) return false;
-    if (!publishDiscovery(cleanup.component, objectIdBuf_, buildCtx)) return false;
-    if (buildCtx.payload && buildCtx.payloadCapacity > 0U) {
-        buildCtx.payload[0] = '\0';
-    }
-    buildCtx.payloadLen = 0U;
-    buildCtx.allowEmptyPayload = true;
-    return true;
-}
-
 MqttBuildResult HAModule::buildMessage_(uint16_t messageId, MqttBuildContext& buildCtx)
 {
     if (oneShotCompleted_) return MqttBuildResult::NoLongerNeeded;
@@ -1204,7 +1164,6 @@ MqttBuildResult HAModule::buildMessage_(uint16_t messageId, MqttBuildContext& bu
     if (!dsSvc_ || !dsSvc_->store) return MqttBuildResult::RetryLater;
     if (!networkReady(*dsSvc_->store)) return MqttBuildResult::RetryLater;
     if (!mqttReady(*dsSvc_->store)) return MqttBuildResult::RetryLater;
-    if (!mqttRuntimeFullSnapshotPublished(*dsSvc_->store)) return MqttBuildResult::RetryLater;
     if (!isPending_(messageId)) return MqttBuildResult::NoLongerNeeded;
 
     refreshIdentityFromConfig();
@@ -1216,13 +1175,8 @@ MqttBuildResult HAModule::buildMessage_(uint16_t messageId, MqttBuildContext& bu
                     (unsigned)messageId,
                     (unsigned)entityCount,
                     (unsigned)messageCount_());
-    if (messageId < entityCount) {
-        if (!buildEntityMessage_(messageId, buildCtx)) return MqttBuildResult::PermanentError;
-        return MqttBuildResult::Ready;
-    }
-    if (!buildLegacyCleanupMessage_((uint16_t)(messageId - entityCount), buildCtx)) {
-        return MqttBuildResult::PermanentError;
-    }
+    if (messageId >= entityCount) return MqttBuildResult::NoLongerNeeded;
+    if (!buildEntityMessage_(messageId, buildCtx)) return MqttBuildResult::PermanentError;
     return MqttBuildResult::Ready;
 }
 
@@ -1280,10 +1234,9 @@ void HAModule::onEvent(const Event& e)
     if (!dsSvc_ || !dsSvc_->store) return;
 
     if (payload->id == DATAKEY_NETWORK_READY) {
-        HA_BOOT_TRACE_D("ha boot trace: event wifi_ready=%d mqtt_ready=%d runtime_full=%d",
+        HA_BOOT_TRACE_D("ha boot trace: event wifi_ready=%d mqtt_ready=%d",
                         networkReady(*dsSvc_->store) ? 1 : 0,
-                        mqttReady(*dsSvc_->store) ? 1 : 0,
-                        mqttRuntimeFullSnapshotPublished(*dsSvc_->store) ? 1 : 0);
+                        mqttReady(*dsSvc_->store) ? 1 : 0);
         if (discoveryReady_()) {
             (void)enqueuePending_(MqttPublishPriority::Low);
         }
@@ -1291,21 +1244,9 @@ void HAModule::onEvent(const Event& e)
     }
 
     if (payload->id == DATAKEY_MQTT_READY) {
-        HA_BOOT_TRACE_D("ha boot trace: event mqtt_ready=%d wifi_ready=%d runtime_full=%d",
+        HA_BOOT_TRACE_D("ha boot trace: event mqtt_ready=%d wifi_ready=%d",
                         mqttReady(*dsSvc_->store) ? 1 : 0,
-                        networkReady(*dsSvc_->store) ? 1 : 0,
-                        mqttRuntimeFullSnapshotPublished(*dsSvc_->store) ? 1 : 0);
-        if (discoveryReady_()) {
-            (void)enqueuePending_(MqttPublishPriority::Low);
-        }
-        return;
-    }
-
-    if (payload->id == DATAKEY_MQTT_RUNTIME_FULL_SNAPSHOT_PUBLISHED) {
-        HA_BOOT_TRACE_D("ha boot trace: event runtime_full=%d wifi_ready=%d mqtt_ready=%d",
-                        mqttRuntimeFullSnapshotPublished(*dsSvc_->store) ? 1 : 0,
-                        networkReady(*dsSvc_->store) ? 1 : 0,
-                        mqttReady(*dsSvc_->store) ? 1 : 0);
+                        networkReady(*dsSvc_->store) ? 1 : 0);
         if (discoveryReady_()) {
             (void)enqueuePending_(MqttPublishPriority::Low);
         }

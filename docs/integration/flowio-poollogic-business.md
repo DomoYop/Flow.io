@@ -88,7 +88,7 @@ Responsabilités:
   - temps de marche jour/semaine/mois/total
   - volume injecté jour/semaine/mois/total
   - volume restant cuve
-- persiste les métriques (`metrics_blob`) dans ConfigStore
+- persiste les métriques via les blobs runtime NVS du ConfigStore
 
 ## 3.3 `IOModule`
 
@@ -150,7 +150,7 @@ Le PID est temporel (sortie en `outputOnMs` dans une fenêtre), avec minimum ON 
 Conditions d’autorisation:
 
 - filtration demandée ON
-- PID ORP armé (`orp_auto_mode` + délai post-filtration)
+- PID désinfection armé (`dis_auto_mode` + délai post-filtration)
 - mesure ORP disponible
 - pas d’erreur PSI
 - cuve chlore non vide
@@ -223,19 +223,47 @@ Si le service alarme n’est pas disponible, `PoolLogic` utilise un fallback loc
 
 ## 7.1 `poollogic/*`
 
-### `poollogic/mode`
+### `poollogic/modes`
 
 - `enabled`
 - `auto_mode`
 - `winter_mode`
-- `ph_auto_mode`
-- `orp_auto_mode`
-- `ph_dose_plus`
 - `disinfection_type`
+
+### `poollogic/ph`
+
+- `ph_auto_mode`
+- `ph_dose_plus`
+- `ph_setpoint`
+- `ph_kp`, `ph_ki`, `ph_kd`
+- `ph_window_ms`
+
+### `poollogic/chlorine`
+
+- `dis_auto_mode`
+- `dis_setpoint`
+- `dis_kp`, `dis_ki`, `dis_kd`
+- `dis_window_ms`
 
 ### `poollogic/swg`
 
 - `swg_control_mode`
+- `secure_elec_t`
+- `dly_electro_min`
+
+### `poollogic/o2`
+
+- `pool_volume_m3`
+- `dose_ml_10m3_week`
+- `load_factor`
+- `temp_comp`
+- `split_count`
+- `main_hour`
+- `min_filter_run_min`
+- `protocol_state`
+- `last_dose_day`
+- `weekly_done_ml`
+- `pending_ml`
 
 ### `poollogic/filtration`
 
@@ -249,7 +277,7 @@ Si le service alarme n’est pas disponible, `PoolLogic` utilise un fallback loc
 ### `poollogic/sensors`
 
 - `ph_io_id`
-- `orp_io_id`
+- `dis_io_id`
 - `psi_io_id`
 - `wat_temp_io_id`
 - `air_temp_io_id`
@@ -257,39 +285,42 @@ Si le service alarme n’est pas disponible, `PoolLogic` utilise un fallback loc
 - `ph_lvl_io_id`
 - `chl_lvl_io_id`
 
-### `poollogic/pid`
+### `poollogic/safety`
 
 - `psi_low_th`
 - `psi_high_th`
 - `winter_start_t`
 - `freeze_hold_t`
-- `secure_elec_t`
-- `ph_setpoint`
-- `orp_setpoint`
-- `ph_kp`, `ph_ki`, `ph_kd`
-- `orp_kp`, `orp_ki`, `orp_kd`
-- `ph_window_ms`
-- `orp_window_ms`
+- `psi_start_dly_s`
+
+### `poollogic/regulation`
+
+- `dly_pid_min`
 - `pid_min_on_ms`
 - `pid_sample_ms`
 
-### `poollogic/delay`
+### `poollogic/heater`
 
-- `psi_start_dly_s`
-- `dly_pid_min`
-- `dly_electro_min`
+- `heater_auto_mode`
+- `heater_setpoint`
+
+### `poollogic/robot`
+
 - `robot_delay_min`
 - `robot_dur_min`
+
+### `poollogic/refill`
+
 - `fill_min_on_s`
 
-### `poollogic/device`
+### `poollogic/devices`
 
 - `filtr_slot`
 - `swg_slot`
 - `robot_slot`
 - `fill_slot`
 - `ph_pump_slot`
-- `orp_pump_slot`
+- `dis_pump_slot`
 
 ## 7.2 `pdm/*` (device manager)
 
@@ -302,9 +333,9 @@ Par slot `pdm/pdN` (N=0..7):
 - `tank_init_ml`
 - `max_uptime_day_s`
 
-Runtime persistant par slot `pdmrt/pdN`:
+Runtime persistant par slot, stocké en blob NVS interne `pdNrt`:
 
-- `metrics_blob`
+- blob de métriques
 
 ## 7.3 `io/*` (principalement utile à la logique piscine)
 

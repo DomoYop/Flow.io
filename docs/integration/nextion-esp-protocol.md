@@ -511,7 +511,7 @@ Les actions Home sont routées via `CommandService` :
 - `AUTO_MODE_TOGGLE`
   - inverse le mode auto global (`poollogic.auto_mode.set`)
 - `ORP_AUTO_MODE_TOGGLE`
-  - inverse `orp_auto_mode`
+  - inverse `dis_auto_mode`
 - `PH_AUTO_MODE_TOGGLE`
   - inverse `ph_auto_mode`
 - `WINTER_MODE_TOGGLE`
