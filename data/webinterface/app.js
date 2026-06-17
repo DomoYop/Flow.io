@@ -4958,6 +4958,35 @@
       return runtimeMeasureDomainKeys.filter((domainKey) => poolMeasureDomainState[domainKey].active);
     }
 
+    const poolMeasureActiveDomainsStorageKey = 'flow_dashboard_active_domains';
+    let poolMeasureDomainPrefsRestored = false;
+
+    function savePoolMeasureDomainPrefs() {
+      const keys = activePoolMeasureDomainKeys();
+      // '-' = tout desactive volontairement (distinct de "jamais sauvegarde").
+      setStorageValue(localStorage, poolMeasureActiveDomainsStorageKey, keys.length ? keys.join(',') : '-');
+    }
+
+    function restorePoolMeasureDomainPrefs() {
+      if (poolMeasureDomainPrefsRestored) return;
+      poolMeasureDomainPrefsRestored = true;
+      ensureRuntimeDomainState();
+      const raw = getStorageValue(localStorage, poolMeasureActiveDomainsStorageKey);
+      if (raw === '-') return;
+      if (!raw) {
+        runtimeMeasureDomainKeys.forEach((domainKey) => {
+          if (poolMeasureDomainState[domainKey]) poolMeasureDomainState[domainKey].active = true;
+        });
+        return;
+      }
+      raw.split(',').forEach((key) => {
+        const cleanDomain = normalizeRuntimeMeasureDomainKey(key);
+        if (cleanDomain && poolMeasureDomainState[cleanDomain]) {
+          poolMeasureDomainState[cleanDomain].active = true;
+        }
+      });
+    }
+
     function registerRuntimeManifestEntry(cache, entry) {
       if (!entry || !Number.isFinite(Number(entry.id))) return;
       const domainKey = normalizeRuntimeManifestDomainKey(entry.domain);
@@ -6080,10 +6109,12 @@
         state.error = '';
         state.sondeSlots = [];
         state.requestSeq += 1;
+        savePoolMeasureDomainPrefs();
         refreshPoolMeasuresView();
         return;
       }
       state.active = true;
+      savePoolMeasureDomainPrefs();
       await loadPoolMeasureDomain(cleanDomain, false);
     }
 
@@ -6092,6 +6123,7 @@
     }
 
     async function onPoolMeasuresPageShown() {
+      restorePoolMeasureDomainPrefs();
       refreshPoolMeasuresView();
       startPoolMeasuresTimer();
       if (activePoolMeasureDomainKeys().length) {
