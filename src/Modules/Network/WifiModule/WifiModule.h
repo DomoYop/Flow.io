@@ -23,7 +23,7 @@
 struct WifiConfig {
     bool enabled = true;
     // IEEE 802.11 SSID supports up to 32 bytes (+ '\0').
-#if defined(FLOW_PROFILE_MICRONOVA) || defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_MICRONOVA) || defined(FLOW_PROFILE_WAVESHARE)
     char ssid[33] = "";
 #else
     char ssid[33] = FLOW_WIRDEF_WIFI_SSID;
@@ -53,7 +53,7 @@ public:
     uint16_t taskStackSize() const override {
 #if defined(FLOW_PROFILE_SUPERVISOR) || defined(FLOW_PROFILE_MICRONOVA)
         return 4096;
-#elif defined(FLOW_PROFILE_FLOWIOS3)
+#elif defined(FLOW_PROFILE_WAVESHARE)
         return 3584;
 #else
         return 2816;

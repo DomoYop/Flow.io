@@ -2,6 +2,7 @@
 
 #include "Board/FlowIODINBoard.h"
 #include "Domain/DomainTypes.h"
+#include "Domain/Pool/PoolIds.h"
 #include "Modules/IOModule/IODrivers/Ads1115Driver.h"
 #include "Modules/IOModule/IOModuleTypes.h"
 
@@ -118,7 +119,7 @@ constexpr PhysicalPortId analogPortFromLegacy(uint8_t source, uint8_t channel)
 }
 
 struct AnalogRoleDefault {
-    DomainRole role; // Role fonctionnel de la sonde.
+    DomainSlotId domainSlot; // Besoin fonctionnel porte par le domaine.
     PhysicalPortId bindingPort; // Port physique associe.
     float c0; // Coefficient de calibration offset/intercept.
     float c1; // Coefficient de calibration gain/slope.
@@ -126,17 +127,17 @@ struct AnalogRoleDefault {
 };
 
 inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
-    // {role, bindingPort, c0, c1, precision}
-    {DomainRole::OrpSensor, analogPortFromLegacy(FLOW_WIRDEF_IO_A0S, FLOW_WIRDEF_IO_A0C), FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
-    {DomainRole::PhSensor, analogPortFromLegacy(FLOW_WIRDEF_IO_A1S, FLOW_WIRDEF_IO_A1C), FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
-    {DomainRole::PsiSensor, analogPortFromLegacy(FLOW_WIRDEF_IO_A2S, FLOW_WIRDEF_IO_A2C), FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
-    {DomainRole::SpareAnalog, analogPortFromLegacy(FLOW_WIRDEF_IO_A3S, FLOW_WIRDEF_IO_A3C), FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
-    {DomainRole::WaterTemp, analogPortFromLegacy(FLOW_WIRDEF_IO_A4S, FLOW_WIRDEF_IO_A4C), FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
-    {DomainRole::AirTemp, analogPortFromLegacy(FLOW_WIRDEF_IO_A5S, FLOW_WIRDEF_IO_A5C), FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
+    // {domainSlot, bindingPort, c0, c1, precision}
+    {PoolIds::SensorOrp, analogPortFromLegacy(FLOW_WIRDEF_IO_A0S, FLOW_WIRDEF_IO_A0C), FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
+    {PoolIds::SensorPh, analogPortFromLegacy(FLOW_WIRDEF_IO_A1S, FLOW_WIRDEF_IO_A1C), FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
+    {PoolIds::SensorPsi, analogPortFromLegacy(FLOW_WIRDEF_IO_A2S, FLOW_WIRDEF_IO_A2C), FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
+    {PoolIds::SensorSpareAnalog, analogPortFromLegacy(FLOW_WIRDEF_IO_A3S, FLOW_WIRDEF_IO_A3C), FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
+    {PoolIds::SensorWaterTemp, analogPortFromLegacy(FLOW_WIRDEF_IO_A4S, FLOW_WIRDEF_IO_A4C), FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
+    {PoolIds::SensorAirTemp, analogPortFromLegacy(FLOW_WIRDEF_IO_A5S, FLOW_WIRDEF_IO_A5C), FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
 };
 
 struct DigitalInputRoleDefault {
-    DomainRole role; // Role fonctionnel de l'entree.
+    DomainSlotId domainSlot; // Besoin fonctionnel porte par le domaine.
     PhysicalPortId bindingPort; // Port physique associe.
     uint8_t mode; // Mode de lecture (etat/counter).
     uint8_t edgeMode; // Type de front pris en compte.
@@ -144,15 +145,15 @@ struct DigitalInputRoleDefault {
 };
 
 inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {
-    // {role, bindingPort, mode, edgeMode, debounceUs}
-    {DomainRole::PoolLevelSensor, PortDigitalIn1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
-    {DomainRole::PhLevelSensor, PortDigitalIn2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
-    {DomainRole::ChlorineLevelSensor, PortDigitalIn3, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore.
-    {DomainRole::WaterCounterSensor, PortDigitalIn4, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (100 ms debounce).
+    // {domainSlot, bindingPort, mode, edgeMode, debounceUs}
+    {PoolIds::SensorPoolLevel, PortDigitalIn1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
+    {PoolIds::SensorPhLevel, PortDigitalIn2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
+    {PoolIds::SensorChlorineLevel, PortDigitalIn3, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore.
+    {PoolIds::SensorWaterCounter, PortDigitalIn4, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (100 ms debounce).
 };
 
 struct DigitalOutputRoleDefault {
-    DomainRole role; // Role fonctionnel de la sortie.
+    DomainSlotId domainSlot; // Besoin fonctionnel porte par le domaine.
     PhysicalPortId bindingPort; // Port physique associe.
     bool activeHigh; // Polarite de commande logique.
     bool retainOnWarmReboot; // Conserve le latch expander sur reboot ESP32 chaud.
@@ -161,37 +162,37 @@ struct DigitalOutputRoleDefault {
 };
 
 inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
-    // {role, bindingPort, activeHigh, retainOnWarmReboot, momentary, pulseMs}
-    {DomainRole::FiltrationPump, PortRelay1, false, true, false, 0U}, // Pompe filtration.
-    {DomainRole::PhPump, PortRelay2, false, false, false, 0U}, // Pompe pH.
-    {DomainRole::ChlorinePump, PortRelay3, false, false, false, 0U}, // Pompe chlore.
-    {DomainRole::ChlorineGenerator, PortRelay4, false, false, BoardProfiles::kFlowIODINv1IoPoints[3].momentary, BoardProfiles::kFlowIODINv1IoPoints[3].pulseMs}, // Electrolyseur; utilise limites board (momentary/pulseMs).
-    {DomainRole::Robot, PortRelay5, false, false, false, 0U}, // Robot.
-    {DomainRole::Lights, PortRelay6, false, false, false, 0U}, // Eclairage.
-    {DomainRole::FillPump, PortRelay7, false, false, false, 0U}, // Pompe de remplissage.
-    {DomainRole::WaterHeater, PortRelay8, false, false, false, 0U}, // Chauffage.
+    // {domainSlot, bindingPort, activeHigh, retainOnWarmReboot, momentary, pulseMs}
+    {PoolIds::ActuatorFiltrationPump, PortRelay1, false, true, false, 0U}, // Pompe filtration.
+    {PoolIds::ActuatorPhPump, PortRelay2, false, false, false, 0U}, // Pompe pH.
+    {PoolIds::ActuatorChlorinePump, PortRelay3, false, false, false, 0U}, // Pompe chlore.
+    {PoolIds::ActuatorChlorineGenerator, PortRelay4, false, false, BoardProfiles::kFlowIODINv1IoPoints[3].momentary, BoardProfiles::kFlowIODINv1IoPoints[3].pulseMs}, // Electrolyseur; utilise limites board (momentary/pulseMs).
+    {PoolIds::ActuatorRobot, PortRelay5, false, false, false, 0U}, // Robot.
+    {PoolIds::ActuatorLights, PortRelay6, false, false, false, 0U}, // Eclairage.
+    {PoolIds::ActuatorFillPump, PortRelay7, false, false, false, 0U}, // Pompe de remplissage.
+    {PoolIds::ActuatorWaterHeater, PortRelay8, false, false, false, 0U}, // Chauffage.
 };
 
-inline constexpr const AnalogRoleDefault* analogDefaultForRole(DomainRole role)
+inline constexpr const AnalogRoleDefault* analogDefaultForDomainSlot(DomainSlotId domainSlot)
 {
     for (const AnalogRoleDefault& entry : kAnalogRoleDefaults) {
-        if (entry.role == role) return &entry;
+        if (entry.domainSlot == domainSlot) return &entry;
     }
     return nullptr;
 }
 
-inline constexpr const DigitalInputRoleDefault* digitalInputDefaultForRole(DomainRole role)
+inline constexpr const DigitalInputRoleDefault* digitalInputDefaultForDomainSlot(DomainSlotId domainSlot)
 {
     for (const DigitalInputRoleDefault& entry : kDigitalInputRoleDefaults) {
-        if (entry.role == role) return &entry;
+        if (entry.domainSlot == domainSlot) return &entry;
     }
     return nullptr;
 }
 
-inline constexpr const DigitalOutputRoleDefault* digitalOutputDefaultForRole(DomainRole role)
+inline constexpr const DigitalOutputRoleDefault* digitalOutputDefaultForDomainSlot(DomainSlotId domainSlot)
 {
     for (const DigitalOutputRoleDefault& entry : kDigitalOutputRoleDefaults) {
-        if (entry.role == role) return &entry;
+        if (entry.domainSlot == domainSlot) return &entry;
     }
     return nullptr;
 }

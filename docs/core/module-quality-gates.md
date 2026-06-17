@@ -3,7 +3,7 @@
 Cette page suit l'état qualité des modules du firmware `Waveshare-ESP32-S3`.
 Elle remplace l'ancienne matrice historique `FlowIO` / `Supervisor` par une
 vue centrée sur le profil réellement compilé et instancié par
-`src/Profiles/FlowIOS3`.
+`src/Profiles/Waveshare`.
 
 Dernière analyse: 2026-06-13.  
 Commande de vérification: `~/.platformio/penv/bin/pio run -e Waveshare-ESP32-S3`.
@@ -24,10 +24,10 @@ capacité à rester sobres.
 
 ## Périmètre Waveshare
 
-Le profil `Waveshare-ESP32-S3` utilise `FLOW_PROFILE_FLOWIOS3=1` et
+Le profil `Waveshare-ESP32-S3` utilise `FLOW_PROFILE_WAVESHARE=1` et
 `FLOW_BOARD_WAVESHARE_ESP32_S3=1`. Il instancie `ModuleInstances` dans
-`src/Profiles/FlowIOS3/FlowIOS3ModuleInstances.cpp` puis enregistre les modules
-dans `src/Profiles/FlowIOS3/FlowIOS3Bootstrap.cpp`.
+`src/Profiles/Waveshare/WaveshareModuleInstances.cpp` puis enregistre les modules
+dans `src/Profiles/Waveshare/WaveshareBootstrap.cpp`.
 
 Modules enregistrés au runtime:
 
@@ -501,7 +501,7 @@ commandes et endpoints update.
 
 Points forts:
 
-- tâche dédiée core 0, stack `4096` en FlowIOS3
+- tâche dédiée core 0, stack `4096` en Waveshare
 - `canStart()` attend un `NetworkAccessService` en mode Station ou AP
 - start delay Waveshare `3000 ms`
 - service `WebInterfaceService`: pause, health, activité, source WebSocket
@@ -513,7 +513,7 @@ Risques:
 - pas de fiche `docs/modules/WebInterfaceModule.md`
 - module très volumineux et contributeur probable à la pression flash
 - surface HTTP/WS large sans tests automatisés visibles
-- dépendances FlowIOS3 déclarées volontairement minimales (`loghub`, `wifi`) mais
+- dépendances Waveshare déclarées volontairement minimales (`loghub`, `wifi`) mais
   nombreux services sont attachés dynamiquement; ce compromis doit être documenté
 
 Actions recommandées:
@@ -529,7 +529,7 @@ Rôle: mise à jour firmware/SPIFFS/Nextion et service `FirmwareUpdateService`.
 
 Points forts:
 
-- tâche dédiée core 0, stack `6144` en FlowIOS3
+- tâche dédiée core 0, stack `6144` en Waveshare
 - start delay Waveshare `6000 ms`
 - commandes `fw.update.*`, `fw.nextion.reboot`, `fw.flowio.hw_reboot`
 - service pour start/status/busy/config/manifest
@@ -546,7 +546,7 @@ Risques:
 
 Actions recommandées:
 
-- créer fiche module spécifique FlowIOS3/Waveshare
+- créer fiche module spécifique Waveshare/Waveshare
 - tests de parsing URL/manifest et transitions d'erreur
 - vérifier UX web: update impossible quand marge flash ou partition insuffisante
 
@@ -717,7 +717,7 @@ Risques:
 Actions recommandées:
 
 - tests host `dependenciesSatisfied_`, max uptime et refill
-- vérifier tous les presets pool contre `FlowIOS3IoLayout`
+- vérifier tous les presets pool contre `WaveshareIoLayout`
 
 ### `sysmon` - 22/30 - Gate B
 
@@ -746,7 +746,7 @@ Actions recommandées:
 
 ### `log.sink.alarm`
 
-Statut: compilé, non enregistré par `FlowIOS3Bootstrap`.
+Statut: compilé, non enregistré par `WaveshareBootstrap`.
 
 Impact:
 
@@ -772,7 +772,7 @@ Priorité 1 - réduire les gates C:
 2. Ajouter tests host simples:
    `NetworkManager`, `ConfigMenuModel`, `HmiUdpServer` token/retry,
    `CommandRegistry`, transitions `AlarmModule`.
-3. Documenter le couplage volontaire FlowIOS3:
+3. Documenter le couplage volontaire Waveshare:
    `WebInterface` démarre tôt avec dépendances minimales, puis attache les
    services dynamiquement.
 
@@ -798,8 +798,8 @@ module générales, utiliser `docs/modules/`. Pour le profil Waveshare, la sourc
 de vérité runtime est désormais:
 
 - `platformio.ini`, section `[env:Waveshare-ESP32-S3]`
-- `src/Profiles/FlowIOS3/FlowIOS3Profile.cpp`
-- `src/Profiles/FlowIOS3/FlowIOS3ModuleInstances.cpp`
-- `src/Profiles/FlowIOS3/FlowIOS3Bootstrap.cpp`
-- `src/Profiles/FlowIOS3/FlowIOS3IoAssembly.cpp`
+- `src/Profiles/Waveshare/WaveshareProfile.cpp`
+- `src/Profiles/Waveshare/WaveshareModuleInstances.cpp`
+- `src/Profiles/Waveshare/WaveshareBootstrap.cpp`
+- `src/Profiles/Waveshare/WaveshareIoAssembly.cpp`
 - `src/Board/WaveshareBoard.h`

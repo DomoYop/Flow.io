@@ -301,6 +301,23 @@ constexpr char IO_D7NM[] = "io_d07nm"; // IO module persisted key for field `io_
 constexpr char IO_D7PM[] = "io_d07pm"; // IO module persisted key for field `io_d07pm`.
 constexpr char IO_D7PN[] = "io_d07pn"; // IO module persisted key for field `io_d07pn`.
 constexpr char IO_D7RT[] = "io_d07rt"; // IO module persisted key for field `io_d07rt`.
+#define FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS(SLOT_STR, KEYNM, KEYBP, KEYAH, KEYIN, KEYRT, KEYMO, KEYPM) \
+constexpr char KEYAH[] = "io_d" SLOT_STR "ah"; /* IO module persisted key for field `io_d" SLOT_STR "ah`. */ \
+constexpr char KEYBP[] = "io_d" SLOT_STR "bp"; /* IO module persisted key for field `io_d" SLOT_STR "bp`. */ \
+constexpr char KEYIN[] = "io_d" SLOT_STR "in"; /* IO module persisted key for field `io_d" SLOT_STR "in`. */ \
+constexpr char KEYMO[] = "io_d" SLOT_STR "mo"; /* IO module persisted key for field `io_d" SLOT_STR "mo`. */ \
+constexpr char KEYNM[] = "io_d" SLOT_STR "nm"; /* IO module persisted key for field `io_d" SLOT_STR "nm`. */ \
+constexpr char KEYPM[] = "io_d" SLOT_STR "pm"; /* IO module persisted key for field `io_d" SLOT_STR "pm`. */ \
+constexpr char KEYRT[] = "io_d" SLOT_STR "rt"; /* IO module persisted key for field `io_d" SLOT_STR "rt`. */
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("08", IO_D8NM, IO_D8BP, IO_D8AH, IO_D8IN, IO_D8RT, IO_D8MO, IO_D8PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("09", IO_D9NM, IO_D9BP, IO_D9AH, IO_D9IN, IO_D9RT, IO_D9MO, IO_D9PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("10", IO_D10NM, IO_D10BP, IO_D10AH, IO_D10IN, IO_D10RT, IO_D10MO, IO_D10PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("11", IO_D11NM, IO_D11BP, IO_D11AH, IO_D11IN, IO_D11RT, IO_D11MO, IO_D11PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("12", IO_D12NM, IO_D12BP, IO_D12AH, IO_D12IN, IO_D12RT, IO_D12MO, IO_D12PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("13", IO_D13NM, IO_D13BP, IO_D13AH, IO_D13IN, IO_D13RT, IO_D13MO, IO_D13PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("14", IO_D14NM, IO_D14BP, IO_D14AH, IO_D14IN, IO_D14RT, IO_D14MO, IO_D14PM)
+FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS("15", IO_D15NM, IO_D15BP, IO_D15AH, IO_D15IN, IO_D15RT, IO_D15MO, IO_D15PM)
+#undef FLOW_IO_DIGITAL_OUTPUT_NVS_KEYS
 constexpr char IO_DIN[] = "io_din"; // IO module persisted key for field `io_din`.
 constexpr char IO_DS[] = "io_ds"; // IO module persisted key for field `io_ds`.
 constexpr char IO_EN[] = "io_en"; // IO module persisted key for field `io_en`.
@@ -321,6 +338,8 @@ constexpr char IO_PCFAD[] = "io_pcfad"; // IO module persisted key for field `io
 constexpr char IO_PCFAL[] = "io_pcfal"; // IO module persisted key for field `io_pcfal`.
 constexpr char IO_PCFEN[] = "io_pcfen"; // IO module persisted key for field `io_pcfen`.
 constexpr char IO_PCFMK[] = "io_pcfmk"; // IO module persisted key for field `io_pcfmk`.
+constexpr char IO_MCPEN[] = "io_mcpen"; // IO module persisted key for field `io_mcp23017_enabled`.
+constexpr char IO_MCPAD[] = "io_mcpad"; // IO module persisted key for field `io_mcp23017_address`.
 constexpr char IO_SCL[] = "io_scl"; // IO module persisted key for field `io_scl`.
 constexpr char IO_SDA[] = "io_sda"; // IO module persisted key for field `io_sda`.
 constexpr char IO_SCL_S3[] = "io_scl3"; // IO module persisted key for S3 field `io_scl`.

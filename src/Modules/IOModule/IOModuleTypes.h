@@ -9,8 +9,10 @@
 #include "Core/Services/IIO.h"
 #include "Core/WokwiDefaultOverrides.h"
 
-typedef uint16_t PhysicalPortId;
-constexpr PhysicalPortId IO_PORT_INVALID = 0xFFFFu;
+typedef uint16_t BindingPointId;
+typedef BindingPointId PhysicalPortId;
+constexpr BindingPointId BINDING_POINT_NONE = 0u;
+constexpr PhysicalPortId IO_PORT_INVALID = BINDING_POINT_NONE;
 
 struct IOModuleConfig {
     bool enabled = FLOW_WIRDEF_IO_EN;
@@ -40,6 +42,8 @@ struct IOModuleConfig {
     uint8_t pcfAddress = FLOW_WIRDEF_IO_PCFAD;
     uint8_t pcfMaskDefault = FLOW_WIRDEF_IO_PCFMK;
     bool pcfActiveLow = FLOW_WIRDEF_IO_PCFAL;
+    bool mcp23017Enabled = true;
+    uint8_t mcp23017Address = 0x21;
     bool traceEnabled = FLOW_MODDEF_IO_TREN;
     int32_t tracePeriodMs = FLOW_MODDEF_IO_TRMS;
 };
@@ -71,7 +75,8 @@ enum IOBindingPortKind : uint8_t {
     IO_PORT_KIND_SHT40 = 9,
     IO_PORT_KIND_BMP280 = 10,
     IO_PORT_KIND_BME680 = 11,
-    IO_PORT_KIND_TCA9554_OUTPUT = 12
+    IO_PORT_KIND_TCA9554_OUTPUT = 12,
+    IO_PORT_KIND_MCP23017_OUTPUT = 13
 };
 
 struct IOBindingPortSpec {

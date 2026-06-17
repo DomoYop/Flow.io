@@ -65,7 +65,7 @@
 
 #ifndef FLOW_WIRDEF_MQ_BASE
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_MQ_BASE "flowios3"
+#define FLOW_WIRDEF_MQ_BASE "waveshare"
 #else
 #define FLOW_WIRDEF_MQ_BASE "flowio"
 #endif

@@ -6,6 +6,7 @@
 #include "Core/NvsKeys.h"
 #include "Core/ServiceBinding.h"
 #include "Core/Services/Services.h"
+#include "Modules/PoolDeviceModule/PoolDeviceModuleDataModel.h"
 
 #include <atomic>
 #include <stddef.h>
@@ -103,8 +104,8 @@ private:
     EventBus* eventBus_ = nullptr;
     const DataStoreService* dsSvc_ = nullptr;
     const AlarmService* alarmSvc_ = nullptr;
-    bool poolDeviceActualValid_[8]{};
-    bool poolDeviceActualOn_[8]{};
+    bool poolDeviceActualValid_[POOL_DEVICE_MAX]{};
+    bool poolDeviceActualOn_[POOL_DEVICE_MAX]{};
     uint32_t lastAlarmPatternMs_ = 0U;
 
     static void onEventStatic_(const Event& e, void* user);

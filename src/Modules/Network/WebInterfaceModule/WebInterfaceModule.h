@@ -35,7 +35,7 @@ public:
     const char* taskName() const override { return "webinterface"; }
     BaseType_t taskCore() const override { return 0; }
     uint16_t taskStackSize() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return 4096;
 #else
         return 4096;
@@ -45,7 +45,7 @@ public:
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
 
     uint8_t dependencyCount() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         // Keep AP provisioning web startup independent from heavy app modules.
         return 2;
 #elif defined(FLOW_PROFILE_MICRONOVA)
@@ -57,14 +57,14 @@ public:
     ModuleId dependency(uint8_t i) const override {
         if (i == 0) return ModuleId::LogHub;
         if (i == 1) return ModuleId::Wifi;
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return ModuleId::Unknown;
 #else
         if (i == 2) return ModuleId::EventBus;
         if (i == 3) return ModuleId::DataStore;
         if (i == 4) return ModuleId::Command;
         if (i == 5) return ModuleId::Hmi;
-#if !defined(FLOW_PROFILE_MICRONOVA) && !defined(FLOW_PROFILE_FLOWIOS3)
+#if !defined(FLOW_PROFILE_MICRONOVA) && !defined(FLOW_PROFILE_WAVESHARE)
         if (i == 6) return ModuleId::I2cCfgClient;
 #endif
         return ModuleId::Unknown;
@@ -73,7 +73,7 @@ public:
 
     void init(ConfigStore& cfg, ServiceRegistry& services) override;
     bool canStart(ConfigStore&, ServiceRegistry& services) override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         const NetworkAccessService* net = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
         if (!net || !net->mode) return false;
         const NetworkAccessMode mode = net->mode(net->ctx);
@@ -85,7 +85,7 @@ public:
     }
     void onStart(ConfigStore& cfg, ServiceRegistry& services) override;
     uint32_t startDelayMs() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return 3000U;
 #else
         return Limits::Boot::WebInterfaceStartDelayMs;
@@ -217,7 +217,7 @@ private:
     static constexpr UBaseType_t kLocalLogQueueLen = 6;
     static constexpr size_t kRuntimeValuesBodyMax = 512U;
     static constexpr size_t kRuntimeValuesJsonDocCapacity = 768U;
-#elif defined(FLOW_PROFILE_FLOWIOS3)
+#elif defined(FLOW_PROFILE_WAVESHARE)
     static constexpr UBaseType_t kLocalLogQueueLen = 128;
     static_assert(kLocalLogQueueLen == 128, "flow.io wslog queue must keep 128 lines");
     static constexpr size_t kRuntimeValuesBodyMax = 4096U;

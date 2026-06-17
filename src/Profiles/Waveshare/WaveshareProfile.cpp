@@ -1,11 +1,11 @@
-#include "Profiles/FlowIOS3/FlowIOS3Profile.h"
+#include "Profiles/Waveshare/WaveshareProfile.h"
 
 #include "Board/BoardCatalog.h"
 #include "Core/FirmwareVersion.h"
 #include "Domain/DomainCatalog.h"
 
 namespace Profiles {
-namespace FlowIOS3 {
+namespace Waveshare {
 
 const FirmwareProfile& profile()
 {
@@ -15,7 +15,7 @@ const FirmwareProfile& profile()
         &DomainCatalog::pool(),
         {
             "flow.io",
-            "flowio-s3",
+            "waveshare",
             FirmwareVersion::Full,
             "rt"
         },
@@ -26,5 +26,5 @@ const FirmwareProfile& profile()
     return kProfile;
 }
 
-}  // namespace FlowIOS3
+}  // namespace Waveshare
 }  // namespace Profiles

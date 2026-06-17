@@ -1382,13 +1382,13 @@ void PoolLogicModule::normalizeDeviceSlots_()
         }
     };
 
-    normalize(filtrationDeviceSlot_, PoolBinding::kDeviceSlotFiltrationPump, filtrationDeviceVar_, "filtration");
-    normalize(swgDeviceSlot_, PoolBinding::kDeviceSlotChlorineGenerator, swgDeviceVar_, "swg");
-    normalize(robotDeviceSlot_, PoolBinding::kDeviceSlotRobot, robotDeviceVar_, "robot");
-    normalize(fillingDeviceSlot_, PoolBinding::kDeviceSlotFillPump, fillingDeviceVar_, "filling");
-    normalize(phPumpDeviceSlot_, PoolBinding::kDeviceSlotPhPump, phPumpDeviceVar_, "ph_pump");
-    normalize(orpPumpDeviceSlot_, PoolBinding::kDeviceSlotChlorinePump, orpPumpDeviceVar_, "dis_pump");
-    normalize(heaterDeviceSlot_, PoolBinding::kDeviceSlotWaterHeater, heaterDeviceVar_, "heater");
+    normalize(filtrationDeviceSlot_, PoolIds::DeviceFiltrationPump, filtrationDeviceVar_, "filtration");
+    normalize(swgDeviceSlot_, PoolIds::DeviceChlorineGenerator, swgDeviceVar_, "swg");
+    normalize(robotDeviceSlot_, PoolIds::DeviceRobot, robotDeviceVar_, "robot");
+    normalize(fillingDeviceSlot_, PoolIds::DeviceFillPump, fillingDeviceVar_, "filling");
+    normalize(phPumpDeviceSlot_, PoolIds::DevicePhPump, phPumpDeviceVar_, "ph_pump");
+    normalize(orpPumpDeviceSlot_, PoolIds::DeviceChlorinePump, orpPumpDeviceVar_, "dis_pump");
+    normalize(heaterDeviceSlot_, PoolIds::DeviceWaterHeater, heaterDeviceVar_, "heater");
 }
 
 void PoolLogicModule::logDeviceSlotConfig_() const
@@ -1413,19 +1413,6 @@ void PoolLogicModule::logDeviceSlotConfig_() const
 
 void PoolLogicModule::logDeviceSlotBinding_(const char* role, uint8_t slot, int8_t expectedType) const
 {
-    // Cross-check the static PoolBinding map with live PoolDevice metadata to
-    // surface miswired or inconsistent configurations early in the logs.
-    const PoolIoBinding* binding = PoolBinding::ioBindingBySlot(slot);
-    if (binding) {
-        LOGI("PoolLogic role=%s slot=%u io=%u map=%s",
-             role ? role : "?",
-             (unsigned)slot,
-             (unsigned)binding->ioId,
-             binding->name ? binding->name : "?");
-    } else {
-        LOGW("PoolLogic role=%s slot=%u has no static IO map", role ? role : "?", (unsigned)slot);
-    }
-
     if (!poolSvc_ || !poolSvc_->meta) {
         LOGW("PoolLogic role=%s slot=%u PDM meta unavailable", role ? role : "?", (unsigned)slot);
         return;
@@ -1448,14 +1435,6 @@ void PoolLogicModule::logDeviceSlotBinding_(const char* role, uint8_t slot, int8
          (unsigned)meta.type,
          (unsigned)meta.ioId,
          meta.label[0] ? meta.label : "?");
-
-    if (binding && meta.ioId != binding->ioId) {
-        LOGW("PoolLogic role=%s slot=%u io mismatch map=%u pdm=%u",
-             role ? role : "?",
-             (unsigned)slot,
-             (unsigned)binding->ioId,
-             (unsigned)meta.ioId);
-    }
 
     if (expectedType >= 0 && meta.type != (uint8_t)expectedType) {
         LOGW("PoolLogic role=%s slot=%u type mismatch expected=%u got=%u",

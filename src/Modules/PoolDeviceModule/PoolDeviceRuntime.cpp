@@ -4,10 +4,9 @@
  */
 
 #include "PoolDeviceModule.h"
-#include "Core/BufferUsageTracker.h"
 #include "Core/ErrorCodes.h"
 #include "Core/SystemLimits.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 #include "Domain/Pool/PoolDeviceSlots.h"
 #define LOG_MODULE_ID ((LogModuleId)LogModuleIdValue::PoolDeviceModule)
 #include "Core/ModuleLog.h"
@@ -19,17 +18,6 @@
 namespace {
 static constexpr const char* kPoolDeviceCfgTopicBase = "cfg/pdm";
 
-template <size_t Rows, size_t Cols>
-size_t charTableUsage_(const char (&table)[Rows][Cols])
-{
-    size_t total = 0U;
-    for (size_t row = 0; row < Rows; ++row) {
-        const size_t len = strnlen(table[row], Cols);
-        if (len > 0U) total += len + 1U;
-    }
-    return total;
-}
-
 bool isFiniteNonNegative_(float value)
 {
     return isfinite(value) && value >= 0.0f;
@@ -38,6 +26,7 @@ bool isFiniteNonNegative_(float value)
 
 bool PoolDeviceModule::defineDevice(const PoolDeviceDefinition& def)
 {
+    if (!ensureStorage_()) return false;
     if (def.slot >= POOL_DEVICE_MAX) {
         LOGW("Pool device definition missing explicit valid slot");
         return false;
@@ -57,15 +46,25 @@ bool PoolDeviceModule::defineDevice(const PoolDeviceDefinition& def)
         strncpy(s.def.label, s.id, sizeof(s.def.label) - 1);
         s.def.label[sizeof(s.def.label) - 1] = '\0';
     }
-    if (s.def.ioId == IO_ID_INVALID) {
-        LOGW("Pool device %s missing ioId", s.id);
+    if (s.def.ioSlot == IO_SLOT_INVALID) {
+        LOGW("Pool device %s missing IO slot binding", s.id);
+        s.used = false;
+        return false;
+    }
+    if (ioSlotKind(s.def.ioSlot) != IO_SLOT_DIGITAL_OUTPUT) {
+        LOGW("Pool device %s IO slot is not a digital output", s.id);
+        s.used = false;
+        return false;
+    }
+    s.ioId = ioIdFromSlot(s.def.ioSlot);
+    if (s.ioId == IO_ID_INVALID) {
+        LOGW("Pool device %s IO slot cannot resolve ioId", s.id);
         s.used = false;
         return false;
     }
     if (s.def.maxUptimeDaySec < 0) {
         s.def.maxUptimeDaySec = 0;
     }
-    s.ioId = s.def.ioId;
     s.desiredOn = false;
     s.actualOn = false;
     s.blockReason = POOL_DEVICE_BLOCK_NONE;
@@ -102,6 +101,7 @@ const char* PoolDeviceModule::blockReasonStr_(uint8_t reason)
     if (reason == POOL_DEVICE_BLOCK_INTERLOCK) return "interlock";
     if (reason == POOL_DEVICE_BLOCK_IO_ERROR) return "io_error";
     if (reason == POOL_DEVICE_BLOCK_MAX_UPTIME) return "max_uptime";
+    if (reason == POOL_DEVICE_BLOCK_UNBOUND) return "unbound";
     return "none";
 }
 
@@ -117,16 +117,16 @@ bool PoolDeviceModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wr
     uint8_t slotIdx = 0xFF;
     switch (valueId) {
         case RuntimeUiFiltrationOn:
-            slotIdx = PoolBinding::kDeviceSlotFiltrationPump;
+            slotIdx = PoolIds::DeviceFiltrationPump;
             break;
         case RuntimeUiPhPumpOn:
-            slotIdx = PoolBinding::kDeviceSlotPhPump;
+            slotIdx = PoolIds::DevicePhPump;
             break;
         case RuntimeUiChlorinePumpOn:
-            slotIdx = PoolBinding::kDeviceSlotChlorinePump;
+            slotIdx = PoolIds::DeviceChlorinePump;
             break;
         case RuntimeUiRobotOn:
-            slotIdx = PoolBinding::kDeviceSlotRobot;
+            slotIdx = PoolIds::DeviceRobot;
             break;
         default:
             return false;
@@ -285,14 +285,20 @@ bool PoolDeviceModule::configureRuntime_()
         PoolDeviceSlot& s = slots_[i];
         if (!s.used) continue;
 
+        bool ioReady = false;
         IoEndpointMeta meta{};
-        if (ioSvc_->meta(ioSvc_->ctx, s.ioId, &meta) != IO_OK) {
-            LOGW("Pool device %s invalid ioId=%u", s.id, (unsigned)s.ioId);
-            return false;
-        }
-        if (meta.kind != IO_KIND_DIGITAL_OUT || (meta.capabilities & IO_CAP_W) == 0) {
-            LOGW("Pool device %s ioId=%u is not writable digital output", s.id, (unsigned)s.ioId);
-            return false;
+        const IoStatus metaStatus = ioSvc_->meta(ioSvc_->ctx, s.ioId, &meta);
+        if (metaStatus == IO_OK && meta.kind == IO_KIND_DIGITAL_OUT && (meta.capabilities & IO_CAP_W) != 0) {
+            ioReady = true;
+        } else {
+            if (metaStatus != IO_OK) {
+                LOGW("Pool device %s unavailable ioId=%u", s.id, (unsigned)s.ioId);
+            } else {
+                LOGW("Pool device %s ioId=%u is not a writable bound digital output", s.id, (unsigned)s.ioId);
+            }
+            s.actualOn = false;
+            s.desiredOn = false;
+            s.blockReason = s.def.enabled ? POOL_DEVICE_BLOCK_UNBOUND : POOL_DEVICE_BLOCK_DISABLED;
         }
 
         if (s.def.tankCapacityMl <= 0.0f) {
@@ -308,7 +314,7 @@ bool PoolDeviceModule::configureRuntime_()
         }
 
         bool initialIoOn = false;
-        if (readIoState_(s, initialIoOn)) {
+        if (ioReady && readIoState_(s, initialIoOn)) {
             s.actualOn = initialIoOn;
             s.desiredOn = initialIoOn;
             if (initialIoOn) {

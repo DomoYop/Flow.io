@@ -8,7 +8,7 @@
 #include "Core/ErrorCodes.h"
 #include "Core/FirmwareVersion.h"
 #include "Core/SystemStats.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 #include "Modules/IOModule/IORuntime.h"
 #include "Modules/Network/MQTTModule/MQTTRuntime.h"
 #include "Modules/PoolDeviceModule/PoolDeviceRuntime.h"
@@ -743,26 +743,26 @@ bool I2CCfgServerModule::buildRuntimeStatusPoolJson_(bool& truncatedOut)
     (void)collectPoolModeFlags_(poolHasMode, poolAutoMode, poolWinterMode, poolPhAutoMode, poolOrpAutoMode);
 
     const bool haveWaterTemp =
-        dataStore_ && ioEndpointFloat(*dataStore_, PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].runtimeIndex, waterTemp);
+        dataStore_ && ioEndpointFloat(*dataStore_, 4U, waterTemp);
     const bool haveAirTemp =
-        dataStore_ && ioEndpointFloat(*dataStore_, PoolBinding::kSensorBindings[PoolBinding::kSensorSlotAirTemp].runtimeIndex, airTemp);
+        dataStore_ && ioEndpointFloat(*dataStore_, 5U, airTemp);
     const bool havePh =
-        dataStore_ && ioEndpointFloat(*dataStore_, PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPh].runtimeIndex, phValue);
+        dataStore_ && ioEndpointFloat(*dataStore_, 1U, phValue);
     const bool haveOrp =
-        dataStore_ && ioEndpointFloat(*dataStore_, PoolBinding::kSensorBindings[PoolBinding::kSensorSlotOrp].runtimeIndex, orpValue);
+        dataStore_ && ioEndpointFloat(*dataStore_, 0U, orpValue);
 
     PoolDeviceRuntimeStateEntry deviceState{};
     const bool haveFiltration =
-        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolBinding::kDeviceSlotFiltrationPump, deviceState);
+        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolIds::DeviceFiltrationPump, deviceState);
     if (haveFiltration) filtrationOn = deviceState.actualOn;
     const bool haveChlorinePump =
-        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolBinding::kDeviceSlotChlorinePump, deviceState);
+        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolIds::DeviceChlorinePump, deviceState);
     if (haveChlorinePump) chlorinePumpOn = deviceState.actualOn;
     const bool havePhPump =
-        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolBinding::kDeviceSlotPhPump, deviceState);
+        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolIds::DevicePhPump, deviceState);
     if (havePhPump) phPumpOn = deviceState.actualOn;
     const bool haveRobot =
-        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolBinding::kDeviceSlotRobot, deviceState);
+        dataStore_ && poolDeviceRuntimeState(*dataStore_, PoolIds::DeviceRobot, deviceState);
     if (haveRobot) robotOn = deviceState.actualOn;
 
     size_t pos = 0;

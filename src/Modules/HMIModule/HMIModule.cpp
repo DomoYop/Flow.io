@@ -13,7 +13,7 @@
 #include "Core/AlarmIds.h"
 #include "Core/Generated/RuntimeUiAlarmText_Generated.h"
 #include "Core/SystemLimits.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 #include "Domain/Pool/PoolDefaults.h"
 #include "Modules/IOModule/IORuntime.h"
 #include "Modules/Network/MQTTModule/MQTTRuntime.h"
@@ -105,13 +105,13 @@ static constexpr uint8_t kNextionAlarmPagePrimary = 11U;
 static constexpr uint8_t kNextionAlarmPageAlias = 3U;
 static constexpr const char* kNextionDegreeC = "\xC2\xB0""C";
 static constexpr bool kFrontLedsSupported =
-#if FLOW_BUILD_IS_FLOWIOS3
+#if FLOW_BUILD_IS_WAVESHARE
     false;
 #else
     true;
 #endif
 static constexpr bool kWs2812StatusLedDefaultEnabled =
-#if FLOW_BUILD_IS_FLOWIOS3
+#if FLOW_BUILD_IS_WAVESHARE
     true;
 #else
     false;
@@ -750,15 +750,21 @@ void HMIModule::init(ConfigStore& cfg, ServiceRegistry& services)
     snprintf(localeLang_, sizeof(localeLang_), "fr");
     localeGenerationSeen_ = 0U;
     refreshLocale_();
-    phIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPh].ioId;
-    orpIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotOrp].ioId;
-    psiIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPsi].ioId;
-    airTempIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotAirTemp].ioId;
-    poolLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPoolLevel].ioId;
-    waterTempIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].ioId;
-    phLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPhLevel].ioId;
-    chlorineLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotChlorineLevel].ioId;
-    waterCounterIoId_ = IO_ID_INVALID;
+    phIoId_ = ioIdFromSlot(analogInputSlot(1));
+    orpIoId_ = ioIdFromSlot(analogInputSlot(0));
+    psiIoId_ = ioIdFromSlot(analogInputSlot(2));
+    airTempIoId_ = ioIdFromSlot(analogInputSlot(5));
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    poolLevelIoId_ = ioIdFromSlot(digitalInputSlot(2));
+    phLevelIoId_ = ioIdFromSlot(digitalInputSlot(0));
+    chlorineLevelIoId_ = ioIdFromSlot(digitalInputSlot(1));
+#else
+    poolLevelIoId_ = ioIdFromSlot(digitalInputSlot(0));
+    phLevelIoId_ = ioIdFromSlot(digitalInputSlot(1));
+    chlorineLevelIoId_ = ioIdFromSlot(digitalInputSlot(2));
+#endif
+    waterTempIoId_ = ioIdFromSlot(analogInputSlot(4));
+    waterCounterIoId_ = ioIdFromSlot(digitalInputSlot(3));
     phRuntimeIndex_ = kInvalidRuntimeIndex;
     orpRuntimeIndex_ = kInvalidRuntimeIndex;
     psiRuntimeIndex_ = kInvalidRuntimeIndex;
@@ -797,7 +803,7 @@ void HMIModule::onConfigLoaded(ConfigStore&, ServiceRegistry&)
 void HMIModule::refreshMqttConfig_()
 {
     bool enabled =
-#if FLOW_BUILD_IS_FLOWIOS3
+#if FLOW_BUILD_IS_WAVESHARE
         false;
 #else
         true;
@@ -839,11 +845,6 @@ bool HMIModule::resolveIoRuntimeIndex_(IoId ioId, uint8_t& outIndex) const
     outIndex = kInvalidRuntimeIndex;
 
     if (ioId == IO_ID_INVALID) return false;
-
-    if (const PoolSensorBinding* binding = PoolBinding::sensorBindingByIoId(ioId)) {
-        outIndex = binding->runtimeIndex;
-        return true;
-    }
 
     if (!ioSvc_ || !ioSvc_->count || !ioSvc_->idAt) return false;
 

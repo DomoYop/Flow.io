@@ -42,22 +42,22 @@ constexpr DataKey HaDeviceId = 12;
 
 /** @brief Reserved base for IO endpoint runtime keys (`IORuntime`). */
 constexpr DataKey IoBase = 40;
-/** @brief Reserved IO runtime key count: supports endpoints `[0..31]`. */
-constexpr uint8_t IoReservedCount = 32;
+/** @brief Reserved IO runtime key count: supports endpoints `[0..39]`. */
+constexpr uint8_t IoReservedCount = 40;
 /** @brief End-exclusive bound for IO runtime key range. */
 constexpr DataKey IoEndExclusive = IoBase + IoReservedCount;
 
 /** @brief Reserved base for pool-device state runtime keys (`PoolDeviceRuntime`, state part). */
 constexpr DataKey PoolDeviceStateBase = 80;
-/** @brief Reserved pool-device state key count: supports slots `[0..7]`. */
-constexpr uint8_t PoolDeviceStateReservedCount = 8;
+/** @brief Reserved pool-device state key count: supports slots `[0..15]`. */
+constexpr uint8_t PoolDeviceStateReservedCount = 16;
 /** @brief End-exclusive bound for pool-device state key range. */
 constexpr DataKey PoolDeviceStateEndExclusive = PoolDeviceStateBase + PoolDeviceStateReservedCount;
 
 /** @brief Reserved base for pool-device metrics runtime keys (`PoolDeviceRuntime`, metrics part). */
 constexpr DataKey PoolDeviceMetricsBase = PoolDeviceStateEndExclusive;
-/** @brief Reserved pool-device metrics key count: supports slots `[0..7]`. */
-constexpr uint8_t PoolDeviceMetricsReservedCount = 8;
+/** @brief Reserved pool-device metrics key count: supports slots `[0..15]`. */
+constexpr uint8_t PoolDeviceMetricsReservedCount = 16;
 /** @brief End-exclusive bound for pool-device metrics key range. */
 constexpr DataKey PoolDeviceMetricsEndExclusive = PoolDeviceMetricsBase + PoolDeviceMetricsReservedCount;
 

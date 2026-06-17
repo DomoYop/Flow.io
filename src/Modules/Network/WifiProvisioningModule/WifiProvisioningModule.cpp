@@ -90,6 +90,11 @@ void WifiProvisioningModule::init(ConfigStore& cfg, ServiceRegistry& services)
     services_ = &services;
     wifiSvc_ = services.get<WifiService>(ServiceId::Wifi);
     hmiSvc_ = services.get<HmiService>(ServiceId::Hmi);
+    const EventBusService* eventBusSvc = services.get<EventBusService>(ServiceId::EventBus);
+    eventBus_ = eventBusSvc ? eventBusSvc->bus : nullptr;
+    if (eventBus_) {
+        eventBus_->subscribe(EventId::NetworkShutdownPending, &WifiProvisioningModule::onEventStatic_, this);
+    }
     bootMs_ = millis();
     networkManager_.begin(bootMs_);
     lastCfgPollMs_ = 0;
@@ -144,6 +149,55 @@ void WifiProvisioningModule::onStart(ConfigStore&, ServiceRegistry&)
 void WifiProvisioningModule::loop()
 {
     uint32_t now = millis();
+    if (apStartDuringStartEventPending_) {
+        apStartDuringStartEventPending_ = false;
+        LOGD("Provisioning AP start event during setup mode=%s", wifiModeName_(WiFi.getMode()));
+    }
+    if (apStopDuringStartEventPending_) {
+        apStopDuringStartEventPending_ = false;
+        LOGD("Provisioning AP stop event during setup mode=%s", wifiModeName_(WiFi.getMode()));
+    }
+    if (apProbeEventCount_ != 0U) {
+        const uint32_t probeCount = apProbeEventCount_;
+        const int probeRssi = apProbeLastRssi_;
+        apProbeEventCount_ = 0;
+        apProbeCount_ += probeCount;
+        if ((now - lastApProbeLogMs_) >= 2000U) {
+            lastApProbeLogMs_ = now;
+            LOGI("AP probe activity probes=%lu clients=%u rssi=%d",
+                 (unsigned long)apProbeCount_,
+                 (unsigned)WiFi.softAPgetStationNum(),
+                 probeRssi);
+        }
+    }
+    if (apClientConnectedEventPending_) {
+        apClientConnectedEventPending_ = false;
+        LOGI("AP client connected count=%u", (unsigned)WiFi.softAPgetStationNum());
+    }
+    if (apClientDisconnectedEventPending_) {
+        const uint8_t reason = apClientDisconnectReason_;
+        apClientDisconnectedEventPending_ = false;
+        const char* reasonName = WiFi.disconnectReasonName((wifi_err_reason_t)reason);
+        LOGW("AP client disconnected reason=%u(%s) count=%u",
+             (unsigned)reason,
+             reasonName ? reasonName : "?",
+             (unsigned)WiFi.softAPgetStationNum());
+    }
+    if (apClientRefreshPending_) {
+        apClientRefreshPending_ = false;
+        refreshApClientState_(now, true);
+    }
+    if (apStopEventPending_) {
+        apStopEventPending_ = false;
+        if (shutdownPending_) {
+            LOGI("Provisioning AP stop observed during shutdown; restart suppressed");
+        } else if (apActive_) {
+            LOGE("Provisioning AP stopped unexpectedly; scheduling restart mode=%s wl=%d",
+                 wifiModeName_(WiFi.getMode()),
+                 (int)WiFi.status());
+            apRestartPending_ = true;
+        }
+    }
     if (apRestartPending_) {
         apRestartPending_ = false;
         dns_.stop();
@@ -243,6 +297,7 @@ bool WifiProvisioningModule::getIP_(char* out, size_t len) const
 
 bool WifiProvisioningModule::notifyWifiConfigChanged_()
 {
+    if (shutdownPending_) return true;
     configDirty_ = true;
     if (wifiSvc_ && wifiSvc_->setStaRetryEnabled) {
         (void)wifiSvc_->setStaRetryEnabled(wifiSvc_->ctx, true);
@@ -251,6 +306,30 @@ bool WifiProvisioningModule::notifyWifiConfigChanged_()
         wifiSvc_->requestReconnect(wifiSvc_->ctx);
     }
     return true;
+}
+
+bool WifiProvisioningModule::notifyShutdownPending_()
+{
+    shutdownPending_ = true;
+    apRestartPending_ = false;
+    apStopEventPending_ = false;
+    portalLatched_ = false;
+    if (apActive_) {
+        LOGI("Provisioning shutdown pending; AP restart disabled");
+    }
+    return true;
+}
+
+void WifiProvisioningModule::onEventStatic_(const Event& e, void* user)
+{
+    WifiProvisioningModule* self = static_cast<WifiProvisioningModule*>(user);
+    if (self) self->onEvent_(e);
+}
+
+void WifiProvisioningModule::onEvent_(const Event& e)
+{
+    if (e.id != EventId::NetworkShutdownPending) return;
+    (void)notifyShutdownPending_();
 }
 
 void WifiProvisioningModule::buildApCredentials_()
@@ -278,7 +357,7 @@ void WifiProvisioningModule::refreshWifiConfig_()
     }
 
     if (ethernetEnabled_) {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         fastPortalStart_ = false;
 #endif
     }
@@ -289,7 +368,7 @@ void WifiProvisioningModule::refreshWifiConfig_()
         wifiEnabled_ = true;
         wifiSsidLen_ = 0;
         wifiPassLen_ = 0;
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         fastPortalStart_ = !ethernetEnabled_;
 #endif
         networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
@@ -304,7 +383,7 @@ void WifiProvisioningModule::refreshWifiConfig_()
         wifiEnabled_ = true;
         wifiSsidLen_ = 0;
         wifiPassLen_ = 0;
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         fastPortalStart_ = !ethernetEnabled_;
 #endif
         networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
@@ -318,7 +397,7 @@ void WifiProvisioningModule::refreshWifiConfig_()
     wifiSsidLen_ = (uint8_t)strnlen(ssid ? ssid : "", 32U);
     wifiPassLen_ = (uint8_t)strnlen(pass ? pass : "", 64U);
     wifiConfigured_ = wifiEnabled_ && ssid && ssid[0] != '\0';
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
     fastPortalStart_ = !ethernetEnabled_ && wifiEnabled_ && !wifiConfigured_;
 #endif
     networkManager_.updateConfig(ethernetEnabled_, wifiEnabled_, wifiConfigured_);
@@ -528,44 +607,30 @@ void WifiProvisioningModule::onWifiEvent_(arduino_event_t* event)
     switch (event->event_id) {
     case ARDUINO_EVENT_WIFI_AP_START:
         if (apStarting_) {
-            LOGD("Provisioning AP start event during setup mode=%s", wifiModeName_(WiFi.getMode()));
+            apStartDuringStartEventPending_ = true;
         }
         break;
     case ARDUINO_EVENT_WIFI_AP_STOP:
         if (apStarting_) {
-            LOGD("Provisioning AP stop event during setup mode=%s", wifiModeName_(WiFi.getMode()));
+            apStopDuringStartEventPending_ = true;
         } else if (apActive_) {
-            LOGE("Provisioning AP stopped unexpectedly; scheduling restart mode=%s wl=%d",
-                 wifiModeName_(WiFi.getMode()),
-                 (int)WiFi.status());
-            apRestartPending_ = true;
+            apStopEventPending_ = true;
         }
         break;
     case ARDUINO_EVENT_WIFI_AP_PROBEREQRECVED: {
-        const uint32_t now = millis();
-        ++apProbeCount_;
-        if ((now - lastApProbeLogMs_) >= 2000U) {
-            lastApProbeLogMs_ = now;
-            const int rssi = (int)event->event_info.wifi_ap_probereqrecved.rssi;
-            LOGI("AP probe activity probes=%lu clients=%u rssi=%d",
-                 (unsigned long)apProbeCount_,
-                 (unsigned)WiFi.softAPgetStationNum(),
-                 rssi);
-        }
+        apProbeEventCount_ = apProbeEventCount_ + 1U;
+        apProbeLastRssi_ = (int)event->event_info.wifi_ap_probereqrecved.rssi;
         break;
     }
     case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
-        LOGI("AP client connected count=%u", (unsigned)WiFi.softAPgetStationNum());
-        refreshApClientState_(millis(), true);
+        apClientConnectedEventPending_ = true;
+        apClientRefreshPending_ = true;
         break;
     case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED: {
         const uint8_t reason = (uint8_t)event->event_info.wifi_ap_stadisconnected.reason;
-        const char* reasonName = WiFi.disconnectReasonName((wifi_err_reason_t)reason);
-        LOGW("AP client disconnected reason=%u(%s) count=%u",
-             (unsigned)reason,
-             reasonName ? reasonName : "?",
-             (unsigned)WiFi.softAPgetStationNum());
-        refreshApClientState_(millis(), true);
+        apClientDisconnectReason_ = reason;
+        apClientDisconnectedEventPending_ = true;
+        apClientRefreshPending_ = true;
         break;
     }
     default:

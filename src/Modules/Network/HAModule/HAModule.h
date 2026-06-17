@@ -26,7 +26,7 @@ public:
     BaseType_t taskCore() const override { return 0; }
     uint16_t taskStackSize() const override { return 2560; }
     UBaseType_t taskStackCaps() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 #else
         return Module::taskStackCaps();
@@ -47,7 +47,7 @@ public:
     void init(ConfigStore& cfg, ServiceRegistry& services) override;
     void onConfigLoaded(ConfigStore&, ServiceRegistry& services) override;
     bool canStart(ConfigStore&, ServiceRegistry& services) override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         const NetworkAccessService* net = services.get<NetworkAccessService>(ServiceId::NetworkAccess);
         return net && net->mode && net->mode(net->ctx) == NetworkAccessMode::Station;
 #else
@@ -58,7 +58,7 @@ public:
     void onStart(ConfigStore&, ServiceRegistry&) override { setStartupReady(true); }
     void loop() override;
     uint32_t startDelayMs() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return 7000U;
 #else
         return Limits::Boot::HaStartDelayMs;

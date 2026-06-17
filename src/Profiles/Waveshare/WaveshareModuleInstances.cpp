@@ -1,10 +1,10 @@
-#include "Profiles/FlowIOS3/FlowIOS3Profile.h"
+#include "Profiles/Waveshare/WaveshareProfile.h"
 
 #include "Board/BoardCatalog.h"
 #include "Board/BoardSpec.h"
 
 namespace Profiles {
-namespace FlowIOS3 {
+namespace Waveshare {
 
 #if defined(FLOW_ENABLE_LOCAL_TFT_HMI) && (FLOW_ENABLE_LOCAL_TFT_HMI != 0)
 namespace {
@@ -50,5 +50,5 @@ ModuleInstances& moduleInstances()
     return instances;
 }
 
-}  // namespace FlowIOS3
+}  // namespace Waveshare
 }  // namespace Profiles

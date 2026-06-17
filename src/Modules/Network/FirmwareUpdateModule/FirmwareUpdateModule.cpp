@@ -1,6 +1,6 @@
 /**
  * @file FirmwareUpdateModule.cpp
- * @brief Supervisor firmware updater implementation.
+ * @brief Firmware updater implementation.
  */
 
 #include "FirmwareUpdateModule.h"
@@ -21,7 +21,6 @@
 #include "Core/SystemLimits.h"
 
 #include <ESPNexUpload.h>
-#include <esp32_flasher.h>
 
 #define LOG_MODULE_ID ((LogModuleId)LogModuleIdValue::FirmwareUpdateModule)
 #include "Core/ModuleLog.h"
@@ -83,7 +82,6 @@ FirmwareUpdateModule::FirmwareUpdateModule(const BoardSpec& board)
     const SupervisorBoardSpec& boardCfg = supervisorBoardSpec_(board);
     const UartSpec& panelUart = panelUartSpec_(board);
     flowIoEnablePin_ = boardCfg.update.flowIoEnablePin;
-    flowIoBootPin_ = boardCfg.update.flowIoBootPin;
     nextionRxPin_ = panelUart.rxPin;
     nextionTxPin_ = panelUart.txPin;
     nextionRebootPin_ = boardCfg.update.nextionRebootPin;
@@ -205,18 +203,6 @@ static bool writeHttpCodeFailedError_(const char* resourceLabel,
     return writeSimpleError_(errOut, errOutLen, msg);
 }
 
-static const char* flasherErrorText_(int code)
-{
-    switch (code) {
-        case SUCCESS: return "success";
-        case ERR_FAIL: return "generic-failure";
-        case ERR_TIMEOUT: return "timeout";
-        case ERR_IMG_SIZE: return "image-too-large";
-        case ERR_INVALID_RESP: return "invalid-response";
-        case ERR_CMD_STATUS: return "target-command-failed";
-        default: return "unknown";
-    }
-}
 static bool appendUrlSegment_(char* out, size_t outLen, const char* segment)
 {
     if (!out || outLen == 0) return false;
@@ -249,9 +235,8 @@ const char* FirmwareUpdateModule::stateStr_(UpdateState s)
 const char* FirmwareUpdateModule::targetStr_(FirmwareUpdateTarget t)
 {
     switch (t) {
-        case FirmwareUpdateTarget::FlowIO: return "flowio";
         case FirmwareUpdateTarget::Nextion: return "nextion";
-        case FirmwareUpdateTarget::Supervisor: return "supervisor";
+        case FirmwareUpdateTarget::Waveshare: return "waveshare";
         case FirmwareUpdateTarget::Spiffs: return "spiffs";
         default: return "unknown";
     }
@@ -450,14 +435,12 @@ bool FirmwareUpdateModule::isBusy_()
     bool busy = false;
     bool pending = false;
     bool nextionReboot = false;
-    bool flowIoHwReboot = false;
     portENTER_CRITICAL(&lock_);
     busy = busy_;
     pending = queuedJob_.pending;
     nextionReboot = nextionRebootQueued_;
-    flowIoHwReboot = flowIoHardwareRebootQueued_;
     portEXIT_CRITICAL(&lock_);
-    return busy || pending || nextionReboot || flowIoHwReboot;
+    return busy || pending || nextionReboot;
 }
 
 bool FirmwareUpdateModule::configJson_(char* out, size_t outLen) const
@@ -536,7 +519,11 @@ bool FirmwareUpdateModule::checkManifestJsonStream_(Print& out, char* errOut, si
 
     out.print("{\"ok\":true,\"manifest_url\":\"");
     out.print(safeUrl);
-    out.print("\",\"current\":{\"supervisor\":\"");
+    out.print("\",\"current\":{\"flowios3\":\"");
+    out.print(current);
+    out.print("\",\"esp32s3\":\"");
+    out.print(current);
+    out.print("\",\"waveshare\":\"");
     out.print(current);
     out.print("\"},\"manifest\":");
     out.print(payload);
@@ -646,115 +633,9 @@ bool FirmwareUpdateModule::queueNextionReboot_(char* errOut, size_t errOutLen)
     return true;
 }
 
-bool FirmwareUpdateModule::queueFlowIoHardwareReboot_(char* errOut, size_t errOutLen)
+bool FirmwareUpdateModule::runWaveshareUpdate_(const char* url, char* errOut, size_t errOutLen)
 {
-    if (flowIoEnablePin_ < 0) {
-        writeSimpleError_(errOut, errOutLen, "flowio EN pin not configured");
-        return false;
-    }
-
-    portENTER_CRITICAL(&lock_);
-    if (busy_ || queuedJob_.pending || nextionRebootQueued_ || flowIoHardwareRebootQueued_) {
-        portEXIT_CRITICAL(&lock_);
-        writeSimpleError_(errOut, errOutLen, "updater busy");
-        return false;
-    }
-    flowIoHardwareRebootQueued_ = true;
-    portEXIT_CRITICAL(&lock_);
-
-    LOGI("flow.io hardware reboot queued");
-    return true;
-}
-
-bool FirmwareUpdateModule::runFlowIoUpdate_(const char* url, char* errOut, size_t errOutLen)
-{
-    if (flowIoBootPin_ < 0 || flowIoEnablePin_ < 0) {
-        writeSimpleError_(errOut, errOutLen, "flowio board pins not configured");
-        return false;
-    }
-
-    setStatus_(UpdateState::Downloading, FirmwareUpdateTarget::FlowIO, 0, "downloading");
-
-    HTTPClient http;
-    configureDownloadHttp_(http);
-    if (!http.begin(url)) {
-        writeHttpBeginFailedError_("fichier de mise a jour", url, errOut, errOutLen);
-        return false;
-    }
-
-    const int code = http.GET();
-    const int32_t contentLength = http.getSize();
-    if (code != HTTP_CODE_OK) {
-        writeHttpCodeFailedError_("fichier de mise a jour", url, http, code, errOut, errOutLen);
-        http.end();
-        return false;
-    }
-    if (contentLength <= 0) {
-        writeSimpleError_(errOut, errOutLen, "invalid content-length");
-        http.end();
-        return false;
-    }
-
-    setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::FlowIO, 0, "flashing");
-    portENTER_CRITICAL(&lock_);
-    activeTotalBytes_ = (uint32_t)contentLength;
-    activeSentBytes_ = 0;
-    portEXIT_CRITICAL(&lock_);
-
-    attachWebInterfaceSvcIfNeeded_();
-    const bool flowCfgPaused = setFlowCfgPaused_(true);
-    if (webInterfaceSvc_ && webInterfaceSvc_->setPaused) {
-        webInterfaceSvc_->setPaused(webInterfaceSvc_->ctx, true);
-    }
-
-    bool ok = false;
-    ESP32Flasher flasher(flowIoBootPin_, flowIoEnablePin_);
-    flasher.setUpdateProgressCallback([this]() {
-        this->onProgressChunk_(1024U);
-    });
-    flasher.espFlasherInit();
-
-    const int connectStatus = flasher.espConnect();
-    if (connectStatus != SUCCESS) {
-        char msg[64] = {0};
-        snprintf(msg,
-                 sizeof(msg),
-                 "target connect failed (%d:%s)",
-                 connectStatus,
-                 flasherErrorText_(connectStatus));
-        writeSimpleError_(errOut, errOutLen, msg);
-    } else {
-        const int flashStatus = flasher.espFlashBinStream(*http.getStreamPtr(), (uint32_t)contentLength);
-        if (flashStatus != SUCCESS) {
-            char msg[64] = {0};
-            snprintf(msg,
-                     sizeof(msg),
-                     "stream flash failed (%d:%s)",
-                     flashStatus,
-                     flasherErrorText_(flashStatus));
-            writeSimpleError_(errOut, errOutLen, msg);
-        } else {
-            ok = true;
-        }
-    }
-
-    if (webInterfaceSvc_ && webInterfaceSvc_->setPaused) {
-        webInterfaceSvc_->setPaused(webInterfaceSvc_->ctx, false);
-    }
-    if (flowCfgPaused) {
-        (void)setFlowCfgPaused_(false);
-    }
-
-    http.end();
-    if (!ok) return false;
-
-    setStatus_(UpdateState::Done, FirmwareUpdateTarget::FlowIO, 100, "flow.io update complete");
-    return true;
-}
-
-bool FirmwareUpdateModule::runSupervisorUpdate_(const char* url, char* errOut, size_t errOutLen)
-{
-    setStatus_(UpdateState::Downloading, FirmwareUpdateTarget::Supervisor, 0, "downloading");
+    setStatus_(UpdateState::Downloading, FirmwareUpdateTarget::Waveshare, 0, "downloading");
 
     HTTPClient http;
     configureDownloadHttp_(http);
@@ -771,7 +652,7 @@ bool FirmwareUpdateModule::runSupervisorUpdate_(const char* url, char* errOut, s
         return false;
     }
 
-    setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::Supervisor, 0, "flashing");
+    setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::Waveshare, 0, "flashing");
     portENTER_CRITICAL(&lock_);
     activeTotalBytes_ = (contentLength > 0) ? (uint32_t)contentLength : 0U;
     activeSentBytes_ = 0;
@@ -870,7 +751,7 @@ bool FirmwareUpdateModule::runSupervisorUpdate_(const char* url, char* errOut, s
         return false;
     }
 
-    setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::Supervisor, 100, "rebooting");
+    setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::Waveshare, 100, "rebooting");
     delay(1800);
     ESP.restart();
     return true;
@@ -968,37 +849,6 @@ bool FirmwareUpdateModule::runNextionReboot_(char* errOut, size_t errOutLen)
     digitalWrite(nextionRebootPin_, LOW);
 
     LOGI("Nextion reboot pulse sequence completed on pin=%d", (int)nextionRebootPin_);
-    return true;
-}
-
-bool FirmwareUpdateModule::runFlowIoHardwareReboot_(char* errOut, size_t errOutLen)
-{
-    if (flowIoEnablePin_ < 0) {
-        writeSimpleError_(errOut, errOutLen, "flowio EN pin not configured");
-        return false;
-    }
-
-    setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::FlowIO, 0, "flow.io hardware reboot");
-
-    if (flowIoBootPin_ >= 0) {
-        pinMode(flowIoBootPin_, OUTPUT);
-        digitalWrite(flowIoBootPin_, HIGH);
-    }
-    pinMode(flowIoEnablePin_, OUTPUT);
-    digitalWrite(flowIoEnablePin_, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    digitalWrite(flowIoEnablePin_, LOW);
-    vTaskDelay(pdMS_TO_TICKS(150));
-    digitalWrite(flowIoEnablePin_, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    if (flowIoBootPin_ >= 0) {
-        pinMode(flowIoBootPin_, INPUT);
-    }
-    pinMode(flowIoEnablePin_, INPUT);
-
-    setStatus_(UpdateState::Done, FirmwareUpdateTarget::FlowIO, 100, "flow.io hardware reboot done");
-    LOGI("flow.io hardware reboot pulse completed en=%d boot=%d", (int)flowIoEnablePin_, (int)flowIoBootPin_);
     return true;
 }
 
@@ -1125,11 +975,8 @@ bool FirmwareUpdateModule::runJob_(const UpdateJob& job)
     char err[128] = {0};
     bool ok = false;
     switch (job.target) {
-        case FirmwareUpdateTarget::FlowIO:
-            ok = runFlowIoUpdate_(job.url, err, sizeof(err));
-            break;
-        case FirmwareUpdateTarget::Supervisor:
-            ok = runSupervisorUpdate_(job.url, err, sizeof(err));
+        case FirmwareUpdateTarget::Waveshare:
+            ok = runWaveshareUpdate_(job.url, err, sizeof(err));
             break;
         case FirmwareUpdateTarget::Nextion:
             ok = runNextionUpdate_(job.url, err, sizeof(err));
@@ -1166,7 +1013,7 @@ bool FirmwareUpdateModule::cmdStatus_(void* userCtx, const CommandRequest&, char
     return true;
 }
 
-bool FirmwareUpdateModule::cmdFlowIo_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen)
+bool FirmwareUpdateModule::cmdWaveshare_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen)
 {
     FirmwareUpdateModule* self = static_cast<FirmwareUpdateModule*>(userCtx);
     if (!self) return false;
@@ -1174,39 +1021,14 @@ bool FirmwareUpdateModule::cmdFlowIo_(void* userCtx, const CommandRequest& req, 
     char url[kUrlLen] = {0};
     const char* explicitUrl = self->parseUrlArg_(req, url, sizeof(url)) ? url : nullptr;
     char err[120] = {0};
-    FirmwareUpdateTarget target = FirmwareUpdateTarget::FlowIO;
-#if FLOW_BUILD_IS_FLOWIOS3
-    // flow.io is a local single-device build: route this command to local OTA update.
-    target = FirmwareUpdateTarget::Supervisor;
-#endif
-    if (!self->startUpdate_(target, explicitUrl, err, sizeof(err))) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::Failed, "fw.update.flowio")) {
+    if (!self->startUpdate_(FirmwareUpdateTarget::Waveshare, explicitUrl, err, sizeof(err))) {
+        if (!writeErrorJson(reply, replyLen, ErrorCode::Failed, "fw.update.waveshare")) {
             snprintf(reply, replyLen, "{\"ok\":false}");
         }
         return false;
     }
 
-    const char* targetLabel = (target == FirmwareUpdateTarget::Supervisor) ? "esp32s3" : "flowio";
-    snprintf(reply, replyLen, "{\"ok\":true,\"queued\":true,\"target\":\"%s\"}", targetLabel);
-    return true;
-}
-
-bool FirmwareUpdateModule::cmdSupervisor_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen)
-{
-    FirmwareUpdateModule* self = static_cast<FirmwareUpdateModule*>(userCtx);
-    if (!self) return false;
-
-    char url[kUrlLen] = {0};
-    const char* explicitUrl = self->parseUrlArg_(req, url, sizeof(url)) ? url : nullptr;
-    char err[120] = {0};
-    if (!self->startUpdate_(FirmwareUpdateTarget::Supervisor, explicitUrl, err, sizeof(err))) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::Failed, "fw.update.supervisor")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-
-    snprintf(reply, replyLen, "{\"ok\":true,\"queued\":true,\"target\":\"supervisor\"}");
+    snprintf(reply, replyLen, "{\"ok\":true,\"queued\":true,\"target\":\"waveshare\"}");
     return true;
 }
 
@@ -1245,25 +1067,6 @@ bool FirmwareUpdateModule::cmdNextionReboot_(void* userCtx, const CommandRequest
     }
 
     snprintf(reply, replyLen, "{\"ok\":true,\"queued\":true,\"target\":\"nextion_reboot\"}");
-    return true;
-}
-
-bool FirmwareUpdateModule::cmdFlowIoHardwareReboot_(void* userCtx, const CommandRequest&, char* reply, size_t replyLen)
-{
-    FirmwareUpdateModule* self = static_cast<FirmwareUpdateModule*>(userCtx);
-    if (!self) return false;
-
-    char err[120] = {0};
-    if (!self->queueFlowIoHardwareReboot_(err, sizeof(err))) {
-        sanitizeJsonString_(err);
-        const int wrote = snprintf(reply,
-                                   replyLen,
-                                   "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"fw.flowio.hw_reboot\",\"msg\":\"%s\"}}",
-                                   err[0] ? err : "failed");
-        return wrote > 0 && (size_t)wrote < replyLen;
-    }
-
-    snprintf(reply, replyLen, "{\"ok\":true,\"queued\":true,\"target\":\"flowio_hardware_reboot\"}");
     return true;
 }
 
@@ -1307,16 +1110,13 @@ void FirmwareUpdateModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     if (cmdSvc_ && cmdSvc_->registerHandler) {
         cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.status", &FirmwareUpdateModule::cmdStatus_, this);
-        cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.flowio", &FirmwareUpdateModule::cmdFlowIo_, this);
-        cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.supervisor", &FirmwareUpdateModule::cmdSupervisor_, this);
+        cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.waveshare", &FirmwareUpdateModule::cmdWaveshare_, this);
         cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.nextion", &FirmwareUpdateModule::cmdNextion_, this);
         cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.nextion.reboot", &FirmwareUpdateModule::cmdNextionReboot_, this);
-        cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.flowio.hw_reboot", &FirmwareUpdateModule::cmdFlowIoHardwareReboot_, this);
         cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.spiffs", &FirmwareUpdateModule::cmdSpiffs_, this);
-        cmdSvc_->registerHandler(cmdSvc_->ctx, "fw.update.cfgdocs", &FirmwareUpdateModule::cmdSpiffs_, this);
     }
 
-    setStatus_(UpdateState::Idle, FirmwareUpdateTarget::FlowIO, 0, "idle");
+    setStatus_(UpdateState::Idle, FirmwareUpdateTarget::Waveshare, 0, "idle");
     LOGI("Firmware updater ready");
 }
 
@@ -1324,7 +1124,6 @@ void FirmwareUpdateModule::loop()
 {
     UpdateJob job{};
     bool runNextionReboot = false;
-    bool runFlowIoHardwareReboot = false;
 
     portENTER_CRITICAL(&lock_);
     if (busy_) {
@@ -1336,10 +1135,6 @@ void FirmwareUpdateModule::loop()
         busy_ = true;
         nextionRebootQueued_ = false;
         runNextionReboot = true;
-    } else if (flowIoHardwareRebootQueued_) {
-        busy_ = true;
-        flowIoHardwareRebootQueued_ = false;
-        runFlowIoHardwareReboot = true;
     } else if (queuedJob_.pending) {
         busy_ = true;
         job = queuedJob_;
@@ -1357,14 +1152,6 @@ void FirmwareUpdateModule::loop()
             LOGE("Nextion reboot failed reason=%s", err[0] ? err : "unknown");
         } else {
             LOGI("Nextion reboot done");
-        }
-    } else if (runFlowIoHardwareReboot) {
-        char err[128] = {0};
-        if (!runFlowIoHardwareReboot_(err, sizeof(err))) {
-            LOGE("flow.io hardware reboot failed reason=%s", err[0] ? err : "unknown");
-            setError_(FirmwareUpdateTarget::FlowIO, err[0] ? err : "flow.io hardware reboot failed");
-        } else {
-            LOGI("flow.io hardware reboot done");
         }
     } else {
         runJob_(job);

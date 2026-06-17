@@ -1,5 +1,5 @@
-#include "Profiles/FlowIOS3/FlowIOS3Profile.h"
-#include "Profiles/FlowIOS3/FlowIOS3IoAssembly.h"
+#include "Profiles/Waveshare/WaveshareProfile.h"
+#include "Profiles/Waveshare/WaveshareIoAssembly.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -23,7 +23,7 @@
 #include "Core/WokwiDefaultOverrides.h"
 #include "Core/Services/IFlowCfg.h"
 #include "Domain/Pool/PoolBehaviors.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 
 #undef snprintf
 #define snprintf(OUT, LEN, FMT, ...) \
@@ -31,17 +31,26 @@
 
 namespace {
 
-using Profiles::FlowIOS3::ModuleInstances;
+using Profiles::Waveshare::ModuleInstances;
 
 constexpr size_t kFlowIos3PsramMallocAlwaysInternalBytes = 128U;
 
-const PoolDevicePreset* findPoolPresetByRole(const DomainSpec& domain, DomainRole role)
+const PoolDevicePreset* findPoolPresetById(const DomainSpec& domain, PoolDeviceId id)
 {
     for (uint8_t i = 0; i < domain.poolDeviceCount; ++i) {
         const PoolDevicePreset& preset = domain.poolDevices[i];
-        if (preset.role == role) return &preset;
+        if (preset.id == id) return &preset;
     }
     return nullptr;
+}
+
+IoSlotId findIoSlotForDomainSlot(const DomainSpec& domain, DomainSlotId id)
+{
+    for (uint8_t i = 0; i < domain.domainIoSlotBindingCount; ++i) {
+        const DomainIoSlotBinding& binding = domain.domainIoSlotBindings[i];
+        if (binding.domainSlot == id) return binding.ioSlot;
+    }
+    return IO_SLOT_INVALID;
 }
 
 void requireSetup(bool ok, const char* step)
@@ -168,23 +177,27 @@ void registerModules(AppContext& ctx, ModuleInstances& modules)
 
 uint8_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset& preset)
 {
-    if (preset.dependsOnRole == DomainRole::None) return 0;
-    const PoolDevicePreset* dependency = findPoolPresetByRole(domain, preset.dependsOnRole);
+    if (preset.dependsOnDevice == POOL_DEVICE_INVALID) return 0;
+    const PoolDevicePreset* dependency = findPoolPresetById(domain, preset.dependsOnDevice);
     if (!dependency) return 0;
-    return (uint8_t)(1u << dependency->legacySlot);
+    return (uint8_t)(1u << dependency->id);
 }
 
 void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
 {
+    static constexpr uint8_t kWaveshareCompDeviceBase = 8U;
+    static constexpr uint8_t kWaveshareCompDeviceCount = 8U;
+
     for (uint8_t i = 0; i < ctx.domain->poolDeviceCount; ++i) {
         const PoolDevicePreset& preset = ctx.domain->poolDevices[i];
-        const PoolIoBinding* compat = PoolBinding::ioBindingBySlot(preset.legacySlot);
-        requireSetup(compat != nullptr, "missing pool device compatibility binding");
+        const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset.commandSlot);
+        requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
 
         PoolDeviceDefinition def{};
         snprintf(def.label, sizeof(def.label), "%s", preset.displayName);
-        def.slot = preset.legacySlot;
-        def.ioId = compat->ioId;
+        def.slot = preset.id;
+        def.commandSlot = preset.commandSlot;
+        def.ioSlot = ioSlot;
         def.type = preset.poolDeviceType;
         def.flowLPerHour = preset.flowLPerHour;
         def.tankCapacityMl = preset.tankCapacityMl;
@@ -193,6 +206,19 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
         def.maxUptimeDaySec = preset.maxUptimeDaySec;
         requireSetup(modules.poolDeviceModule.defineDevice(def), "define pool device");
     }
+
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    for (uint8_t i = 0; i < kWaveshareCompDeviceCount; ++i) {
+        PoolDeviceDefinition def{};
+        snprintf(def.label, sizeof(def.label), "COMP%02u", (unsigned)(i + 1U));
+        def.slot = (uint8_t)(kWaveshareCompDeviceBase + i);
+        def.commandSlot = DOMAIN_SLOT_INVALID;
+        def.ioSlot = digitalOutputSlot((uint8_t)(8U + i));
+        def.type = POOL_DEVICE_RELAY_STD;
+        def.enabled = true;
+        requireSetup(modules.poolDeviceModule.defineDevice(def), "define comp pool device");
+    }
+#endif
 }
 
 void postInit(AppContext& ctx, ModuleInstances& modules)
@@ -215,7 +241,7 @@ void postInit(AppContext& ctx, ModuleInstances& modules)
 }  // namespace
 
 namespace Profiles {
-namespace FlowIOS3 {
+namespace Waveshare {
 
 void setupProfile(AppContext& ctx)
 {
@@ -227,7 +253,7 @@ void setupProfile(AppContext& ctx)
     if (psramFound()) {
         heap_caps_malloc_extmem_enable(kFlowIos3PsramMallocAlwaysInternalBytes);
         Board::SerialMap::logSerial().printf(
-            "[flowios3] PSRAM malloc policy threshold=%u internal_free=%lu psram_free=%lu\r\n",
+            "[waveshare] PSRAM malloc policy threshold=%u internal_free=%lu psram_free=%lu\r\n",
             (unsigned)kFlowIos3PsramMallocAlwaysInternalBytes,
             (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
             (unsigned long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
@@ -264,5 +290,5 @@ void loopProfile(AppContext&)
     delay(20);
 }
 
-}  // namespace FlowIOS3
+}  // namespace Waveshare
 }  // namespace Profiles

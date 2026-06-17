@@ -10,7 +10,7 @@
 #include "Core/ServiceBinding.h"
 #include "Core/EventBus/EventBus.h"
 #include "Core/Services/Services.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 #include "Modules/HMIModule/ConfigMenuModel.h"
 #include "Modules/HMIModule/Drivers/HmiDriverTypes.h"
 #include "Modules/HMIModule/Drivers/NextionDriver.h"
@@ -33,7 +33,7 @@ public:
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
     uint32_t startDelayMs() const override {
-#if FLOW_BUILD_IS_FLOWIOS3
+#if FLOW_BUILD_IS_WAVESHARE
         return 0U;
 #else
         return 5000U;
@@ -64,7 +64,7 @@ private:
     struct ConfigData {
         bool ledsEnabled = true;
         bool waveshareLedEnabled =
-#if FLOW_BUILD_IS_FLOWIOS3
+#if FLOW_BUILD_IS_WAVESHARE
             true;
 #else
             false;
@@ -151,29 +151,35 @@ private:
     bool ws2812AutoWifiAlarmActiveLast_ = false;
     bool ws2812AutoWifiAlarmRedPhaseLast_ = false;
     bool mqttEnabled_ =
-#if FLOW_BUILD_IS_FLOWIOS3
+#if FLOW_BUILD_IS_WAVESHARE
         false;
 #else
         true;
 #endif
     uint32_t homePublishMask_ = 0U;
     portMUX_TYPE homePublishMux_ = portMUX_INITIALIZER_UNLOCKED;
-    IoId phIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPh].ioId;
-    IoId orpIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotOrp].ioId;
-    IoId psiIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPsi].ioId;
-    IoId airTempIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotAirTemp].ioId;
-    IoId poolLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPoolLevel].ioId;
-    IoId waterTempIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].ioId;
-    IoId phLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPhLevel].ioId;
-    IoId chlorineLevelIoId_ = PoolBinding::kSensorBindings[PoolBinding::kSensorSlotChlorineLevel].ioId;
-    IoId waterCounterIoId_ = IO_ID_INVALID;
-    uint8_t filtrationDeviceSlot_ = PoolBinding::kDeviceSlotFiltrationPump;
-    uint8_t phPumpDeviceSlot_ = PoolBinding::kDeviceSlotPhPump;
-    uint8_t orpPumpDeviceSlot_ = PoolBinding::kDeviceSlotChlorinePump;
-    uint8_t robotDeviceSlot_ = PoolBinding::kDeviceSlotRobot;
-    uint8_t lightsDeviceSlot_ = PoolBinding::kDeviceSlotLights;
-    uint8_t heaterDeviceSlot_ = PoolBinding::kDeviceSlotWaterHeater;
-    uint8_t fillingDeviceSlot_ = PoolBinding::kDeviceSlotFillPump;
+    IoId phIoId_ = ioIdFromSlot(analogInputSlot(1));
+    IoId orpIoId_ = ioIdFromSlot(analogInputSlot(0));
+    IoId psiIoId_ = ioIdFromSlot(analogInputSlot(2));
+    IoId airTempIoId_ = ioIdFromSlot(analogInputSlot(5));
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    IoId poolLevelIoId_ = ioIdFromSlot(digitalInputSlot(2));
+    IoId phLevelIoId_ = ioIdFromSlot(digitalInputSlot(0));
+    IoId chlorineLevelIoId_ = ioIdFromSlot(digitalInputSlot(1));
+#else
+    IoId poolLevelIoId_ = ioIdFromSlot(digitalInputSlot(0));
+    IoId phLevelIoId_ = ioIdFromSlot(digitalInputSlot(1));
+    IoId chlorineLevelIoId_ = ioIdFromSlot(digitalInputSlot(2));
+#endif
+    IoId waterTempIoId_ = ioIdFromSlot(analogInputSlot(4));
+    IoId waterCounterIoId_ = ioIdFromSlot(digitalInputSlot(3));
+    uint8_t filtrationDeviceSlot_ = PoolIds::DeviceFiltrationPump;
+    uint8_t phPumpDeviceSlot_ = PoolIds::DevicePhPump;
+    uint8_t orpPumpDeviceSlot_ = PoolIds::DeviceChlorinePump;
+    uint8_t robotDeviceSlot_ = PoolIds::DeviceRobot;
+    uint8_t lightsDeviceSlot_ = PoolIds::DeviceLights;
+    uint8_t heaterDeviceSlot_ = PoolIds::DeviceWaterHeater;
+    uint8_t fillingDeviceSlot_ = PoolIds::DeviceFillPump;
     uint8_t phRuntimeIndex_ = 0xFFU;
     uint8_t orpRuntimeIndex_ = 0xFFU;
     uint8_t psiRuntimeIndex_ = 0xFFU;

@@ -29,7 +29,7 @@ constexpr size_t JsonConfigApplyBuf = JsonCfgBuf;
 /** @brief Maximum number of registered config variables in `ConfigStore` metadata table.
  *  Sized for current FlowIO/Supervisor profiles with additional headroom for local TFT
  *  sensor/alarm slots, dashboard/LCD and PoolLogic extensions while staying bounded. */
-constexpr size_t MaxConfigVars = 480;
+constexpr size_t MaxConfigVars = 640;
 /** @brief Maximum NVS key length (without null terminator) enforced by `ConfigTypes::NVS_KEY`. */
 constexpr size_t MaxNvsKeyLen = 15;
 /** @brief FreeRTOS log queue length used by `LogHub` (`LogHubModule::init`).
@@ -65,7 +65,7 @@ constexpr uint32_t LoopDelayMs = 10;
 namespace Config {
 namespace Capacity {
 /** @brief Maximum number of unique config branches returned by `ConfigStore::listModules`. */
-constexpr uint8_t ModuleListMax = 96;
+constexpr uint8_t ModuleListMax = 160;
 }  // namespace Capacity
 }  // namespace Config
 
@@ -199,7 +199,7 @@ constexpr uint8_t JitterPct = 15;
 
 }  // namespace Mqtt
 /** @brief Maximum number of runtime MQTT routes stored in the runtime mux (`RuntimeProducer`). */
-constexpr uint8_t MaxRuntimeRoutes = 56;
+constexpr uint8_t MaxRuntimeRoutes = 80;
 /** @brief Default momentary digital output pulse duration in ms (`IOModule`). */
 constexpr uint16_t MomentaryPulseMs = 500;
 /** @brief Default periodic trace interval for ORP/pH/PSI calc logs (`IOModule`, `trace_period_ms`). */
@@ -215,6 +215,9 @@ constexpr uint8_t MaxDigitalOutputs = BoardCapacityProfile::kIoCapacity.digitalO
 constexpr uint8_t AnalogConfigSlots = BoardCapacityProfile::kIoCapacity.analogConfigSlots;
 constexpr uint8_t DigitalInputConfigSlots = BoardCapacityProfile::kIoCapacity.digitalInputConfigSlots;
 constexpr uint8_t DigitalOutputConfigSlots = BoardCapacityProfile::kIoCapacity.digitalOutputConfigSlots;
+constexpr uint8_t MaxDomainSlots = 24;
+constexpr uint8_t MaxDomainIoSlotBindings = 24;
+constexpr uint8_t MaxPoolDevices = 16;
 
 static_assert(MaxAnalogEndpoints > 0, "IO analogEndpoints must be at least 1");
 static_assert(MaxDigitalInputs > 0, "IO digitalInputs must be at least 1");
@@ -225,6 +228,9 @@ static_assert(DigitalOutputConfigSlots >= 8, "IO digitalOutputConfigSlots must k
 static_assert(AnalogConfigSlots >= MaxAnalogEndpoints, "analog config slots must cover runtime analog endpoints");
 static_assert(DigitalInputConfigSlots >= MaxDigitalInputs, "digital input config slots must cover runtime inputs");
 static_assert(DigitalOutputConfigSlots >= MaxDigitalOutputs, "digital output config slots must cover runtime outputs");
+static_assert(MaxDomainSlots > 0, "domain slot capacity must be non-zero");
+static_assert(MaxDomainIoSlotBindings >= MaxDomainSlots, "domain IO binding capacity must cover domain slots");
+static_assert(MaxPoolDevices > 0, "pool device capacity must be non-zero");
 }  // namespace Io
 
 /** @brief Alarm engine compile-time capacities and defaults. */
@@ -244,7 +250,7 @@ namespace Wifi {
 /** @brief Maximum number of scanned networks retained for provisioning UIs. */
 #if defined(FLOW_PROFILE_FLOW_CONNECT_DISPLAY)
 constexpr uint8_t MaxScanResults = 8;
-#elif defined(FLOW_PROFILE_FLOWIOS3)
+#elif defined(FLOW_PROFILE_WAVESHARE)
 constexpr uint8_t MaxScanResults = 12;
 #else
 constexpr uint8_t MaxScanResults = 24;
@@ -254,7 +260,7 @@ namespace Buffers {
 /** @brief JSON document/output buffer used for WiFi scan status snapshots. */
 #if defined(FLOW_PROFILE_FLOW_CONNECT_DISPLAY)
 constexpr size_t ScanStatusJson = 1536;
-#elif defined(FLOW_PROFILE_FLOWIOS3)
+#elif defined(FLOW_PROFILE_WAVESHARE)
 constexpr size_t ScanStatusJson = 4096;
 #else
 constexpr size_t ScanStatusJson = 3072;

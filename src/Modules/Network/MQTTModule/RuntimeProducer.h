@@ -43,14 +43,15 @@ private:
     const IRuntimeSnapshotProvider* providers_[MaxProviders] = {};
     uint8_t providerCount_ = 0;
 
-    Route routes_[Limits::MaxRuntimeRoutes] = {};
+    Route* routes_ = nullptr;
     uint8_t routeCount_ = 0;
     bool initialFullSnapshotActive_ = false;
-    bool initialFullSnapshotDone_[Limits::MaxRuntimeRoutes] = {};
+    bool* initialFullSnapshotDone_ = nullptr;
     uint8_t initialFullSnapshotRemaining_ = 0;
     InitialFullSnapshotCallback initialFullSnapshotCb_ = nullptr;
     void* initialFullSnapshotCtx_ = nullptr;
 
+    bool ensureStorage_();
     void markRoutePending_(uint8_t idx, bool force);
     void enqueueRoute_(uint8_t idx);
     void completeInitialFullSnapshotRoute_(uint8_t idx);

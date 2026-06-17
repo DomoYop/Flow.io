@@ -35,8 +35,8 @@
     const remoteMenuIconFontHref = 'https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded&display=block';
     const remoteMenuIconLigatures = {
       'icon-measures': 'water_damage',
+      'icon-io': 'lan',
       'icon-calibration': 'science',
-      'icon-io': 'cable',
       'icon-terminal': 'list_alt',
       'icon-system': 'system_update_alt',
       'icon-flowcfg': 'settings',
@@ -548,13 +548,15 @@
       return webProfileKey === 'micronova';
     }
 
-    function isFlowIOS3Profile() {
+    function isWaveshareProfile() {
       const key = String(webProfileKey || '').trim().toLowerCase();
-      return key === 'flowios3'
-        || key === 'waveshare'
+      return key === 'waveshare'
+        || key === 'flowios3'
         || key === 'esp32s3'
+        || key === 'esp32-s3'
+        || key === 'flowio-s3'
         || key.indexOf('waveshare') >= 0
-        || key.indexOf('flowios3') === 0;
+        || key.indexOf('flowios3') >= 0;
     }
 
     function isFlowIOProfile() {
@@ -635,8 +637,8 @@
         };
         const blockValues = isMicronovaProfile()
           ? new Set(['flow_soft', 'flow_hard', 'nextion', 'factory_reset'])
-          : (isFlowIOS3Profile() ? new Set(['supervisor', 'flow_hard']) : new Set());
-        const hiddenValues = isFlowIOS3Profile()
+          : (isWaveshareProfile() ? new Set(['supervisor', 'flow_hard']) : new Set());
+        const hiddenValues = isWaveshareProfile()
           ? new Set(['supervisor', 'flow_hard'])
           : new Set();
         Array.from(rebootDeviceTargetSelect.options || []).forEach((option) => {
@@ -1694,6 +1696,12 @@
       return queued;
     }
 
+    function fetchFlowCfgEndpoint(url, options) {
+      return isWaveshareProfile()
+        ? fetchWithBusyRetry(url, options)
+        : fetchFlowRemoteQueued(url, options);
+    }
+
     function waitMs(ms) {
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -1744,10 +1752,10 @@
       } else {
         stopPoolMeasuresTimer();
       }
-      if (pageId === 'page-io') {
-        schedulePageTask(pageId, pageToken, deferredHeavyMs, () => onIoPageShown());
+      if (pageId === 'page-io-summary') {
+        schedulePageTask(pageId, pageToken, deferredHeavyMs, () => onIoSummaryPageShown());
       } else {
-        stopIoSnapshotTimer();
+        stopIoSummaryTimer();
       }
       if (pageId === 'page-calibration') {
         schedulePageTask(pageId,
@@ -1880,14 +1888,12 @@
     const flowStatusChip = document.getElementById('flowStatusChip');
     const flowStatusGrid = document.getElementById('flowStatusGrid');
     const flowStatusRaw = document.getElementById('flowStatusRaw');
+    const ioSummaryCards = document.getElementById('ioSummaryCards');
+    const ioSummaryTables = document.getElementById('ioSummaryTables');
     const poolMeasuresRefreshBtn = document.getElementById('poolMeasuresRefresh');
     const poolMeasuresDomains = document.getElementById('poolMeasuresDomains');
     const poolMeasuresStatus = document.getElementById('poolMeasuresStatus');
     const poolMeasuresGrid = document.getElementById('poolMeasuresGrid');
-    const ioSnapshotRefreshBtn = document.getElementById('ioSnapshotRefresh');
-    const ioSnapshotGrid = document.getElementById('ioSnapshotGrid');
-    const ioSnapshotStatus = document.getElementById('ioSnapshotStatus');
-    const ioSnapshotAgeChip = document.getElementById('ioSnapshotAge');
     const calibrationSensorSelect = document.getElementById('calibrationSensorSelect');
     const calibrationLoadBtn = document.getElementById('calibrationLoadBtn');
     const calibrationComputeBtn = document.getElementById('calibrationComputeBtn');
@@ -1923,6 +1929,7 @@
     const flowCfgStatus = document.getElementById('flowCfgStatus');
     const flowCfgBackupStatus = document.getElementById('flowCfgBackupStatus');
     const flowCfgBackupProgress = document.getElementById('flowCfgBackupProgress');
+    const flowCfgBackupProgressLabel = document.getElementById('flowCfgBackupProgressLabel');
     const flowCfgBackupPct = document.getElementById('flowCfgBackupPct');
     const flowCfgBackupProgressBar = document.getElementById('flowCfgBackupProgressBar');
     const flowCfgBackupProgressDot = document.getElementById('flowCfgBackupProgressDot');
@@ -1961,6 +1968,7 @@
     let cfgTreeVirtualBranches = [];
     const cfgTreeNodeTextNames = { supervisor: {}, flow: {} };
     const cfgTreeNodeTextNamePending = { supervisor: new Set(), flow: new Set() };
+    const poolLogicDeviceIoOutputNames = { supervisor: {}, flow: {} };
     let supCfgCurrentModule = '';
     let supCfgCurrentData = {};
     let supCfgCurrentPdmExtension = null;
@@ -1976,10 +1984,20 @@
       4: 'Pompe remplissage',
       5: 'Electrolyse',
       6: 'Eclairage',
-      7: 'Chauffage eau'
+      7: 'Chauffage eau',
+      8: 'COMP01',
+      9: 'COMP02',
+      10: 'COMP03',
+      11: 'COMP04',
+      12: 'COMP05',
+      13: 'COMP06',
+      14: 'COMP07',
+      15: 'COMP08'
     });
     let wifiScanAutoRequested = false;
     let flowStatusReqSeq = 0;
+    let ioSummaryReqSeq = 0;
+    let ioSummaryLoadedOnce = false;
     fieldApplyCheckIcon = iconCheckText();
     const flowCfgBackupFormat = 'flowio-configstore-backup';
     const flowCfgBackupVersion = 1;
@@ -2086,31 +2104,26 @@
     let runtimeManifestDomainLoadPromise = null;
     const poolMeasureDomainState = {
       mode: createRuntimeDomainState(),
-      equipements: createRuntimeDomainState(),
       sondes: createRuntimeDomainState(),
       micronova: createRuntimeDomainState(),
       alarm: createRuntimeDomainState()
     };
     const poolMeasureDomainAnimations = {};
-    const poolSondesShowUnavailableStorageKey = 'flow_dashboard_sondes_show_unavailable';
-    let poolSondesShowUnavailable = getStorageValue(localStorage, poolSondesShowUnavailableStorageKey) === '1';
-    const poolMeasureActiveDomainsStorageKey = 'flow_dashboard_active_domains';
-    let poolMeasureDomainPrefsRestored = false;
     const upgradeReconnectFetchTimeoutMs = 1400;
     const upgradeTargetDefs = {
-      flowio: { manifestKey: 'flowio', target: 'flowio', endpoint: '/fwupdate/flowio', label: 'flow.io', order: 10 },
-      esp32s3: { manifestKey: 'esp32s3', target: 'esp32s3', endpoint: '/fwupdate/flowio', label: 'ESP32-S3', order: 11 },
-      'esp32s3-spiffs': { manifestKey: 'esp32s3-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'Assets ESP32-S3', order: 12 },
-      supervisor: { manifestKey: 'supervisor', target: 'supervisor', endpoint: '/fwupdate/supervisor', label: 'Supervisor', order: 20 },
-      nextion: { manifestKey: 'nextion', target: 'nextion', endpoint: '/fwupdate/nextion', label: 'Nextion', order: 30 },
-      spiffs: { manifestKey: 'spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'Assets Supervisor', order: 40 },
-      cfgdocs: { manifestKey: 'cfgdocs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'Assets Supervisor', order: 41 }
+      flowios3: { manifestKey: 'flowios3', target: 'flowios3', endpoint: '/fwupdate/waveshare', label: 'FlowIOS3', order: 10 },
+      waveshare: { manifestKey: 'waveshare', target: 'waveshare', endpoint: '/fwupdate/waveshare', label: 'Waveshare', order: 10 },
+      esp32s3: { manifestKey: 'esp32s3', target: 'esp32s3', endpoint: '/fwupdate/waveshare', label: 'ESP32-S3', order: 11 },
+      'flowios3-spiffs': { manifestKey: 'flowios3-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS FlowIOS3', order: 39 },
+      'esp32s3-spiffs': { manifestKey: 'esp32s3-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS ESP32-S3', order: 39 },
+      'waveshare-spiffs': { manifestKey: 'waveshare-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS Waveshare', order: 39 },
+      spiffs: { manifestKey: 'spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS', order: 40 }
     };
     const upgradeComponentDefs = [
       {
         key: 'flowio',
-        title: 'flow.io',
-        subtitle: 'Firmware',
+        title: 'FlowIOS3',
+        subtitle: 'Firmware Waveshare',
         icon: 'layers',
         tone: 'blue',
         commentsAvailable: 'Ajout de nouvelles fonctionnalités et améliorations système',
@@ -2124,15 +2137,6 @@
         tone: 'green',
         commentsAvailable: 'Nouveaux fichiers de configuration et ressources',
         commentsCurrent: 'Fichiers système actuels'
-      },
-      {
-        key: 'nextion',
-        title: 'Nextion',
-        subtitle: 'Interface',
-        icon: 'tab',
-        tone: 'orange',
-        commentsAvailable: 'Interface utilisateur disponible',
-        commentsCurrent: 'Interface utilisateur actuelle'
       }
     ];
 
@@ -2154,6 +2158,10 @@
     const poolMeasuresPoller = createIntervalRunner(() => {
       if (getActivePageId() !== 'page-pool-measures' || document.hidden) return;
       return refreshPoolMeasures(false);
+    }, 10000);
+    const ioSummaryPoller = createIntervalRunner(() => {
+      if (getActivePageId() !== 'page-io-summary' || document.hidden) return;
+      return refreshIoSummary(false);
     }, 10000);
     const wifiScanPoller = createTimeoutRunner(() => refreshWifiScanStatus(false));
 
@@ -2440,17 +2448,15 @@
 
     function upgradeTargetLabel(target) {
       const key = String(target || '').trim().toLowerCase();
-      if (key === 'flowio') return 'flow.io';
-      if (key === 'esp32s3') return 'ESP32-S3';
-      if (key === 'supervisor') return isMicronovaProfile() ? 'Micronova' : 'Superviseur';
-      if (key === 'nextion') return 'Nextion';
+      if (key === 'flowios3' || key === 'esp32s3') return 'FlowIOS3';
+      if (key === 'waveshare') return 'FlowIOS3';
       if (key === 'spiffs') return 'SPIFFS';
       return 'Firmware';
     }
 
     function upgradeUsesReconnect(target) {
       const key = String(target || '').trim().toLowerCase();
-      return key === 'supervisor' || key === 'spiffs';
+      return key === 'flowios3' || key === 'esp32s3' || key === 'waveshare' || key === 'spiffs';
     }
 
     function upgradeStepDefinitions(target) {
@@ -2999,11 +3005,9 @@
 
     function endpointForUpgradeTarget(target) {
       const key = String(target || '').trim().toLowerCase();
-      if (key === 'flowio') return '/fwupdate/flowio';
-      if (key === 'esp32s3') return isFlowIOS3Profile() ? '/fwupdate/supervisor' : '/fwupdate/flowio';
-      if (key === 'supervisor') return '/fwupdate/supervisor';
-      if (key === 'nextion') return '/fwupdate/nextion';
-      if (key === 'spiffs' || key === 'cfgdocs') return '/fwupdate/spiffs';
+      if (key === 'flowios3' || key === 'esp32s3') return '/fwupdate/waveshare';
+      if (key === 'waveshare') return '/fwupdate/waveshare';
+      if (key === 'spiffs') return '/fwupdate/spiffs';
       return '';
     }
 
@@ -3015,10 +3019,12 @@
       const key = String(category || '').trim().toLowerCase();
       if (!key) return false;
       if (isMicronovaProfile() || isSupervisorProfile()) {
-        return key === 'supervisor' || key === 'spiffs' || key === 'cfgdocs' || key === 'nextion';
+        return key === 'flowios3' || key === 'esp32s3' || key === 'waveshare'
+          || key === 'spiffs' || key === 'flowios3-spiffs' || key === 'esp32s3-spiffs' || key === 'waveshare-spiffs';
       }
-      if (isFlowIOS3Profile()) {
-        return key === 'esp32s3' || key === 'esp32s3-spiffs' || key === 'nextion';
+      if (isWaveshareProfile()) {
+        return key === 'flowios3' || key === 'esp32s3' || key === 'waveshare'
+          || key === 'spiffs' || key === 'flowios3-spiffs' || key === 'esp32s3-spiffs' || key === 'waveshare-spiffs';
       }
       if (isFlowIOProfile()) {
         return key === 'flowio';
@@ -3035,8 +3041,8 @@
 
     function resolveArtifactEndpoint(category, artifact, target) {
       const categoryKey = String(category || '').trim().toLowerCase();
-      if (isFlowIOS3Profile() && categoryKey === 'esp32s3') {
-        return '/fwupdate/supervisor';
+      if (categoryKey === 'flowios3' || categoryKey === 'esp32s3' || categoryKey === 'waveshare') {
+        return '/fwupdate/waveshare';
       }
       const explicit = String(artifact && (artifact.route || artifact.endpoint || artifact.update_route) ? (artifact.route || artifact.endpoint || artifact.update_route) : '').trim();
       if (explicit) {
@@ -3156,15 +3162,11 @@
     function upgradeManifestKeysForComponent(componentKey) {
       const key = String(componentKey || '').trim().toLowerCase();
       if (key === 'flowio') {
-        if (isFlowIOS3Profile()) return ['esp32s3', 'flowio'];
-        if (isMicronovaProfile() || isSupervisorProfile()) return ['supervisor'];
-        return ['flowio', 'esp32s3', 'supervisor'];
+        return ['flowios3', 'waveshare', 'esp32s3'];
       }
       if (key === 'spiffs') {
-        if (isFlowIOS3Profile()) return ['esp32s3-spiffs', 'spiffs'];
-        return ['spiffs', 'cfgdocs', 'esp32s3-spiffs'];
+        return ['spiffs', 'flowios3-spiffs', 'esp32s3-spiffs', 'waveshare-spiffs'];
       }
-      if (key === 'nextion') return ['nextion'];
       return [key];
     }
 
@@ -4552,6 +4554,367 @@
       }
     }
 
+    function stopIoSummaryTimer() {
+      ioSummaryPoller.stop();
+    }
+
+    function startIoSummaryTimer() {
+      ioSummaryPoller.start();
+    }
+
+    function ioSummaryStateLabel(state) {
+      const key = String(state || '').trim().toLowerCase();
+      if (key === 'active') return tr('io.state.active', 'Actif');
+      if (key === 'sleeping') return tr('io.state.sleeping', 'Veille');
+      if (key === 'error') return tr('io.state.error', 'Erreur');
+      return key || '-';
+    }
+
+    function ioSummaryStateClass(state) {
+      const key = String(state || '').trim().toLowerCase();
+      if (key === 'active') return 'is-active';
+      if (key === 'error') return 'is-error';
+      return 'is-sleeping';
+    }
+
+    function ioSummaryText(value, fallback) {
+      const text = String(value === null || value === undefined ? '' : value).trim();
+      return text || fallback || '-';
+    }
+
+    function ioSummaryNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function ioSummarySlotLabel(row) {
+      const kind = ioSummaryText(row && row.io_slot, '');
+      const idx = Number(row && row.io_slot_index);
+      if (!kind) return '-';
+      return Number.isFinite(idx) ? (kind + ' #' + idx) : kind;
+    }
+
+    function ioSummaryIoIdLabel(row) {
+      const explicit = ioSummaryText(row && row.io_id_label, '');
+      if (explicit) return explicit;
+      const id = Number(row && row.io_id);
+      if (!Number.isFinite(id) || id === 65535) return tr('io.unassigned', 'Non affecté');
+      return String(id);
+    }
+
+    function appendIoSummaryCard(title, value, summary, state) {
+      if (!ioSummaryCards) return;
+      const card = document.createElement('div');
+      card.className = 'status-card io-summary-card';
+
+      const head = document.createElement('div');
+      head.className = 'status-card-head';
+      const copy = document.createElement('div');
+      const h3 = document.createElement('h3');
+      h3.textContent = title;
+      const p = document.createElement('p');
+      p.className = 'status-card-summary';
+      p.textContent = summary;
+      copy.appendChild(h3);
+      copy.appendChild(p);
+
+      const metric = document.createElement('span');
+      metric.className = 'io-summary-card-value ' + ioSummaryStateClass(state);
+      metric.textContent = String(value);
+      head.appendChild(copy);
+      head.appendChild(metric);
+      card.appendChild(head);
+      ioSummaryCards.appendChild(card);
+    }
+
+    function appendIoSummarySkeletonCard(title, summary) {
+      if (!ioSummaryCards) return;
+      const card = document.createElement('div');
+      card.className = 'status-card io-summary-card status-card-skeleton';
+
+      const head = document.createElement('div');
+      head.className = 'status-card-head';
+      const copy = document.createElement('div');
+      const h3 = document.createElement('h3');
+      h3.textContent = title;
+      const p = document.createElement('p');
+      p.className = 'status-card-summary';
+      p.textContent = summary;
+      copy.appendChild(h3);
+      copy.appendChild(p);
+
+      const metric = document.createElement('span');
+      metric.className = 'io-summary-card-value is-sleeping';
+      metric.appendChild(createSkeletonLine('io-summary-card-value-skeleton', 100));
+      head.appendChild(copy);
+      head.appendChild(metric);
+      card.appendChild(head);
+      ioSummaryCards.appendChild(card);
+    }
+
+    function createIoStateBadge(state) {
+      const badge = document.createElement('span');
+      badge.className = 'io-state-badge ' + ioSummaryStateClass(state);
+      badge.textContent = ioSummaryStateLabel(state);
+      return badge;
+    }
+
+    function createIoCompactTable(title, columns, rows) {
+      const section = document.createElement('section');
+      section.className = 'io-table-section';
+
+      const heading = document.createElement('div');
+      heading.className = 'control-section-title ui-heading-inline';
+      const icon = document.createElement('span');
+      icon.className = 'ui-msr ui-msr-sm';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'table_chart';
+      const text = document.createElement('span');
+      text.textContent = title;
+      heading.appendChild(icon);
+      heading.appendChild(text);
+      section.appendChild(heading);
+
+      const shell = document.createElement('div');
+      shell.className = 'io-table-shell';
+      const table = document.createElement('table');
+      table.className = 'io-compact-table';
+
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      columns.forEach((column) => {
+        const th = document.createElement('th');
+        th.scope = 'col';
+        th.textContent = column.label;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      (rows || []).forEach((row) => {
+        const trEl = document.createElement('tr');
+        columns.forEach((column) => {
+          const td = document.createElement('td');
+          const rendered = typeof column.render === 'function' ? column.render(row) : row[column.key];
+          if (rendered instanceof Node) {
+            td.appendChild(rendered);
+          } else {
+            td.textContent = ioSummaryText(rendered, '-');
+          }
+          trEl.appendChild(td);
+        });
+        tbody.appendChild(trEl);
+      });
+      if (!rows || !rows.length) {
+        const trEl = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = columns.length;
+        td.className = 'io-empty-cell';
+        td.textContent = tr('io.empty', 'Aucune donnée.');
+        trEl.appendChild(td);
+        tbody.appendChild(trEl);
+      }
+      table.appendChild(tbody);
+      shell.appendChild(table);
+      section.appendChild(shell);
+      return section;
+    }
+
+    function createIoSummaryTableSkeleton(title, labels, rowCount) {
+      const widths = [72, 54, 48, 42, 64, 58, 46];
+      const columns = (labels || []).map((label, index) => ({
+        key: 'c' + index,
+        label,
+        render: () => createSkeletonLine('io-table-skeleton-line', widths[index % widths.length])
+      }));
+      const rows = Array.from({ length: Math.max(1, rowCount || 1) }, () => ({}));
+      return createIoCompactTable(title, columns, rows);
+    }
+
+    function renderIoSummarySkeleton() {
+      if (ioSummaryCards) {
+        ioSummaryCards.innerHTML = '';
+        appendIoSummarySkeletonCard(
+          tr('io.cards.bindingPorts', 'BindingPorts'),
+          tr('io.cards.bindingPorts.summary', 'ports physiques actifs')
+        );
+        appendIoSummarySkeletonCard(
+          tr('io.cards.ioslots', 'IOSlots'),
+          tr('io.cards.ioslots.summary', 'slots logiques actifs')
+        );
+        appendIoSummarySkeletonCard(
+          tr('io.cards.domainSlots', 'DomainSlots'),
+          tr('io.cards.domainSlots.summary', 'slots domaine actifs')
+        );
+        appendIoSummarySkeletonCard(
+          tr('io.cards.errors', 'Slots en erreur'),
+          tr('io.status.loading', 'Chargement...')
+        );
+      }
+      if (ioSummaryTables) {
+        ioSummaryTables.innerHTML = '';
+        ioSummaryTables.appendChild(createIoSummaryTableSkeleton(
+          tr('io.table.drivers', 'Affectations par driver'),
+          [
+            tr('io.col.driver', 'Driver'),
+            tr('io.col.active', 'Actifs'),
+            tr('io.col.errors', 'Erreurs')
+          ],
+          3
+        ));
+        ioSummaryTables.appendChild(createIoSummaryTableSkeleton(
+          tr('io.table.bindingPorts', 'BindingPorts'),
+          [
+            tr('io.col.port', 'Port'),
+            tr('io.col.driver', 'Driver'),
+            tr('io.col.channel', 'Canal'),
+            tr('io.col.state', 'Etat'),
+            tr('io.col.lastValue', 'Dernière valeur'),
+            tr('io.col.ioId', 'IoId')
+          ],
+          4
+        ));
+        ioSummaryTables.appendChild(createIoSummaryTableSkeleton(
+          tr('io.table.ioSlots', 'IOSlots'),
+          [
+            tr('io.col.slot', 'Slot'),
+            tr('io.col.kind', 'Type'),
+            tr('io.col.driver', 'Driver'),
+            tr('io.col.state', 'Etat'),
+            tr('io.col.lastValue', 'Dernière valeur'),
+            tr('io.col.poolDevice', 'PoolDevice'),
+            tr('io.col.error', 'Erreur')
+          ],
+          4
+        ));
+        ioSummaryTables.appendChild(createIoSummaryTableSkeleton(
+          tr('io.table.domainSlots', 'DomainSlots'),
+          [
+            tr('io.col.domainSlot', 'Domaine'),
+            tr('io.col.endpoint', 'Endpoint'),
+            tr('io.col.slot', 'Slot'),
+            tr('io.col.state', 'Etat'),
+            tr('io.col.lastValue', 'Dernière valeur'),
+            tr('io.col.poolDevice', 'PoolDevice')
+          ],
+          4
+        ));
+      }
+    }
+
+    function renderIoSummary(data) {
+      const summary = data && typeof data.summary === 'object' ? data.summary : {};
+      const drivers = Array.isArray(data && data.drivers) ? data.drivers : [];
+      const bindingPorts = Array.isArray(data && data.binding_ports) ? data.binding_ports : [];
+      const ioSlots = Array.isArray(data && data.io_slots) ? data.io_slots : [];
+      const domainSlots = Array.isArray(data && data.domain_slots) ? data.domain_slots : [];
+      const errors = Array.isArray(data && data.error_slots) ? data.error_slots : [];
+
+      if (ioSummaryCards) {
+        ioSummaryCards.innerHTML = '';
+        appendIoSummaryCard(
+          tr('io.cards.bindingPorts', 'BindingPorts'),
+          ioSummaryNumber(summary.binding_ports_active) + '/' + ioSummaryNumber(summary.binding_ports_total),
+          tr('io.cards.bindingPorts.summary', 'ports physiques actifs'),
+          ioSummaryNumber(summary.binding_ports_error) ? 'error' : 'active'
+        );
+        appendIoSummaryCard(
+          tr('io.cards.ioslots', 'IOSlots'),
+          ioSummaryNumber(summary.io_slots_active) + '/' + ioSummaryNumber(summary.io_slots_total),
+          tr('io.cards.ioslots.summary', 'slots logiques actifs'),
+          ioSummaryNumber(summary.io_slots_error) ? 'error' : 'active'
+        );
+        appendIoSummaryCard(
+          tr('io.cards.domainSlots', 'DomainSlots'),
+          ioSummaryNumber(summary.domain_slots_active) + '/' + ioSummaryNumber(summary.domain_slots_total),
+          tr('io.cards.domainSlots.summary', 'slots domaine actifs'),
+          ioSummaryNumber(summary.domain_slots_error) ? 'error' : 'active'
+        );
+        appendIoSummaryCard(
+          tr('io.cards.errors', 'Slots en erreur'),
+          ioSummaryNumber(summary.error_slots),
+          errors.length ? errors.map((slot) => ioSummaryText(slot.label, slot.io_slot)).slice(0, 3).join(', ') : tr('io.cards.errors.none', 'aucune erreur active'),
+          errors.length ? 'error' : 'active'
+        );
+      }
+
+      if (ioSummaryTables) {
+        ioSummaryTables.innerHTML = '';
+        ioSummaryTables.appendChild(createIoCompactTable(
+          tr('io.table.drivers', 'Affectations par driver'),
+          [
+            { key: 'driver', label: tr('io.col.driver', 'Driver') },
+            { key: 'active_slots', label: tr('io.col.active', 'Actifs') },
+            { key: 'error_slots', label: tr('io.col.errors', 'Erreurs') }
+          ],
+          drivers
+        ));
+        ioSummaryTables.appendChild(createIoCompactTable(
+          tr('io.table.bindingPorts', 'BindingPorts'),
+          [
+            { key: 'port_id', label: tr('io.col.port', 'Port') },
+            { key: 'driver', label: tr('io.col.driver', 'Driver') },
+            { key: 'channel', label: tr('io.col.channel', 'Canal') },
+            { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
+            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
+            { key: 'io_id', label: tr('io.col.ioId', 'IoId'), render: (row) => ioSummaryIoIdLabel(row) }
+          ],
+          bindingPorts
+        ));
+        ioSummaryTables.appendChild(createIoCompactTable(
+          tr('io.table.ioSlots', 'IOSlots'),
+          [
+            { key: 'io_slot', label: tr('io.col.slot', 'Slot'), render: (row) => ioSummarySlotLabel(row) },
+            { key: 'kind', label: tr('io.col.kind', 'Type') },
+            { key: 'driver', label: tr('io.col.driver', 'Driver') },
+            { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
+            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
+            { key: 'pool_device', label: tr('io.col.poolDevice', 'PoolDevice'), render: (row) => row.pool_device && row.pool_device.label ? row.pool_device.label : '-' },
+            { key: 'error', label: tr('io.col.error', 'Erreur') }
+          ],
+          ioSlots
+        ));
+        ioSummaryTables.appendChild(createIoCompactTable(
+          tr('io.table.domainSlots', 'DomainSlots'),
+          [
+            { key: 'display_name', label: tr('io.col.domainSlot', 'Domaine') },
+            { key: 'endpoint_id', label: tr('io.col.endpoint', 'Endpoint') },
+            { key: 'io_slot', label: tr('io.col.slot', 'Slot'), render: (row) => ioSummarySlotLabel(row) },
+            { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
+            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
+            { key: 'pool_device', label: tr('io.col.poolDevice', 'PoolDevice'), render: (row) => row.pool_device && row.pool_device.label ? row.pool_device.label : '-' }
+          ],
+          domainSlots
+        ));
+      }
+    }
+
+    async function fetchIoSummary() {
+      const data = await fetchOkJson('/api/io/summary', { cache: 'no-store' }, 'lecture entrées/sorties indisponible');
+      if (!data || data.ok !== true) throw new Error('résumé entrées/sorties indisponible');
+      return data;
+    }
+
+    async function refreshIoSummary(forceRefresh) {
+      const reqSeq = ++ioSummaryReqSeq;
+      if (forceRefresh || !ioSummaryLoadedOnce) renderIoSummarySkeleton();
+      try {
+        const data = await fetchIoSummary();
+        if (reqSeq !== ioSummaryReqSeq) return;
+        ioSummaryLoadedOnce = true;
+        renderIoSummary(data);
+      } catch (err) {
+        if (reqSeq !== ioSummaryReqSeq) return;
+        if (ioSummaryTables) ioSummaryTables.innerHTML = '';
+      }
+    }
+
+    async function onIoSummaryPageShown() {
+      startIoSummaryTimer();
+      await refreshIoSummary(!ioSummaryLoadedOnce);
+    }
+
     function stopPoolMeasuresTimer() {
       poolMeasuresPoller.stop();
     }
@@ -4647,7 +5010,7 @@
     function formatRuntimeDomainLabel(domain) {
       const key = String(domain || '').trim().toLowerCase();
       if (key === 'mode') return 'Mode';
-      if (key === 'equipements') return 'Équipements';
+      if (key === 'equipements') return tr('dashboard.domain.equipements', 'Equipements');
       if (key === 'sondes') return 'Sondes';
       if (key === 'micronova') return 'Micronova';
       if (key === 'mqtt') return 'MQTT';
@@ -4663,7 +5026,14 @@
       const domainLabel = formatRuntimeDomainLabel(domain);
       const groupLabel = String(group || '').trim();
       if (!groupLabel) return domainLabel;
-      if (groupLabel.localeCompare(domainLabel, 'fr', { sensitivity: 'base' }) === 0) return domainLabel;
+      const comparableTitle = (value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        const ascii = typeof normalized.normalize === 'function'
+          ? normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          : normalized;
+        return ascii.replace(/[^a-z0-9]+/g, '').replace(/s$/, '');
+      };
+      if (comparableTitle(groupLabel) === comparableTitle(domainLabel)) return domainLabel;
       return domainLabel + ' · ' + groupLabel;
     }
 
@@ -4799,21 +5169,6 @@
       return { value: valueRaw, unit: unit };
     }
 
-    function isPoolSondeSlotAvailable(slot) {
-      return !!(slot && slot.enabled !== false && slot.available);
-    }
-
-    function countUnavailablePoolSondeSlots(slots) {
-      const cleanSlots = Array(8).fill(null);
-      if (Array.isArray(slots)) {
-        slots.forEach((slot) => {
-          const idx = Number(slot && slot.slot);
-          if (Number.isInteger(idx) && idx >= 0 && idx < 8) cleanSlots[idx] = slot;
-        });
-      }
-      return cleanSlots.filter((slot) => !isPoolSondeSlotAvailable(slot)).length;
-    }
-
     function buildPoolSondeSlotsGrid(slots) {
       const cleanSlots = Array(8).fill(null);
       if (Array.isArray(slots)) {
@@ -4822,24 +5177,14 @@
           if (Number.isInteger(idx) && idx >= 0 && idx < 8) cleanSlots[idx] = slot;
         });
       }
-      const visibleIndexes = [];
-      for (let i = 0; i < 8; i += 1) {
-        if (poolSondesShowUnavailable || isPoolSondeSlotAvailable(cleanSlots[i])) visibleIndexes.push(i);
-      }
-      if (!visibleIndexes.length) {
-        const empty = document.createElement('p');
-        empty.className = 'status-card-summary';
-        empty.textContent = tr('dashboard.sondes.allUnavailable', 'Aucune mesure disponible.');
-        return empty;
-      }
       const grid = document.createElement('div');
       grid.className = 'status-sonde-slot-grid';
 
-      visibleIndexes.forEach((i) => {
+      for (let i = 0; i < 8; i += 1) {
         const slot = cleanSlots[i] || null;
         const tile = document.createElement('div');
         tile.className = 'status-sonde-slot';
-        const available = isPoolSondeSlotAvailable(slot);
+        const available = !!(slot && slot.enabled !== false && slot.available);
         if (!available) tile.classList.add('is-empty');
 
         const bgColor = slot && isValidHexColor(slot.bgColor) ? slot.bgColor : '';
@@ -4868,7 +5213,7 @@
 
         tile.appendChild(metric);
         grid.appendChild(tile);
-      });
+      }
 
       return grid;
     }
@@ -5328,12 +5673,10 @@
         const isPoolModeGroup =
           String(group.domainKey || '').trim().toLowerCase() === 'mode' &&
           String(group.groupKey || '').trim().localeCompare('Mode', 'fr', { sensitivity: 'base' }) === 0;
-        const isPoolEquipementsGroup =
-          String(group.domainKey || '').trim().toLowerCase() === 'equipements';
         const isPoolSondesGroup = isPoolSondesGroupKey(group.domainKey, group.groupKey);
         const groupDisplayOptions = {
           displayLabelResolver: (entry) => runtimeMeasureDisplayLabel(entry),
-          booleanTexts: (isPoolModeGroup || isPoolEquipementsGroup)
+          booleanTexts: isPoolModeGroup
             ? {
               activeText: 'Marche',
               inactiveText: 'Arrêt'
@@ -5347,21 +5690,6 @@
 
         if (isPoolSondesGroup) {
           card.appendChild(buildPoolSondeSlotsGrid(sondeSlots));
-          const hiddenCount = countUnavailablePoolSondeSlots(sondeSlots);
-          if (hiddenCount > 0 || poolSondesShowUnavailable) {
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.className = 'status-sonde-toggle';
-            toggle.textContent = poolSondesShowUnavailable
-              ? tr('dashboard.sondes.hideUnavailable', 'Masquer les indisponibles')
-              : tr('dashboard.sondes.showUnavailable', 'Afficher les indisponibles') + ' (' + hiddenCount + ')';
-            toggle.addEventListener('click', () => {
-              poolSondesShowUnavailable = !poolSondesShowUnavailable;
-              setStorageValue(localStorage, poolSondesShowUnavailableStorageKey, poolSondesShowUnavailable ? '1' : '0');
-              renderPoolMeasuresGrid();
-            });
-            card.appendChild(toggle);
-          }
           fragment.appendChild(card);
           return;
         }
@@ -5742,32 +6070,6 @@
       }
     }
 
-    function savePoolMeasureDomainPrefs() {
-      const keys = activePoolMeasureDomainKeys();
-      // '-' = tout desactive volontairement (distinct de "jamais sauvegarde").
-      setStorageValue(localStorage, poolMeasureActiveDomainsStorageKey, keys.length ? keys.join(',') : '-');
-    }
-
-    function restorePoolMeasureDomainPrefs() {
-      if (poolMeasureDomainPrefsRestored) return;
-      poolMeasureDomainPrefsRestored = true;
-      ensureRuntimeDomainState();
-      const raw = getStorageValue(localStorage, poolMeasureActiveDomainsStorageKey);
-      if (raw === '-') return;
-      if (!raw) {
-        runtimeMeasureDomainKeys.forEach((domainKey) => {
-          if (poolMeasureDomainState[domainKey]) poolMeasureDomainState[domainKey].active = true;
-        });
-        return;
-      }
-      raw.split(',').forEach((key) => {
-        const cleanDomain = normalizeRuntimeMeasureDomainKey(key);
-        if (cleanDomain && poolMeasureDomainState[cleanDomain]) {
-          poolMeasureDomainState[cleanDomain].active = true;
-        }
-      });
-    }
-
     async function togglePoolMeasureDomain(domainKey) {
       const cleanDomain = normalizeRuntimeMeasureDomainKey(domainKey);
       if (!cleanDomain) return;
@@ -5778,12 +6080,10 @@
         state.error = '';
         state.sondeSlots = [];
         state.requestSeq += 1;
-        savePoolMeasureDomainPrefs();
         refreshPoolMeasuresView();
         return;
       }
       state.active = true;
-      savePoolMeasureDomainPrefs();
       await loadPoolMeasureDomain(cleanDomain, false);
     }
 
@@ -5792,7 +6092,6 @@
     }
 
     async function onPoolMeasuresPageShown() {
-      restorePoolMeasureDomainPrefs();
       refreshPoolMeasuresView();
       startPoolMeasuresTimer();
       if (activePoolMeasureDomainKeys().length) {
@@ -5802,257 +6101,6 @@
           showPoolMeasuresError(err);
         }
       }
-    }
-
-    let ioSnapshotTimer = null;
-    let ioSnapshotLoading = false;
-    const ioSnapshotRefreshMs = 4000;
-
-    function ioEndpointCode(ep) {
-      const id = Number(ep && ep.id);
-      if (!Number.isFinite(id) || id < 0) return '';
-      if (id < 64) return 'd' + String(id).padStart(2, '0');
-      if (id < 192) return 'i' + String(id - 64).padStart(2, '0');
-      return 'a' + String(id - 192).padStart(2, '0');
-    }
-
-    function ioEndpointLabel(ep) {
-      const code = ioEndpointCode(ep);
-      const name = String(ep && ep.name ? ep.name : '').trim();
-      if (!name || name === code) return code || '-';
-      return code ? (code + ' · ' + name) : name;
-    }
-
-    function ioEndpointBoolState(ep) {
-      if (!ep || !ep.valid || ep.type !== 'bool') return null;
-      return !!ep.value;
-    }
-
-    const ioStaleValueAgeMs = 10000;
-
-    function formatIoNumericValue(ep, nowMs) {
-      if (!ep || !ep.valid) return tr('io.unavailable', 'Indisponible');
-      if (ep.value === null || ep.value === undefined) return '-';
-      let text = String(ep.value);
-      const ts = Number(ep.ts);
-      const now = Number(nowMs);
-      if (Number.isFinite(ts) && Number.isFinite(now) && now >= ts) {
-        const age = now - ts;
-        if (age > ioStaleValueAgeMs) {
-          text += ' (' + fmtFlowRelativeAge(age) + ')';
-        }
-      }
-      return text;
-    }
-
-    function buildIoSnapshotCard(title) {
-      const card = document.createElement('div');
-      card.className = 'status-card';
-      const heading = document.createElement('h3');
-      heading.textContent = title;
-      card.appendChild(heading);
-      return card;
-    }
-
-    function buildIoValueTile(label, valueText) {
-      const tile = document.createElement('div');
-      tile.className = 'status-state-tile is-value';
-      tile.setAttribute('role', 'img');
-      tile.setAttribute('aria-label', label + ' : ' + valueText);
-
-      const title = document.createElement('div');
-      title.className = 'status-state-title';
-      title.textContent = label;
-      tile.appendChild(title);
-
-      const state = document.createElement('div');
-      state.className = 'status-state-value';
-      state.textContent = valueText;
-      tile.appendChild(state);
-      return tile;
-    }
-
-    function buildIoTable(headers, rows) {
-      const table = document.createElement('table');
-      table.className = 'io-table';
-      const thead = document.createElement('thead');
-      const headRow = document.createElement('tr');
-      headers.forEach((header) => {
-        const th = document.createElement('th');
-        th.textContent = String(header && header.text !== undefined ? header.text : header);
-        if (header && header.cls) th.className = header.cls;
-        headRow.appendChild(th);
-      });
-      thead.appendChild(headRow);
-      table.appendChild(thead);
-      const tbody = document.createElement('tbody');
-      rows.forEach((cells) => {
-        const tr = document.createElement('tr');
-        cells.forEach((cell) => {
-          const td = document.createElement('td');
-          td.textContent = String(cell && cell.text !== undefined ? cell.text : cell);
-          if (cell && cell.cls) td.className = cell.cls;
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      return table;
-    }
-
-    function renderIoSnapshot(data) {
-      if (!ioSnapshotGrid) return;
-      ioSnapshotGrid.innerHTML = '';
-      const endpoints = Array.isArray(data && data.endpoints) ? data.endpoints : [];
-      const deviceNowMs = Number(data && data.now);
-
-      if (!endpoints.length) {
-        const empty = document.createElement('div');
-        empty.className = 'measure-domain-empty';
-        empty.textContent = tr('io.empty', 'Aucun endpoint E/S exposé.');
-        ioSnapshotGrid.appendChild(empty);
-        return;
-      }
-
-      const outputs = endpoints.filter((ep) => ep && ep.kind === 'do');
-      const inputs = endpoints.filter((ep) => ep && ep.kind === 'di');
-      const analogs = endpoints.filter((ep) => ep && ep.kind === 'ai');
-
-      if (outputs.length) {
-        const card = buildIoSnapshotCard(tr('io.outputs', 'Sorties (relais)'));
-        const tiles = outputs.map((ep) => buildFlowReadonlyStateTile(
-          ioEndpointLabel(ep),
-          ioEndpointBoolState(ep),
-          { activeText: 'Marche', inactiveText: 'Arrêt' }
-        ));
-        const grid = buildFlowReadonlyStateGrid(tiles);
-        if (grid) card.appendChild(grid);
-        ioSnapshotGrid.appendChild(card);
-      }
-
-      if (inputs.length) {
-        const card = buildIoSnapshotCard(tr('io.inputs', 'Entrées binaires'));
-        const tiles = inputs.map((ep) => {
-          if (ep.valid && ep.type !== 'bool') {
-            return buildIoValueTile(ioEndpointLabel(ep), formatIoNumericValue(ep, deviceNowMs));
-          }
-          return buildFlowReadonlyStateTile(
-            ioEndpointLabel(ep),
-            ioEndpointBoolState(ep),
-            { activeText: 'Actif', inactiveText: 'Inactif' }
-          );
-        });
-        const grid = buildFlowReadonlyStateGrid(tiles);
-        if (grid) card.appendChild(grid);
-        ioSnapshotGrid.appendChild(card);
-      }
-
-      if (analogs.length) {
-        const card = buildIoSnapshotCard(tr('io.analog', 'Entrées analogiques'));
-        const rows = analogs.map((ep) => {
-          const code = ioEndpointCode(ep);
-          const name = String(ep && ep.name ? ep.name : '').trim();
-          return [
-            { text: code || '-', cls: 'io-code' },
-            (name && name !== code) ? name : '-',
-            String(ep.backend || '?'),
-            { text: formatIoNumericValue(ep, deviceNowMs), cls: ep.valid ? 'io-col-num' : 'io-col-num io-muted' }
-          ];
-        });
-        card.appendChild(buildIoTable([
-          tr('io.table.endpoint', 'Endpoint'),
-          tr('io.table.name', 'Nom'),
-          tr('io.table.source', 'Source'),
-          { text: tr('io.table.value', 'Valeur'), cls: 'io-col-num' }
-        ], rows));
-        ioSnapshotGrid.appendChild(card);
-      }
-
-      const byBackend = new Map();
-      endpoints.forEach((ep) => {
-        const key = String(ep && ep.backend ? ep.backend : '?');
-        let entry = byBackend.get(key);
-        if (!entry) {
-          entry = { total: 0, valid: 0 };
-          byBackend.set(key, entry);
-        }
-        entry.total += 1;
-        if (ep && ep.valid) entry.valid += 1;
-      });
-      if (byBackend.size) {
-        const card = buildIoSnapshotCard(tr('io.drivers', 'Capteurs / bus'));
-        const rows = [];
-        byBackend.forEach((entry, backend) => {
-          rows.push([
-            { text: backend, cls: 'io-code' },
-            { text: entry.valid + '/' + entry.total, cls: 'io-col-num' },
-            entry.valid > 0
-              ? { text: tr('io.driver.ok', 'OK'), cls: 'io-ok' }
-              : { text: tr('io.driver.noData', 'Aucune donnée'), cls: 'io-muted' }
-          ]);
-        });
-        card.appendChild(buildIoTable([
-          tr('io.table.bus', 'Bus / capteur'),
-          { text: tr('io.table.endpoints', 'Endpoints'), cls: 'io-col-num' },
-          tr('io.table.state', 'État')
-        ], rows));
-        ioSnapshotGrid.appendChild(card);
-      }
-    }
-
-    function refreshIoSnapshotStatusLine(endpoints) {
-      if (!ioSnapshotStatus) return;
-      const counts = { do: 0, di: 0, ai: 0 };
-      (endpoints || []).forEach((ep) => {
-        if (ep && Object.prototype.hasOwnProperty.call(counts, ep.kind)) counts[ep.kind] += 1;
-      });
-      ioSnapshotStatus.textContent =
-        tr('io.outputs', 'Sorties (relais)') + ': ' + counts.do + ' | ' +
-        tr('io.inputs', 'Entrées binaires') + ': ' + counts.di + ' | ' +
-        tr('io.analog', 'Entrées analogiques') + ': ' + counts.ai;
-    }
-
-    async function refreshIoSnapshot() {
-      if (ioSnapshotLoading) return;
-      ioSnapshotLoading = true;
-      try {
-        const data = await fetchOkJson(
-          '/api/io/snapshot',
-          { cache: 'no-store' },
-          'lecture E/S indisponible'
-        );
-        renderIoSnapshot(data);
-        refreshIoSnapshotStatusLine(data && data.endpoints);
-        if (ioSnapshotAgeChip) {
-          ioSnapshotAgeChip.textContent = new Date().toLocaleTimeString();
-          ioSnapshotAgeChip.hidden = false;
-        }
-      } catch (err) {
-        if (ioSnapshotStatus) {
-          ioSnapshotStatus.textContent = tr('io.error', 'Lecture E/S échouée') + ': ' + err;
-        }
-      } finally {
-        ioSnapshotLoading = false;
-      }
-    }
-
-    function stopIoSnapshotTimer() {
-      if (!ioSnapshotTimer) return;
-      clearInterval(ioSnapshotTimer);
-      ioSnapshotTimer = null;
-    }
-
-    function startIoSnapshotTimer() {
-      stopIoSnapshotTimer();
-      ioSnapshotTimer = setInterval(() => {
-        if (document.hidden || !isPageActive('page-io')) return;
-        refreshIoSnapshot();
-      }, ioSnapshotRefreshMs);
-    }
-
-    async function onIoPageShown() {
-      await refreshIoSnapshot();
-      startIoSnapshotTimer();
     }
 
     async function onUpgradePageShown() {
@@ -7749,6 +7797,108 @@
       return resolved;
     }
 
+    function poolLogicDeviceSlotSource(source) {
+      return source === 'supervisor' ? 'supervisor' : 'flow';
+    }
+
+    function poolLogicDeviceSlotRef(slot) {
+      const n = Number.parseInt(slot, 10);
+      if (!Number.isFinite(n) || n < 0 || n > 15) return '';
+      return 'd' + String(n).padStart(2, '0');
+    }
+
+    function poolLogicDeviceIoOutputModule(slot) {
+      const ref = poolLogicDeviceSlotRef(slot);
+      return ref ? ('io/output/' + ref) : '';
+    }
+
+    function poolLogicDeviceIoOutputNameKey(slot) {
+      const ref = poolLogicDeviceSlotRef(slot);
+      return ref ? (ref + '_name') : '';
+    }
+
+    function isPoolLogicDeviceSlotField(moduleName, key, doc) {
+      const cleanModule = nettoyerNomFlowCfg(moduleName).toLowerCase();
+      const cleanKey = String(key || '').trim().toLowerCase();
+      if (cleanModule !== 'poollogic/devices') return false;
+      if (!cleanKey.endsWith('_slot')) return false;
+      return !doc || String(doc.enum_set || '').trim() === 'poollogic_device_slot';
+    }
+
+    function poolLogicDeviceSlotLabel(source, slot, fallback) {
+      const n = Number.parseInt(slot, 10);
+      const ref = poolLogicDeviceSlotRef(n);
+      if (!ref) return String(fallback || slot);
+      const src = poolLogicDeviceSlotSource(source);
+      const cache = poolLogicDeviceIoOutputNames[src] || {};
+      const ioName = typeof cache[n] === 'string' ? cache[n].trim() : '';
+      const baseName = ioName || String(ioOutputPdmLabels[n] || '').trim();
+      const suffix = baseName ? (' [' + baseName + ']') : '';
+      return 'pd' + String(n) + ' - ' + ref + suffix;
+    }
+
+    function dynamicPoolLogicDeviceSlotOptions(source, enumOptions) {
+      const byValue = {};
+      if (Array.isArray(enumOptions)) {
+        enumOptions.forEach((opt) => {
+          if (!opt || typeof opt !== 'object') return;
+          const value = Number.parseInt(opt.value, 10);
+          if (Number.isFinite(value)) byValue[value] = opt;
+        });
+      }
+      const out = [];
+      for (let slot = 0; slot <= 15; slot += 1) {
+        const base = byValue[slot] ? Object.assign({}, byValue[slot]) : { value: slot };
+        base.value = slot;
+        base.label = poolLogicDeviceSlotLabel(source, slot, base.label);
+        out.push(base);
+      }
+      return out;
+    }
+
+    function configEnumOptionsForField(source, moduleName, key, doc) {
+      const options = (doc && Array.isArray(doc._enumOptions)) ? doc._enumOptions : null;
+      if (!options) return null;
+      if (isWaveshareProfile() && isPoolLogicDeviceSlotField(moduleName, key, doc)) {
+        return dynamicPoolLogicDeviceSlotOptions(source, options);
+      }
+      return options;
+    }
+
+    async function loadPoolLogicDeviceSlotLabels(source, forceReload) {
+      const src = poolLogicDeviceSlotSource(source);
+      if (!poolLogicDeviceIoOutputNames[src]) poolLogicDeviceIoOutputNames[src] = {};
+      const cache = poolLogicDeviceIoOutputNames[src];
+      const fetchOne = async (slot) => {
+        if (!forceReload && Object.prototype.hasOwnProperty.call(cache, slot)) return;
+        const moduleName = poolLogicDeviceIoOutputModule(slot);
+        const nameKey = poolLogicDeviceIoOutputNameKey(slot);
+        if (!moduleName || !nameKey) return;
+        try {
+          const url = src === 'supervisor'
+            ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(moduleName))
+            : ('/api/flowcfg/module?name=' + encodeURIComponent(moduleName));
+          const res = src === 'supervisor'
+            ? await fetchWithBusyRetry(url, { cache: 'no-store' })
+            : await fetchFlowRemoteQueued(url, { cache: 'no-store' });
+          const payload = await res.json().catch(() => null);
+          if (!res.ok || !payload || payload.ok !== true || !payload.data || typeof payload.data !== 'object') {
+            cache[slot] = '';
+            return;
+          }
+          const raw = payload.data[nameKey];
+          cache[slot] = (typeof raw === 'string') ? raw.trim() : '';
+        } catch (err) {
+          cache[slot] = '';
+        }
+      };
+      const jobs = [];
+      for (let slot = 0; slot <= 15; slot += 1) {
+        jobs.push(fetchOne(slot));
+      }
+      await Promise.all(jobs);
+    }
+
     function closeColorPickerPopover() {
       if (!activeColorPickerPopover) return;
       const state = activeColorPickerPopover;
@@ -8054,16 +8204,15 @@
       return value;
     }
 
-    function configSupportsUnsetBindingPort(moduleName, key) {
+    function configIsBindingPortField(moduleName, key) {
       if (String(key || '').trim() !== 'binding_port') return false;
       const modulePath = String(moduleName || '').trim().toLowerCase();
-      return /^io\/input\/(?:a\d{2}|i\d{2})$/.test(modulePath);
+      return /^io\/(?:input\/(?:a\d{2}|i\d{2})|output\/d\d{2})$/.test(modulePath);
     }
 
-    function configUnsetBindingPortValue(doc) {
-      const typeName = String((doc && doc.type) || '').trim().toLowerCase();
-      if (typeName === 'uint8') return String(0xFF);
-      return String(0xFFFF);
+    function configNormalizeBindingPortSelectValue(value) {
+      const current = String(value ?? '').trim();
+      return (current.length === 0 || current === '65535') ? '0' : current;
     }
 
     function configDocFor(moduleName, key, extraSources) {
@@ -8321,7 +8470,7 @@
         }
         row.appendChild(labelWrap);
 
-        const enumOptions = (doc && Array.isArray(doc._enumOptions)) ? doc._enumOptions : null;
+        const enumOptions = configEnumOptionsForField(opts.source || cfgTreeSelectedSource, moduleName, key, doc);
         let inputEl = null;
         const valueWrap = document.createElement('div');
         valueWrap.className = 'control-value-wrap';
@@ -8341,25 +8490,13 @@
           if (doc && typeof doc.display_format === 'string') {
             select.dataset.format = doc.display_format;
           }
-          const currentValue = String(value);
+          const isBindingPortField = configIsBindingPortField(moduleName, key);
+          const currentValue = isBindingPortField ? configNormalizeBindingPortSelectValue(value) : String(value);
           let hasSelectedOption = false;
-          const supportsUnsetBindingPort = configSupportsUnsetBindingPort(moduleName, key);
-          const unsetBindingPortValue = supportsUnsetBindingPort ? configUnsetBindingPortValue(doc) : '';
-          if (supportsUnsetBindingPort) {
-            const unsetOption = document.createElement('option');
-            unsetOption.value = unsetBindingPortValue;
-            unsetOption.textContent = 'Valeur non definie';
-            if (currentValue === unsetBindingPortValue || currentValue.length === 0) {
-              unsetOption.selected = true;
-              hasSelectedOption = true;
-            }
-            select.appendChild(unsetOption);
-          }
           enumOptions.forEach((opt) => {
             if (!opt || typeof opt !== 'object') return;
             const optionEl = document.createElement('option');
             optionEl.value = String(opt.value);
-            if (supportsUnsetBindingPort && optionEl.value === unsetBindingPortValue) return;
             optionEl.textContent = (typeof opt.label === 'string' && opt.label.length > 0)
               ? opt.label
               : String(opt.value);
@@ -8375,11 +8512,13 @@
           if (!hasSelectedOption && currentValue.length > 0) {
             const placeholder = document.createElement('option');
             placeholder.value = currentValue;
-            placeholder.textContent = 'Valeur non definie';
+            placeholder.textContent = isBindingPortField
+              ? ('Port inconnu (' + currentValue + ')')
+              : 'Valeur inconnue';
             placeholder.selected = true;
             select.insertBefore(placeholder, select.firstChild);
           }
-          storeConfigFieldInitialValue(select, value);
+          storeConfigFieldInitialValue(select, isBindingPortField ? parseConfigNumericValue(currentValue, 'int', '') : value);
           inputEl = select;
           inputEl.dataset.module = moduleName;
           valueWrap.appendChild(select);
@@ -8539,6 +8678,7 @@
 
     function renderFlowCfgFields(dataObj) {
       renderConfigFields(flowCfgFields, flowCfgCurrentModule, dataObj, {
+        source: 'flow',
         controlsPrimaryPane: true,
         perFieldApply: flowCfgApplyPerFieldEnabled(flowCfgCurrentModule),
         onApplyField: appliquerFlowCfgField
@@ -8552,6 +8692,7 @@
           Object.keys(flowCfgCurrentPdmExtension.data).length > 0) {
         renderConfigFields(flowCfgFields, flowCfgCurrentPdmExtension.module, flowCfgCurrentPdmExtension.data, {
           append: true,
+          source: 'flow',
           sectionTitle: flowCfgPdmSectionTitle(flowCfgCurrentModule, dataObj),
           controlsPrimaryPane: true,
           perFieldApply: flowCfgApplyPerFieldEnabled(flowCfgCurrentModule),
@@ -8566,7 +8707,7 @@
       const match = cleanModule.match(/^(?:io\/output\/)?d(\d{1,2})$/);
       if (match) {
         const slot = Number.parseInt(match[1], 10);
-        if (Number.isFinite(slot) && slot >= 0 && slot <= 7) return slot;
+        if (Number.isFinite(slot) && slot >= 0 && slot <= 15) return slot;
       }
       const data = (dataObj && typeof dataObj === 'object') ? dataObj : null;
       if (data) {
@@ -8574,7 +8715,7 @@
         if (key) {
           const keyMatch = String(key).match(/^d(\d{2})_name$/i);
           const slot = keyMatch ? Number.parseInt(keyMatch[1], 10) : -1;
-          if (Number.isFinite(slot) && slot >= 0 && slot <= 7) return slot;
+          if (Number.isFinite(slot) && slot >= 0 && slot <= 15) return slot;
         }
       }
       return -1;
@@ -8616,7 +8757,7 @@
     }
 
     async function loadPrimarySupervisorPdmExtensionData(moduleName, dataObj) {
-      if (!isFlowIOS3Profile()) return null;
+      if (!isWaveshareProfile()) return null;
       const pdmModule = flowCfgPdmModuleForIoOutput(moduleName, dataObj);
       if (!pdmModule) return null;
       try {
@@ -8639,6 +8780,7 @@
 
     function renderPrimarySupervisorCfgFields(dataObj) {
       renderConfigFields(flowCfgFields, supCfgCurrentModule, dataObj, {
+        source: 'supervisor',
         controlsPrimaryPane: true,
         perFieldApply: flowCfgApplyPerFieldEnabled(supCfgCurrentModule),
         onApplyField: appliquerPrimaryCfgField
@@ -8652,6 +8794,7 @@
           Object.keys(supCfgCurrentPdmExtension.data).length > 0) {
         renderConfigFields(flowCfgFields, supCfgCurrentPdmExtension.module, supCfgCurrentPdmExtension.data, {
           append: true,
+          source: 'supervisor',
           sectionTitle: flowCfgPdmSectionTitle(supCfgCurrentModule, dataObj),
           controlsPrimaryPane: true,
           perFieldApply: flowCfgApplyPerFieldEnabled(supCfgCurrentModule),
@@ -8726,6 +8869,9 @@
         if (pdmModule) {
           await ensureCfgDocsForModule(pdmModule);
         }
+        if (isWaveshareProfile() && m === 'poollogic/devices') {
+          await loadPoolLogicDeviceSlotLabels('flow', true);
+        }
         flowCfgCurrentModule = m;
         flowCfgCurrentData = data.data;
         flowCfgCurrentPdmExtension = await loadFlowCfgPdmExtensionData(m, flowCfgCurrentData);
@@ -8758,9 +8904,12 @@
           throw new Error('lecture module supervisor impossible');
         }
         await ensureCfgDocsForModule(m);
-        const pdmModule = isFlowIOS3Profile() ? flowCfgPdmModuleForIoOutput(m, data.data) : '';
+        const pdmModule = isWaveshareProfile() ? flowCfgPdmModuleForIoOutput(m, data.data) : '';
         if (pdmModule) {
           await ensureCfgDocsForModule(pdmModule);
+        }
+        if (isWaveshareProfile() && m === 'poollogic/devices') {
+          await loadPoolLogicDeviceSlotLabels('supervisor', true);
         }
         supCfgCurrentModule = m;
         supCfgCurrentData = data.data;
@@ -9126,9 +9275,12 @@
       if (tone === 'busy') flowCfgBackupStatus.classList.add('is-busy');
     }
 
-    function setFlowCfgBackupProgress(percent, visible) {
+    function setFlowCfgBackupProgress(percent, visible, label) {
       const show = !!visible;
       if (flowCfgBackupProgress) flowCfgBackupProgress.hidden = !show;
+      if (flowCfgBackupProgressLabel && typeof label === 'string' && label.trim().length > 0) {
+        flowCfgBackupProgressLabel.textContent = label.trim();
+      }
 
       if (!show) {
         if (flowCfgBackupPct) flowCfgBackupPct.textContent = '0%';
@@ -9157,15 +9309,20 @@
     }
 
     function flowCfgBackupStoreLabel(storeName) {
+      if (isWaveshareProfile()) return webProfileName || 'Waveshare';
       return storeName === 'supervisor' ? webProfileName : 'flow.io';
     }
 
     function flowCfgBackupStoreFetchImpl(storeName) {
-      return storeName === 'supervisor' ? fetch : fetchFlowRemoteQueued;
+      return storeName === 'supervisor' ? fetch : fetchFlowCfgEndpoint;
     }
 
     function flowCfgBackupStoreBasePath(storeName) {
       return storeName === 'supervisor' ? '/api/supervisorcfg' : '/api/flowcfg';
+    }
+
+    function flowCfgBackupStoreNames() {
+      return isWaveshareProfile() ? ['flow'] : ['supervisor', 'flow'];
     }
 
     function flowCfgBackupIsoDateForFile(dateLike) {
@@ -9477,7 +9634,7 @@
       const startedAt = Date.now();
       try {
         setFlowCfgBackupStatus('Préparation de l\'export ConfigStore...', 'busy');
-        setFlowCfgBackupProgress(0, true);
+        setFlowCfgBackupProgress(0, true, 'Export ConfigStore');
         const createdAt = new Date();
         const backupDoc = {
           format: flowCfgBackupFormat,
@@ -9503,7 +9660,7 @@
           }
         };
 
-        const stores = ['supervisor', 'flow'];
+        const stores = flowCfgBackupStoreNames();
         const modulesByStore = {};
         let totalModuleCount = 0;
         for (const storeName of stores) {
@@ -9517,7 +9674,7 @@
 
         let exportedModuleCount = 0;
         if (totalModuleCount === 0) {
-          setFlowCfgBackupProgress(100, true);
+          setFlowCfgBackupProgress(100, true, 'Export ConfigStore');
         }
 
         for (const storeName of stores) {
@@ -9539,7 +9696,7 @@
                 reason: String(err || '').trim() || 'lecture module impossible'
               });
               exportedModuleCount += 1;
-              setFlowCfgBackupProgress((exportedModuleCount / totalModuleCount) * 100, true);
+              setFlowCfgBackupProgress((exportedModuleCount / totalModuleCount) * 100, true, 'Export ConfigStore');
               continue;
             }
             if (modulePayload.truncated) {
@@ -9554,7 +9711,7 @@
               });
             });
             exportedModuleCount += 1;
-            setFlowCfgBackupProgress((exportedModuleCount / totalModuleCount) * 100, true);
+            setFlowCfgBackupProgress((exportedModuleCount / totalModuleCount) * 100, true, 'Export ConfigStore');
           }
           if (storeName === 'flow') {
             backupDoc.meta.flow_reachable = true;
@@ -9578,7 +9735,7 @@
         const fileName = 'flowio-configstore-backup-' + flowCfgBackupIsoDateForFile(createdAt) + '.json';
         flowCfgBackupDownloadText(fileName, serialized);
         const durationMs = Date.now() - startedAt;
-        setFlowCfgBackupProgress(100, true);
+        setFlowCfgBackupProgress(100, true, 'Export ConfigStore');
         const failedSummary = failedModuleErrors.length > 0
           ? ' Modules ignorés: ' + failedModuleErrors.length + ' (' + failedModuleErrors.join(', ') + ').'
           : '';
@@ -9598,7 +9755,7 @@
       setFlowCfgBackupBusy(true);
       const startedAt = Date.now();
       try {
-        setFlowCfgBackupProgress(0, false);
+        setFlowCfgBackupProgress(0, true, 'Import ConfigStore');
         let parsedDoc = null;
         try {
           parsedDoc = JSON.parse(String(rawText || ''));
@@ -9616,13 +9773,41 @@
           flow: { modules_applied: 0, modules_skipped: 0, patches_applied: 0 }
         };
 
-        const stores = ['supervisor', 'flow'];
+        const stores = flowCfgBackupStoreNames();
+        const importPlan = {};
+        let totalPatchCount = 0;
+        stores.forEach((storeName) => {
+          const storeData = backupDoc.stores[storeName];
+          const moduleNames = Object.keys(storeData.modules || {}).sort((left, right) => left.localeCompare(right));
+          const truncatedSet = new Set(storeData.truncated_modules || []);
+          const redactedSet = flowCfgBackupBuildRedactedFieldSet(storeData.redacted_fields);
+          importPlan[storeName] = {};
+          moduleNames.forEach((moduleName) => {
+            if (truncatedSet.has(moduleName)) return;
+            const modulePatch = flowCfgBackupBuildModulePatch(
+              moduleName,
+              storeData.modules[moduleName],
+              redactedSet
+            );
+            if (Object.keys(modulePatch).length === 0) return;
+            const chunkPatches = flowCfgBackupSplitModulePatch(
+              moduleName,
+              modulePatch,
+              flowCfgBackupPatchTargetBytes
+            );
+            importPlan[storeName][moduleName] = chunkPatches;
+            totalPatchCount += chunkPatches.length;
+          });
+        });
+        let appliedPatchCount = 0;
+        if (totalPatchCount === 0) {
+          setFlowCfgBackupProgress(100, true, 'Import ConfigStore');
+        }
         for (const storeName of stores) {
           const storeData = backupDoc.stores[storeName];
           const storeLabel = flowCfgBackupStoreLabel(storeName);
           const moduleNames = Object.keys(storeData.modules || {}).sort((left, right) => left.localeCompare(right));
           const truncatedSet = new Set(storeData.truncated_modules || []);
-          const redactedSet = flowCfgBackupBuildRedactedFieldSet(storeData.redacted_fields);
 
           for (let moduleIndex = 0; moduleIndex < moduleNames.length; moduleIndex += 1) {
             const moduleName = moduleNames[moduleIndex];
@@ -9631,21 +9816,13 @@
               continue;
             }
 
-            const modulePatch = flowCfgBackupBuildModulePatch(
-              moduleName,
-              storeData.modules[moduleName],
-              redactedSet
-            );
-            if (Object.keys(modulePatch).length === 0) {
+            const chunkPatches = (importPlan[storeName] && importPlan[storeName][moduleName])
+              ? importPlan[storeName][moduleName]
+              : [];
+            if (chunkPatches.length === 0) {
               report[storeName].modules_skipped += 1;
               continue;
             }
-
-            const chunkPatches = flowCfgBackupSplitModulePatch(
-              moduleName,
-              modulePatch,
-              flowCfgBackupPatchTargetBytes
-            );
 
             for (let chunkIndex = 0; chunkIndex < chunkPatches.length; chunkIndex += 1) {
               setFlowCfgBackupStatus(
@@ -9656,6 +9833,10 @@
               );
               await flowCfgBackupApplyPatch(storeName, JSON.stringify(chunkPatches[chunkIndex]));
               report[storeName].patches_applied += 1;
+              appliedPatchCount += 1;
+              if (totalPatchCount > 0) {
+                setFlowCfgBackupProgress((appliedPatchCount / totalPatchCount) * 100, true, 'Import ConfigStore');
+              }
             }
 
             report[storeName].modules_applied += 1;
@@ -9672,6 +9853,7 @@
             + report.flow.patches_applied + ' patch(s).',
           'ok'
         );
+        setFlowCfgBackupProgress(100, true, 'Import ConfigStore');
       } catch (err) {
         setFlowCfgBackupStatus('Import échoué: ' + err, 'error');
       } finally {
@@ -9689,7 +9871,7 @@
     }
 
     async function callSystemAction(target, action) {
-      const flowLocalProfile = isFlowIOS3Profile();
+      const flowLocalProfile = isWaveshareProfile();
       let endpoint = '/api/system/reboot';
       if (target === 'flow' && action === 'reboot') {
         endpoint = flowLocalProfile ? '/api/system/reboot' : '/api/flow/system/reboot';
@@ -9787,9 +9969,6 @@
         } catch (err) {
           flowStatusChip.textContent = 'erreur lecture statut';
         }
-      });
-      bindClickAction(ioSnapshotRefreshBtn, async () => {
-        await refreshIoSnapshot();
       });
       bindClickAction(poolMeasuresRefreshBtn, async () => {
         try {
@@ -9961,6 +10140,12 @@
           stopPoolMeasuresTimer();
         } else {
           startPoolMeasuresTimer();
+        }
+        if (document.hidden || activePageId !== 'page-io-summary') {
+          stopIoSummaryTimer();
+        } else {
+          startIoSummaryTimer();
+          refreshIoSummary(false).catch(() => {});
         }
         if (document.hidden || !onTerminalPage) {
           closeLogSocket();

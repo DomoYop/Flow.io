@@ -14,8 +14,8 @@
 #include "Core/ConfigTypes.h"
 #include "Core/NvsKeys.h"
 #include "Core/Services/Services.h"
-#include "Domain/Pool/PoolBindings.h"
 #include "Domain/Pool/PoolDefaults.h"
+#include "Domain/Pool/PoolIds.h"
 
 /** @brief Event ids owned by PoolLogicModule. */
 constexpr uint16_t POOLLOGIC_EVENT_DAILY_RECALC = 0x2101;
@@ -47,7 +47,7 @@ public:
     void loop() override;
     uint16_t taskStackSize() const override { return 4096; }
     uint32_t startDelayMs() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return 8000U;
 #else
         return Limits::Boot::PoolLogicStartDelayMs;
@@ -143,22 +143,20 @@ private:
     static constexpr uint8_t SLOT_DAILY_RECALC = 3;
     static constexpr uint8_t SLOT_FILTR_WINDOW = 4;
 
-    static constexpr IoId IO_ID_PH_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPh].ioId;
-    static constexpr IoId IO_ID_ORP_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotOrp].ioId;
-    static constexpr IoId IO_ID_PSI_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPsi].ioId;
-    static constexpr IoId IO_ID_WATER_TEMP_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].ioId;
-    static constexpr IoId IO_ID_AIR_TEMP_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotAirTemp].ioId;
-    static constexpr IoId IO_ID_LEVEL_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPoolLevel].ioId;
-    static constexpr IoId IO_ID_PH_LEVEL_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPhLevel].ioId;
-    static constexpr IoId IO_ID_CHLORINE_LEVEL_DEFAULT =
-        PoolBinding::kSensorBindings[PoolBinding::kSensorSlotChlorineLevel].ioId;
+    static constexpr IoId IO_ID_PH_DEFAULT = ioIdFromSlot(analogInputSlot(1));
+    static constexpr IoId IO_ID_ORP_DEFAULT = ioIdFromSlot(analogInputSlot(0));
+    static constexpr IoId IO_ID_PSI_DEFAULT = ioIdFromSlot(analogInputSlot(2));
+    static constexpr IoId IO_ID_WATER_TEMP_DEFAULT = ioIdFromSlot(analogInputSlot(4));
+    static constexpr IoId IO_ID_AIR_TEMP_DEFAULT = ioIdFromSlot(analogInputSlot(5));
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    static constexpr IoId IO_ID_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(2));
+    static constexpr IoId IO_ID_PH_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(0));
+    static constexpr IoId IO_ID_CHLORINE_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(1));
+#else
+    static constexpr IoId IO_ID_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(0));
+    static constexpr IoId IO_ID_PH_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(1));
+    static constexpr IoId IO_ID_CHLORINE_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(2));
+#endif
 
     // State and configuration storage
     bool enabled_ = false;
@@ -237,13 +235,13 @@ private:
     mutable char o2PoolDeviceJsonBuf_[160] = {0};
 
     // Controlled pool devices
-    uint8_t filtrationDeviceSlot_ = PoolBinding::kDeviceSlotFiltrationPump;
-    uint8_t swgDeviceSlot_ = PoolBinding::kDeviceSlotChlorineGenerator;
-    uint8_t robotDeviceSlot_ = PoolBinding::kDeviceSlotRobot;
-    uint8_t fillingDeviceSlot_ = PoolBinding::kDeviceSlotFillPump;
-    uint8_t phPumpDeviceSlot_ = PoolBinding::kDeviceSlotPhPump;
-    uint8_t orpPumpDeviceSlot_ = PoolBinding::kDeviceSlotChlorinePump;
-    uint8_t heaterDeviceSlot_ = PoolBinding::kDeviceSlotWaterHeater;
+    uint8_t filtrationDeviceSlot_ = PoolIds::DeviceFiltrationPump;
+    uint8_t swgDeviceSlot_ = PoolIds::DeviceChlorineGenerator;
+    uint8_t robotDeviceSlot_ = PoolIds::DeviceRobot;
+    uint8_t fillingDeviceSlot_ = PoolIds::DeviceFillPump;
+    uint8_t phPumpDeviceSlot_ = PoolIds::DevicePhPump;
+    uint8_t orpPumpDeviceSlot_ = PoolIds::DeviceChlorinePump;
+    uint8_t heaterDeviceSlot_ = PoolIds::DeviceWaterHeater;
 
     // Runtime flags
     DeviceFsm filtrationFsm_{};

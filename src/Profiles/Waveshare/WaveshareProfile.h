@@ -41,7 +41,7 @@ class DataStore;
 struct HAService;
 
 namespace Profiles {
-namespace FlowIOS3 {
+namespace Waveshare {
 
 struct ModuleInstances {
     explicit ModuleInstances(const BoardSpec& board);
@@ -92,5 +92,5 @@ const FirmwareProfile& profile();
 void setupProfile(AppContext& ctx);
 void loopProfile(AppContext& ctx);
 
-}  // namespace FlowIOS3
+}  // namespace Waveshare
 }  // namespace Profiles

@@ -1,7 +1,7 @@
 #pragma once
 /**
  * @file IFirmwareUpdate.h
- * @brief Firmware update service interface (Supervisor profile).
+ * @brief Firmware update service interface.
  */
 
 #include <stddef.h>
@@ -10,9 +10,8 @@
 class Print;
 
 enum class FirmwareUpdateTarget : uint8_t {
-    FlowIO = 1,
     Nextion = 2,
-    Supervisor = 3,
+    Waveshare = 3,
     Spiffs = 4
 };
 

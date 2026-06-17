@@ -5,7 +5,7 @@
 
 #include "PoolDeviceModule.h"
 #include "Core/ErrorCodes.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 #define LOG_MODULE_ID ((LogModuleId)LogModuleIdValue::PoolDeviceModule)
 #include "Core/ModuleLog.h"
 #include <ArduinoJson.h>
@@ -147,8 +147,8 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
     // if a dosing pump is manually forced ON, disable the corresponding auto mode
     // regardless of the command source (HMI, MQTT, Web, ...).
     if (requested && cfgStore_) {
-        uint8_t phPumpSlot = PoolBinding::kDeviceSlotPhPump;
-        uint8_t orpPumpSlot = PoolBinding::kDeviceSlotChlorinePump;
+        uint8_t phPumpSlot = PoolIds::DevicePhPump;
+        uint8_t orpPumpSlot = PoolIds::DeviceChlorinePump;
 
         char modeJson[160]{};
         bool truncated = false;

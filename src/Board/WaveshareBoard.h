@@ -6,7 +6,7 @@
  * Waveshare ESP32-S3 board profile.
  *
  * This file is the hardware description for the Waveshare ESP32-S3 based
- * FlowIOS3 target. It is intentionally kept as a single, editable map of the
+ * Waveshare target. It is intentionally kept as a single, editable map of the
  * board: serial ports, I2C buses, 1-Wire probes, IO points, disabled TFT
  * wiring, supervisor inputs, MQTT/Home Assistant sizing, and Ethernet wiring.
  *
@@ -55,7 +55,7 @@ inline constexpr uint32_t kWaveshareESP32S3InterlinkI2cHz = 400000U;
  *   Not stored in NVS. These are compile-time sizing limits, so the compiled
  *   values always apply.
  */
-inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{11, 8, 8, 11, 8, 8};
+inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{16, 8, 16, 16, 8, 16};
 
 /*
  * MQTT task and queue capacities.
@@ -265,7 +265,7 @@ inline constexpr HmiBuzzerSpec kWaveshareESP32S3HmiBuzzer{
  *   driven as a pulse instead of a latched output.
  *
  * NVS behavior:
- *   The board IO point table itself is not stored in NVS. For FlowIOS3, the IO
+ *   The board IO point table itself is not stored in NVS. For Waveshare, the IO
  *   module defines logical analog/digital endpoints from profile defaults and
  *   stores endpoint config such as binding_port, names, polarity, modes,
  *   calibration, momentary behavior, and pulse duration in NVS. Those persistent
@@ -393,7 +393,7 @@ inline constexpr SupervisorInputSpec kWaveshareESP32S3Inputs{
  * Field order:
  *   flowIoEnablePin, flowIoBootPin, nextionRebootPin, nextionUploadBaud.
  *
- * This Waveshare profile is a local FlowIOS3 build and does not control a
+ * This Waveshare profile is a local Waveshare build and does not control a
  * separate downstream FlowIO target, so the control pins are disabled with -1.
  * Set these GPIOs only if this board is wired to reset/boot another controller
  * or reboot an external Nextion panel.

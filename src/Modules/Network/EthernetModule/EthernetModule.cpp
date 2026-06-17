@@ -576,3 +576,11 @@ bool EthernetModule::notifyWifiConfigChanged_()
     }
     return ok;
 }
+
+bool EthernetModule::notifyShutdownPending_()
+{
+    if (eventBus_) {
+        return eventBus_->post(EventId::NetworkShutdownPending, nullptr, 0, moduleId());
+    }
+    return true;
+}

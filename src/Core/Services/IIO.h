@@ -20,11 +20,11 @@ constexpr IoId IO_ID_DI_BASE = 64;
 /** Reserved base for analog inputs. */
 constexpr IoId IO_ID_AI_BASE = 192;
 /** Hard upper bound used by static service implementations. */
-constexpr uint8_t IO_SVC_MAX_ENDPOINTS = 32;
+constexpr uint8_t IO_SVC_MAX_ENDPOINTS = 40;
 /** Max length for display names in metadata payloads. */
 constexpr size_t IO_NAME_MAX_LEN = 24;
 /** Max number of changed ids tracked per cycle. */
-constexpr uint8_t IO_MAX_CHANGED_IDS = 32;
+constexpr uint8_t IO_MAX_CHANGED_IDS = 40;
 
 /** Result code for IOServiceV2 calls. */
 enum IoStatus : uint8_t {
@@ -62,7 +62,8 @@ enum IoBackend : uint8_t {
     IO_BACKEND_BMP280 = 6,
     IO_BACKEND_BME680 = 7,
     IO_BACKEND_INA226 = 8,
-    IO_BACKEND_TCA9554 = 9
+    IO_BACKEND_TCA9554 = 9,
+    IO_BACKEND_MCP23017 = 10
 };
 
 /** Endpoint capability bitmask. */

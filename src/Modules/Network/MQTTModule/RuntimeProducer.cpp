@@ -1,6 +1,38 @@
 #include "Modules/Network/MQTTModule/RuntimeProducer.h"
 
+#include <esp_heap_caps.h>
+#include <new>
 #include <string.h>
+
+namespace {
+template <typename T>
+T* allocPsramArray_(size_t count)
+{
+    void* mem = heap_caps_malloc(sizeof(T) * count, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!mem) mem = heap_caps_malloc(sizeof(T) * count, MALLOC_CAP_8BIT);
+    if (!mem) return nullptr;
+
+    T* out = static_cast<T*>(mem);
+    for (size_t i = 0; i < count; ++i) {
+        new (&out[i]) T();
+    }
+    return out;
+}
+
+bool* allocPsramBoolArray_(size_t count)
+{
+    void* mem = heap_caps_calloc(count, sizeof(bool), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!mem) mem = heap_caps_calloc(count, sizeof(bool), MALLOC_CAP_8BIT);
+    return static_cast<bool*>(mem);
+}
+} // namespace
+
+bool RuntimeProducer::ensureStorage_()
+{
+    if (!routes_) routes_ = allocPsramArray_<Route>(Limits::MaxRuntimeRoutes);
+    if (!initialFullSnapshotDone_) initialFullSnapshotDone_ = allocPsramBoolArray_(Limits::MaxRuntimeRoutes);
+    return routes_ && initialFullSnapshotDone_;
+}
 
 void RuntimeProducer::configure(const MqttService* mqttSvc,
                                 InitialFullSnapshotCallback initialFullSnapshotCb,
@@ -9,10 +41,12 @@ void RuntimeProducer::configure(const MqttService* mqttSvc,
     mqttSvc_ = mqttSvc;
     initialFullSnapshotCb_ = initialFullSnapshotCb;
     initialFullSnapshotCtx_ = initialFullSnapshotCtx;
+    (void)ensureStorage_();
 }
 
 bool RuntimeProducer::registerProvider(const IRuntimeSnapshotProvider* provider)
 {
+    if (!ensureStorage_()) return false;
     if (!provider) return false;
     if (providerCount_ >= MaxProviders) return false;
 
@@ -27,6 +61,10 @@ bool RuntimeProducer::registerProvider(const IRuntimeSnapshotProvider* provider)
 
 void RuntimeProducer::rebuildRoutes()
 {
+    if (!ensureStorage_()) {
+        routeCount_ = 0;
+        return;
+    }
     routeCount_ = 0;
 
     for (uint8_t p = 0; p < providerCount_; ++p) {
@@ -98,7 +136,8 @@ void RuntimeProducer::notifyInitialFullSnapshotComplete_()
 
 void RuntimeProducer::onConnected()
 {
-    memset(initialFullSnapshotDone_, 0, sizeof(initialFullSnapshotDone_));
+    if (!ensureStorage_()) return;
+    memset(initialFullSnapshotDone_, 0, sizeof(bool) * Limits::MaxRuntimeRoutes);
     initialFullSnapshotRemaining_ = routeCount_;
     initialFullSnapshotActive_ = true;
     if (routeCount_ == 0U) {

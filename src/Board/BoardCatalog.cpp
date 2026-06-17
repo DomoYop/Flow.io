@@ -18,11 +18,6 @@ const BoardSpec& flowIODINv1S3()
     return BoardProfiles::kFlowIODINv1S3;
 }
 
-const BoardSpec& flowIOS3()
-{
-    return BoardProfiles::kFlowIOS3;
-}
-
 const BoardSpec& waveshareESP32S3()
 {
     return BoardProfiles::kWaveshareESP32S3;
@@ -51,12 +46,8 @@ const BoardSpec& activeBoard()
 #else
     return flowIODINv1();
 #endif
-#elif FLOW_BUILD_IS_FLOWIOS3
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+#elif FLOW_BUILD_IS_WAVESHARE
     return waveshareESP32S3();
-#else
-    return flowIOS3();
-#endif
 #elif FLOW_BUILD_IS_SUPERVISOR
     return supervisorBoardRev1();
 #elif FLOW_BUILD_IS_MICRONOVA

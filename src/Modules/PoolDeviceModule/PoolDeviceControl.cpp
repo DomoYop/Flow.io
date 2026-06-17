@@ -24,17 +24,6 @@ struct Fixed3 {
     unsigned frac = 0U;
 };
 
-template <size_t Rows, size_t Cols>
-size_t charTableUsage_(const char (&table)[Rows][Cols])
-{
-    size_t total = 0U;
-    for (size_t row = 0; row < Rows; ++row) {
-        const size_t len = strnlen(table[row], Cols);
-        if (len > 0U) total += len + 1U;
-    }
-    return total;
-}
-
 bool isFiniteNonNegative_(float value)
 {
     return isfinite(value) && value >= 0.0f;
@@ -108,6 +97,9 @@ PoolDeviceSvcStatus PoolDeviceModule::svcWriteDesiredImpl_(uint8_t slot, uint8_t
         if (!s.def.enabled) {
             s.blockReason = POOL_DEVICE_BLOCK_DISABLED;
             return POOLDEV_SVC_ERR_DISABLED;
+        }
+        if (s.blockReason == POOL_DEVICE_BLOCK_UNBOUND) {
+            return POOLDEV_SVC_ERR_IO;
         }
         if (maxUptimeReached) {
             s.blockReason = POOL_DEVICE_BLOCK_MAX_UPTIME;
@@ -422,8 +414,8 @@ bool PoolDeviceModule::persistMetrics_(uint8_t slotIdx, PoolDeviceSlot& slot, ui
     strncpy(runtimePersistBuf_[slotIdx], encoded, sizeof(runtimePersistBuf_[slotIdx]) - 1U);
     runtimePersistBuf_[slotIdx][sizeof(runtimePersistBuf_[slotIdx]) - 1U] = '\0';
     BufferUsageTracker::note(TrackedBufferId::PoolDeviceRuntimePersistTable,
-                             charTableUsage_(runtimePersistBuf_),
-                             sizeof(runtimePersistBuf_),
+                             runtimePersistUsage_(),
+                             runtimePersistCapacity_(),
                              slot.id,
                              encoded);
 

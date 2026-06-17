@@ -124,6 +124,15 @@ void WebInterfaceModule::scheduleReboot_(uint32_t delayMs, const char* reason)
     rebootPending_ = true;
     rebootAtMs_ = millis() + delayMs;
     snprintf(rebootReason_, sizeof(rebootReason_), "%s", (reason && reason[0] != '\0') ? reason : "web");
+    if (!netAccessSvc_ && services_) {
+        netAccessSvc_ = services_->get<NetworkAccessService>(ServiceId::NetworkAccess);
+    }
+    if (netAccessSvc_ && netAccessSvc_->notifyShutdownPending) {
+        (void)netAccessSvc_->notifyShutdownPending(netAccessSvc_->ctx);
+    }
+    if (eventBus_) {
+        (void)eventBus_->post(EventId::NetworkShutdownPending, nullptr, 0, moduleId());
+    }
     LOGW("Web reboot scheduled in %lu ms reason=%s", (unsigned long)delayMs, rebootReason_);
 }
 
@@ -175,7 +184,7 @@ void WebInterfaceModule::loop()
             return;
         }
 
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         if (mode == NetworkAccessMode::AccessPoint) {
             provisioningOnly_ = true;
             LOGI("Web startup in flow.io AP provisioning mode");

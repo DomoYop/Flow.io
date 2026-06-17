@@ -5,6 +5,7 @@
  */
 
 #include "Core/Module.h"
+#include "Core/EventBus/EventBus.h"
 #include "Core/ServiceBinding.h"
 #include "Core/Services/Services.h"
 
@@ -120,7 +121,7 @@ public:
     void onStart(ConfigStore& cfg, ServiceRegistry& services) override;
     void loop() override;
     uint32_t startDelayMs() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return fastPortalStart_ ? 0U : Limits::Boot::WifiProvisioningStartDelayMs;
 #else
         return Limits::Boot::WifiProvisioningStartDelayMs;
@@ -148,6 +149,7 @@ private:
     const WifiService* wifiSvc_ = nullptr;
     const NetworkAccessService* observedNetAccessSvc_ = nullptr;
     const HmiService* hmiSvc_ = nullptr;
+    EventBus* eventBus_ = nullptr;
     FlowNetwork::NetworkManager networkManager_{};
 
     DNSServer dns_;
@@ -164,7 +166,17 @@ private:
     bool hmiCaptivePortalConditionSynced_ = false;
     bool staProbeActive_ = false;
     bool apStarting_ = false;
+    volatile bool shutdownPending_ = false;
     volatile bool apRestartPending_ = false;
+    volatile bool apStopEventPending_ = false;
+    volatile bool apStopDuringStartEventPending_ = false;
+    volatile bool apStartDuringStartEventPending_ = false;
+    volatile bool apClientRefreshPending_ = false;
+    volatile bool apClientConnectedEventPending_ = false;
+    volatile bool apClientDisconnectedEventPending_ = false;
+    volatile uint8_t apClientDisconnectReason_ = 0;
+    volatile uint32_t apProbeEventCount_ = 0;
+    volatile int apProbeLastRssi_ = 0;
     bool apClientEverSeen_ = false;
     uint8_t apClientCount_ = 0;
     uint32_t lastApClientSeenMs_ = 0;
@@ -206,6 +218,7 @@ private:
     NetworkAccessMode mode_() const;
     bool getIP_(char* out, size_t len) const;
     bool notifyWifiConfigChanged_();
+    bool notifyShutdownPending_();
 
     void buildApCredentials_();
     void handleStaProbePolicy_(uint32_t nowMs);
@@ -217,6 +230,8 @@ private:
     void ensurePortalStarted_();
     static void onWifiEventSys_(arduino_event_t* event);
     void onWifiEvent_(arduino_event_t* event);
+    static void onEventStatic_(const Event& e, void* user);
+    void onEvent_(const Event& e);
     bool startCaptivePortal_(NetworkPortalReason reason);
     void stopCaptivePortal_(const char* reason);
     bool isStaConnected_() const;
@@ -260,6 +275,7 @@ private:
         ServiceBinding::bind<&WifiProvisioningModule::mode_>,
         ServiceBinding::bind<&WifiProvisioningModule::getIP_>,
         ServiceBinding::bind<&WifiProvisioningModule::notifyWifiConfigChanged_>,
+        ServiceBinding::bind<&WifiProvisioningModule::notifyShutdownPending_>,
         this
     };
 };

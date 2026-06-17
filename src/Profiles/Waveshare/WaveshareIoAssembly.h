@@ -3,7 +3,7 @@
 class AppContext;
 
 namespace Profiles {
-namespace FlowIOS3 {
+namespace Waveshare {
 
 struct ModuleInstances;
 
@@ -12,5 +12,5 @@ void registerIoHomeAssistant(AppContext& ctx, ModuleInstances& modules);
 void releaseIoHomeAssistantDiscoveryHeapIfDone(ModuleInstances& modules);
 void refreshIoHomeAssistantIfNeeded(ModuleInstances& modules);
 
-}  // namespace FlowIOS3
+}  // namespace Waveshare
 }  // namespace Profiles

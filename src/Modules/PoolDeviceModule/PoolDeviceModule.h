@@ -15,6 +15,7 @@
 #include "Core/Services/Services.h"
 #include "Core/CommandRegistry.h"
 #include "Core/ConfigTypes.h"
+#include "Domain/DomainTypes.h"
 #include "Modules/PoolDeviceModule/PoolDeviceModuleDataModel.h"
 
 enum PoolDeviceType : uint8_t {
@@ -26,8 +27,10 @@ enum PoolDeviceType : uint8_t {
 struct PoolDeviceDefinition {
     char label[24] = {0};
     uint8_t slot = 0xFF;
-    /** Required IOServiceV2 digital output id bound to this pool device. */
-    IoId ioId = IO_ID_INVALID;
+    /** Optional domain actuator slot used by this pool device command path. */
+    DomainSlotId commandSlot = DOMAIN_SLOT_INVALID;
+    /** Generic IO output slot driven by this pool device. */
+    IoSlotId ioSlot = IO_SLOT_INVALID;
     uint8_t type = POOL_DEVICE_RELAY_STD;
     bool enabled = true;
     float flowLPerHour = 0.0f;     // used for dosing volumes
@@ -65,7 +68,7 @@ public:
     // est gourmande en pile et faisait deborder le canari de la tache pooldev au boot.
     uint16_t taskStackSize() const override { return 4096; }
     uint32_t startDelayMs() const override {
-#if defined(FLOW_PROFILE_FLOWIOS3)
+#if defined(FLOW_PROFILE_WAVESHARE)
         return 5000U;
 #else
         return 0U;
@@ -94,12 +97,13 @@ private:
     static constexpr uint8_t RESET_PENDING_MONTH = (1u << 2);
     static constexpr uint32_t RUNTIME_PERSIST_INTERVAL_MS = 60000U;
     static constexpr uint32_t MIN_VALID_EPOCH_SEC = 1609459200U; // 2021-01-01
+    static constexpr size_t RUNTIME_PERSIST_BUF_LEN = 192U;
 
     struct PoolDeviceSlot {
         bool used = false;
         const char* id = nullptr;  // stable runtime id: pdN
         PoolDeviceDefinition def{};
-        /** Cached hardware endpoint id (copied from definition at registration). */
+        /** Cached IOServiceV2 endpoint id derived from the generic IO slot. */
         IoId ioId = IO_ID_INVALID;
 
         bool desiredOn = false;
@@ -185,6 +189,9 @@ private:
     bool handlePoolResetUptimeAll_(const CommandRequest& req, char* reply, size_t replyLen);
     bool resetUptimeSlot_(uint8_t slot);
     uint8_t resetUptimeAll_();
+    bool ensureStorage_();
+    size_t runtimePersistUsage_() const;
+    size_t runtimePersistCapacity_() const { return (size_t)POOL_DEVICE_MAX * RUNTIME_PERSIST_BUF_LEN; }
 
     // State and configuration storage
     bool runtimeReady_ = false;
@@ -193,8 +200,8 @@ private:
     uint8_t resetPendingMask_ = 0;
     bool periodReconcilePending_ = true;
 
-    char runtimePersistBuf_[POOL_DEVICE_MAX][192]{};
-    PoolDeviceSlot slots_[POOL_DEVICE_MAX]{};
+    char (*runtimePersistBuf_)[RUNTIME_PERSIST_BUF_LEN] = nullptr;
+    PoolDeviceSlot* slots_ = nullptr;
 
     // Services and shared runtime integrations
     const LogHubService* logHub_ = nullptr;
@@ -218,10 +225,10 @@ private:
     const ConfigStoreService* cfgSvc_ = nullptr;
     MqttConfigRouteProducer* cfgMqttPub_ = nullptr;
 
-    ConfigVariable<bool,0> cfgEnabledVar_[POOL_DEVICE_MAX]{};
-    ConfigVariable<uint8_t,0> cfgDependsVar_[POOL_DEVICE_MAX]{};
-    ConfigVariable<float,0> cfgFlowVar_[POOL_DEVICE_MAX]{};
-    ConfigVariable<float,0> cfgTankCapVar_[POOL_DEVICE_MAX]{};
-    ConfigVariable<float,0> cfgTankInitVar_[POOL_DEVICE_MAX]{};
-    ConfigVariable<int32_t,0> cfgMaxUptimeVar_[POOL_DEVICE_MAX]{};
+    ConfigVariable<bool,0>* cfgEnabledVar_ = nullptr;
+    ConfigVariable<uint8_t,0>* cfgDependsVar_ = nullptr;
+    ConfigVariable<float,0>* cfgFlowVar_ = nullptr;
+    ConfigVariable<float,0>* cfgTankCapVar_ = nullptr;
+    ConfigVariable<float,0>* cfgTankInitVar_ = nullptr;
+    ConfigVariable<int32_t,0>* cfgMaxUptimeVar_ = nullptr;
 };

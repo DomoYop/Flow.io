@@ -123,12 +123,14 @@ private:
     NetworkAccessMode mode_() const;
     bool getIp_(char* out, size_t len) const;
     bool notifyWifiConfigChanged_();
+    bool notifyShutdownPending_();
 
     NetworkAccessService netAccessSvc_{
         ServiceBinding::bind<&EthernetModule::isWebReachable_>,
         ServiceBinding::bind<&EthernetModule::mode_>,
         ServiceBinding::bind<&EthernetModule::getIp_>,
         ServiceBinding::bind<&EthernetModule::notifyWifiConfigChanged_>,
+        ServiceBinding::bind<&EthernetModule::notifyShutdownPending_>,
         this
     };
 };

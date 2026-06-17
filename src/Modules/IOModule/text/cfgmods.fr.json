@@ -133,6 +133,9 @@
       "label_t": "cfgmods.io.input.i07.mode.label",
       "help_t": "cfgmods.io.input.i07.mode.help",
       "enum_set": "flowio_digital_input_mode"
+    },
+    "io/drivers/mcp23017/address": {
+      "display_format": "hex"
     }
   },
   "meta": {
@@ -202,10 +205,6 @@
         "store": "io/input/a15"
       },
       {
-        "display": "io/input/analog/a16",
-        "store": "io/input/a16"
-      },
-      {
         "display": "io/input/digital/i00",
         "store": "io/input/i00"
       },
@@ -264,8 +263,7 @@
           "a12",
           "a13",
           "a14",
-          "a15",
-          "a16"
+          "a15"
         ]
       },
       {
@@ -326,6 +324,10 @@
         }
       ],
       "flowio_binding_port_analog": [
+        {
+          "value": 0,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port.none.label"
+        },
         {
           "value": 2,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.0.label"
@@ -417,6 +419,10 @@
       ],
       "flowio_binding_port_digital_input": [
         {
+          "value": 0,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port.none.label"
+        },
+        {
           "value": 200,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_input.0.label"
         },
@@ -450,6 +456,10 @@
         }
       ],
       "flowio_binding_port_digital_output": [
+        {
+          "value": 0,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port.none.label"
+        },
         {
           "value": 1,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.0.label"
@@ -513,6 +523,42 @@
         {
           "value": 406,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.15.label"
+        },
+        {
+          "value": 407,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.16.label"
+        },
+        {
+          "value": 408,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.17.label"
+        },
+        {
+          "value": 409,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.18.label"
+        },
+        {
+          "value": 410,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.19.label"
+        },
+        {
+          "value": 411,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.20.label"
+        },
+        {
+          "value": 412,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.21.label"
+        },
+        {
+          "value": 413,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.22.label"
+        },
+        {
+          "value": 414,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.23.label"
+        },
+        {
+          "value": 415,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_digital_output.24.label"
         }
       ],
       "flowio_edge_mode": [
@@ -593,10 +639,6 @@
         {
           "value": 207,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.15.label"
-        },
-        {
-          "value": 208,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.16.label"
         }
       ],
       "flowio_logical_input_digital": [

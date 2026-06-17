@@ -25,7 +25,7 @@
 #include "Core/Services/IAlarm.h"
 #include "Core/SystemLimits.h"
 #include "Core/SystemStats.h"
-#include "Domain/Pool/PoolBindings.h"
+#include "Domain/Pool/PoolIds.h"
 #include "Modules/IOModule/IORuntime.h"
 #include "Modules/Network/MQTTModule/MQTTRuntime.h"
 #include "Modules/Network/WifiModule/WifiRuntime.h"
@@ -1337,12 +1337,12 @@ bool TFTModuleS3::readRuntimeValue_(RuntimeUiId runtimeId, RuntimeValue& out) co
 
         case ModuleId::Io:
             switch (valueId) {
-                case 1: return readIoValue_(PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterTemp].ioId, out);
-                case 2: return readIoValue_(PoolBinding::kSensorBindings[PoolBinding::kSensorSlotAirTemp].ioId, out);
-                case 3: return readIoValue_(PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPh].ioId, out);
-                case 4: return readIoValue_(PoolBinding::kSensorBindings[PoolBinding::kSensorSlotOrp].ioId, out);
-                case 5: return readIoValue_(PoolBinding::kSensorBindings[PoolBinding::kSensorSlotWaterCounter].ioId, out);
-                case 6: return readIoValue_(PoolBinding::kSensorBindings[PoolBinding::kSensorSlotPsi].ioId, out);
+                case 1: return readIoValue_(ioIdFromSlot(analogInputSlot(4)), out);
+                case 2: return readIoValue_(ioIdFromSlot(analogInputSlot(5)), out);
+                case 3: return readIoValue_(ioIdFromSlot(analogInputSlot(1)), out);
+                case 4: return readIoValue_(ioIdFromSlot(analogInputSlot(0)), out);
+                case 5: return readIoValue_(ioIdFromSlot(digitalInputSlot(3)), out);
+                case 6: return readIoValue_(ioIdFromSlot(analogInputSlot(2)), out);
                 case 7: return readIoBackendValue_(IO_BACKEND_BMP280, 0U, out);
                 case 8: return readIoBackendValue_(IO_BACKEND_BME680, 0U, out);
                 case 9: return readIoBackendValue_(IO_BACKEND_BMP280, 1U, out);
@@ -1443,10 +1443,10 @@ bool TFTModuleS3::readRuntimeValue_(RuntimeUiId runtimeId, RuntimeValue& out) co
         case ModuleId::PoolDevice: {
             if (!ds) return false;
             uint8_t deviceSlot = 0xFFU;
-            if (valueId == 1U) deviceSlot = PoolBinding::kDeviceSlotFiltrationPump;
-            else if (valueId == 2U) deviceSlot = PoolBinding::kDeviceSlotPhPump;
-            else if (valueId == 3U) deviceSlot = PoolBinding::kDeviceSlotChlorinePump;
-            else if (valueId == 4U) deviceSlot = PoolBinding::kDeviceSlotRobot;
+            if (valueId == 1U) deviceSlot = PoolIds::DeviceFiltrationPump;
+            else if (valueId == 2U) deviceSlot = PoolIds::DevicePhPump;
+            else if (valueId == 3U) deviceSlot = PoolIds::DeviceChlorinePump;
+            else if (valueId == 4U) deviceSlot = PoolIds::DeviceRobot;
             else return false;
 
             PoolDeviceRuntimeStateEntry state{};
