@@ -128,6 +128,18 @@ bool PoolDeviceModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wr
         case RuntimeUiRobotOn:
             slotIdx = PoolIds::DeviceRobot;
             break;
+        case RuntimeUiFillPumpOn:
+            slotIdx = PoolIds::DeviceFillPump;
+            break;
+        case RuntimeUiChlorineGeneratorOn:
+            slotIdx = PoolIds::DeviceChlorineGenerator;
+            break;
+        case RuntimeUiLightsOn:
+            slotIdx = PoolIds::DeviceLights;
+            break;
+        case RuntimeUiWaterHeaterOn:
+            slotIdx = PoolIds::DeviceWaterHeater;
+            break;
         default:
             return false;
     }

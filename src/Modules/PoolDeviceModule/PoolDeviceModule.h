@@ -90,6 +90,10 @@ private:
         RuntimeUiPhPumpOn = 2,
         RuntimeUiChlorinePumpOn = 3,
         RuntimeUiRobotOn = 4,
+        RuntimeUiFillPumpOn = 5,
+        RuntimeUiChlorineGeneratorOn = 6,
+        RuntimeUiLightsOn = 7,
+        RuntimeUiWaterHeaterOn = 8,
     };
 
     static constexpr uint8_t RESET_PENDING_DAY = (1u << 0);

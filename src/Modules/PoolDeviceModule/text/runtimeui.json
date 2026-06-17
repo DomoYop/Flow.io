@@ -44,6 +44,46 @@
       "order": 100,
       "label_t": "runtimeui.pooldev.v04.label",
       "group_t": "runtimeui.pooldev.v04.group"
+    },
+    {
+      "valueId": 5,
+      "key": "pool.fill_pump_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "order": 110,
+      "label_t": "runtimeui.pooldev.v05.label",
+      "group_t": "runtimeui.pooldev.v05.group"
+    },
+    {
+      "valueId": 6,
+      "key": "pool.chlorine_generator_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "order": 120,
+      "label_t": "runtimeui.pooldev.v06.label",
+      "group_t": "runtimeui.pooldev.v06.group"
+    },
+    {
+      "valueId": 7,
+      "key": "pool.lights_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "order": 130,
+      "label_t": "runtimeui.pooldev.v07.label",
+      "group_t": "runtimeui.pooldev.v07.group"
+    },
+    {
+      "valueId": 8,
+      "key": "pool.water_heater_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "order": 140,
+      "label_t": "runtimeui.pooldev.v08.label",
+      "group_t": "runtimeui.pooldev.v08.group"
     }
   ]
 }
