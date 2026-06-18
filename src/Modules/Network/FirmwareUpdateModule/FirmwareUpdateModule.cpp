@@ -72,6 +72,7 @@ const UartSpec& panelUartSpec_(const BoardSpec& board)
 {
     static constexpr UartSpec kFallback{"panel", 2, 33, 32, 115200, false, -1};
     const UartSpec* spec = boardFindUart(board, "panel");
+    if (!spec) spec = boardFindUart(board, "hmi");
     return spec ? *spec : kFallback;
 }
 
@@ -759,25 +760,31 @@ bool FirmwareUpdateModule::runWaveshareUpdate_(const char* url, char* errOut, si
 
 bool FirmwareUpdateModule::runNextionUpdate_(const char* url, char* errOut, size_t errOutLen)
 {
-    if (flowIoEnablePin_ < 0 || nextionRebootPin_ < 0 || nextionRxPin_ < 0 || nextionTxPin_ < 0) {
+    if (nextionRxPin_ < 0 || nextionTxPin_ < 0) {
         writeSimpleError_(errOut, errOutLen, "nextion board pins not configured");
         return false;
     }
 
     setStatus_(UpdateState::Downloading, FirmwareUpdateTarget::Nextion, 0, "downloading");
 
-    pinMode(flowIoEnablePin_, OUTPUT);
-    digitalWrite(flowIoEnablePin_, LOW);
+    if (flowIoEnablePin_ >= 0) {
+        pinMode(flowIoEnablePin_, OUTPUT);
+        digitalWrite(flowIoEnablePin_, LOW);
+    }
 
-    pinMode(nextionRebootPin_, OUTPUT);
-    digitalWrite(nextionRebootPin_, HIGH);
+    if (nextionRebootPin_ >= 0) {
+        pinMode(nextionRebootPin_, OUTPUT);
+        digitalWrite(nextionRebootPin_, HIGH);
+    }
 
     HTTPClient http;
     configureDownloadHttp_(http);
     if (!http.begin(url)) {
         writeHttpBeginFailedError_("fichier de mise a jour", url, errOut, errOutLen);
-        digitalWrite(flowIoEnablePin_, HIGH);
-        pinMode(flowIoEnablePin_, INPUT);
+        if (flowIoEnablePin_ >= 0) {
+            digitalWrite(flowIoEnablePin_, HIGH);
+            pinMode(flowIoEnablePin_, INPUT);
+        }
         return false;
     }
 
@@ -786,15 +793,19 @@ bool FirmwareUpdateModule::runNextionUpdate_(const char* url, char* errOut, size
     if (code != HTTP_CODE_OK) {
         writeHttpCodeFailedError_("fichier de mise a jour", url, http, code, errOut, errOutLen);
         http.end();
-        digitalWrite(flowIoEnablePin_, HIGH);
-        pinMode(flowIoEnablePin_, INPUT);
+        if (flowIoEnablePin_ >= 0) {
+            digitalWrite(flowIoEnablePin_, HIGH);
+            pinMode(flowIoEnablePin_, INPUT);
+        }
         return false;
     }
     if (contentLength <= 0) {
         writeSimpleError_(errOut, errOutLen, "invalid content-length");
         http.end();
-        digitalWrite(flowIoEnablePin_, HIGH);
-        pinMode(flowIoEnablePin_, INPUT);
+        if (flowIoEnablePin_ >= 0) {
+            digitalWrite(flowIoEnablePin_, HIGH);
+            pinMode(flowIoEnablePin_, INPUT);
+        }
         return false;
     }
 
@@ -823,8 +834,10 @@ bool FirmwareUpdateModule::runNextionUpdate_(const char* url, char* errOut, size
     pinMode(nextionTxPin_, INPUT);
 
     http.end();
-    digitalWrite(flowIoEnablePin_, HIGH);
-    pinMode(flowIoEnablePin_, INPUT);
+    if (flowIoEnablePin_ >= 0) {
+        digitalWrite(flowIoEnablePin_, HIGH);
+        pinMode(flowIoEnablePin_, INPUT);
+    }
 
     if (!ok) return false;
 

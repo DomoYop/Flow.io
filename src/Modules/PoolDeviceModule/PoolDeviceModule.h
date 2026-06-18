@@ -15,6 +15,7 @@
 #include "Core/Services/Services.h"
 #include "Core/CommandRegistry.h"
 #include "Core/ConfigTypes.h"
+#include "Core/Services/ITime.h"
 #include "Domain/DomainTypes.h"
 #include "Modules/PoolDeviceModule/PoolDeviceModuleDataModel.h"
 
@@ -113,6 +114,7 @@ private:
         bool desiredOn = false;
         bool actualOn = false;
         uint8_t blockReason = POOL_DEVICE_BLOCK_NONE;
+        bool runtimePublishable = false;
 
         uint32_t lastTickMs = 0;
         uint64_t runningMsDay = 0;
@@ -178,6 +180,7 @@ private:
     static MqttBuildResult buildCfgBasePdmStatic_(void* ctx, uint16_t messageId, MqttBuildContext& buildCtx);
     MqttBuildResult buildCfgBasePdm_(MqttBuildContext& buildCtx);
     bool snapshotRouteFromIndex_(uint8_t snapshotIdx, uint8_t& slotIdxOut, bool& metricsOut) const;
+    bool slotRuntimePublishable_(uint8_t slotIdx) const;
     bool buildStateSnapshot_(uint8_t slotIdx, char* out, size_t len, uint32_t& maxTsOut) const;
     bool buildMetricsSnapshot_(uint8_t slotIdx, char* out, size_t len, uint32_t& maxTsOut) const;
     static const char* blockReasonStr_(uint8_t reason);
@@ -210,6 +213,7 @@ private:
     // Services and shared runtime integrations
     const LogHubService* logHub_ = nullptr;
     const IOServiceV2* ioSvc_ = nullptr;
+    const TimeService* timeSvc_ = nullptr;
     const CommandService* cmdSvc_ = nullptr;
     const MqttService* mqttSvc_ = nullptr;
     const HAService* haSvc_ = nullptr;

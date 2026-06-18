@@ -11,7 +11,6 @@
 #include "Modules/Network/TimeModule/TimeRuntime.h"
 #include "Modules/PoolDeviceModule/PoolDeviceRuntime.h"
 #include <Arduino.h>
-#include <ArduinoJson.h>
 #include <climits>
 #include <math.h>
 #include <stdlib.h>
@@ -222,20 +221,9 @@ bool PoolDeviceModule::currentPeriodKeys_(PeriodKeys& out) const
 
 bool PoolDeviceModule::weekStartMondayFromConfig_() const
 {
-    if (!cfgStore_) return true;
-
-    char timeCfg[160] = {0};
-    bool truncated = false;
-    if (!cfgStore_->toJsonModule("time", timeCfg, sizeof(timeCfg), &truncated)) return true;
-    if (truncated) return true;
-
-    StaticJsonDocument<192> doc;
-    const DeserializationError err = deserializeJson(doc, timeCfg);
-    if (err || !doc.is<JsonObjectConst>()) return true;
-    const JsonVariantConst v = doc["week_start_mon"];
-    if (v.is<bool>()) return v.as<bool>();
-    if (v.is<int32_t>()) return v.as<int32_t>() != 0;
-    if (v.is<uint32_t>()) return v.as<uint32_t>() != 0U;
+    if (timeSvc_ && timeSvc_->weekStartMonday) {
+        return timeSvc_->weekStartMonday(timeSvc_->ctx);
+    }
     return true;
 }
 
@@ -543,6 +531,7 @@ void PoolDeviceModule::tickDevices_(uint32_t nowMs, bool allowPersist)
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
         PoolDeviceSlot& s = slots_[i];
         if (!s.used) continue;
+        if (runtimeReady_ && !s.runtimePublishable) continue;
         const bool wasActualOn = s.actualOn;
         bool stateChanged = false;
         bool metricsChanged = (pending != 0U) || s.forceMetricsCommit;

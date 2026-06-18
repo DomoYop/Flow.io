@@ -295,6 +295,7 @@ private:
     uint32_t handlerFailCount_ = 0;
     uint32_t oversizeDropCount_ = 0;
     uint32_t lastEnqueueRejectLogMs_ = 0;
+    uint32_t lastDataChangedTraceLogMs_ = 0;
     uint32_t occLastReportMs_ = 0;
     uint16_t occMaxJobs_ = 0;
     uint16_t occMaxHigh_ = 0;

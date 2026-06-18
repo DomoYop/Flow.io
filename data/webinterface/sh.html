@@ -16,6 +16,7 @@
       </div>
       <nav class="menu-group">
         <button class="menu-item active" data-page="page-pool-measures"><span class="ico icon-measures" aria-hidden="true"></span><span class="label" data-i18n="menu.dashboard">Tableau de bord</span></button>
+        <button class="menu-item" data-page="page-pool"><span class="ico icon-pool" aria-hidden="true"></span><span class="label" data-i18n="menu.pool">Piscine</span></button>
         <button class="menu-item" data-page="page-io-summary"><span class="ico icon-io" aria-hidden="true"></span><span class="label" data-i18n="menu.io">Entrées/Sorties</span></button>
         <button class="menu-item" data-page="page-calibration"><span class="ico icon-calibration" aria-hidden="true"></span><span class="label" data-i18n="menu.calibration">Étalonnage</span></button>
         <button class="menu-item" data-page="page-terminal"><span class="ico icon-terminal" aria-hidden="true"></span><span class="label" data-i18n="menu.terminal">Journal d’activité</span></button>
@@ -82,6 +83,39 @@
           <div class="measure-results-shell">
             <div id="poolMeasuresGrid" class="status-grid measure-status-grid"></div>
           </div>
+        </div>
+      </section>
+
+      <section id="page-pool" class="page">
+        <div class="topbar">
+          <h1 class="ui-heading-inline"><span class="ui-msr" aria-hidden="true">pool</span><span data-i18n="menu.pool">Piscine</span></h1>
+        </div>
+        <div class="pool-page-shell">
+          <section class="pool-hero-panel">
+            <div class="pool-hero-main">
+              <span class="ui-msr pool-hero-icon" aria-hidden="true">pool</span>
+              <div class="pool-hero-copy">
+                <h2 id="poolConfigTitle" data-i18n="pool.title">Vue piscine</h2>
+                <div id="poolHeroState" class="pool-hero-state is-ok" aria-live="polite">
+                  <span class="ui-msr pool-hero-state-icon" aria-hidden="true">check_circle</span>
+                  <span data-i18n="pool.state.normalStatus">État normal</span>
+                </div>
+                <p id="poolConfigSummary" data-i18n="pool.summary">Lecture des paramètres utilisateur de filtration, traitement, chauffage et remplissage.</p>
+                <div class="pool-filtration-daybar" aria-hidden="true">
+                  <span id="poolFiltrationStart" class="pool-daybar-time">--:--</span>
+                  <span class="pool-daybar-track"><span id="poolFiltrationFill" class="pool-daybar-fill"></span></span>
+                  <span id="poolFiltrationStop" class="pool-daybar-time">--:--</span>
+                </div>
+              </div>
+            </div>
+            <div class="pool-hero-side">
+              <button id="poolConfigRefresh" class="btn-tonal btn-icon-only btn-refresh-icon pool-hero-refresh" aria-label="Rafraîchir la configuration piscine" title="Rafraîchir la configuration piscine" data-i18n-aria-label="pool.refresh" data-i18n-title="pool.refresh"><span class="refresh-icon-glyph" aria-hidden="true"></span></button>
+              <div id="poolModeBadges" class="pool-mode-badges" aria-live="polite"></div>
+            </div>
+          </section>
+          <section id="poolAlarmCard" class="pool-alarm-card" hidden aria-live="polite"></section>
+          <section id="poolDisinfectionModes" class="pool-treatment-panel" aria-live="polite"></section>
+          <section id="poolConfigGrid" class="pool-config-grid" aria-live="polite"></section>
         </div>
       </section>
 

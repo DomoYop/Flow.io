@@ -56,4 +56,5 @@ struct TimeService {
     bool (*currentState)(void* ctx, TimeState* out);
     bool (*setManualEpoch)(void* ctx, uint64_t epochSec);
     bool (*isPlausible)(uint64_t epochSec);
+    bool (*weekStartMonday)(void* ctx);
 };

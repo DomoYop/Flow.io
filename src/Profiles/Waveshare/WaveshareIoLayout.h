@@ -72,8 +72,8 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortAdsInternal3, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 3, 0}, // ADS1115 interne canal 3.
     {PortAdsExternal0, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 0, 0}, // ADS1115 externe paire 0.
     {PortAdsExternal1, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 1, 0}, // ADS1115 externe paire 1.
-    {PortOneWire1, IO_PORT_KIND_DS18_WATER, 0, 0}, // DS18B20 bus 1.
-    {PortOneWire2, IO_PORT_KIND_DS18_AIR, 0, 0}, // DS18B20 bus 2.
+    {PortOneWire1, IO_PORT_KIND_DS18_WATER, 47, 0}, // DS18B20 bus 1 GPIO47.
+    {PortOneWire2, IO_PORT_KIND_DS18_AIR, 48, 0}, // DS18B20 bus 2 GPIO48.
     {PortSht40Temp, IO_PORT_KIND_SHT40, 0, 0}, // SHT40 temperature.
     {PortSht40Humidity, IO_PORT_KIND_SHT40, 1, 0}, // SHT40 humidite.
     {PortBmp280Temp, IO_PORT_KIND_BMP280, 0, 0}, // BMP280 temperature.

@@ -150,6 +150,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
     logHub_ = services.get<LogHubService>(ServiceId::LogHub);
     mqttSvc_ = services.get<MqttService>(ServiceId::Mqtt);
     ioSvc_ = services.get<IOServiceV2>(ServiceId::Io);
+    timeSvc_ = services.get<TimeService>(ServiceId::Time);
     if (!services.add(ServiceId::PoolDevice, &poolSvc_)) {
         LOGE("service registration failed: %s", toString(ServiceId::PoolDevice));
     }

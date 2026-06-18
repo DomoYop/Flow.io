@@ -35,6 +35,7 @@
     const remoteMenuIconFontHref = 'https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded&display=block';
     const remoteMenuIconLigatures = {
       'icon-measures': 'water_damage',
+      'icon-pool': 'pool',
       'icon-io': 'lan',
       'icon-calibration': 'science',
       'icon-terminal': 'list_alt',
@@ -234,6 +235,9 @@
           syncMenuIconFallbacks();
           renderInfoPanel();
           refreshPoolMeasuresView();
+          if (getActivePageId() === 'page-pool' && poolConfigLoadedOnce) {
+            loadPoolConfig(true).catch(() => {});
+          }
           refreshCfgDocLocaleRuntime(false).catch(() => {});
         }).catch(() => {});
         return;
@@ -270,6 +274,9 @@
         syncMenuIconFallbacks();
         renderInfoPanel();
         refreshPoolMeasuresView();
+        if (getActivePageId() === 'page-pool' && poolConfigLoadedOnce) {
+          loadPoolConfig(true).catch(() => {});
+        }
         refreshCfgDocLocaleRuntime(true).catch(() => {});
       }).catch(() => {});
     }
@@ -626,6 +633,7 @@
       setBrandWordmark(isMicronovaProfile() ? 'Pellet' : 'Flow');
       if (isMicronovaProfile()) {
         setPageMenuVisible('page-calibration', false);
+        setPageMenuVisible('page-pool', false);
       }
       if (rebootDeviceTargetSelect) {
         const labelsByTarget = {
@@ -1752,6 +1760,12 @@
       } else {
         stopPoolMeasuresTimer();
       }
+      if (pageId === 'page-pool') {
+        schedulePageTask(pageId,
+                         pageToken,
+                         deferredHeavyMs > 0 ? (deferredHeavyMs + 120) : 0,
+                         () => onPoolConfigPageShown(false));
+      }
       if (pageId === 'page-io-summary') {
         schedulePageTask(pageId, pageToken, deferredHeavyMs, () => onIoSummaryPageShown());
       } else {
@@ -1894,6 +1908,17 @@
     const poolMeasuresDomains = document.getElementById('poolMeasuresDomains');
     const poolMeasuresStatus = document.getElementById('poolMeasuresStatus');
     const poolMeasuresGrid = document.getElementById('poolMeasuresGrid');
+    const poolConfigRefreshBtn = document.getElementById('poolConfigRefresh');
+    const poolConfigTitle = document.getElementById('poolConfigTitle');
+    const poolConfigSummary = document.getElementById('poolConfigSummary');
+    const poolHeroState = document.getElementById('poolHeroState');
+    const poolFiltrationStart = document.getElementById('poolFiltrationStart');
+    const poolFiltrationStop = document.getElementById('poolFiltrationStop');
+    const poolFiltrationFill = document.getElementById('poolFiltrationFill');
+    const poolModeBadges = document.getElementById('poolModeBadges');
+    const poolDisinfectionModes = document.getElementById('poolDisinfectionModes');
+    const poolAlarmCard = document.getElementById('poolAlarmCard');
+    const poolConfigGrid = document.getElementById('poolConfigGrid');
     const calibrationSensorSelect = document.getElementById('calibrationSensorSelect');
     const calibrationLoadBtn = document.getElementById('calibrationLoadBtn');
     const calibrationComputeBtn = document.getElementById('calibrationComputeBtn');
@@ -2011,7 +2036,8 @@
         label: 'pH',
         mode: 'two',
         poollogicKey: 'ph_io_id',
-        runtimeUiId: 2103,
+        ioSlot: 1,
+        runtimeUiId: 2203,
         recommendedSpan: 1.5,
         warningOffset: 1.0
       },
@@ -2020,7 +2046,8 @@
         label: 'ORP',
         mode: 'two',
         poollogicKey: 'dis_io_id',
-        runtimeUiId: 2104,
+        ioSlot: 0,
+        runtimeUiId: 2204,
         recommendedSpan: 120,
         warningOffset: 120
       },
@@ -2029,7 +2056,8 @@
         label: 'Pression PSI',
         mode: 'two',
         poollogicKey: 'psi_io_id',
-        runtimeUiId: 2106,
+        ioSlot: 2,
+        runtimeUiId: 2206,
         recommendedSpan: 0.4,
         warningOffset: 0.6
       },
@@ -2038,7 +2066,8 @@
         label: 'Température eau',
         mode: 'one',
         poollogicKey: 'wat_temp_io_id',
-        runtimeUiId: 2101,
+        ioSlot: 4,
+        runtimeUiId: 2201,
         recommendedSpan: 0,
         warningOffset: 2.0
       },
@@ -2047,7 +2076,8 @@
         label: 'Température air',
         mode: 'one',
         poollogicKey: 'air_temp_io_id',
-        runtimeUiId: 2102,
+        ioSlot: 5,
+        runtimeUiId: 2202,
         recommendedSpan: 0,
         warningOffset: 2.0
       }
@@ -2108,6 +2138,52 @@
       micronova: createRuntimeDomainState(),
       alarm: createRuntimeDomainState()
     };
+    let poolConfigLoadedOnce = false;
+    let poolConfigReqSeq = 0;
+    const poolConfigModuleDefs = Object.freeze([
+      Object.freeze({ module: 'poollogic/modes', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
+      Object.freeze({ module: 'poollogic/filtration', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'La plage de filtration combine contraintes horaires et température d’eau pour protéger le bassin.' }),
+      Object.freeze({ module: 'poollogic/heater', titleKey: 'pool.card.heater.title', title: 'Chauffage', icon: 'thermostat', noteKey: 'pool.card.heater.note', note: 'Le chauffage suit sa consigne seulement quand le mode automatique le permet.' }),
+      Object.freeze({ module: 'poollogic/refill', titleKey: 'pool.card.refill.title', title: 'Remplissage', icon: 'water_drop', noteKey: 'pool.card.refill.note', note: 'Le remplissage garde une durée minimale pour éviter les cycles trop courts.' }),
+      Object.freeze({ module: 'poollogic/safety', titleKey: 'pool.card.safety.title', title: 'Protections', icon: 'health_and_safety', noteKey: 'pool.card.safety.note', note: 'Seuils de pression, hors gel et bascule hiver utilisés par les automatismes.' }),
+      Object.freeze({ module: 'poollogic/regulation', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.' }),
+      Object.freeze({ module: 'poollogic/robot', titleKey: 'pool.card.robot.title', title: 'Robot', icon: 'smart_toy', noteKey: 'pool.card.robot.note', note: 'Fenêtre de lancement et durée du nettoyage automatique.' })
+    ]);
+    const poolDisinfectionModeDefs = Object.freeze([
+      Object.freeze({
+        key: 'chlorine',
+        typeValue: 0,
+        module: 'poollogic/chlorine',
+        titleKey: 'pool.disinfection.chlorine.title',
+        title: 'Chlore / Brome',
+        icon: 'science',
+        accent: 'blue',
+        noteKey: 'pool.disinfection.chlorine.note',
+        note: 'Régulation liquide pilotée par la mesure ORP et une pompe doseuse.'
+      }),
+      Object.freeze({
+        key: 'swg',
+        typeValue: 1,
+        module: 'poollogic/swg',
+        titleKey: 'pool.disinfection.swg.title',
+        title: 'Électrolyse',
+        icon: 'bolt',
+        accent: 'cyan',
+        noteKey: 'pool.disinfection.swg.note',
+        note: 'Production au sel, soit sur consigne ORP, soit en continu pendant la filtration.'
+      }),
+      Object.freeze({
+        key: 'o2',
+        typeValue: 2,
+        module: 'poollogic/o2',
+        titleKey: 'pool.disinfection.o2.title',
+        title: 'Oxygène actif',
+        icon: 'bubble_chart',
+        accent: 'green',
+        noteKey: 'pool.disinfection.o2.note',
+        note: 'Dosage hebdomadaire calculé depuis le volume du bassin, la charge et la température.'
+      })
+    ]);
     const poolMeasureDomainAnimations = {};
     const upgradeReconnectFetchTimeoutMs = 1400;
     const upgradeTargetDefs = {
@@ -2117,6 +2193,7 @@
       'flowios3-spiffs': { manifestKey: 'flowios3-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS FlowIOS3', order: 39 },
       'esp32s3-spiffs': { manifestKey: 'esp32s3-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS ESP32-S3', order: 39 },
       'waveshare-spiffs': { manifestKey: 'waveshare-spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS Waveshare', order: 39 },
+      nextion: { manifestKey: 'nextion', target: 'nextion', endpoint: '/fwupdate/nextion', label: 'Nextion', order: 30 },
       spiffs: { manifestKey: 'spiffs', target: 'spiffs', endpoint: '/fwupdate/spiffs', label: 'SPIFFS', order: 40 }
     };
     const upgradeComponentDefs = [
@@ -2137,6 +2214,15 @@
         tone: 'green',
         commentsAvailable: 'Nouveaux fichiers de configuration et ressources',
         commentsCurrent: 'Fichiers système actuels'
+      },
+      {
+        key: 'nextion',
+        title: 'Nextion',
+        subtitle: 'Interface écran',
+        icon: 'display_settings',
+        tone: 'orange',
+        commentsAvailable: 'Nouvelle interface écran disponible',
+        commentsCurrent: 'Interface écran actuelle'
       }
     ];
 
@@ -2451,6 +2537,7 @@
       if (key === 'flowios3' || key === 'esp32s3') return 'FlowIOS3';
       if (key === 'waveshare') return 'FlowIOS3';
       if (key === 'spiffs') return 'SPIFFS';
+      if (key === 'nextion') return 'Nextion';
       return 'Firmware';
     }
 
@@ -3008,6 +3095,7 @@
       if (key === 'flowios3' || key === 'esp32s3') return '/fwupdate/waveshare';
       if (key === 'waveshare') return '/fwupdate/waveshare';
       if (key === 'spiffs') return '/fwupdate/spiffs';
+      if (key === 'nextion') return '/fwupdate/nextion';
       return '';
     }
 
@@ -3020,11 +3108,13 @@
       if (!key) return false;
       if (isMicronovaProfile() || isSupervisorProfile()) {
         return key === 'flowios3' || key === 'esp32s3' || key === 'waveshare'
-          || key === 'spiffs' || key === 'flowios3-spiffs' || key === 'esp32s3-spiffs' || key === 'waveshare-spiffs';
+          || key === 'spiffs' || key === 'flowios3-spiffs' || key === 'esp32s3-spiffs' || key === 'waveshare-spiffs'
+          || key === 'nextion';
       }
       if (isWaveshareProfile()) {
         return key === 'flowios3' || key === 'esp32s3' || key === 'waveshare'
-          || key === 'spiffs' || key === 'flowios3-spiffs' || key === 'esp32s3-spiffs' || key === 'waveshare-spiffs';
+          || key === 'spiffs' || key === 'flowios3-spiffs' || key === 'esp32s3-spiffs' || key === 'waveshare-spiffs'
+          || key === 'nextion';
       }
       if (isFlowIOProfile()) {
         return key === 'flowio';
@@ -6135,6 +6225,611 @@
       }
     }
 
+    function poolConfigDisinfectionLabel(value) {
+      const n = Number(value);
+      if (n === 0) return tr('pool.disinfection.chlorine.title', 'Chlore / Brome');
+      if (n === 1) return tr('pool.disinfection.swg.title', 'Électrolyse');
+      if (n === 2) return tr('pool.disinfection.o2.title', 'Oxygène actif');
+      if (n === 3) return tr('pool.disinfection.disabled', 'Désactivé');
+      return tr('pool.state.unknown', 'Inconnu');
+    }
+
+    function poolConfigBoolLabel(value, activeText, inactiveText) {
+      return toBool(value) ? (activeText || tr('pool.state.active', 'Actif')) : (inactiveText || tr('pool.state.stopped', 'Arrêt'));
+    }
+
+    function poolConfigFormatHour(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value ?? '-');
+      return String(Math.max(0, Math.min(23, Math.trunc(n)))).padStart(2, '0') + ':00';
+    }
+
+    function poolConfigHourToMinutes(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+      return Math.max(0, Math.min(23, Math.trunc(n))) * 60;
+    }
+
+    function poolConfigDayProgress(startValue, stopValue) {
+      const start = poolConfigHourToMinutes(startValue);
+      const stopRaw = poolConfigHourToMinutes(stopValue);
+      if (start === null || stopRaw === null) return 0;
+      let stop = stopRaw;
+      const now = new Date();
+      let current = now.getHours() * 60 + now.getMinutes();
+      if (stop <= start) {
+        stop += 24 * 60;
+        if (current < start) current += 24 * 60;
+      }
+      if (current <= start) return 0;
+      if (current >= stop) return 100;
+      return Math.max(0, Math.min(100, ((current - start) / (stop - start)) * 100));
+    }
+
+    function poolConfigFormatDurationMs(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value ?? '-');
+      if (Math.abs(n) >= 3600000 && n % 3600000 === 0) return String(Math.round(n / 3600000)) + ' h';
+      if (Math.abs(n) >= 60000 && n % 60000 === 0) return String(Math.round(n / 60000)) + ' min';
+      if (Math.abs(n) >= 1000 && n % 1000 === 0) return String(Math.round(n / 1000)) + ' s';
+      return String(Math.round(n)) + ' ms';
+    }
+
+    function poolConfigFormatNumber(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value ?? '-');
+      const rounded = Math.round(n * 1000) / 1000;
+      const normalized = rounded.toFixed(3).replace(/(?:\.0+|(\.\d*?)0+)$/, '$1');
+      return webUiLocale === 'en' ? normalized : normalized.replace('.', ',');
+    }
+
+    function poolConfigDoc(moduleName, key) {
+      try {
+        return configDocFor(moduleName, key, []);
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function poolConfigFieldLabel(moduleName, key) {
+      const doc = poolConfigDoc(moduleName, key);
+      return doc && typeof doc.label === 'string' && doc.label.trim()
+        ? doc.label.trim()
+        : String(key || '');
+    }
+
+    function poolConfigEnumLabel(doc, value) {
+      const options = doc && Array.isArray(doc._enumOptions) ? doc._enumOptions : [];
+      const current = String(value ?? '');
+      for (const opt of options) {
+        if (!opt || typeof opt !== 'object') continue;
+        if (String(opt.value) === current) {
+          return typeof opt.label === 'string' && opt.label.trim() ? opt.label.trim() : current;
+        }
+      }
+      return '';
+    }
+
+    function poolConfigFormatValue(moduleName, key, value) {
+      if (value === null || typeof value === 'undefined' || value === '') return '-';
+      const doc = poolConfigDoc(moduleName, key);
+      const enumLabel = poolConfigEnumLabel(doc, value);
+      if (enumLabel) return enumLabel;
+      if (typeof value === 'boolean') return poolConfigBoolLabel(value);
+      const cleanKey = String(key || '').toLowerCase();
+      const unit = String(doc && doc.unit ? doc.unit : '').trim();
+      if (cleanKey.endsWith('_ms') || unit === 'ms') return poolConfigFormatDurationMs(value);
+      if (cleanKey.includes('hour') || /^filtr_(?:start|stop)_/.test(cleanKey)) return poolConfigFormatHour(value);
+      if (Number.isFinite(Number(value))) {
+        const base = poolConfigFormatNumber(value);
+        if (unit === 'C') return base + ' °C';
+        if (unit === 'm3') return base + ' m³';
+        return unit ? (base + ' ' + unit) : base;
+      }
+      return String(value);
+    }
+
+    function poolConfigAppendMetric(parent, label, value, options) {
+      if (!parent) return;
+      const opts = options || {};
+      const item = document.createElement('div');
+      item.className = 'pool-metric' + (opts.featured ? ' is-featured' : '');
+      const labelEl = document.createElement('span');
+      labelEl.className = 'pool-metric-label';
+      labelEl.textContent = String(label || '');
+      const valueEl = document.createElement('b');
+      valueEl.className = 'pool-metric-value';
+      valueEl.textContent = String(value ?? '-');
+      item.appendChild(labelEl);
+      item.appendChild(valueEl);
+      parent.appendChild(item);
+    }
+
+    function poolConfigFields(moduleName, data, options) {
+      const opts = options || {};
+      const keys = Object.keys((data && typeof data === 'object') ? data : {})
+        .filter((key) => !opts.exclude || opts.exclude.indexOf(key) < 0)
+        .sort();
+      const picked = Number.isFinite(Number(opts.limit)) ? keys.slice(0, Number(opts.limit)) : keys;
+      return picked.map((key) => ({
+        key,
+        label: poolConfigFieldLabel(moduleName, key),
+        value: poolConfigFormatValue(moduleName, key, data[key])
+      }));
+    }
+
+    function poolConfigBuildFieldList(moduleName, data, options) {
+      const list = document.createElement('div');
+      list.className = 'pool-field-list';
+      poolConfigFields(moduleName, data, options).forEach((field) => {
+        const row = document.createElement('div');
+        row.className = 'pool-field-row';
+        const label = document.createElement('span');
+        label.className = 'pool-field-label';
+        label.textContent = field.label;
+        const value = document.createElement('b');
+        const activeText = tr('pool.state.active', 'Actif').trim().toLowerCase();
+        const cleanValue = String(field.value || '').trim().toLowerCase();
+        const isActiveValue = cleanValue === activeText || cleanValue === 'active' || cleanValue === 'actif';
+        value.className = 'pool-field-value' + (isActiveValue ? ' has-active-dot' : '');
+        const valueText = document.createElement('span');
+        valueText.textContent = field.value;
+        value.appendChild(valueText);
+        if (isActiveValue) {
+          const dot = document.createElement('span');
+          dot.className = 'pool-field-active-dot';
+          dot.setAttribute('aria-hidden', 'true');
+          value.appendChild(dot);
+        }
+        row.appendChild(label);
+        row.appendChild(value);
+        list.appendChild(row);
+      });
+      if (!list.childNodes.length) {
+        const empty = document.createElement('div');
+        empty.className = 'pool-field-empty';
+        empty.textContent = tr('pool.empty.settings', 'Aucun réglage disponible.');
+        list.appendChild(empty);
+      }
+      return list;
+    }
+
+    async function poolConfigFetchModule(moduleName) {
+      const cleanModule = nettoyerNomFlowCfg(moduleName);
+      const data = await fetchOkJson(
+        '/api/flowcfg/module?name=' + encodeURIComponent(cleanModule),
+        { cache: 'no-store' },
+        tr('pool.error.moduleRead', 'lecture {module} impossible').replace('{module}', cleanModule),
+        fetchFlowRemoteQueued
+      );
+      return {
+        module: cleanModule,
+        data: (data && data.data && typeof data.data === 'object') ? data.data : {},
+        truncated: !!(data && data.truncated)
+      };
+    }
+
+    async function poolConfigEnsureDocs() {
+      const modules = poolConfigModuleDefs.map((def) => def.module)
+        .concat(poolDisinfectionModeDefs.map((def) => def.module));
+      await ensureCfgDocsForModule('');
+      for (const moduleName of modules) {
+        await ensureCfgDocsForModule(moduleName).catch(() => {});
+      }
+    }
+
+    function poolConfigRenderModeBadges(modules) {
+      if (!poolModeBadges) return;
+      poolModeBadges.innerHTML = '';
+      const modes = modules['poollogic/modes'] || {};
+      const items = [
+        [tr('pool.badge.poollogic', 'PoolLogic'), poolConfigBoolLabel(modes.enabled, tr('pool.state.active', 'Actif'), tr('pool.state.disabled', 'Désactivé')), toBool(modes.enabled), 'bolt'],
+        [tr('pool.badge.auto', 'Auto'), poolConfigBoolLabel(modes.auto_mode, tr('pool.state.automatic', 'Automatique'), tr('pool.state.manual', 'Manuel')), toBool(modes.auto_mode), 'settings'],
+        [tr('pool.badge.winter', 'Hiver'), poolConfigBoolLabel(modes.winter_mode, tr('pool.state.forced', 'Forcé'), tr('pool.state.normal', 'Normal')), toBool(modes.winter_mode), 'ac_unit']
+      ];
+      items.forEach((item) => {
+        const badge = document.createElement('span');
+        badge.className = 'pool-mode-badge' + (item[2] ? ' is-on' : ' is-off');
+        const icon = document.createElement('span');
+        icon.className = 'ui-msr pool-mode-badge-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = item[3];
+        const label = document.createElement('span');
+        label.textContent = item[0] + ' · ' + item[1];
+        badge.appendChild(icon);
+        badge.appendChild(label);
+        poolModeBadges.appendChild(badge);
+      });
+    }
+
+    function poolConfigHeroSummary(modules, start, stop) {
+      const source = modules && typeof modules === 'object' ? modules : {};
+      const modes = source['poollogic/modes'] || {};
+      const heater = source['poollogic/heater'] || {};
+      const poolLogicEnabled = toBool(modes.enabled);
+      const autoMode = toBool(modes.auto_mode);
+      const winterMode = toBool(modes.winter_mode);
+      const treatment = poolConfigDisinfectionLabel(modes.disinfection_type);
+      const heaterState = poolConfigBoolLabel(heater.heater_auto_mode, tr('pool.state.autoShort', 'auto'), tr('pool.state.off', 'arrêt'));
+
+      if (!poolLogicEnabled) {
+        return tr('pool.summary.poollogicOff', 'PoolLogic est désactivé : le système reste en mode manuel et ne pilote pas automatiquement la piscine.');
+      }
+      if (!autoMode) {
+        return tr('pool.summary.manual', 'PoolLogic est actif en mode manuel : les automatismes sont suspendus. Traitement configuré : {treatment}.')
+          .replace('{treatment}', treatment);
+      }
+      if (winterMode) {
+        return tr('pool.summary.autoWinter', 'PoolLogic pilote la piscine en automatique hiver. Filtration prévue de {start} à {stop}, traitement {treatment}, chauffage {heater}.')
+          .replace('{start}', start)
+          .replace('{stop}', stop)
+          .replace('{treatment}', treatment)
+          .replace('{heater}', heaterState);
+      }
+      return tr('pool.summary.auto', 'PoolLogic pilote la piscine en automatique. Filtration prévue de {start} à {stop}, traitement {treatment}, chauffage {heater}.')
+        .replace('{start}', start)
+        .replace('{stop}', stop)
+        .replace('{treatment}', treatment)
+        .replace('{heater}', heaterState);
+    }
+
+    function poolConfigRenderHero(modules, alarmSlots) {
+      const modes = modules['poollogic/modes'] || {};
+      const filtration = modules['poollogic/filtration'] || {};
+      const alarms = poolConfigActiveAlarms(alarmSlots);
+      const startValue = filtration.filtr_start_clc ?? filtration.filtr_start_min;
+      const stopValue = filtration.filtr_stop_clc ?? filtration.filtr_stop_max;
+      const start = poolConfigFormatHour(startValue);
+      const stop = poolConfigFormatHour(stopValue);
+      if (poolConfigTitle) {
+        poolConfigTitle.textContent = tr('pool.overview.title', 'État Général');
+      }
+      if (poolHeroState) {
+        poolHeroState.className = 'pool-hero-state ' + (alarms.length ? 'is-alert' : 'is-ok');
+        poolHeroState.innerHTML = '';
+        const icon = document.createElement('span');
+        icon.className = 'ui-msr pool-hero-state-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = alarms.length ? 'warning' : 'check_circle';
+        const label = document.createElement('span');
+        label.textContent = alarms.length
+          ? tr('pool.state.alarmNamed', 'Alarme - {alarm}').replace('{alarm}', alarms[0].label)
+          : tr('pool.state.normalStatus', 'État normal');
+        poolHeroState.appendChild(icon);
+        poolHeroState.appendChild(label);
+      }
+      if (poolConfigSummary) {
+        poolConfigSummary.textContent = poolConfigHeroSummary(modules, start, stop);
+      }
+      if (poolFiltrationStart) poolFiltrationStart.textContent = start;
+      if (poolFiltrationStop) poolFiltrationStop.textContent = stop;
+      if (poolFiltrationFill) {
+        poolFiltrationFill.style.width = poolConfigDayProgress(startValue, stopValue).toFixed(1) + '%';
+      }
+      poolConfigRenderModeBadges(modules);
+    }
+
+    function poolConfigRenderDisinfection(modules) {
+      if (!poolDisinfectionModes) return;
+      poolDisinfectionModes.innerHTML = '';
+      const modes = modules['poollogic/modes'] || {};
+      const selectedType = Number(modes.disinfection_type);
+      const selectedDef = poolDisinfectionModeDefs.find((def) => selectedType === def.typeValue) || poolDisinfectionModeDefs[0];
+      const selected = selectedType === selectedDef.typeValue;
+      const data = selected ? (modules[selectedDef.module] || {}) : {};
+
+      const selector = document.createElement('div');
+      selector.className = 'pool-treatment-selector';
+      const selectorHead = document.createElement('div');
+      selectorHead.className = 'pool-treatment-title';
+      const selectorIcon = document.createElement('span');
+      selectorIcon.className = 'ui-msr pool-treatment-title-icon';
+      selectorIcon.setAttribute('aria-hidden', 'true');
+      selectorIcon.textContent = 'water_drop';
+      const selectorTitle = document.createElement('h3');
+      selectorTitle.textContent = tr('pool.treatment.title', 'Traitement de l’eau');
+      selectorHead.appendChild(selectorIcon);
+      selectorHead.appendChild(selectorTitle);
+      selector.appendChild(selectorHead);
+
+      const choiceGroup = document.createElement('div');
+      choiceGroup.className = 'pool-treatment-choice-group';
+      poolDisinfectionModeDefs.forEach((def) => {
+        const choice = document.createElement('button');
+        choice.type = 'button';
+        choice.disabled = true;
+        choice.className = 'pool-treatment-choice' + (selectedType === def.typeValue ? ' is-selected' : '');
+        const choiceIcon = document.createElement('span');
+        choiceIcon.className = 'ui-msr pool-treatment-choice-icon';
+        choiceIcon.setAttribute('aria-hidden', 'true');
+        choiceIcon.textContent = def.icon;
+        const choiceLabel = document.createElement('span');
+        choiceLabel.textContent = tr(def.titleKey, def.title);
+        choice.appendChild(choiceIcon);
+        choice.appendChild(choiceLabel);
+        choiceGroup.appendChild(choice);
+      });
+      selector.appendChild(choiceGroup);
+
+      const detail = document.createElement('article');
+      detail.className = 'pool-treatment-detail is-' + selectedDef.accent;
+      const head = document.createElement('div');
+      head.className = 'pool-card-head';
+      const icon = document.createElement('span');
+      icon.className = 'ui-msr pool-card-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = selectedDef.icon;
+      const copy = document.createElement('div');
+      copy.className = 'pool-card-title-wrap';
+      const title = document.createElement('h3');
+      title.textContent = selected ? tr(selectedDef.titleKey, selectedDef.title) : poolConfigDisinfectionLabel(selectedType);
+      const note = document.createElement('p');
+      note.textContent = selected
+        ? tr(selectedDef.noteKey, selectedDef.note)
+        : tr('pool.disinfection.disabled.note', 'Aucun traitement de désinfection n’est sélectionné.');
+      copy.appendChild(title);
+      copy.appendChild(note);
+      head.appendChild(icon);
+      head.appendChild(copy);
+      detail.appendChild(head);
+
+      const metrics = document.createElement('div');
+      metrics.className = 'pool-metric-grid';
+      if (selected) {
+        if (selectedDef.key === 'chlorine') {
+          poolConfigAppendMetric(metrics, tr('pool.metric.autoOrp', 'Auto ORP'), poolConfigBoolLabel(data.dis_auto_mode));
+          poolConfigAppendMetric(metrics, tr('pool.metric.setpoint', 'Consigne'), poolConfigFormatValue(selectedDef.module, 'dis_setpoint', data.dis_setpoint), { featured: true });
+          poolConfigAppendMetric(metrics, tr('pool.metric.window', 'Fenêtre'), poolConfigFormatValue(selectedDef.module, 'dis_window_ms', data.dis_window_ms));
+        } else if (selectedDef.key === 'swg') {
+          poolConfigAppendMetric(metrics, tr('pool.metric.control', 'Contrôle'), poolConfigFormatValue(selectedDef.module, 'swg_control_mode', data.swg_control_mode), { featured: true });
+          poolConfigAppendMetric(metrics, tr('pool.metric.delay', 'Délai'), poolConfigFormatValue(selectedDef.module, 'dly_electro_min', data.dly_electro_min));
+          poolConfigAppendMetric(metrics, tr('pool.metric.waterSafety', 'Sécurité eau'), poolConfigFormatValue(selectedDef.module, 'secure_elec_t', data.secure_elec_t));
+        } else if (selectedDef.key === 'o2') {
+          poolConfigAppendMetric(metrics, tr('pool.metric.poolVolume', 'Volume bassin'), poolConfigFormatValue(selectedDef.module, 'pool_volume_m3', data.pool_volume_m3), { featured: true });
+          poolConfigAppendMetric(metrics, tr('pool.metric.weeklyDose', 'Dose hebdo'), poolConfigFormatValue(selectedDef.module, 'dose_ml_10m3_week', data.dose_ml_10m3_week));
+          poolConfigAppendMetric(metrics, tr('pool.metric.injections', 'Injections'), poolConfigFormatValue(selectedDef.module, 'split_count', data.split_count));
+          poolConfigAppendMetric(metrics, tr('pool.metric.pending', 'En attente'), poolConfigFormatValue(selectedDef.module, 'pending_ml', data.pending_ml));
+        }
+      }
+      detail.appendChild(metrics);
+
+      poolDisinfectionModes.appendChild(selector);
+      poolDisinfectionModes.appendChild(detail);
+    }
+
+    function poolConfigActiveAlarms(alarmSlots) {
+      return (Array.isArray(alarmSlots) ? alarmSlots : [])
+        .filter((slot) => {
+          if (!slot || slot.enabled === false) return false;
+          return slot.conditionTrue === true || slot.latched === true;
+        })
+        .map((slot) => {
+          const label = String(slot.label || '').trim() || tr('pool.alarm.defaultLabel', 'Alarme piscine');
+          const state = slot.conditionTrue === true
+            ? tr('pool.alarm.state.activeCondition', 'condition active')
+            : tr('pool.alarm.state.latched', 'alarme mémorisée');
+          return { label, state };
+        });
+    }
+
+    function poolConfigRenderAlarms(alarmSlots) {
+      if (!poolAlarmCard) return;
+      const alarms = poolConfigActiveAlarms(alarmSlots);
+      poolAlarmCard.innerHTML = '';
+      poolAlarmCard.hidden = alarms.length === 0;
+      if (alarms.length === 0) return;
+
+      const head = document.createElement('div');
+      head.className = 'pool-alarm-head';
+      const icon = document.createElement('span');
+      icon.className = 'ui-msr pool-alarm-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'warning';
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'pool-alarm-title-wrap';
+      const title = document.createElement('h3');
+      title.textContent = alarms.length > 1 ? tr('pool.alarm.title.plural', 'Alarmes piscine en cours') : tr('pool.alarm.title.singular', 'Alarme piscine en cours');
+      const intro = document.createElement('p');
+      intro.textContent = tr('pool.alarm.intro', 'PoolLogic signale une attention requise avant de laisser les automatismes fonctionner sans surveillance.');
+      titleWrap.appendChild(title);
+      titleWrap.appendChild(intro);
+      head.appendChild(icon);
+      head.appendChild(titleWrap);
+      poolAlarmCard.appendChild(head);
+
+      const list = document.createElement('div');
+      list.className = 'pool-alarm-list';
+      alarms.forEach((alarm) => {
+        const row = document.createElement('div');
+        row.className = 'pool-alarm-row';
+        const label = document.createElement('b');
+        label.textContent = alarm.label;
+        const state = document.createElement('span');
+        state.textContent = alarm.state;
+        row.appendChild(label);
+        row.appendChild(state);
+        list.appendChild(row);
+      });
+      poolAlarmCard.appendChild(list);
+    }
+
+    function poolConfigRenderFiltrationCard(def, data) {
+      const card = document.createElement('article');
+      card.className = 'pool-config-card pool-filtration-card';
+
+      const head = document.createElement('div');
+      head.className = 'pool-card-head';
+      const icon = document.createElement('span');
+      icon.className = 'ui-msr pool-card-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = def.icon;
+      const copy = document.createElement('div');
+      copy.className = 'pool-card-title-wrap';
+      const title = document.createElement('h3');
+      title.textContent = tr(def.titleKey, def.title);
+      copy.appendChild(title);
+      head.appendChild(icon);
+      head.appendChild(copy);
+      card.appendChild(head);
+
+      const start = poolConfigFormatHour(data.filtr_start_clc ?? data.filtr_start_min);
+      const stop = poolConfigFormatHour(data.filtr_stop_clc ?? data.filtr_stop_max);
+      const times = document.createElement('div');
+      times.className = 'pool-filtration-times';
+      const startEl = document.createElement('b');
+      startEl.textContent = start;
+      const arrow = document.createElement('span');
+      arrow.className = 'ui-msr pool-filtration-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.textContent = 'arrow_forward';
+      const stopEl = document.createElement('b');
+      stopEl.textContent = stop;
+      times.appendChild(startEl);
+      times.appendChild(arrow);
+      times.appendChild(stopEl);
+      card.appendChild(times);
+      return card;
+    }
+
+    function poolConfigRenderGeneralCards(modules) {
+      if (!poolConfigGrid) return;
+      poolConfigGrid.innerHTML = '';
+      const order = ['poollogic/heater', 'poollogic/safety', 'poollogic/regulation', 'poollogic/robot'];
+      const orderedDefs = poolConfigModuleDefs.slice().sort((a, b) => {
+        const ai = order.indexOf(a.module);
+        const bi = order.indexOf(b.module);
+        return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+      });
+      orderedDefs.forEach((def) => {
+        if (def.module === 'poollogic/modes' || def.module === 'poollogic/filtration' || def.module === 'poollogic/refill') return;
+        const data = modules[def.module] || {};
+        if (def.module === 'poollogic/filtration') {
+          poolConfigGrid.appendChild(poolConfigRenderFiltrationCard(def, data));
+          return;
+        }
+        const card = document.createElement('article');
+        card.className = 'pool-config-card pool-config-card-' + runtimeMeasureCssSlug(def.module);
+
+        const head = document.createElement('div');
+        head.className = 'pool-card-head';
+        const icon = document.createElement('span');
+        icon.className = 'ui-msr pool-card-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = def.icon;
+        const copy = document.createElement('div');
+        copy.className = 'pool-card-title-wrap';
+        const title = document.createElement('h3');
+        title.textContent = tr(def.titleKey, def.title);
+        const note = document.createElement('p');
+        note.textContent = tr(def.noteKey, def.note);
+        copy.appendChild(title);
+        copy.appendChild(note);
+        head.appendChild(icon);
+        head.appendChild(copy);
+        card.appendChild(head);
+        card.appendChild(poolConfigBuildFieldList(def.module, data));
+        poolConfigGrid.appendChild(card);
+      });
+    }
+
+    function poolConfigRender(modules, alarmSlots) {
+      const source = modules && typeof modules === 'object' ? modules : {};
+      poolConfigRenderHero(source, alarmSlots);
+      poolConfigRenderDisinfection(source);
+      poolConfigRenderAlarms([]);
+      poolConfigRenderGeneralCards(source);
+    }
+
+    function poolConfigRenderSkeleton() {
+      if (poolDisinfectionModes) {
+        poolDisinfectionModes.innerHTML = '';
+        for (let i = 0; i < 2; i += 1) {
+          const card = document.createElement('article');
+          card.className = (i === 0 ? 'pool-treatment-selector' : 'pool-treatment-detail') + ' pool-config-skeleton';
+          card.appendChild(createSkeletonLine('', 58));
+          card.appendChild(createSkeletonLine('', 86));
+          card.appendChild(createSkeletonLine('', 42));
+          poolDisinfectionModes.appendChild(card);
+        }
+      }
+      if (poolConfigGrid) {
+        poolConfigGrid.innerHTML = '';
+        for (let i = 0; i < 4; i += 1) {
+          const card = document.createElement('article');
+          card.className = 'pool-config-card pool-config-skeleton';
+          card.appendChild(createSkeletonLine('', i % 2 === 0 ? 52 : 66));
+          card.appendChild(createSkeletonLine('', 88));
+          card.appendChild(createSkeletonLine('', 74));
+          poolConfigGrid.appendChild(card);
+        }
+      }
+      if (poolAlarmCard) {
+        poolAlarmCard.hidden = true;
+        poolAlarmCard.innerHTML = '';
+      }
+    }
+
+    function poolConfigRenderError(err) {
+      if (poolDisinfectionModes) poolDisinfectionModes.innerHTML = '';
+      if (poolAlarmCard) {
+        poolAlarmCard.hidden = true;
+        poolAlarmCard.innerHTML = '';
+      }
+      if (!poolConfigGrid) return;
+      poolConfigGrid.innerHTML = '';
+      const card = document.createElement('article');
+      card.className = 'pool-config-card pool-config-error-card';
+      const head = document.createElement('div');
+      head.className = 'pool-card-head';
+      const icon = document.createElement('span');
+      icon.className = 'ui-msr pool-card-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'error';
+      const copy = document.createElement('div');
+      copy.className = 'pool-card-title-wrap';
+      const title = document.createElement('h3');
+      title.textContent = tr('pool.error.title', 'Configuration piscine indisponible');
+      const detail = document.createElement('p');
+      detail.textContent = String(err || tr('pool.error.readFailed', 'Lecture de la configuration impossible.'));
+      copy.appendChild(title);
+      copy.appendChild(detail);
+      head.appendChild(icon);
+      head.appendChild(copy);
+      card.appendChild(head);
+      poolConfigGrid.appendChild(card);
+    }
+
+    async function loadPoolConfig(forceRefresh) {
+      const reqSeq = ++poolConfigReqSeq;
+      if (!poolConfigLoadedOnce || forceRefresh) poolConfigRenderSkeleton();
+      if (poolConfigRefreshBtn) poolConfigRefreshBtn.disabled = true;
+      try {
+        await poolConfigEnsureDocs().catch(() => {});
+        const modules = {};
+        const allDefs = poolConfigModuleDefs.concat(poolDisinfectionModeDefs);
+        for (const def of allDefs) {
+          const payload = await poolConfigFetchModule(def.module);
+          if (reqSeq !== poolConfigReqSeq) return;
+          modules[payload.module] = payload.data;
+        }
+        const alarmSlots = await fetchPoolAlarmSlots().catch(() => []);
+        if (reqSeq !== poolConfigReqSeq) return;
+        poolConfigRender(modules, alarmSlots);
+        poolConfigLoadedOnce = true;
+      } catch (err) {
+        if (reqSeq !== poolConfigReqSeq) return;
+        poolConfigRenderError(err);
+      } finally {
+        if (reqSeq === poolConfigReqSeq && poolConfigRefreshBtn) {
+          poolConfigRefreshBtn.disabled = false;
+        }
+      }
+    }
+
+    async function onPoolConfigPageShown(forceRefresh) {
+      await loadPoolConfig(!!forceRefresh || !poolConfigLoadedOnce);
+    }
+
     async function onUpgradePageShown() {
       renderUpgradeJourney(readUpgradeUiSession() || { phase: 'idle', target: '', detail: tr('updates.none', 'Aucune opération en cours.') });
       renderUpgradeCatalog();
@@ -6248,42 +6943,22 @@
       if (calibrationApplyBtn) calibrationApplyBtn.disabled = true;
     }
 
-    function calibrationModuleFromEnumLabel(label) {
-      const text = String(label || '').trim();
-      if (!text) return '';
-      const parts = text.split('|').map((part) => part.trim()).filter((part) => part.length > 0);
-      for (let i = parts.length - 1; i >= 0; --i) {
-        if (/^io\/input\/a\d{2}$/i.test(parts[i])) {
-          return parts[i].toLowerCase();
-        }
+    function calibrationIoModuleFromId(ioIdRaw) {
+      const ioId = Number(ioIdRaw);
+      if (!Number.isFinite(ioId)) return '';
+      const idx = Math.round(ioId) - 192;
+      if (idx >= 0 && idx <= 15) {
+        return 'io/input/a' + String(idx).padStart(2, '0');
       }
       return '';
     }
 
-    function calibrationIoModuleFromId(ioIdRaw) {
-      const ioId = Number(ioIdRaw);
-      if (!Number.isFinite(ioId)) return '';
-
-      for (const source of cfgDocSources) {
-        const normalized = normalizeDocSource(source);
-        if (!normalized || !normalized.meta || typeof normalized.meta !== 'object') continue;
-        const enumSets = normalized.meta.enum_sets;
-        if (!enumSets || typeof enumSets !== 'object') continue;
-        const entries = Array.isArray(enumSets.flowio_logical_input_analog)
-          ? enumSets.flowio_logical_input_analog
-          : [];
-        for (const entry of entries) {
-          if (Number(entry && entry.value) !== ioId) continue;
-          const moduleName = calibrationModuleFromEnumLabel(entry && entry.label);
-          if (moduleName) return moduleName;
-        }
-      }
-
-      const idx = Math.round(ioId) - 192;
-      if (idx >= 0 && idx <= 14) {
-        return 'io/input/a' + String(idx).padStart(2, '0');
-      }
-      return '';
+    function calibrationIoIdFromAnalogSlot(slotRaw) {
+      const slot = Number(slotRaw);
+      if (!Number.isFinite(slot)) return NaN;
+      const idx = Math.trunc(slot);
+      if (idx < 0 || idx > 15) return NaN;
+      return 192 + idx;
     }
 
     async function calibrationEnsureDocSourcesLoaded() {
@@ -6352,7 +7027,10 @@
       try {
         await calibrationEnsureDocSourcesLoaded();
         const poolSensorCfg = await calibrationFetchFlowModule('poollogic/sensors');
-        const ioId = Number(poolSensorCfg[def.poollogicKey]);
+        let ioId = Number(poolSensorCfg[def.poollogicKey]);
+        if (!Number.isFinite(ioId) || !calibrationIoModuleFromId(ioId)) {
+          ioId = calibrationIoIdFromAnalogSlot(def.ioSlot);
+        }
         if (!Number.isFinite(ioId) || ioId <= 0) {
           throw new Error(tr('calibration.err.ioNotConfigured', 'IO non configurée pour {sensor}').replace('{sensor}', def.label));
         }
@@ -10009,6 +10687,7 @@
           showPoolMeasuresError(err);
         }
       });
+      bindClickAction(poolConfigRefreshBtn, () => loadPoolConfig(true));
     }
 
     function initInfoBindings() {

@@ -2796,7 +2796,7 @@ bool waveshareIoPortBackendChannel_(const IOBindingPortSpec& spec, uint8_t& back
         case IO_PORT_KIND_DS18_WATER:
         case IO_PORT_KIND_DS18_AIR:
             backendOut = IO_BACKEND_DS18B20;
-            channelOut = 0U;
+            channelOut = spec.param0;
             return true;
         case IO_PORT_KIND_INA226:
             backendOut = IO_BACKEND_INA226;

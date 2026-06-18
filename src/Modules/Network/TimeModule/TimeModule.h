@@ -171,6 +171,7 @@ private:
     TimeQuality qualitySvc_() const;
     const char* qualityNameSvc_() const;
     bool currentStateSvc_(TimeState* out) const;
+    bool weekStartMondaySvc_() const;
     uint64_t epoch_() const;
     bool formatLocalTime_(char* out, size_t len) const;
     bool setExternalEpoch_(uint64_t epochSec);
@@ -302,7 +303,8 @@ private:
         ServiceBinding::bind<&TimeModule::qualityNameSvc_>,
         ServiceBinding::bind<&TimeModule::currentStateSvc_>,
         ServiceBinding::bind<&TimeModule::setManualEpoch_>,
-        &TimeModule::isTimePlausibleSvc_
+        &TimeModule::isTimePlausibleSvc_,
+        ServiceBinding::bind<&TimeModule::weekStartMondaySvc_>
     };
     TimeSchedulerService schedSvc_{
         ServiceBinding::bind<&TimeModule::setSlotSvc_>,

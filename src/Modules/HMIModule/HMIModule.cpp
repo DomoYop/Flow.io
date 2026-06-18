@@ -1183,6 +1183,7 @@ bool HMIModule::publishHomeText_(HmiHomeTextField field)
 {
     if (!driver_) return false;
 
+    IoId ioId = IO_ID_INVALID;
     uint8_t runtimeIndex = kInvalidRuntimeIndex;
     char value[32]{};
     if (field == HmiHomeTextField::ErrorMessage) {
@@ -1229,15 +1230,19 @@ bool HMIModule::publishHomeText_(HmiHomeTextField field)
 
     switch (field) {
         case HmiHomeTextField::WaterTemp:
+            ioId = waterTempIoId_;
             runtimeIndex = waterTempRuntimeIndex_;
             break;
         case HmiHomeTextField::AirTemp:
+            ioId = airTempIoId_;
             runtimeIndex = airTempRuntimeIndex_;
             break;
         case HmiHomeTextField::Ph:
+            ioId = phIoId_;
             runtimeIndex = phRuntimeIndex_;
             break;
         case HmiHomeTextField::Orp:
+            ioId = orpIoId_;
             runtimeIndex = orpRuntimeIndex_;
             break;
         default:
@@ -1246,7 +1251,10 @@ bool HMIModule::publishHomeText_(HmiHomeTextField field)
 
     bool hasValue = false;
     float rawValue = 0.0f;
-    if (dsSvc_ && dsSvc_->store && runtimeIndex != kInvalidRuntimeIndex) {
+    if (ioSvc_ && ioSvc_->readAnalog && ioId != IO_ID_INVALID) {
+        hasValue = (ioSvc_->readAnalog(ioSvc_->ctx, ioId, &rawValue, nullptr, nullptr) == IO_OK);
+    }
+    if (!hasValue && dsSvc_ && dsSvc_->store && runtimeIndex != kInvalidRuntimeIndex) {
         hasValue = ioEndpointFloat(*dsSvc_->store, runtimeIndex, rawValue);
     }
 
@@ -1278,6 +1286,7 @@ bool HMIModule::publishHomeGaugePercent_(HmiHomeGaugeField field)
 {
     if (!driver_) return false;
 
+    IoId ioId = IO_ID_INVALID;
     uint8_t runtimeIndex = kInvalidRuntimeIndex;
     float setpoint = 0.0f;
     float phSetpoint = 0.0f;
@@ -1286,10 +1295,12 @@ bool HMIModule::publishHomeGaugePercent_(HmiHomeGaugeField field)
 
     switch (field) {
         case HmiHomeGaugeField::PhPercent:
+            ioId = phIoId_;
             runtimeIndex = phRuntimeIndex_;
             setpoint = phSetpoint;
             break;
         case HmiHomeGaugeField::OrpPercent:
+            ioId = orpIoId_;
             runtimeIndex = orpRuntimeIndex_;
             setpoint = orpSetpoint;
             break;
@@ -1299,7 +1310,10 @@ bool HMIModule::publishHomeGaugePercent_(HmiHomeGaugeField field)
 
     bool hasValue = false;
     float rawValue = 0.0f;
-    if (dsSvc_ && dsSvc_->store && runtimeIndex != kInvalidRuntimeIndex) {
+    if (ioSvc_ && ioSvc_->readAnalog && ioId != IO_ID_INVALID) {
+        hasValue = (ioSvc_->readAnalog(ioSvc_->ctx, ioId, &rawValue, nullptr, nullptr) == IO_OK);
+    }
+    if (!hasValue && dsSvc_ && dsSvc_->store && runtimeIndex != kInvalidRuntimeIndex) {
         hasValue = ioEndpointFloat(*dsSvc_->store, runtimeIndex, rawValue);
     }
 
@@ -1852,25 +1866,17 @@ void HMIModule::onEvent_(const Event& e)
             homePublishMask |= kHomePublishTime | kHomePublishDate;
             rtcPushPending_ = true;
             lastRtcPushAttemptMs_ = 0;
-        } else if (poolLevelRuntimeIndex_ != kInvalidRuntimeIndex &&
-                   p->id == (DataKey)(DATAKEY_IO_BASE + poolLevelRuntimeIndex_)) {
+        } else if (p->id >= DATAKEY_IO_BASE &&
+                   p->id < (DataKey)(DATAKEY_IO_BASE + IO_MAX_ENDPOINTS)) {
             ledDirty = true;
-            homePublishMask |= kHomePublishAlarmBits;
-        } else if (waterTempRuntimeIndex_ != kInvalidRuntimeIndex &&
-                   p->id == (DataKey)(DATAKEY_IO_BASE + waterTempRuntimeIndex_)) {
-            homePublishMask |= kHomePublishWaterTemp;
-        } else if (airTempRuntimeIndex_ != kInvalidRuntimeIndex &&
-                   p->id == (DataKey)(DATAKEY_IO_BASE + airTempRuntimeIndex_)) {
-            homePublishMask |= kHomePublishAirTemp;
-        } else if (phRuntimeIndex_ != kInvalidRuntimeIndex &&
-                   p->id == (DataKey)(DATAKEY_IO_BASE + phRuntimeIndex_)) {
-            homePublishMask |= kHomePublishPh | kHomePublishPhGauge;
-        } else if (orpRuntimeIndex_ != kInvalidRuntimeIndex &&
-                   p->id == (DataKey)(DATAKEY_IO_BASE + orpRuntimeIndex_)) {
-            homePublishMask |= kHomePublishOrp | kHomePublishOrpGauge;
-        } else if (psiRuntimeIndex_ != kInvalidRuntimeIndex &&
-                   p->id == (DataKey)(DATAKEY_IO_BASE + psiRuntimeIndex_)) {
-            homePublishMask |= kHomePublishPsi;
+            homePublishMask |= kHomePublishWaterTemp |
+                               kHomePublishAirTemp |
+                               kHomePublishPh |
+                               kHomePublishOrp |
+                               kHomePublishPhGauge |
+                               kHomePublishOrpGauge |
+                               kHomePublishPsi |
+                               kHomePublishAlarmBits;
         } else if (p->id == (DataKey)(DATAKEY_POOL_DEVICE_STATE_BASE + filtrationDeviceSlot_) ||
                    p->id == (DataKey)(DATAKEY_POOL_DEVICE_STATE_BASE + phPumpDeviceSlot_) ||
                    p->id == (DataKey)(DATAKEY_POOL_DEVICE_STATE_BASE + orpPumpDeviceSlot_) ||

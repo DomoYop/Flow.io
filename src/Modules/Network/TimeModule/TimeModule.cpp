@@ -634,6 +634,10 @@ bool TimeModule::currentStateSvc_(TimeState* out) const {
     return true;
 }
 
+bool TimeModule::weekStartMondaySvc_() const {
+    return cfgData.weekStartMonday;
+}
+
 uint64_t TimeModule::epoch_() const {
     return (uint64_t)nowEpoch_();
 }

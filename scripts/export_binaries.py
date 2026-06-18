@@ -58,7 +58,12 @@ def _classify_artifact(software, ext):
     norm = software_name.lower()
 
     if ext == "tft":
-        return None
+        return {
+            "category": "nextion",
+            "target": "nextion",
+            "kind": "nextion-tft",
+            "route": "/fwupdate/nextion",
+        }
     if norm in ("flowios3-spiffs", "esp32s3-spiffs", "waveshare-spiffs"):
         return {
             "category": "spiffs",

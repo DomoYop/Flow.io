@@ -1,5 +1,6 @@
 #include "Modules/Network/MQTTModule/RuntimeProducer.h"
 
+#include <Arduino.h>
 #include <esp_heap_caps.h>
 #include <new>
 #include <string.h>
@@ -98,17 +99,17 @@ void RuntimeProducer::markRoutePending_(uint8_t idx, bool force)
     route.force = route.force || force;
 }
 
-void RuntimeProducer::enqueueRoute_(uint8_t idx)
+bool RuntimeProducer::enqueueRoute_(uint8_t idx)
 {
-    if (!mqttSvc_ || !mqttSvc_->enqueue) return;
-    if (idx >= routeCount_) return;
+    if (!mqttSvc_ || !mqttSvc_->enqueue) return false;
+    if (idx >= routeCount_) return false;
 
     const Route& route = routes_[idx];
     const MqttPublishPriority prio = (route.routeClass == RuntimeRouteClass::ActuatorImmediate)
         ? MqttPublishPriority::High
         : MqttPublishPriority::Normal;
 
-    (void)mqttSvc_->enqueue(mqttSvc_->ctx, ProducerId, idx, (uint8_t)prio, 0);
+    return mqttSvc_->enqueue(mqttSvc_->ctx, ProducerId, idx, (uint8_t)prio, 0);
 }
 
 void RuntimeProducer::completeInitialFullSnapshotRoute_(uint8_t idx)
@@ -151,15 +152,28 @@ void RuntimeProducer::onConnected()
     }
 }
 
-void RuntimeProducer::onDataChanged(DataKey key)
+RuntimeProducer::DataChangeStats RuntimeProducer::onDataChanged(DataKey key)
 {
+    DataChangeStats stats{};
+    stats.routeCount = routeCount_;
     for (uint8_t i = 0; i < routeCount_; ++i) {
         Route& route = routes_[i];
         if (!route.provider) continue;
+        ++stats.checked;
         if (!route.provider->runtimeSnapshotAffectsKey(route.snapshotIdx, key)) continue;
+        ++stats.matched;
+        if (route.pending || route.force) ++stats.pendingAlready;
         markRoutePending_(i, false);
-        enqueueRoute_(i);
+        const uint32_t t0 = micros();
+        const bool ok = enqueueRoute_(i);
+        stats.enqueueUs += (uint32_t)(micros() - t0);
+        if (ok) {
+            ++stats.enqueueOk;
+        } else {
+            ++stats.enqueueFail;
+        }
     }
+    return stats;
 }
 
 MqttBuildResult RuntimeProducer::buildMessage(uint16_t messageId, MqttBuildContext& ctx)
@@ -169,6 +183,11 @@ MqttBuildResult RuntimeProducer::buildMessage(uint16_t messageId, MqttBuildConte
     Route& route = routes_[messageId];
     if (!route.provider) return MqttBuildResult::NoLongerNeeded;
     if (!route.pending && !route.force) return MqttBuildResult::NoLongerNeeded;
+    if (!route.provider->runtimeSnapshotSuffix(route.snapshotIdx)) {
+        route.pending = false;
+        route.force = false;
+        return MqttBuildResult::NoLongerNeeded;
+    }
 
     const uint32_t nowMs = millis();
     if (!route.force && route.routeClass == RuntimeRouteClass::NumericThrottled) {

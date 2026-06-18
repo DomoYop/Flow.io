@@ -382,7 +382,7 @@ void syncDigitalInputBinarySensors(ModuleInstances& modules)
 
     for (uint8_t i = 0; i < (uint8_t)(sizeof(kDigitalHaSpecs) / sizeof(kDigitalHaSpecs[0])); ++i) {
         const FlowIoDigitalHaSpec& spec = kDigitalHaSpecs[i];
-        if (!modules.ioModule.digitalInputSlotUsed(spec.logicalIdx)) continue;
+        if (!modules.ioModule.digitalInputSlotPublished(spec.logicalIdx)) continue;
 
         snprintf(
             gDiscoveryHeap->digitalStateSuffix[i],
@@ -434,13 +434,13 @@ void syncSwitches(const DomainSpec& domain, ModuleInstances& modules)
         if (ioSlot == IO_SLOT_INVALID || ioSlotKind(ioSlot) != IO_SLOT_DIGITAL_OUTPUT) continue;
 
         const uint8_t logical = ioSlotIndex(ioSlot);
-        if (!modules.ioModule.digitalOutputSlotUsed(logical)) continue;
+        if (!modules.ioModule.digitalOutputSlotWritable(logical)) continue;
 
         snprintf(
             gDiscoveryHeap->switchStateSuffix[i],
             sizeof(gDiscoveryHeap->switchStateSuffix[i]),
-            "rt/io/output/d%02u",
-            (unsigned)logical
+            "rt/pdm/state/pd%u",
+            (unsigned)device.id
         );
         bool payloadOk = true;
 
@@ -484,7 +484,7 @@ void syncSwitches(const DomainSpec& domain, ModuleInstances& modules)
             device.objectSuffix,
             commandSlot->displayName,
             gDiscoveryHeap->switchStateSuffix[i],
-            "{% if value_json.value %}ON{% else %}OFF{% endif %}",
+            "{% if value_json.on %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCmd,
             gDiscoveryHeap->switchPayloadOn[i],
             gDiscoveryHeap->switchPayloadOff[i],
