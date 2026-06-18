@@ -1739,6 +1739,12 @@
 
     function showPage(pageId, options) {
       const opts = options || {};
+      if (flowCfgLocalApplyBusyDepth > 0 && currentPageId === 'page-control' && pageId !== 'page-control') {
+        if (flowCfgStatus) {
+          flowCfgStatus.textContent = tr('cfg.apply.waitBeforeLeaving', 'Application en cours : attendez la confirmation avant de quitter la configuration.');
+        }
+        return;
+      }
       const deferredHeavyMs = Math.max(0, Number(opts.deferHeavyMs) || 0);
       const pageToken = ++pageLoadToken;
       currentPageId = pageId;
@@ -1951,6 +1957,7 @@
     const flowCfgPathLabel = document.getElementById('flowCfgCurrentPath');
     const flowCfgPathMeta = document.getElementById('flowCfgPathMeta');
     const flowCfgFields = document.getElementById('flowCfgFields');
+    const flowCfgApplyBusy = document.getElementById('flowCfgApplyBusy');
     const flowCfgStatus = document.getElementById('flowCfgStatus');
     const flowCfgBackupStatus = document.getElementById('flowCfgBackupStatus');
     const flowCfgBackupProgress = document.getElementById('flowCfgBackupProgress');
@@ -1983,6 +1990,8 @@
     let flowCfgLoadPromise = null;
     let flowCfgRetryTimer = null;
     let flowCfgFlowOnlyFailureStreak = 0;
+    let flowCfgLocalApplyBusyDepth = 0;
+    let flowCfgApplyBtnSavedText = '';
     let wifiConfigLoadedOnce = false;
     let flowCfgLoadedOnce = false;
     let calibrationLoadedOnce = false;
@@ -6453,20 +6462,20 @@
       const heaterState = poolConfigBoolLabel(heater.heater_auto_mode, tr('pool.state.autoShort', 'auto'), tr('pool.state.off', 'arrêt'));
 
       if (!poolLogicEnabled) {
-        return tr('pool.summary.poollogicOff', 'PoolLogic est désactivé : le système reste en mode manuel et ne pilote pas automatiquement la piscine.');
+        return tr('pool.summary.poollogicOff', 'PoolLogic désactivé : le système reste en manuel et ne pilote pas la piscine.');
       }
       if (!autoMode) {
-        return tr('pool.summary.manual', 'PoolLogic est actif en mode manuel : les automatismes sont suspendus. Traitement configuré : {treatment}.')
+        return tr('pool.summary.manual', 'Mode manuel : PoolLogic est actif, mais les automatismes sont suspendus. Traitement configuré : {treatment}.')
           .replace('{treatment}', treatment);
       }
       if (winterMode) {
-        return tr('pool.summary.autoWinter', 'PoolLogic pilote la piscine en automatique hiver. Filtration prévue de {start} à {stop}, traitement {treatment}, chauffage {heater}.')
+        return tr('pool.summary.autoWinter', 'Mode automatique hiver : filtration {start}-{stop}, traitement {treatment}, chauffage {heater}.')
           .replace('{start}', start)
           .replace('{stop}', stop)
           .replace('{treatment}', treatment)
           .replace('{heater}', heaterState);
       }
-      return tr('pool.summary.auto', 'PoolLogic pilote la piscine en automatique. Filtration prévue de {start} à {stop}, traitement {treatment}, chauffage {heater}.')
+      return tr('pool.summary.auto', 'Mode automatique : filtration {start}-{stop}, traitement {treatment}, chauffage {heater}.')
         .replace('{start}', start)
         .replace('{stop}', stop)
         .replace('{treatment}', treatment)
@@ -9087,16 +9096,81 @@
       return JSON.stringify(readConfigFieldValue(el)) !== JSON.stringify(initialValue);
     }
 
+    function flowCfgLocalApplyMessage(message) {
+      return String(message || '').trim() || tr('cfg.apply.busy', 'Application de la configuration en cours...');
+    }
+
+    function flowCfgSetControlsLocked(locked) {
+      const page = document.getElementById('page-control');
+      if (!page) return;
+      const nodes = page.querySelectorAll('.cfg-tree button,.control-fields input,.control-fields select,.control-fields textarea,.control-field-apply,#flowCfgApply,#flowCfgRefresh');
+      nodes.forEach((node) => {
+        if (!node) return;
+        if (locked) {
+          if (!Object.prototype.hasOwnProperty.call(node.dataset, 'cfgApplyPrevDisabled')) {
+            node.dataset.cfgApplyPrevDisabled = node.disabled ? '1' : '0';
+          }
+          node.disabled = true;
+          return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(node.dataset, 'cfgApplyPrevDisabled')) return;
+        node.disabled = node.dataset.cfgApplyPrevDisabled === '1';
+        delete node.dataset.cfgApplyPrevDisabled;
+      });
+    }
+
+    function setFlowCfgLocalApplyBusy(active, message) {
+      flowCfgLocalApplyBusyDepth = Math.max(0, flowCfgLocalApplyBusyDepth + (active ? 1 : -1));
+      const busy = flowCfgLocalApplyBusyDepth > 0;
+      const text = flowCfgLocalApplyMessage(message);
+      const page = document.getElementById('page-control');
+      if (page) {
+        page.classList.toggle('is-config-applying', busy);
+        page.setAttribute('aria-busy', busy ? 'true' : 'false');
+      }
+      if (flowCfgApplyBusy) {
+        flowCfgApplyBusy.hidden = !busy;
+        const label = flowCfgApplyBusy.querySelector('span:last-child');
+        if (label) label.textContent = text;
+      }
+      if (flowCfgStatus && busy) {
+        flowCfgStatus.textContent = text;
+      }
+      if (flowCfgApplyBtn) {
+        if (busy) {
+          if (!flowCfgApplyBtnSavedText) flowCfgApplyBtnSavedText = flowCfgApplyBtn.textContent || '';
+          flowCfgApplyBtn.classList.add('is-pending');
+          flowCfgApplyBtn.textContent = tr('cfg.apply.busyShort', 'Application...');
+        } else {
+          flowCfgApplyBtn.classList.remove('is-pending');
+          if (flowCfgApplyBtnSavedText) {
+            flowCfgApplyBtn.textContent = flowCfgApplyBtnSavedText;
+            flowCfgApplyBtnSavedText = '';
+          }
+        }
+      }
+      flowCfgSetControlsLocked(busy);
+      if (!busy) {
+        updatePrimaryCfgApplyState();
+        document.querySelectorAll('.control-field-apply').forEach((button) => {
+          const row = button && button.closest('.control-row');
+          const input = row && row.querySelector('input.control-input,select.control-input,textarea.control-input');
+          if (input) updateControlFieldApplyState(input, button);
+        });
+      }
+    }
+
     function updateControlFieldApplyState(inputEl, applyBtn) {
       if (!inputEl || !applyBtn) return;
       const valid = validateConfigFieldValue(inputEl, { silent: true });
       const dirty = configFieldIsDirty(inputEl);
-      applyBtn.disabled = !dirty || !valid;
+      const busy = flowCfgLocalApplyBusyDepth > 0;
+      applyBtn.disabled = busy || !dirty || !valid;
       applyBtn.classList.toggle('is-dirty', dirty && valid);
-      applyBtn.classList.remove('is-pending');
+      if (!busy) applyBtn.classList.remove('is-pending');
       applyBtn.title = !valid
         ? 'Corrigez ce champ avant application'
-        : (dirty ? 'Appliquer ce changement' : 'Aucun changement a appliquer');
+        : (busy ? tr('cfg.apply.busy', 'Application de la configuration en cours...') : (dirty ? 'Appliquer ce changement' : 'Aucun changement a appliquer'));
       applyBtn.setAttribute('aria-label', applyBtn.title);
       const row = inputEl.closest('.control-row');
       if (row) row.classList.toggle('is-dirty', dirty);
@@ -9897,6 +9971,7 @@
         return;
       }
 
+      setFlowCfgLocalApplyBusy(true, tr('cfg.apply.busyField', 'Application locale du champ « {field} »...').replace('{field}', key));
       try {
         applyBtn.disabled = true;
         applyBtn.classList.add('is-pending');
@@ -9923,6 +9998,9 @@
       } catch (err) {
         flowCfgStatus.textContent = 'Application locale du champ echouee: ' + err;
         updateControlFieldApplyState(inputEl, applyBtn);
+      } finally {
+        applyBtn.classList.remove('is-pending');
+        setFlowCfgLocalApplyBusy(false);
       }
     }
 
@@ -9950,6 +10028,7 @@
 
     async function appliquerPrimaryCfg() {
       if (cfgTreeSelectedSource === 'supervisor') {
+        setFlowCfgLocalApplyBusy(true, tr('cfg.apply.busy', 'Application de la configuration en cours...'));
         try {
           const patch = buildPrimaryCfgPatchJson();
           const body = new URLSearchParams();
@@ -9970,6 +10049,8 @@
           await refreshWebUiLocale(true);
         } catch (err) {
           flowCfgStatus.textContent = 'Application cfg locale échouée: ' + err;
+        } finally {
+          setFlowCfgLocalApplyBusy(false);
         }
         return;
       }
