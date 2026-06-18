@@ -6,7 +6,7 @@
 #include "Ds18b20Driver.h"
 #include <DallasTemperature.h>
 
-Ds18b20Driver::Ds18b20Driver(const char* driverId, OneWireBus* bus, const uint8_t address[8],
+Ds18b20Driver::Ds18b20Driver(const char* driverId, IOneWireBus* bus, const uint8_t address[8],
                              const Ds18b20DriverConfig& cfg)
     : driverId_(driverId), bus_(bus), cfg_(cfg)
 {

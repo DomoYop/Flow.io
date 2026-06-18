@@ -9,6 +9,13 @@
 
 OneWireBus::OneWireBus(int pin) : pin_(pin), oneWire_(pin), dt_(&oneWire_) {}
 
+void OneWireBus::setPin(int pin) {
+    if (pin == pin_) return;
+    pin_ = pin;
+    if (pin >= 0) oneWire_.begin((uint8_t)pin);
+    started_ = false;
+}
+
 void OneWireBus::begin() {
     if (pin_ < 0) return;
     if (started_) return;

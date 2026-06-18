@@ -61,6 +61,65 @@
       "help_t": "cfgdocs.io.drivers.bme680.poll_ms.help",
       "unit": "ms"
     },
+    "io/drivers/ds18b20/water_rom": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.drivers.ds18b20.water_rom.label",
+      "help_t": "cfgdocs.io.drivers.ds18b20.water_rom.help"
+    },
+    "io/drivers/ds18b20/air_rom": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.drivers.ds18b20.air_rom.label",
+      "help_t": "cfgdocs.io.drivers.ds18b20.air_rom.help"
+    },
+    "io/drivers/ds2484/address": {
+      "type": "UInt8",
+      "label_t": "cfgdocs.io.drivers.ds2484.address.label",
+      "help_t": "cfgdocs.io.drivers.ds2484.address.help",
+      "display_format": "hex"
+    },
+    "io/drivers/ds2484/enabled": {
+      "type": "Bool",
+      "label_t": "cfgdocs.io.drivers.ds2484.enabled.label",
+      "help_t": "cfgdocs.io.drivers.ds2484.enabled.help"
+    },
+    "io/drivers/ds2484/poll_ms": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.drivers.ds2484.poll_ms.label",
+      "help_t": "cfgdocs.io.drivers.ds2484.poll_ms.help",
+      "unit": "ms"
+    },
+    "io/drivers/1wire_int1/enabled": {
+      "type": "Bool",
+      "label_t": "cfgdocs.io.drivers.1wire_int1.enabled.label",
+      "help_t": "cfgdocs.io.drivers.1wire_int1.enabled.help"
+    },
+    "io/drivers/1wire_int1/gpio": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.drivers.1wire_int1.gpio.label",
+      "help_t": "cfgdocs.io.drivers.1wire_int1.gpio.help"
+    },
+    "io/drivers/1wire_int1/poll_ms": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.drivers.1wire_int1.poll_ms.label",
+      "help_t": "cfgdocs.io.drivers.1wire_int1.poll_ms.help",
+      "unit": "ms"
+    },
+    "io/drivers/1wire_int2/enabled": {
+      "type": "Bool",
+      "label_t": "cfgdocs.io.drivers.1wire_int2.enabled.label",
+      "help_t": "cfgdocs.io.drivers.1wire_int2.enabled.help"
+    },
+    "io/drivers/1wire_int2/gpio": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.drivers.1wire_int2.gpio.label",
+      "help_t": "cfgdocs.io.drivers.1wire_int2.gpio.help"
+    },
+    "io/drivers/1wire_int2/poll_ms": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.drivers.1wire_int2.poll_ms.label",
+      "help_t": "cfgdocs.io.drivers.1wire_int2.poll_ms.help",
+      "unit": "ms"
+    },
     "io/drivers/bmp280/address": {
       "type": "UInt8",
       "label_t": "cfgdocs.io.drivers.bmp280.address.label",

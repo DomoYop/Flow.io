@@ -8,19 +8,22 @@
 #include <stddef.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
+#include "Modules/IOModule/IOBus/IOneWireBus.h"
 
-class OneWireBus {
+class OneWireBus : public IOneWireBus {
 public:
     explicit OneWireBus(int pin);
 
-    void begin();
-    void request();
-    void setWaitForConversion(bool enabled);
-    bool getAddress(uint8_t index, uint8_t out[8]) const;
-    bool hasAddress(const uint8_t addr[8]) const;
-    float readC(const uint8_t addr[8]) const;
-    uint8_t deviceCount() const;
-    int pin() const { return pin_; }
+    /** Reassign the GPIO before begin() (for config-driven pins). */
+    void setPin(int pin);
+    void begin() override;
+    void request() override;
+    void setWaitForConversion(bool enabled) override;
+    bool getAddress(uint8_t index, uint8_t out[8]) const override;
+    bool hasAddress(const uint8_t addr[8]) const override;
+    float readC(const uint8_t addr[8]) const override;
+    uint8_t deviceCount() const override;
+    int pin() const override { return pin_; }
 
 private:
     int pin_ = -1;

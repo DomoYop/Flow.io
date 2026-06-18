@@ -44,6 +44,20 @@ struct IOModuleConfig {
     bool pcfActiveLow = FLOW_WIRDEF_IO_PCFAL;
     bool mcp23017Enabled = true;
     uint8_t mcp23017Address = 0x21;
+    // DS2484 I2C-to-1-Wire bridge.
+    bool ds2484Enabled = false;
+    uint8_t ds2484Address = 0x18;
+    int32_t ds2484PollMs = 2000;
+    // GPIO bit-bang 1-Wire buses (gpio < 0 means "use board default pin").
+    bool oneWire1Enabled = true;
+    int32_t oneWire1Gpio = -1;
+    int32_t oneWire1PollMs = 2000;
+    bool oneWire2Enabled = true;
+    int32_t oneWire2Gpio = -1;
+    int32_t oneWire2PollMs = 2000;
+    // DS18B20 sensor->temperature assignment by ROM (hex "AA:BB:..."; empty = auto).
+    char dsWaterRom[24] = {0};
+    char dsAirRom[24] = {0};
     bool traceEnabled = FLOW_MODDEF_IO_TREN;
     int32_t tracePeriodMs = FLOW_MODDEF_IO_TRMS;
 };

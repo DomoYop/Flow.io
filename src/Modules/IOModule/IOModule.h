@@ -17,6 +17,8 @@
 #include "Modules/IOModule/IODrivers/Ads1115Driver.h"
 #include "Modules/IOModule/IODrivers/Bme680Driver.h"
 #include "Modules/IOModule/IODrivers/Bmp280Driver.h"
+#include "Modules/IOModule/IOBus/Ds2484Bus.h"
+#include "Modules/IOModule/IOBus/OneWireBus.h"
 #include "Modules/IOModule/IODrivers/Ds18b20Driver.h"
 #include "Modules/IOModule/IODrivers/GpioDriver.h"
 #include "Modules/IOModule/IODrivers/Ina226Driver.h"
@@ -86,7 +88,7 @@ public:
     void loop() override;
     uint32_t startDelayMs() const override { return Limits::Boot::IoStartDelayMs; }
 
-    void setOneWireBuses(OneWireBus* water, OneWireBus* air);
+    void setOneWireBuses(OneWireBus* gpio1, OneWireBus* gpio2);
     void setBindingPorts(const IOBindingPortSpec* ports, uint8_t count);
     bool defineAnalogInput(const IOAnalogDefinition& def);
     bool defineDigitalInput(const IODigitalInputDefinition& def);
@@ -173,6 +175,12 @@ private:
                                       bool& usesTcaOut,
                                       bool& usesMcpOut) const;
     bool resolveDsBusAddress_(OneWireBus* bus, const char* runtimeKey, uint8_t outAddr[8]);
+    void resolveDs18Sensors_();
+    bool resolveDsSensor_(IOneWireBus** buses, uint8_t nBuses, char* romCfg, size_t romCfgLen,
+                          const char* nvsKey, const uint8_t* excludeAddr,
+                          IOneWireBus** busOut, uint8_t outAddr[8]);
+    uint32_t dsPollForBus_(const IOneWireBus* bus) const;
+    static bool parseDs18Address_(const char* str, uint8_t out[8]);
     bool runtimeSnapshotRouteFromIndex_(uint8_t snapshotIdx, uint8_t& routeTypeOut, uint8_t& slotIdxOut) const;
     bool buildEndpointSnapshot_(IOEndpoint* ep, char* out, size_t len, uint32_t& maxTsOut, bool invalidAsUndefined = false) const;
     bool buildGroupSnapshot_(char* out, size_t len, bool inputGroup, uint32_t& maxTsOut) const;
@@ -225,7 +233,7 @@ private:
                                             uint8_t edgeMode = IO_EDGE_RISING,
                                             uint32_t counterDebounceUs = 0);
     IAnalogSourceDriver* allocAdsDriver_(const char* driverId, I2CBus* bus, const Ads1115DriverConfig& cfg);
-    IAnalogSourceDriver* allocDsDriver_(const char* driverId, OneWireBus* bus, const uint8_t address[8], const Ds18b20DriverConfig& cfg);
+    IAnalogSourceDriver* allocDsDriver_(const char* driverId, IOneWireBus* bus, const uint8_t address[8], const Ds18b20DriverConfig& cfg);
     IAnalogSourceDriver* allocSht40Driver_(const char* driverId, I2CBus* bus, const Sht40DriverConfig& cfg);
     IAnalogSourceDriver* allocBmp280Driver_(const char* driverId, I2CBus* bus, const Bmp280DriverConfig& cfg);
     IAnalogSourceDriver* allocBme680Driver_(const char* driverId, I2CBus* bus, const Bme680DriverConfig& cfg);
@@ -557,9 +565,14 @@ private:
     IORegistry registry_{};
     IOScheduler scheduler_{};
     I2CBus i2cBus_{};
+    Ds2484Bus ds2484Bus_{&i2cBus_};
 
-    OneWireBus* oneWireWater_ = nullptr;
-    OneWireBus* oneWireAir_ = nullptr;
+    // GPIO bit-bang 1-Wire buses provided by the profile (board pins).
+    OneWireBus* oneWireGpio1_ = nullptr;
+    OneWireBus* oneWireGpio2_ = nullptr;
+    // Resolved bus carrying each DS18B20 sensor (any of the enabled buses).
+    IOneWireBus* oneWireWater_ = nullptr;
+    IOneWireBus* oneWireAir_ = nullptr;
     uint8_t oneWireWaterAddr_[8] = {0};
     uint8_t oneWireAirAddr_[8] = {0};
     bool oneWireWaterAddrValid_ = false;
@@ -681,6 +694,17 @@ private:
     ConfigVariable<bool,0> pcfActiveLowVar_ { NVS_KEY(NvsKeys::Io::IO_PCFAL),"active_low","io/drivers/pcf857x",ConfigType::Bool,&cfgData_.pcfActiveLow,ConfigPersistence::Persistent,0 };
     ConfigVariable<bool,0> mcp23017EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_MCPEN),"enabled","io/drivers/mcp23017",ConfigType::Bool,&cfgData_.mcp23017Enabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<uint8_t,0> mcp23017AddressVar_ { NVS_KEY(NvsKeys::Io::IO_MCPAD),"address","io/drivers/mcp23017",ConfigType::UInt8,&cfgData_.mcp23017Address,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> ds2484EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_DS24EN),"enabled","io/drivers/ds2484",ConfigType::Bool,&cfgData_.ds2484Enabled,ConfigPersistence::Persistent,0 };
+    ConfigVariable<uint8_t,0> ds2484AddressVar_ { NVS_KEY(NvsKeys::Io::IO_DS24AD),"address","io/drivers/ds2484",ConfigType::UInt8,&cfgData_.ds2484Address,ConfigPersistence::Persistent,0 };
+    ConfigVariable<int32_t,0> ds2484PollVar_ { NVS_KEY(NvsKeys::Io::IO_DS24PL),"poll_ms","io/drivers/ds2484",ConfigType::Int32,&cfgData_.ds2484PollMs,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> oneWire1EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_OW1EN),"enabled","io/drivers/1wire_int1",ConfigType::Bool,&cfgData_.oneWire1Enabled,ConfigPersistence::Persistent,0 };
+    ConfigVariable<int32_t,0> oneWire1GpioVar_ { NVS_KEY(NvsKeys::Io::IO_OW1GP),"gpio","io/drivers/1wire_int1",ConfigType::Int32,&cfgData_.oneWire1Gpio,ConfigPersistence::Persistent,0 };
+    ConfigVariable<int32_t,0> oneWire1PollVar_ { NVS_KEY(NvsKeys::Io::IO_OW1PL),"poll_ms","io/drivers/1wire_int1",ConfigType::Int32,&cfgData_.oneWire1PollMs,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> oneWire2EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_OW2EN),"enabled","io/drivers/1wire_int2",ConfigType::Bool,&cfgData_.oneWire2Enabled,ConfigPersistence::Persistent,0 };
+    ConfigVariable<int32_t,0> oneWire2GpioVar_ { NVS_KEY(NvsKeys::Io::IO_OW2GP),"gpio","io/drivers/1wire_int2",ConfigType::Int32,&cfgData_.oneWire2Gpio,ConfigPersistence::Persistent,0 };
+    ConfigVariable<int32_t,0> oneWire2PollVar_ { NVS_KEY(NvsKeys::Io::IO_OW2PL),"poll_ms","io/drivers/1wire_int2",ConfigType::Int32,&cfgData_.oneWire2PollMs,ConfigPersistence::Persistent,0 };
+    ConfigVariable<char,0> dsWaterRomVar_ { NVS_KEY(NvsKeys::Io::IO_DSWR),"water_rom","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsWaterRom,ConfigPersistence::Persistent,sizeof(cfgData_.dsWaterRom) };
+    ConfigVariable<char,0> dsAirRomVar_ { NVS_KEY(NvsKeys::Io::IO_DSAR),"air_rom","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsAirRom,ConfigPersistence::Persistent,sizeof(cfgData_.dsAirRom) };
     ConfigVariable<bool,0> traceEnabledVar_ { NVS_KEY(NvsKeys::Io::IO_TREN),"trace_enabled","io/debug",ConfigType::Bool,&cfgData_.traceEnabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> tracePeriodVar_ { NVS_KEY(NvsKeys::Io::IO_TRMS),"trace_period_ms","io/debug",ConfigType::Int32,&cfgData_.tracePeriodMs,ConfigPersistence::Persistent,0 };
 

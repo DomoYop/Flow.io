@@ -346,6 +346,17 @@ constexpr char IO_SCL_S3[] = "io_scl3"; // IO module persisted key for S3 field 
 constexpr char IO_SDA_S3[] = "io_sda3"; // IO module persisted key for S3 field `io_sda`.
 constexpr char IO_TREN[] = "io_tren"; // IO module persisted key for field `io_tren`.
 constexpr char IO_TRMS[] = "io_trms"; // IO module persisted key for field `io_trms`.
+constexpr char IO_DS24EN[] = "io_ds24en"; // DS2484 1-Wire bridge enabled.
+constexpr char IO_DS24AD[] = "io_ds24ad"; // DS2484 1-Wire bridge I2C address.
+constexpr char IO_DS24PL[] = "io_ds24pl"; // DS2484 1-Wire bridge poll period (ms).
+constexpr char IO_OW1EN[] = "io_ow1en"; // GPIO 1-Wire bus #1 enabled.
+constexpr char IO_OW1GP[] = "io_ow1gp"; // GPIO 1-Wire bus #1 GPIO pin.
+constexpr char IO_OW1PL[] = "io_ow1pl"; // GPIO 1-Wire bus #1 poll period (ms).
+constexpr char IO_OW2EN[] = "io_ow2en"; // GPIO 1-Wire bus #2 enabled.
+constexpr char IO_OW2GP[] = "io_ow2gp"; // GPIO 1-Wire bus #2 GPIO pin.
+constexpr char IO_OW2PL[] = "io_ow2pl"; // GPIO 1-Wire bus #2 poll period (ms).
+constexpr char IO_DSWR[] = "io_dswr"; // DS18B20 water sensor ROM selection.
+constexpr char IO_DSAR[] = "io_dsar"; // DS18B20 air sensor ROM selection.
 constexpr char DsRomWater[] = "io_dswrm"; // IO module runtime DS18 water ROM blob.
 constexpr char DsRomAir[] = "io_dsarm"; // IO module runtime DS18 air ROM blob.
 }  // namespace Io
