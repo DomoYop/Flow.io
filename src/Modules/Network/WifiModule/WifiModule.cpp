@@ -442,6 +442,18 @@ void WifiModule::startConnect() {
     if (!modeOk) {
         LOGW("WiFi.mode failed requested=%d current=%d", (int)wantedMode, (int)WiFi.getMode());
     }
+
+    // Apply the configured device name as the DHCP/STA hostname so the router
+    // shows it instead of the default "esp32s3-XXXXXX". Must be set after
+    // WiFi.mode(STA) and before WiFi.begin() to take effect on this DHCP cycle.
+    char host[sizeof(deviceName_)] = {0};
+    computeHostname_(host, sizeof(host));
+    if (!WiFi.setHostname(host)) {
+        LOGW("WiFi.setHostname failed host=%s", host);
+    } else {
+        LOGD("WiFi hostname set host=%s", host);
+    }
+
     WiFi.setSleep(false);               ///< ✅ important (stability)
 
     // Avoid explicit disconnect/restart churn between attempts: the underlying
@@ -972,6 +984,35 @@ void WifiModule::stopMdns_()
     LOGD("mDNS stopped");
 }
 
+void WifiModule::computeHostname_(char* out, size_t outSize) const
+{
+    if (out == nullptr || outSize == 0) return;
+
+    size_t w = 0;
+    for (size_t i = 0; deviceName_[i] != '\0' && w < (outSize - 1); ++i) {
+        char c = deviceName_[i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+            out[w++] = (char)tolower((unsigned char)c);
+        } else if (c == ' ' || c == '_' || c == '.') {
+            out[w++] = '-';
+        }
+    }
+    out[w] = '\0';
+
+    while (w > 0 && out[0] == '-') {
+        memmove(out, out + 1, w);
+        --w;
+    }
+    while (w > 0 && out[w - 1] == '-') {
+        out[w - 1] = '\0';
+        --w;
+    }
+
+    if (out[0] == '\0') {
+        snprintf(out, outSize, "flowio");
+    }
+}
+
 void WifiModule::syncMdns_()
 {
     if (!WiFi.isConnected()) {
@@ -980,29 +1021,7 @@ void WifiModule::syncMdns_()
     }
 
     char host[sizeof(deviceName_)] = {0};
-    size_t w = 0;
-    for (size_t i = 0; deviceName_[i] != '\0' && w < (sizeof(host) - 1); ++i) {
-        char c = deviceName_[i];
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
-            host[w++] = (char)tolower((unsigned char)c);
-        } else if (c == ' ' || c == '_' || c == '.') {
-            host[w++] = '-';
-        }
-    }
-    host[w] = '\0';
-
-    while (w > 0 && host[0] == '-') {
-        memmove(host, host + 1, w);
-        --w;
-    }
-    while (w > 0 && host[w - 1] == '-') {
-        host[w - 1] = '\0';
-        --w;
-    }
-
-    if (host[0] == '\0') {
-        snprintf(host, sizeof(host), "flowio");
-    }
+    computeHostname_(host, sizeof(host));
 
     if (mdnsStarted && strcmp(mdnsApplied, host) == 0) return;
 

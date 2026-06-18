@@ -193,6 +193,7 @@ private:
     void startConnect();
     void stopMdns_();
     void syncMdns_();
+    void computeHostname_(char* out, size_t outSize) const;
     void loadSystemDeviceName_();
     void refreshEthernetConfig_(ConfigStore& cfg);
     bool preferredEthernetAvailable_() const;
