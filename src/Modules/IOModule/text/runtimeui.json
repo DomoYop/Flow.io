@@ -243,6 +243,78 @@
       "order": 170,
       "label_t": "runtimeui.io.v17.label",
       "group_t": "runtimeui.io.v17.group"
+    },
+    {
+      "valueId": 18,
+      "key": "ina228.voltage",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "V",
+      "decimals": 2,
+      "order": 180,
+      "label_t": "runtimeui.io.v18.label",
+      "group_t": "runtimeui.io.v18.group"
+    },
+    {
+      "valueId": 19,
+      "key": "ina228.current",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "mA",
+      "decimals": 1,
+      "order": 190,
+      "label_t": "runtimeui.io.v19.label",
+      "group_t": "runtimeui.io.v19.group"
+    },
+    {
+      "valueId": 20,
+      "key": "ina228.power",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "mW",
+      "decimals": 0,
+      "order": 200,
+      "label_t": "runtimeui.io.v20.label",
+      "group_t": "runtimeui.io.v20.group"
+    },
+    {
+      "valueId": 21,
+      "key": "ina228.temperature",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "°C",
+      "decimals": 1,
+      "order": 210,
+      "label_t": "runtimeui.io.v21.label",
+      "group_t": "runtimeui.io.v21.group"
+    },
+    {
+      "valueId": 22,
+      "key": "ina228.energy",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "Wh",
+      "decimals": 3,
+      "order": 220,
+      "label_t": "runtimeui.io.v22.label",
+      "group_t": "runtimeui.io.v22.group"
+    },
+    {
+      "valueId": 23,
+      "key": "ina228.charge",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "mAh",
+      "decimals": 1,
+      "order": 230,
+      "label_t": "runtimeui.io.v23.label",
+      "group_t": "runtimeui.io.v23.group"
     }
   ]
 }

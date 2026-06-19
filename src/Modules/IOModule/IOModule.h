@@ -22,6 +22,7 @@
 #include "Modules/IOModule/IODrivers/Ds18b20Driver.h"
 #include "Modules/IOModule/IODrivers/GpioDriver.h"
 #include "Modules/IOModule/IODrivers/Ina226Driver.h"
+#include "Modules/IOModule/IODrivers/Ina228Driver.h"
 #include "Modules/IOModule/IODrivers/Mcp23017BitDriver.h"
 #include "Modules/IOModule/IODrivers/Mcp23017Driver.h"
 #include "Modules/IOModule/IODrivers/PcntCounterDriver.h"
@@ -138,6 +139,12 @@ private:
         RuntimeUiIna226Voltage = 15,
         RuntimeUiIna226Current = 16,
         RuntimeUiIna226Power = 17,
+        RuntimeUiIna228Voltage = 18,
+        RuntimeUiIna228Current = 19,
+        RuntimeUiIna228Power = 20,
+        RuntimeUiIna228Temperature = 21,
+        RuntimeUiIna228Energy = 22,
+        RuntimeUiIna228Charge = 23,
     };
 
     static bool tickFastAds_(void* ctx, uint32_t nowMs);
@@ -242,6 +249,7 @@ private:
     IAnalogSourceDriver* allocBmp280Driver_(const char* driverId, I2CBus* bus, const Bmp280DriverConfig& cfg);
     IAnalogSourceDriver* allocBme680Driver_(const char* driverId, I2CBus* bus, const Bme680DriverConfig& cfg);
     IAnalogSourceDriver* allocIna226Driver_(const char* driverId, I2CBus* bus, const Ina226DriverConfig& cfg);
+    IAnalogSourceDriver* allocIna228Driver_(const char* driverId, I2CBus* bus, const Ina228DriverConfig& cfg);
     IDigitalPinDriver* allocPcfBitDriver_(const char* driverId, Pcf8574Driver* parent, uint8_t bit, bool activeHigh);
     IDigitalPinDriver* allocTcaBitDriver_(const char* driverId, Tca9554Driver* parent, uint8_t bit, bool activeHigh);
     IDigitalPinDriver* allocMcpBitDriver_(const char* driverId, Mcp23017Driver* parent, uint8_t bit, bool activeHigh);
@@ -625,6 +633,7 @@ private:
     alignas(Bmp280Driver) uint8_t bmp280DriverPool_[1][sizeof(Bmp280Driver)]{};
     alignas(Bme680Driver) uint8_t bme680DriverPool_[1][sizeof(Bme680Driver)]{};
     alignas(Ina226Driver) uint8_t ina226DriverPool_[1][sizeof(Ina226Driver)]{};
+    alignas(Ina228Driver) uint8_t ina228DriverPool_[1][sizeof(Ina228Driver)]{};
     alignas(Pcf8574Driver) uint8_t pcfDriverPool_[1][sizeof(Pcf8574Driver)]{};
     alignas(Tca9554Driver) uint8_t tcaDriverPool_[1][sizeof(Tca9554Driver)]{};
     alignas(Mcp23017Driver) uint8_t mcpDriverPool_[1][sizeof(Mcp23017Driver)]{};
@@ -643,6 +652,7 @@ private:
     uint8_t bmp280DriverPoolUsed_ = 0;
     uint8_t bme680DriverPoolUsed_ = 0;
     uint8_t ina226DriverPoolUsed_ = 0;
+    uint8_t ina228DriverPoolUsed_ = 0;
     uint8_t pcfDriverPoolUsed_ = 0;
     uint8_t tcaDriverPoolUsed_ = 0;
     uint8_t mcpDriverPoolUsed_ = 0;
@@ -692,6 +702,10 @@ private:
     ConfigVariable<uint8_t,0> ina226AddressVar_ { NVS_KEY(NvsKeys::Io::IO_INAAD),"address","io/drivers/ina226",ConfigType::UInt8,&cfgData_.ina226Address,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> ina226PollVar_ { NVS_KEY(NvsKeys::Io::IO_INAPL),"poll_ms","io/drivers/ina226",ConfigType::Int32,&cfgData_.ina226PollMs,ConfigPersistence::Persistent,0 };
     ConfigVariable<float,0> ina226ShuntOhmsVar_ { NVS_KEY(NvsKeys::Io::IO_INASH),"shunt_ohms","io/drivers/ina226",ConfigType::Float,&cfgData_.ina226ShuntOhms,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> ina228EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_IN8EN),"enabled","io/drivers/ina228",ConfigType::Bool,&cfgData_.ina228Enabled,ConfigPersistence::Persistent,0 };
+    ConfigVariable<uint8_t,0> ina228AddressVar_ { NVS_KEY(NvsKeys::Io::IO_IN8AD),"address","io/drivers/ina228",ConfigType::UInt8,&cfgData_.ina228Address,ConfigPersistence::Persistent,0 };
+    ConfigVariable<int32_t,0> ina228PollVar_ { NVS_KEY(NvsKeys::Io::IO_IN8PL),"poll_ms","io/drivers/ina228",ConfigType::Int32,&cfgData_.ina228PollMs,ConfigPersistence::Persistent,0 };
+    ConfigVariable<float,0> ina228ShuntOhmsVar_ { NVS_KEY(NvsKeys::Io::IO_IN8SH),"shunt_ohms","io/drivers/ina228",ConfigType::Float,&cfgData_.ina228ShuntOhms,ConfigPersistence::Persistent,0 };
     ConfigVariable<bool,0> pcfEnabledVar_ { NVS_KEY(NvsKeys::Io::IO_PCFEN),"enabled","io/drivers/pcf857x",ConfigType::Bool,&cfgData_.pcfEnabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<uint8_t,0> pcfAddressVar_ { NVS_KEY(NvsKeys::Io::IO_PCFAD),"address","io/drivers/pcf857x",ConfigType::UInt8,&cfgData_.pcfAddress,ConfigPersistence::Persistent,0 };
     ConfigVariable<uint8_t,0> pcfMaskDefaultVar_ { NVS_KEY(NvsKeys::Io::IO_PCFMK),"mask_default","io/drivers/pcf857x",ConfigType::UInt8,&cfgData_.pcfMaskDefault,ConfigPersistence::Persistent,0 };

@@ -20,6 +20,9 @@
     "io/drivers/ina226/address": {
       "display_format": "hex"
     },
+    "io/drivers/ina228/address": {
+      "display_format": "hex"
+    },
     "io/drivers/pcf857x/address": {
       "display_format": "hex"
     },
@@ -415,6 +418,38 @@
         {
           "value": 142,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.21.label"
+        },
+        {
+          "value": 143,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.22.label"
+        },
+        {
+          "value": 144,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.23.label"
+        },
+        {
+          "value": 145,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.24.label"
+        },
+        {
+          "value": 146,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.25.label"
+        },
+        {
+          "value": 147,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.26.label"
+        },
+        {
+          "value": 148,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.27.label"
+        },
+        {
+          "value": 149,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.28.label"
+        },
+        {
+          "value": 150,
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.29.label"
         }
       ],
       "flowio_binding_port_digital_input": [

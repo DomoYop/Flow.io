@@ -86,6 +86,7 @@ Backends actuellement gérés par le module:
 - sondes `DS18B20`
 - capteurs `SHT40`, `BMP280`, `BME680`
 - mesures électriques `INA226`
+- mesures électriques `INA228` (20 bits: tension, courant, puissance, température, énergie, charge)
 - compteur d'impulsions sur GPIO avec debounce
 
 Les `IoBackend` visibles dans le service sont:
@@ -99,6 +100,7 @@ Les `IoBackend` visibles dans le service sont:
 - `IO_BACKEND_BMP280`
 - `IO_BACKEND_BME680`
 - `IO_BACKEND_INA226`
+- `IO_BACKEND_INA228`
 
 ## Modèle de binding actuel
 
@@ -123,6 +125,7 @@ Ports déclarés actuellement:
 - BMP280: `PortBmp280Temp`, `PortBmp280Pressure`
 - BME680: `PortBme680Temp`, `PortBme680Humidity`, `PortBme680Pressure`, `PortBme680Gas`
 - INA226: `PortIna226ShuntMv`, `PortIna226BusV`, `PortIna226CurrentMa`, `PortIna226PowerMw`, `PortIna226LoadV`
+- INA228: `PortIna228ShuntMv`, `PortIna228BusV`, `PortIna228CurrentMa`, `PortIna228PowerMw`, `PortIna228LoadV`, `PortIna228Temp`, `PortIna228Energy`, `PortIna228Charge`
 - entrées digitales GPIO: `PortDigitalIn1..4`
 - sorties relais GPIO: `PortRelay1..8`
 - sorties PCF8574: `PortPcf0Bit0..7`

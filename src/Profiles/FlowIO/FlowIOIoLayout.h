@@ -32,6 +32,14 @@ enum : PhysicalPortId {
     PortIna226CurrentMa = 140, // INA226: courant (mA).
     PortIna226PowerMw = 141, // INA226: puissance (mW).
     PortIna226LoadV = 142, // INA226: tension charge (V).
+    PortIna228ShuntMv = 143, // INA228: tension shunt (mV).
+    PortIna228BusV = 144, // INA228: tension bus (V).
+    PortIna228CurrentMa = 145, // INA228: courant (mA).
+    PortIna228PowerMw = 146, // INA228: puissance (mW).
+    PortIna228LoadV = 147, // INA228: tension charge (V).
+    PortIna228Temp = 148, // INA228: temperature (degC).
+    PortIna228Energy = 149, // INA228: energie (Wh).
+    PortIna228Charge = 150, // INA228: charge (mAh).
     PortDigitalIn1 = 200, // Entree digitale 1 (GPIO board).
     PortDigitalIn2 = 201, // Entree digitale 2 (GPIO board).
     PortDigitalIn3 = 202, // Entree digitale 3 (GPIO board).
@@ -77,6 +85,14 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortIna226CurrentMa, IO_PORT_KIND_INA226, 2, 0}, // INA226 courant.
     {PortIna226PowerMw, IO_PORT_KIND_INA226, 3, 0}, // INA226 puissance.
     {PortIna226LoadV, IO_PORT_KIND_INA226, 4, 0}, // INA226 tension charge.
+    {PortIna228ShuntMv, IO_PORT_KIND_INA228, 0, 0}, // INA228 shunt.
+    {PortIna228BusV, IO_PORT_KIND_INA228, 1, 0}, // INA228 bus.
+    {PortIna228CurrentMa, IO_PORT_KIND_INA228, 2, 0}, // INA228 courant.
+    {PortIna228PowerMw, IO_PORT_KIND_INA228, 3, 0}, // INA228 puissance.
+    {PortIna228LoadV, IO_PORT_KIND_INA228, 4, 0}, // INA228 tension charge.
+    {PortIna228Temp, IO_PORT_KIND_INA228, 5, 0}, // INA228 temperature.
+    {PortIna228Energy, IO_PORT_KIND_INA228, 6, 0}, // INA228 energie.
+    {PortIna228Charge, IO_PORT_KIND_INA228, 7, 0}, // INA228 charge.
     {PortDigitalIn1, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[8].pin, 0}, // Entree digitale 1 via GPIO de la board.
     {PortDigitalIn2, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[9].pin, 0}, // Entree digitale 2 via GPIO de la board.
     {PortDigitalIn3, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[10].pin, 0}, // Entree digitale 3 via GPIO de la board.

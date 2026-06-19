@@ -30,6 +30,14 @@ enum : PhysicalPortId {
     PortIna226CurrentMa = 140, // INA226: courant (mA).
     PortIna226PowerMw = 141, // INA226: puissance (mW).
     PortIna226LoadV = 142, // INA226: tension charge (V).
+    PortIna228ShuntMv = 143, // INA228: tension shunt (mV).
+    PortIna228BusV = 144, // INA228: tension bus (V).
+    PortIna228CurrentMa = 145, // INA228: courant (mA).
+    PortIna228PowerMw = 146, // INA228: puissance (mW).
+    PortIna228LoadV = 147, // INA228: tension charge (V).
+    PortIna228Temp = 148, // INA228: temperature (degC).
+    PortIna228Energy = 149, // INA228: energie (Wh).
+    PortIna228Charge = 150, // INA228: charge (mAh).
     PortDin0 = 200, // DIN0.
     PortDin1 = 201, // DIN1.
     PortDin2 = 202, // DIN2.
@@ -87,6 +95,14 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortIna226CurrentMa, IO_PORT_KIND_INA226, 2, 0}, // INA226 courant.
     {PortIna226PowerMw, IO_PORT_KIND_INA226, 3, 0}, // INA226 puissance.
     {PortIna226LoadV, IO_PORT_KIND_INA226, 4, 0}, // INA226 tension charge.
+    {PortIna228ShuntMv, IO_PORT_KIND_INA228, 0, 0}, // INA228 shunt.
+    {PortIna228BusV, IO_PORT_KIND_INA228, 1, 0}, // INA228 bus.
+    {PortIna228CurrentMa, IO_PORT_KIND_INA228, 2, 0}, // INA228 courant.
+    {PortIna228PowerMw, IO_PORT_KIND_INA228, 3, 0}, // INA228 puissance.
+    {PortIna228LoadV, IO_PORT_KIND_INA228, 4, 0}, // INA228 tension charge.
+    {PortIna228Temp, IO_PORT_KIND_INA228, 5, 0}, // INA228 temperature.
+    {PortIna228Energy, IO_PORT_KIND_INA228, 6, 0}, // INA228 energie.
+    {PortIna228Charge, IO_PORT_KIND_INA228, 7, 0}, // INA228 charge.
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
     {PortDin0, IO_PORT_KIND_GPIO_INPUT, 4, 0}, // DIN0 GPIO4.
     {PortDin1, IO_PORT_KIND_GPIO_INPUT, 5, 0}, // DIN1 GPIO5.

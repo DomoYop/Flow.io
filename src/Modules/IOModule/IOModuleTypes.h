@@ -38,6 +38,10 @@ struct IOModuleConfig {
     uint8_t ina226Address = 0x40;
     int32_t ina226PollMs = 500;
     float ina226ShuntOhms = 0.1f;
+    bool ina228Enabled = false;
+    uint8_t ina228Address = 0x40;
+    int32_t ina228PollMs = 500;
+    float ina228ShuntOhms = 0.1f;
     bool pcfEnabled = FLOW_WIRDEF_IO_PCFEN;
     uint8_t pcfAddress = FLOW_WIRDEF_IO_PCFAD;
     uint8_t pcfMaskDefault = FLOW_WIRDEF_IO_PCFMK;
@@ -71,7 +75,8 @@ enum IOAnalogSource : uint8_t {
     IO_SRC_BMP280 = 5,
     IO_SRC_BME680 = 6,
     IO_SRC_INA226 = 7,
-    IO_SRC_COUNT = 8
+    IO_SRC_INA228 = 8,
+    IO_SRC_COUNT = 9
 };
 
 constexpr uint8_t IO_ANALOG_SOURCE_INVALID = 0xFFu;
@@ -90,7 +95,8 @@ enum IOBindingPortKind : uint8_t {
     IO_PORT_KIND_BMP280 = 10,
     IO_PORT_KIND_BME680 = 11,
     IO_PORT_KIND_TCA9554_OUTPUT = 12,
-    IO_PORT_KIND_MCP23017_OUTPUT = 13
+    IO_PORT_KIND_MCP23017_OUTPUT = 13,
+    IO_PORT_KIND_INA228 = 14
 };
 
 struct IOBindingPortSpec {
