@@ -3,13 +3,16 @@
  * @file Ds2484Bus.h
  * @brief 1-Wire bus driven through a DS2484 I2C-to-1-Wire master.
  *
- * Implements the IOneWireBus interface using raw I2C transactions (no extra
- * library): device/1-Wire reset, byte read/write, search triplet, ROM search
- * and DS18B20 scratchpad reads. Lets IOModule treat DS18B20 sensors wired on a
- * DS2484 bridge exactly like sensors on a bit-bang GPIO OneWireBus.
+ * Implements the IOneWireBus interface on top of the Adafruit_DS248x library:
+ * the DS2484 protocol, 1-Wire primitives and ROM search are delegated to the
+ * library, while DS18B20 scratchpad decoding stays here. Lets IOModule treat
+ * DS18B20 sensors wired on a DS2484 bridge exactly like sensors on a bit-bang
+ * GPIO OneWireBus. All I2C traffic is serialized through the shared I2CBus lock.
  */
 
+#include <Adafruit_DS248x.h>
 #include <stdint.h>
+
 #include "Modules/IOModule/IOBus/IOneWireBus.h"
 
 class I2CBus;
@@ -38,24 +41,14 @@ public:
     bool present() const { return present_; }
 
 private:
-    // DS2484 device reset + configuration (active pull-up).
-    bool deviceReset_();
-    bool writeConfig_(uint8_t config);
-    bool setReadPointer_(uint8_t pointer) const;
-    bool readStatus_(uint8_t& status) const;
-    bool waitNotBusy_(uint8_t& status) const;
-
-    // 1-Wire primitives over the bridge.
-    bool owReset_(bool& presencePulse) const;
-    bool owWriteByte_(uint8_t value) const;
-    bool owReadByte_(uint8_t& value) const;
-    bool owTriplet_(bool dir, uint8_t& status) const;
-
     bool searchRoms_();
     bool readScratchpad_(const uint8_t addr[8], uint8_t out[9]) const;
     static uint8_t crc8_(const uint8_t* data, uint8_t len);
 
     I2CBus* bus_ = nullptr;
+    // mutable: readC()/readScratchpad_() are const but the library's OneWire ops
+    // are not (same pattern as `mutable DallasTemperature dt_` in OneWireBus.h).
+    mutable Adafruit_DS248x ds_;
     uint8_t i2cAddr_ = kDefaultI2cAddress;
     bool started_ = false;
     bool present_ = false;
@@ -63,9 +56,4 @@ private:
 
     uint8_t roms_[kMaxDevices][8] = {{0}};
     uint8_t romCount_ = 0;
-
-    // Search state.
-    uint8_t searchRom_[8] = {0};
-    int lastDiscrepancy_ = 0;
-    bool lastDeviceFlag_ = false;
 };
