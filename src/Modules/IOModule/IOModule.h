@@ -41,6 +41,7 @@
 #include "Modules/IOModule/IOProviders/IOProviders.h"
 #include "Modules/IOModule/IORegistry/IORegistry.h"
 #include "Modules/IOModule/IOScheduler/IOScheduler.h"
+#include <stdio.h>
 
 class DataStore;
 class OneWireBus;
@@ -92,6 +93,7 @@ public:
     void setOneWireBuses(OneWireBus* gpio1, OneWireBus* gpio2);
     void setBindingPorts(const IOBindingPortSpec* ports, uint8_t count);
     bool defineAnalogInput(const IOAnalogDefinition& def);
+    bool applyAnalogInputDefaults(const IOAnalogDefinition& def);
     bool defineDigitalInput(const IODigitalInputDefinition& def);
     bool defineDigitalOutput(const IODigitalOutputDefinition& def);
     const char* analogSlotName(uint8_t idx) const;
@@ -269,6 +271,7 @@ private:
     static constexpr uint8_t DIGITAL_INPUT_CFG_STORAGE_SLOTS =
         (DIGITAL_INPUT_CFG_SLOTS < 8U) ? 8U : DIGITAL_INPUT_CFG_SLOTS;
     static constexpr uint8_t DIGITAL_CFG_STORAGE_SLOTS = (DIGITAL_CFG_SLOTS < 16U) ? 16U : DIGITAL_CFG_SLOTS;
+    static_assert(ANALOG_CFG_SLOTS <= 32U, "ExtraAnalogConfigVars currently supports analog slots a00..a31");
     /** End-exclusive upper bounds for each static id range. */
     static constexpr IoId IO_ID_DO_MAX = IO_ID_DO_BASE + MAX_DIGITAL_OUTPUTS;
     static constexpr IoId IO_ID_DI_MAX = IO_ID_DI_BASE + MAX_DIGITAL_INPUTS;
@@ -318,119 +321,87 @@ private:
     };
 
     struct ExtraAnalogConfigVars {
-        ConfigVariable<char,0> a6NameVar_;
-        ConfigVariable<PhysicalPortId,0> a6BindingVar_;
-        ConfigVariable<float,0> a6C0Var_;
-        ConfigVariable<float,0> a6C1Var_;
-        ConfigVariable<int32_t,0> a6PrecVar_;
-        ConfigVariable<char,0> a7NameVar_;
-        ConfigVariable<PhysicalPortId,0> a7BindingVar_;
-        ConfigVariable<float,0> a7C0Var_;
-        ConfigVariable<float,0> a7C1Var_;
-        ConfigVariable<int32_t,0> a7PrecVar_;
-        ConfigVariable<char,0> a8NameVar_;
-        ConfigVariable<PhysicalPortId,0> a8BindingVar_;
-        ConfigVariable<float,0> a8C0Var_;
-        ConfigVariable<float,0> a8C1Var_;
-        ConfigVariable<int32_t,0> a8PrecVar_;
-        ConfigVariable<char,0> a9NameVar_;
-        ConfigVariable<PhysicalPortId,0> a9BindingVar_;
-        ConfigVariable<float,0> a9C0Var_;
-        ConfigVariable<float,0> a9C1Var_;
-        ConfigVariable<int32_t,0> a9PrecVar_;
-        ConfigVariable<char,0> a10NameVar_;
-        ConfigVariable<PhysicalPortId,0> a10BindingVar_;
-        ConfigVariable<float,0> a10C0Var_;
-        ConfigVariable<float,0> a10C1Var_;
-        ConfigVariable<int32_t,0> a10PrecVar_;
-        ConfigVariable<char,0> a11NameVar_;
-        ConfigVariable<PhysicalPortId,0> a11BindingVar_;
-        ConfigVariable<float,0> a11C0Var_;
-        ConfigVariable<float,0> a11C1Var_;
-        ConfigVariable<int32_t,0> a11PrecVar_;
-        ConfigVariable<char,0> a12NameVar_;
-        ConfigVariable<PhysicalPortId,0> a12BindingVar_;
-        ConfigVariable<float,0> a12C0Var_;
-        ConfigVariable<float,0> a12C1Var_;
-        ConfigVariable<int32_t,0> a12PrecVar_;
-        ConfigVariable<char,0> a13NameVar_;
-        ConfigVariable<PhysicalPortId,0> a13BindingVar_;
-        ConfigVariable<float,0> a13C0Var_;
-        ConfigVariable<float,0> a13C1Var_;
-        ConfigVariable<int32_t,0> a13PrecVar_;
-        ConfigVariable<char,0> a14NameVar_;
-        ConfigVariable<PhysicalPortId,0> a14BindingVar_;
-        ConfigVariable<float,0> a14C0Var_;
-        ConfigVariable<float,0> a14C1Var_;
-        ConfigVariable<int32_t,0> a14PrecVar_;
-        ConfigVariable<char,0> a15NameVar_;
-        ConfigVariable<PhysicalPortId,0> a15BindingVar_;
-        ConfigVariable<float,0> a15C0Var_;
-        ConfigVariable<float,0> a15C1Var_;
-        ConfigVariable<int32_t,0> a15PrecVar_;
-        ConfigVariable<char,0> a16NameVar_;
-        ConfigVariable<PhysicalPortId,0> a16BindingVar_;
-        ConfigVariable<float,0> a16C0Var_;
-        ConfigVariable<float,0> a16C1Var_;
-        ConfigVariable<int32_t,0> a16PrecVar_;
+        static constexpr uint8_t FIRST_SLOT = 6U;
+        static constexpr uint8_t SLOT_COUNT = 26U; // a06..a31
+
+        struct SlotVars {
+            char nameJson[9] = {0};
+            char c0Json[8] = {0};
+            char c1Json[8] = {0};
+            char precJson[10] = {0};
+            char moduleName[13] = {0};
+            ConfigVariable<char,0> nameVar_;
+            ConfigVariable<PhysicalPortId,0> bindingVar_;
+            ConfigVariable<float,0> c0Var_;
+            ConfigVariable<float,0> c1Var_;
+            ConfigVariable<int32_t,0> precVar_;
+        };
+
+        SlotVars slots[SLOT_COUNT]{};
 
         explicit ExtraAnalogConfigVars(IOAnalogSlotConfig* analogCfg)
-            : a6NameVar_{NVS_KEY(NvsKeys::Io::IO_A6NM), "a06_name", "io/input/a06", ConfigType::CharArray, (char*)analogCfg[6].name, ConfigPersistence::Persistent, sizeof(analogCfg[6].name)},
-              a6BindingVar_{NVS_KEY(NvsKeys::Io::IO_A6BP), "binding_port", "io/input/a06", ConfigType::UInt16, &analogCfg[6].bindingPort, ConfigPersistence::Persistent, 0},
-              a6C0Var_{NVS_KEY(NvsKeys::Io::IO_A60), "a06_c0", "io/input/a06", ConfigType::Float, &analogCfg[6].c0, ConfigPersistence::Persistent, 0},
-              a6C1Var_{NVS_KEY(NvsKeys::Io::IO_A61), "a06_c1", "io/input/a06", ConfigType::Float, &analogCfg[6].c1, ConfigPersistence::Persistent, 0},
-              a6PrecVar_{NVS_KEY(NvsKeys::Io::IO_A6P), "a06_prec", "io/input/a06", ConfigType::Int32, &analogCfg[6].precision, ConfigPersistence::Persistent, 0},
-              a7NameVar_{NVS_KEY(NvsKeys::Io::IO_A7NM), "a07_name", "io/input/a07", ConfigType::CharArray, (char*)analogCfg[7].name, ConfigPersistence::Persistent, sizeof(analogCfg[7].name)},
-              a7BindingVar_{NVS_KEY(NvsKeys::Io::IO_A7BP), "binding_port", "io/input/a07", ConfigType::UInt16, &analogCfg[7].bindingPort, ConfigPersistence::Persistent, 0},
-              a7C0Var_{NVS_KEY(NvsKeys::Io::IO_A70), "a07_c0", "io/input/a07", ConfigType::Float, &analogCfg[7].c0, ConfigPersistence::Persistent, 0},
-              a7C1Var_{NVS_KEY(NvsKeys::Io::IO_A71), "a07_c1", "io/input/a07", ConfigType::Float, &analogCfg[7].c1, ConfigPersistence::Persistent, 0},
-              a7PrecVar_{NVS_KEY(NvsKeys::Io::IO_A7P), "a07_prec", "io/input/a07", ConfigType::Int32, &analogCfg[7].precision, ConfigPersistence::Persistent, 0},
-              a8NameVar_{NVS_KEY(NvsKeys::Io::IO_A8NM), "a08_name", "io/input/a08", ConfigType::CharArray, (char*)analogCfg[8].name, ConfigPersistence::Persistent, sizeof(analogCfg[8].name)},
-              a8BindingVar_{NVS_KEY(NvsKeys::Io::IO_A8BP), "binding_port", "io/input/a08", ConfigType::UInt16, &analogCfg[8].bindingPort, ConfigPersistence::Persistent, 0},
-              a8C0Var_{NVS_KEY(NvsKeys::Io::IO_A80), "a08_c0", "io/input/a08", ConfigType::Float, &analogCfg[8].c0, ConfigPersistence::Persistent, 0},
-              a8C1Var_{NVS_KEY(NvsKeys::Io::IO_A81), "a08_c1", "io/input/a08", ConfigType::Float, &analogCfg[8].c1, ConfigPersistence::Persistent, 0},
-              a8PrecVar_{NVS_KEY(NvsKeys::Io::IO_A8P), "a08_prec", "io/input/a08", ConfigType::Int32, &analogCfg[8].precision, ConfigPersistence::Persistent, 0},
-              a9NameVar_{NVS_KEY(NvsKeys::Io::IO_A9NM), "a09_name", "io/input/a09", ConfigType::CharArray, (char*)analogCfg[9].name, ConfigPersistence::Persistent, sizeof(analogCfg[9].name)},
-              a9BindingVar_{NVS_KEY(NvsKeys::Io::IO_A9BP), "binding_port", "io/input/a09", ConfigType::UInt16, &analogCfg[9].bindingPort, ConfigPersistence::Persistent, 0},
-              a9C0Var_{NVS_KEY(NvsKeys::Io::IO_A90), "a09_c0", "io/input/a09", ConfigType::Float, &analogCfg[9].c0, ConfigPersistence::Persistent, 0},
-              a9C1Var_{NVS_KEY(NvsKeys::Io::IO_A91), "a09_c1", "io/input/a09", ConfigType::Float, &analogCfg[9].c1, ConfigPersistence::Persistent, 0},
-              a9PrecVar_{NVS_KEY(NvsKeys::Io::IO_A9P), "a09_prec", "io/input/a09", ConfigType::Int32, &analogCfg[9].precision, ConfigPersistence::Persistent, 0},
-              a10NameVar_{NVS_KEY(NvsKeys::Io::IO_A10NM), "a10_name", "io/input/a10", ConfigType::CharArray, (char*)analogCfg[10].name, ConfigPersistence::Persistent, sizeof(analogCfg[10].name)},
-              a10BindingVar_{NVS_KEY(NvsKeys::Io::IO_A10BP), "binding_port", "io/input/a10", ConfigType::UInt16, &analogCfg[10].bindingPort, ConfigPersistence::Persistent, 0},
-              a10C0Var_{NVS_KEY(NvsKeys::Io::IO_A100), "a10_c0", "io/input/a10", ConfigType::Float, &analogCfg[10].c0, ConfigPersistence::Persistent, 0},
-              a10C1Var_{NVS_KEY(NvsKeys::Io::IO_A101), "a10_c1", "io/input/a10", ConfigType::Float, &analogCfg[10].c1, ConfigPersistence::Persistent, 0},
-              a10PrecVar_{NVS_KEY(NvsKeys::Io::IO_A10P), "a10_prec", "io/input/a10", ConfigType::Int32, &analogCfg[10].precision, ConfigPersistence::Persistent, 0},
-              a11NameVar_{NVS_KEY(NvsKeys::Io::IO_A11NM), "a11_name", "io/input/a11", ConfigType::CharArray, (char*)analogCfg[11].name, ConfigPersistence::Persistent, sizeof(analogCfg[11].name)},
-              a11BindingVar_{NVS_KEY(NvsKeys::Io::IO_A11BP), "binding_port", "io/input/a11", ConfigType::UInt16, &analogCfg[11].bindingPort, ConfigPersistence::Persistent, 0},
-              a11C0Var_{NVS_KEY(NvsKeys::Io::IO_A110), "a11_c0", "io/input/a11", ConfigType::Float, &analogCfg[11].c0, ConfigPersistence::Persistent, 0},
-              a11C1Var_{NVS_KEY(NvsKeys::Io::IO_A111), "a11_c1", "io/input/a11", ConfigType::Float, &analogCfg[11].c1, ConfigPersistence::Persistent, 0},
-              a11PrecVar_{NVS_KEY(NvsKeys::Io::IO_A11P), "a11_prec", "io/input/a11", ConfigType::Int32, &analogCfg[11].precision, ConfigPersistence::Persistent, 0},
-              a12NameVar_{NVS_KEY(NvsKeys::Io::IO_A12NM), "a12_name", "io/input/a12", ConfigType::CharArray, (char*)analogCfg[12].name, ConfigPersistence::Persistent, sizeof(analogCfg[12].name)},
-              a12BindingVar_{NVS_KEY(NvsKeys::Io::IO_A12BP), "binding_port", "io/input/a12", ConfigType::UInt16, &analogCfg[12].bindingPort, ConfigPersistence::Persistent, 0},
-              a12C0Var_{NVS_KEY(NvsKeys::Io::IO_A120), "a12_c0", "io/input/a12", ConfigType::Float, &analogCfg[12].c0, ConfigPersistence::Persistent, 0},
-              a12C1Var_{NVS_KEY(NvsKeys::Io::IO_A121), "a12_c1", "io/input/a12", ConfigType::Float, &analogCfg[12].c1, ConfigPersistence::Persistent, 0},
-              a12PrecVar_{NVS_KEY(NvsKeys::Io::IO_A12P), "a12_prec", "io/input/a12", ConfigType::Int32, &analogCfg[12].precision, ConfigPersistence::Persistent, 0},
-              a13NameVar_{NVS_KEY(NvsKeys::Io::IO_A13NM), "a13_name", "io/input/a13", ConfigType::CharArray, (char*)analogCfg[13].name, ConfigPersistence::Persistent, sizeof(analogCfg[13].name)},
-              a13BindingVar_{NVS_KEY(NvsKeys::Io::IO_A13BP), "binding_port", "io/input/a13", ConfigType::UInt16, &analogCfg[13].bindingPort, ConfigPersistence::Persistent, 0},
-              a13C0Var_{NVS_KEY(NvsKeys::Io::IO_A130), "a13_c0", "io/input/a13", ConfigType::Float, &analogCfg[13].c0, ConfigPersistence::Persistent, 0},
-              a13C1Var_{NVS_KEY(NvsKeys::Io::IO_A131), "a13_c1", "io/input/a13", ConfigType::Float, &analogCfg[13].c1, ConfigPersistence::Persistent, 0},
-              a13PrecVar_{NVS_KEY(NvsKeys::Io::IO_A13P), "a13_prec", "io/input/a13", ConfigType::Int32, &analogCfg[13].precision, ConfigPersistence::Persistent, 0},
-              a14NameVar_{NVS_KEY(NvsKeys::Io::IO_A14NM), "a14_name", "io/input/a14", ConfigType::CharArray, (char*)analogCfg[14].name, ConfigPersistence::Persistent, sizeof(analogCfg[14].name)},
-              a14BindingVar_{NVS_KEY(NvsKeys::Io::IO_A14BP), "binding_port", "io/input/a14", ConfigType::UInt16, &analogCfg[14].bindingPort, ConfigPersistence::Persistent, 0},
-              a14C0Var_{NVS_KEY(NvsKeys::Io::IO_A140), "a14_c0", "io/input/a14", ConfigType::Float, &analogCfg[14].c0, ConfigPersistence::Persistent, 0},
-              a14C1Var_{NVS_KEY(NvsKeys::Io::IO_A141), "a14_c1", "io/input/a14", ConfigType::Float, &analogCfg[14].c1, ConfigPersistence::Persistent, 0},
-              a14PrecVar_{NVS_KEY(NvsKeys::Io::IO_A14P), "a14_prec", "io/input/a14", ConfigType::Int32, &analogCfg[14].precision, ConfigPersistence::Persistent, 0},
-              a15NameVar_{NVS_KEY(NvsKeys::Io::IO_A15NM), "a15_name", "io/input/a15", ConfigType::CharArray, (char*)analogCfg[15].name, ConfigPersistence::Persistent, sizeof(analogCfg[15].name)},
-              a15BindingVar_{NVS_KEY(NvsKeys::Io::IO_A15BP), "binding_port", "io/input/a15", ConfigType::UInt16, &analogCfg[15].bindingPort, ConfigPersistence::Persistent, 0},
-              a15C0Var_{NVS_KEY(NvsKeys::Io::IO_A150), "a15_c0", "io/input/a15", ConfigType::Float, &analogCfg[15].c0, ConfigPersistence::Persistent, 0},
-              a15C1Var_{NVS_KEY(NvsKeys::Io::IO_A151), "a15_c1", "io/input/a15", ConfigType::Float, &analogCfg[15].c1, ConfigPersistence::Persistent, 0},
-              a15PrecVar_{NVS_KEY(NvsKeys::Io::IO_A15P), "a15_prec", "io/input/a15", ConfigType::Int32, &analogCfg[15].precision, ConfigPersistence::Persistent, 0},
-              a16NameVar_{NVS_KEY(NvsKeys::Io::IO_A16NM), "a16_name", "io/input/a16", ConfigType::CharArray, (char*)analogCfg[16].name, ConfigPersistence::Persistent, sizeof(analogCfg[16].name)},
-              a16BindingVar_{NVS_KEY(NvsKeys::Io::IO_A16BP), "binding_port", "io/input/a16", ConfigType::UInt16, &analogCfg[16].bindingPort, ConfigPersistence::Persistent, 0},
-              a16C0Var_{NVS_KEY(NvsKeys::Io::IO_A160), "a16_c0", "io/input/a16", ConfigType::Float, &analogCfg[16].c0, ConfigPersistence::Persistent, 0},
-              a16C1Var_{NVS_KEY(NvsKeys::Io::IO_A161), "a16_c1", "io/input/a16", ConfigType::Float, &analogCfg[16].c1, ConfigPersistence::Persistent, 0},
-              a16PrecVar_{NVS_KEY(NvsKeys::Io::IO_A16P), "a16_prec", "io/input/a16", ConfigType::Int32, &analogCfg[16].precision, ConfigPersistence::Persistent, 0}
         {
+            static constexpr const char* kNameKeys[SLOT_COUNT] = {
+                NVS_KEY(NvsKeys::Io::IO_A6NM), NVS_KEY(NvsKeys::Io::IO_A7NM), NVS_KEY(NvsKeys::Io::IO_A8NM), NVS_KEY(NvsKeys::Io::IO_A9NM),
+                NVS_KEY(NvsKeys::Io::IO_A10NM), NVS_KEY(NvsKeys::Io::IO_A11NM), NVS_KEY(NvsKeys::Io::IO_A12NM), NVS_KEY(NvsKeys::Io::IO_A13NM),
+                NVS_KEY(NvsKeys::Io::IO_A14NM), NVS_KEY(NvsKeys::Io::IO_A15NM), NVS_KEY(NvsKeys::Io::IO_A16NM), NVS_KEY(NvsKeys::Io::IO_A17NM),
+                NVS_KEY(NvsKeys::Io::IO_A18NM), NVS_KEY(NvsKeys::Io::IO_A19NM), NVS_KEY(NvsKeys::Io::IO_A20NM), NVS_KEY(NvsKeys::Io::IO_A21NM),
+                NVS_KEY(NvsKeys::Io::IO_A22NM), NVS_KEY(NvsKeys::Io::IO_A23NM), NVS_KEY(NvsKeys::Io::IO_A24NM), NVS_KEY(NvsKeys::Io::IO_A25NM),
+                NVS_KEY(NvsKeys::Io::IO_A26NM), NVS_KEY(NvsKeys::Io::IO_A27NM), NVS_KEY(NvsKeys::Io::IO_A28NM), NVS_KEY(NvsKeys::Io::IO_A29NM),
+                NVS_KEY(NvsKeys::Io::IO_A30NM), NVS_KEY(NvsKeys::Io::IO_A31NM)
+            };
+            static constexpr const char* kBindingKeys[SLOT_COUNT] = {
+                NVS_KEY(NvsKeys::Io::IO_A6BP), NVS_KEY(NvsKeys::Io::IO_A7BP), NVS_KEY(NvsKeys::Io::IO_A8BP), NVS_KEY(NvsKeys::Io::IO_A9BP),
+                NVS_KEY(NvsKeys::Io::IO_A10BP), NVS_KEY(NvsKeys::Io::IO_A11BP), NVS_KEY(NvsKeys::Io::IO_A12BP), NVS_KEY(NvsKeys::Io::IO_A13BP),
+                NVS_KEY(NvsKeys::Io::IO_A14BP), NVS_KEY(NvsKeys::Io::IO_A15BP), NVS_KEY(NvsKeys::Io::IO_A16BP), NVS_KEY(NvsKeys::Io::IO_A17BP),
+                NVS_KEY(NvsKeys::Io::IO_A18BP), NVS_KEY(NvsKeys::Io::IO_A19BP), NVS_KEY(NvsKeys::Io::IO_A20BP), NVS_KEY(NvsKeys::Io::IO_A21BP),
+                NVS_KEY(NvsKeys::Io::IO_A22BP), NVS_KEY(NvsKeys::Io::IO_A23BP), NVS_KEY(NvsKeys::Io::IO_A24BP), NVS_KEY(NvsKeys::Io::IO_A25BP),
+                NVS_KEY(NvsKeys::Io::IO_A26BP), NVS_KEY(NvsKeys::Io::IO_A27BP), NVS_KEY(NvsKeys::Io::IO_A28BP), NVS_KEY(NvsKeys::Io::IO_A29BP),
+                NVS_KEY(NvsKeys::Io::IO_A30BP), NVS_KEY(NvsKeys::Io::IO_A31BP)
+            };
+            static constexpr const char* kC0Keys[SLOT_COUNT] = {
+                NVS_KEY(NvsKeys::Io::IO_A60), NVS_KEY(NvsKeys::Io::IO_A70), NVS_KEY(NvsKeys::Io::IO_A80), NVS_KEY(NvsKeys::Io::IO_A90),
+                NVS_KEY(NvsKeys::Io::IO_A100), NVS_KEY(NvsKeys::Io::IO_A110), NVS_KEY(NvsKeys::Io::IO_A120), NVS_KEY(NvsKeys::Io::IO_A130),
+                NVS_KEY(NvsKeys::Io::IO_A140), NVS_KEY(NvsKeys::Io::IO_A150), NVS_KEY(NvsKeys::Io::IO_A160), NVS_KEY(NvsKeys::Io::IO_A170),
+                NVS_KEY(NvsKeys::Io::IO_A180), NVS_KEY(NvsKeys::Io::IO_A190), NVS_KEY(NvsKeys::Io::IO_A200), NVS_KEY(NvsKeys::Io::IO_A210),
+                NVS_KEY(NvsKeys::Io::IO_A220), NVS_KEY(NvsKeys::Io::IO_A230), NVS_KEY(NvsKeys::Io::IO_A240), NVS_KEY(NvsKeys::Io::IO_A250),
+                NVS_KEY(NvsKeys::Io::IO_A260), NVS_KEY(NvsKeys::Io::IO_A270), NVS_KEY(NvsKeys::Io::IO_A280), NVS_KEY(NvsKeys::Io::IO_A290),
+                NVS_KEY(NvsKeys::Io::IO_A300), NVS_KEY(NvsKeys::Io::IO_A310)
+            };
+            static constexpr const char* kC1Keys[SLOT_COUNT] = {
+                NVS_KEY(NvsKeys::Io::IO_A61), NVS_KEY(NvsKeys::Io::IO_A71), NVS_KEY(NvsKeys::Io::IO_A81), NVS_KEY(NvsKeys::Io::IO_A91),
+                NVS_KEY(NvsKeys::Io::IO_A101), NVS_KEY(NvsKeys::Io::IO_A111), NVS_KEY(NvsKeys::Io::IO_A121), NVS_KEY(NvsKeys::Io::IO_A131),
+                NVS_KEY(NvsKeys::Io::IO_A141), NVS_KEY(NvsKeys::Io::IO_A151), NVS_KEY(NvsKeys::Io::IO_A161), NVS_KEY(NvsKeys::Io::IO_A171),
+                NVS_KEY(NvsKeys::Io::IO_A181), NVS_KEY(NvsKeys::Io::IO_A191), NVS_KEY(NvsKeys::Io::IO_A201), NVS_KEY(NvsKeys::Io::IO_A211),
+                NVS_KEY(NvsKeys::Io::IO_A221), NVS_KEY(NvsKeys::Io::IO_A231), NVS_KEY(NvsKeys::Io::IO_A241), NVS_KEY(NvsKeys::Io::IO_A251),
+                NVS_KEY(NvsKeys::Io::IO_A261), NVS_KEY(NvsKeys::Io::IO_A271), NVS_KEY(NvsKeys::Io::IO_A281), NVS_KEY(NvsKeys::Io::IO_A291),
+                NVS_KEY(NvsKeys::Io::IO_A301), NVS_KEY(NvsKeys::Io::IO_A311)
+            };
+            static constexpr const char* kPrecKeys[SLOT_COUNT] = {
+                NVS_KEY(NvsKeys::Io::IO_A6P), NVS_KEY(NvsKeys::Io::IO_A7P), NVS_KEY(NvsKeys::Io::IO_A8P), NVS_KEY(NvsKeys::Io::IO_A9P),
+                NVS_KEY(NvsKeys::Io::IO_A10P), NVS_KEY(NvsKeys::Io::IO_A11P), NVS_KEY(NvsKeys::Io::IO_A12P), NVS_KEY(NvsKeys::Io::IO_A13P),
+                NVS_KEY(NvsKeys::Io::IO_A14P), NVS_KEY(NvsKeys::Io::IO_A15P), NVS_KEY(NvsKeys::Io::IO_A16P), NVS_KEY(NvsKeys::Io::IO_A17P),
+                NVS_KEY(NvsKeys::Io::IO_A18P), NVS_KEY(NvsKeys::Io::IO_A19P), NVS_KEY(NvsKeys::Io::IO_A20P), NVS_KEY(NvsKeys::Io::IO_A21P),
+                NVS_KEY(NvsKeys::Io::IO_A22P), NVS_KEY(NvsKeys::Io::IO_A23P), NVS_KEY(NvsKeys::Io::IO_A24P), NVS_KEY(NvsKeys::Io::IO_A25P),
+                NVS_KEY(NvsKeys::Io::IO_A26P), NVS_KEY(NvsKeys::Io::IO_A27P), NVS_KEY(NvsKeys::Io::IO_A28P), NVS_KEY(NvsKeys::Io::IO_A29P),
+                NVS_KEY(NvsKeys::Io::IO_A30P), NVS_KEY(NvsKeys::Io::IO_A31P)
+            };
+
+            for (uint8_t i = 0; i < SLOT_COUNT; ++i) {
+                const uint8_t slot = (uint8_t)(FIRST_SLOT + i);
+                SlotVars& vars = slots[i];
+                snprintf(vars.nameJson, sizeof(vars.nameJson), "a%02u_name", (unsigned)slot);
+                snprintf(vars.c0Json, sizeof(vars.c0Json), "a%02u_c0", (unsigned)slot);
+                snprintf(vars.c1Json, sizeof(vars.c1Json), "a%02u_c1", (unsigned)slot);
+                snprintf(vars.precJson, sizeof(vars.precJson), "a%02u_prec", (unsigned)slot);
+                snprintf(vars.moduleName, sizeof(vars.moduleName), "io/input/a%02u", (unsigned)slot);
+
+                vars.nameVar_ = {kNameKeys[i], vars.nameJson, vars.moduleName, ConfigType::CharArray, (char*)analogCfg[slot].name, ConfigPersistence::Persistent, sizeof(analogCfg[slot].name)};
+                vars.bindingVar_ = {kBindingKeys[i], "binding_port", vars.moduleName, ConfigType::UInt16, &analogCfg[slot].bindingPort, ConfigPersistence::Persistent, 0};
+                vars.c0Var_ = {kC0Keys[i], vars.c0Json, vars.moduleName, ConfigType::Float, &analogCfg[slot].c0, ConfigPersistence::Persistent, 0};
+                vars.c1Var_ = {kC1Keys[i], vars.c1Json, vars.moduleName, ConfigType::Float, &analogCfg[slot].c1, ConfigPersistence::Persistent, 0};
+                vars.precVar_ = {kPrecKeys[i], vars.precJson, vars.moduleName, ConfigType::Int32, &analogCfg[slot].precision, ConfigPersistence::Persistent, 0};
+            }
         }
     };
 

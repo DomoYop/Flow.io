@@ -312,8 +312,10 @@ bool EthernetModule::installDriver_()
         networkEventHandle_ = Network.onEvent(EthernetModule::onNetworkEventStatic_);
     }
 
+    resetPhyHardware_();
     SPI.begin(ethCfg_.sclkPin, ethCfg_.misoPin, ethCfg_.mosiPin);
     spiStarted_ = true;
+    ETH.setTaskStackSize(6144);
 
     const bool ok = ETH.begin(ETH_PHY_W5500,
                               (int32_t)ethCfg_.phyAddr,
@@ -335,6 +337,22 @@ bool EthernetModule::installDriver_()
 
     LOGI("Ethernet driver started freq_mhz=%u", (unsigned)spiFreqMhz_);
     return true;
+}
+
+void EthernetModule::resetPhyHardware_()
+{
+    if (ethCfg_.csPin >= 0) {
+        pinMode(ethCfg_.csPin, OUTPUT);
+        digitalWrite(ethCfg_.csPin, HIGH);
+    }
+    if (ethCfg_.rstPin < 0) return;
+
+    pinMode(ethCfg_.rstPin, OUTPUT);
+    digitalWrite(ethCfg_.rstPin, LOW);
+    vTaskDelay(pdMS_TO_TICKS(25));
+    digitalWrite(ethCfg_.rstPin, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(150));
+    LOGD("W5500 hardware reset pulse rst=%d", (int)ethCfg_.rstPin);
 }
 
 bool EthernetModule::ensureDriverStarted_()

@@ -52,6 +52,11 @@ private:
     const LogHubService* logHub = nullptr;
     const EventBusService* eventBusSvc_ = nullptr;
     EventBus* eventBus_ = nullptr;
+    ServiceRegistry* services_ = nullptr;
+    portMUX_TYPE restartMux_ = portMUX_INITIALIZER_UNLOCKED;
+    bool restartScheduled_ = false;
+    uint32_t restartDelayMs_ = 0U;
+    char restartReason_[24] = {0};
     SystemConfig cfgData_{};
     uint32_t localeGeneration_ = 1U;
 
@@ -72,6 +77,9 @@ private:
     static bool cmdPing(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen);
     static bool cmdReboot(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen);
     static bool cmdFactoryReset(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen);
+    static void restartTaskStatic_(void* userCtx);
+    bool scheduleRestart_(uint32_t delayMs, const char* reason);
+    void notifyShutdownPending_();
     static void onEventStatic_(const Event& e, void* user);
     void onEvent_(const Event& e);
     bool normalizeLanguage_(bool bumpGenerationIfChanged);

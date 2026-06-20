@@ -33,6 +33,9 @@ static constexpr uint8_t kCfgBranchDevices = 10;
 static constexpr uint8_t kCfgBranchHeater = 11;
 static constexpr uint8_t kCfgBranchRobot = 12;
 static constexpr uint8_t kCfgBranchRefill = 13;
+static constexpr uint32_t kStartupActivityStabilizeMs = 3000U;
+static constexpr uint32_t kStartupActivityMaxDelayMs = 30000U;
+static constexpr uint64_t kActivityMinEpoch = 1609459200ULL;
 static constexpr const char* kCfgModuleModes = "poollogic/modes";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
@@ -330,6 +333,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     const HAService* haSvc = services.get<HAService>(ServiceId::Ha);
     const CommandService* cmdSvc = services.get<CommandService>(ServiceId::Command);
     alarmSvc_ = services.get<AlarmService>(ServiceId::Alarm);
+    activityLogSvc_ = services.get<ActivityLogService>(ServiceId::ActivityLog);
     if (!ioSvc_) {
         LOGW("PoolLogic waiting for IOServiceV2");
     }
@@ -1121,6 +1125,9 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
                                services);
     }
 
+    startupActivityPending_ = true;
+    startupActivitySinceMs_ = millis();
+
     if (!enabled_) return;
 
     if (disinfectionType_ > DisinfectionDisabled) {
@@ -1184,8 +1191,55 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
     portEXIT_CRITICAL(&pendingMux_);
 }
 
+bool PoolLogicModule::activityTimeReady_() const
+{
+    if (!timeSvc_ || !timeSvc_->isSynced || !timeSvc_->epoch) return false;
+    if (!timeSvc_->isSynced(timeSvc_->ctx)) return false;
+    const uint64_t epoch = timeSvc_->epoch(timeSvc_->ctx);
+    return epoch >= kActivityMinEpoch;
+}
+
+void PoolLogicModule::emitStartupActivityIfReady_(uint32_t nowMs)
+{
+    if (!startupActivityPending_) return;
+
+    const uint32_t elapsedMs = (uint32_t)(nowMs - startupActivitySinceMs_);
+    if (elapsedMs < kStartupActivityStabilizeMs) return;
+
+    const bool timeReady = activityTimeReady_();
+    if (!timeReady && elapsedMs < kStartupActivityMaxDelayMs) return;
+
+    if (enabled_) {
+        emitActivity_(ActivityCode::PoolLogicReady,
+                      ActivitySource::System,
+                      ActivitySeverity::Success,
+                      ActivityRole::None,
+                      ActivityState::None,
+                      ActivityReason::None,
+                      ACTIVITY_TARGET_NONE,
+                      "PoolLogic est prêt",
+                      "Les automatismes piscine sont initialisés.",
+                      "pool");
+    } else {
+        emitActivity_(ActivityCode::PoolLogicDisabled,
+                      ActivitySource::System,
+                      ActivitySeverity::Info,
+                      ActivityRole::None,
+                      ActivityState::None,
+                      ActivityReason::None,
+                      ACTIVITY_TARGET_NONE,
+                      "PoolLogic est désactivé",
+                      "Les automatismes piscine ne pilotent pas les équipements.",
+                      "toggle_off");
+    }
+    startupActivityPending_ = false;
+}
+
 void PoolLogicModule::loop()
 {
+    const uint32_t nowMs = millis();
+    emitStartupActivityIfReady_(nowMs);
+
     if (!enabled_) {
         if (!bootControlReady_) {
             if (setPoolDeviceWritesEnabled_(true)) {
@@ -1217,7 +1271,6 @@ void PoolLogicModule::loop()
         LOGI("Daily reset: cleaning_done=false");
     }
 
-    const uint32_t nowMs = millis();
     if (!bootControlReady_) {
         adoptBootDeviceState_(nowMs);
         if (setPoolDeviceWritesEnabled_(true)) {

@@ -14,7 +14,9 @@
     const headerDeviceStatus = document.getElementById('headerDeviceStatus');
     const headerClockLabel = document.getElementById('headerClockLabel');
     const headerClockStatus = document.getElementById('headerClockStatus');
+    const themeToggle = document.getElementById('themeToggle');
     const flowWebAssetVersionStorageKey = 'flow_web_asset_version';
+    const flowWebThemeStorageKey = 'flow_web_theme';
     const deferredVisualAssetsStateKey = 'flow_web_deferred_visual_assets';
     const upgradeUiSessionStorageKey = 'flow_upgrade_ui_session';
     const upgradeStatusPollActiveMs = 900;
@@ -39,6 +41,7 @@
       'icon-io': 'lan',
       'icon-calibration': 'science',
       'icon-terminal': 'list_alt',
+      'icon-activity': 'history',
       'icon-system': 'system_update_alt',
       'icon-flowcfg': 'settings',
       'icon-info': 'info'
@@ -225,12 +228,14 @@
         applyStaticTranslations();
         syncMobileTopbarTitle(getActivePageId());
         updateInfoLoadButtonsText();
+        updateThemeToggleUi(currentThemePreference());
         refreshCfgDocLocaleRuntime(false).catch(() => {});
         ensureWebUiLocaleBundle(normalized, false).then((loaded) => {
           if (!loaded || webUiLocale !== normalized) return;
           applyStaticTranslations();
           syncMobileTopbarTitle(getActivePageId());
           updateInfoLoadButtonsText();
+          updateThemeToggleUi(currentThemePreference());
           applyProfileUiText();
           syncMenuIconFallbacks();
           renderInfoPanel();
@@ -259,6 +264,7 @@
       applyStaticTranslations();
       syncMobileTopbarTitle(getActivePageId());
       updateInfoLoadButtonsText();
+      updateThemeToggleUi(currentThemePreference());
       applyProfileUiText();
       syncMenuIconFallbacks();
       renderInfoPanel();
@@ -270,6 +276,7 @@
         applyStaticTranslations();
         syncMobileTopbarTitle(getActivePageId());
         updateInfoLoadButtonsText();
+        updateThemeToggleUi(currentThemePreference());
         applyProfileUiText();
         syncMenuIconFallbacks();
         renderInfoPanel();
@@ -737,6 +744,49 @@
         storage.setItem(key, value);
       } catch (err) {
       }
+    }
+
+    function normalizeThemePreference(raw) {
+      return String(raw || '').trim().toLowerCase() === 'dark' ? 'dark' : 'light';
+    }
+
+    function currentThemePreference() {
+      return normalizeThemePreference(getStorageValue(localStorage, flowWebThemeStorageKey));
+    }
+
+    function themeToggleLabel(theme) {
+      const isDark = theme === 'dark';
+      if (webUiLocale === 'en') return isDark ? 'Light mode' : 'Dark mode';
+      return isDark ? 'Mode clair' : 'Mode sombre';
+    }
+
+    function themeToggleTitle(theme) {
+      const isDark = theme === 'dark';
+      if (webUiLocale === 'en') return isDark ? 'Switch to light mode' : 'Switch to dark mode';
+      return isDark ? 'Activer le mode clair' : 'Activer le mode sombre';
+    }
+
+    function updateThemeToggleUi(theme) {
+      if (!themeToggle) return;
+      const currentTheme = normalizeThemePreference(theme);
+      const label = themeToggleLabel(currentTheme);
+      const title = themeToggleTitle(currentTheme);
+      const wrapper = themeToggle.closest('.theme-switch');
+      const labelNode = wrapper ? wrapper.querySelector('.theme-toggle-label') : null;
+      themeToggle.checked = currentTheme === 'dark';
+      themeToggle.setAttribute('aria-label', title);
+      if (wrapper) wrapper.setAttribute('title', title);
+      if (labelNode) labelNode.textContent = label;
+    }
+
+    function applyThemePreference(theme, persist) {
+      const currentTheme = normalizeThemePreference(theme);
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      document.documentElement.style.colorScheme = currentTheme;
+      if (persist) {
+        setStorageValue(localStorage, flowWebThemeStorageKey, currentTheme);
+      }
+      updateThemeToggleUi(currentTheme);
     }
 
     async function fetchJsonResponse(url, options, fetchImpl) {
@@ -1754,12 +1804,9 @@
       pages.forEach((el) => el.classList.toggle('active', el.id === pageId));
       menuItems.forEach((el) => el.classList.toggle('active', el.dataset.page === pageId));
       syncMobileTopbarTitle(pageId);
-      terminalActive = pageId === 'page-terminal';
-      if (terminalActive) {
-        connectLogSocket();
-      } else {
-        closeLogSocket();
-        setWsStatusText(tr('terminal.inactive', 'inactif'));
+      if (!logsOverlayOpen) setWsStatusText(tr('terminal.inactive', 'inactif'));
+      if (pageId === 'page-activity-log') {
+        schedulePageTask(pageId, pageToken, deferredHeavyMs, () => refreshActivityLog(false));
       }
       if (pageId === 'page-pool-measures') {
         schedulePageTask(pageId, pageToken, deferredHeavyMs, () => onPoolMeasuresPageShown());
@@ -1869,8 +1916,21 @@
     const logSourceSelect = document.getElementById('logSourceSelect');
     const bootLogDumpBtn = document.getElementById('bootLogDumpBtn');
     const toggleAutoscrollInput = document.getElementById('toggleAutoscroll');
+    const logsOverlay = document.getElementById('logsOverlay');
+    const openLogsOverlayBtn = document.getElementById('openLogsOverlay');
+    const closeLogsOverlayBtn = document.getElementById('closeLogsOverlay');
+    const activityLogList = document.getElementById('activityLogList');
+    const activityLogStatus = document.getElementById('activityLogStatus');
+    const activityRefreshBtn = document.getElementById('activityRefreshBtn');
+    const activityPurgeBtn = document.getElementById('activityPurgeBtn');
+    const activityPrevBtn = document.getElementById('activityPrevBtn');
+    const activityNextBtn = document.getElementById('activityNextBtn');
+    const activityRangeText = document.getElementById('activityRangeText');
+    const activityFilterBtns = Array.from(document.querySelectorAll('[data-activity-filter]'));
     let autoScrollEnabled = true;
-    let terminalActive = false;
+    let logsOverlayOpen = false;
+    let activityFilter = 'all';
+    let activityWindowShiftHours = 0;
 
     const checkUpdatesBtn = document.getElementById('checkUpdates');
     const cancelUpgradeUiBtn = document.getElementById('cancelUpgradeUi');
@@ -2335,6 +2395,11 @@
     }
 
     function connectLogSocket() {
+      if (!logsOverlayOpen || document.hidden) {
+        closeLogSocket();
+        setWsStatusText(tr('terminal.inactive', 'inactif'));
+        return;
+      }
       closeLogSocket();
       setWsStatusText(tr('terminal.connecting', 'connexion...'));
       const meta = activeLogSourceMeta();
@@ -2350,6 +2415,7 @@
       };
       socket.onclose = (ev) => {
         if (socket !== logSocket) return;
+        logSocket = null;
         const code = ev && Number.isFinite(ev.code) ? ev.code : 0;
         if (code === 1008) {
           setWsStatusText(meta.statusBusy);
@@ -2369,6 +2435,7 @@
     }
 
     function appendTerminalLine(raw, decodeAnsi) {
+      if (!term) return;
       const parsed = decodeAnsi ? decodeAnsiLine(raw) : { text: raw, color: null };
       const row = document.createElement('div');
       row.className = 'log-line';
@@ -2435,6 +2502,196 @@
       }
     }
 
+    function openLogsOverlay() {
+      if (!logsOverlay) return;
+      logsOverlay.hidden = false;
+      logsOverlay.setAttribute('aria-hidden', 'false');
+      logsOverlayOpen = true;
+      if (term) term.textContent = '';
+      connectLogSocket();
+    }
+
+    function closeLogsOverlay() {
+      if (!logsOverlay) return;
+      logsOverlayOpen = false;
+      closeLogSocket();
+      logsOverlay.hidden = true;
+      logsOverlay.setAttribute('aria-hidden', 'true');
+      setWsStatusText(tr('terminal.inactive', 'inactif'));
+    }
+
+    function activityEventDate(ev) {
+      const epoch = Number(ev && ev.epoch_s) || 0;
+      if (epoch > 0) return new Date(epoch * 1000);
+      return null;
+    }
+
+    function formatActivityTime(date) {
+      if (!date) return '--:--:--';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function formatActivityDay(date) {
+      if (!date) return 'Date inconnue';
+      return date.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function formatActivityRelative(date) {
+      if (!date) return 'heure non synchronisée';
+      const diffSec = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+      if (diffSec < 60) return diffSec <= 3 ? 'Maintenant' : ('Il y a ' + diffSec + ' secondes');
+      const diffMin = Math.round(diffSec / 60);
+      if (diffMin < 60) return 'Il y a ' + diffMin + ' min';
+      const diffHour = Math.round(diffMin / 60);
+      if (diffHour < 24) return 'Il y a ' + diffHour + ' h';
+      const diffDay = Math.round(diffHour / 24);
+      return 'Il y a ' + diffDay + ' j';
+    }
+
+    function activityMatchesFilter(ev) {
+      const date = activityEventDate(ev);
+      if (date) {
+        const end = Date.now() - (activityWindowShiftHours * 3 * 3600000);
+        const start = end - (3 * 3600000);
+        const ts = date.getTime();
+        if (ts < start || ts > end) return false;
+      } else if (activityWindowShiftHours !== 0) {
+        return false;
+      }
+      if (activityFilter === 'all') return true;
+      if (activityFilter === 'poollogic') return ev.domain_name === 'poollogic' || ev.domain_name === 'pooldevice';
+      if (activityFilter === 'manual') return ev.source_name === 'manual';
+      if (activityFilter === 'safety') return ev.source_name === 'safety' || ev.severity_name === 'warning' || ev.severity_name === 'alarm';
+      if (activityFilter === 'system') return ev.domain_name === 'system';
+      return true;
+    }
+
+    function updateActivityRangeText() {
+      if (!activityRangeText) return;
+      const end = new Date(Date.now() - (activityWindowShiftHours * 3 * 3600000));
+      const start = new Date(end.getTime() - (3 * 3600000));
+      activityRangeText.textContent =
+        start.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' à ' +
+        start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' - ' +
+        end.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' à ' +
+        end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderActivityLog(events, stats) {
+      if (!activityLogList) return;
+      activityLogList.innerHTML = '';
+      updateActivityRangeText();
+      const filtered = (Array.isArray(events) ? events : [])
+        .filter(activityMatchesFilter)
+        .sort((a, b) => {
+          const ae = Number(a.epoch_s) || 0;
+          const be = Number(b.epoch_s) || 0;
+          if (ae !== be) return be - ae;
+          return (Number(b.seq) || 0) - (Number(a.seq) || 0);
+        });
+      if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.className = 'activity-empty';
+        empty.textContent = 'Aucune activité pour ce filtre.';
+        activityLogList.appendChild(empty);
+        if (activityLogStatus) {
+          if (stats) {
+            activityLogStatus.textContent =
+              '0/' + (Number(stats.entries) || 0) +
+              ' événement(s), persistés=' + (Number(stats.persisted) || 0);
+          } else {
+            activityLogStatus.textContent = 'Aucune activité.';
+          }
+        }
+        return;
+      }
+      let currentDay = '';
+      filtered.forEach((ev) => {
+        const date = activityEventDate(ev);
+        const day = formatActivityDay(date);
+        if (day !== currentDay) {
+          currentDay = day;
+          const dayNode = document.createElement('div');
+          dayNode.className = 'activity-day-title';
+          dayNode.textContent = day;
+          activityLogList.appendChild(dayNode);
+        }
+        const row = document.createElement('div');
+        row.className = 'activity-row activity-severity-' + String(ev.severity_name || 'info');
+        const icon = document.createElement('span');
+        icon.className = 'ui-msr activity-row-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = String(ev.icon || 'history');
+        const main = document.createElement('div');
+        main.className = 'activity-row-main';
+        const title = document.createElement('div');
+        title.className = 'activity-row-title';
+        const strong = document.createElement('strong');
+        strong.textContent = String(ev.title || 'Activité');
+        title.appendChild(strong);
+        const meta = document.createElement('div');
+        meta.className = 'activity-row-meta';
+        meta.textContent = formatActivityTime(date) + ' - ' + formatActivityRelative(date);
+        main.appendChild(title);
+        if (ev.detail) {
+          const detail = document.createElement('div');
+          detail.className = 'activity-row-detail';
+          detail.textContent = String(ev.detail);
+          main.appendChild(detail);
+        }
+        main.appendChild(meta);
+        row.appendChild(icon);
+        row.appendChild(main);
+        activityLogList.appendChild(row);
+      });
+      if (activityLogStatus && stats) {
+        activityLogStatus.textContent =
+          filtered.length + '/' + (Number(stats.entries) || filtered.length) +
+          ' événement(s), persistés=' + (Number(stats.persisted) || 0);
+      }
+    }
+
+    async function refreshActivityLog(showBusy) {
+      if (!activityLogList) return;
+      if (showBusy && activityLogStatus) activityLogStatus.textContent = 'Chargement du journal...';
+      const limit = 128;
+      let offset = 0;
+      const events = [];
+      let stats = null;
+      while (true) {
+        const response = await fetch('/api/activity/logs?offset=' + encodeURIComponent(offset) + '&limit=' + limit, { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const page = await response.json();
+        stats = page;
+        if (Array.isArray(page.events)) events.push(...page.events);
+        if (page.complete || page.next == null || Number(page.count) === 0) break;
+        offset = Number(page.next);
+        if (!Number.isFinite(offset) || offset < 0 || events.length >= 768) break;
+      }
+      renderActivityLog(events, stats);
+    }
+
+    async function purgeActivityLog() {
+      if (!confirm('Confirmer la purge du Journal d’Activité ? Cette action efface l’historique en mémoire et dans le SPIFFS.')) {
+        return;
+      }
+      if (activityPurgeBtn) activityPurgeBtn.disabled = true;
+      if (activityLogStatus) activityLogStatus.textContent = 'Purge du journal...';
+      try {
+        const response = await fetch('/api/activity/purge', { method: 'POST', cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const payload = await response.json().catch(() => ({}));
+        if (payload && payload.ok === false) throw new Error('Purge refusée');
+        activityWindowShiftHours = 0;
+        await refreshActivityLog(false);
+        if (activityLogStatus) activityLogStatus.textContent = 'Journal purgé.';
+      } catch (err) {
+        if (activityLogStatus) activityLogStatus.textContent = 'Purge impossible: ' + (err && err.message ? err.message : String(err));
+      } finally {
+        if (activityPurgeBtn) activityPurgeBtn.disabled = false;
+      }
+    }
+
     function setLogSource(source) {
       let normalized = String(source || '').trim().toLowerCase();
       if (webLocalRuntime && normalized === 'flowio') {
@@ -2444,8 +2701,8 @@
       if (logSourceSelect && logSourceSelect.value !== logSource) {
         logSourceSelect.value = logSource;
       }
-      if (terminalActive) {
-        term.textContent = '';
+      if (logsOverlayOpen) {
+        if (term) term.textContent = '';
         connectLogSocket();
       } else {
         setWsStatusText(tr('terminal.inactive', 'inactif'));
@@ -2482,7 +2739,7 @@
     if (toggleAutoscrollInput) toggleAutoscrollInput.addEventListener('change', () => {
       autoScrollEnabled = !!toggleAutoscrollInput.checked;
       refreshAutoscrollUi();
-      if (autoScrollEnabled) term.scrollTop = term.scrollHeight;
+      if (autoScrollEnabled && term) term.scrollTop = term.scrollHeight;
     });
     if (logSourceSelect) {
       logSourceSelect.value = 'supervisor';
@@ -2493,6 +2750,53 @@
     if (bootLogDumpBtn) {
       bootLogDumpBtn.addEventListener('click', requestBootLogDump);
     }
+    if (openLogsOverlayBtn) {
+      openLogsOverlayBtn.addEventListener('click', openLogsOverlay);
+    }
+    if (closeLogsOverlayBtn) {
+      closeLogsOverlayBtn.addEventListener('click', closeLogsOverlay);
+    }
+    if (logsOverlay) {
+      logsOverlay.addEventListener('click', (ev) => {
+        if (ev.target === logsOverlay) closeLogsOverlay();
+      });
+    }
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && logsOverlayOpen) closeLogsOverlay();
+    });
+    if (activityRefreshBtn) {
+      activityRefreshBtn.addEventListener('click', () => refreshActivityLog(true).catch((err) => {
+        if (activityLogStatus) activityLogStatus.textContent = 'Journal indisponible: ' + (err && err.message ? err.message : String(err));
+      }));
+    }
+    if (activityPurgeBtn) {
+      activityPurgeBtn.addEventListener('click', () => {
+        purgeActivityLog().catch((err) => {
+          if (activityLogStatus) activityLogStatus.textContent = 'Purge impossible: ' + (err && err.message ? err.message : String(err));
+        });
+      });
+    }
+    if (activityPrevBtn) {
+      activityPrevBtn.addEventListener('click', () => {
+        activityWindowShiftHours += 1;
+        updateActivityRangeText();
+        refreshActivityLog(false).catch(() => {});
+      });
+    }
+    if (activityNextBtn) {
+      activityNextBtn.addEventListener('click', () => {
+        activityWindowShiftHours = Math.max(0, activityWindowShiftHours - 1);
+        updateActivityRangeText();
+        refreshActivityLog(false).catch(() => {});
+      });
+    }
+    activityFilterBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activityFilter = String(btn.dataset.activityFilter || 'all');
+        activityFilterBtns.forEach((el) => el.classList.toggle('is-active', el === btn));
+        refreshActivityLog(false).catch(() => {});
+      });
+    });
     applyLogSourceUi();
     refreshAutoscrollUi();
     logSource = 'supervisor';
@@ -4878,11 +5182,11 @@
           tr('io.table.ioSlots', 'IOSlots'),
           [
             tr('io.col.slot', 'Slot'),
+            tr('io.col.configName', 'Nom config'),
             tr('io.col.kind', 'Type'),
             tr('io.col.driver', 'Driver'),
             tr('io.col.state', 'Etat'),
             tr('io.col.lastValue', 'Dernière valeur'),
-            tr('io.col.poolDevice', 'PoolDevice'),
             tr('io.col.error', 'Erreur')
           ],
           4
@@ -4891,11 +5195,10 @@
           tr('io.table.domainSlots', 'DomainSlots'),
           [
             tr('io.col.domainSlot', 'Domaine'),
-            tr('io.col.endpoint', 'Endpoint'),
-            tr('io.col.slot', 'Slot'),
+            tr('io.col.ioName', 'IONAME'),
+            tr('io.col.ioSlot', 'IOSlot'),
             tr('io.col.state', 'Etat'),
-            tr('io.col.lastValue', 'Dernière valeur'),
-            tr('io.col.poolDevice', 'PoolDevice')
+            tr('io.col.lastValue', 'Dernière valeur')
           ],
           4
         ));
@@ -4965,11 +5268,11 @@
           tr('io.table.ioSlots', 'IOSlots'),
           [
             { key: 'io_slot', label: tr('io.col.slot', 'Slot'), render: (row) => ioSummarySlotLabel(row) },
+            { key: 'config_name', label: tr('io.col.configName', 'Nom config'), render: (row) => ioSummaryText(row.config_name, '-') },
             { key: 'kind', label: tr('io.col.kind', 'Type') },
             { key: 'driver', label: tr('io.col.driver', 'Driver') },
             { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
             { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
-            { key: 'pool_device', label: tr('io.col.poolDevice', 'PoolDevice'), render: (row) => row.pool_device && row.pool_device.label ? row.pool_device.label : '-' },
             { key: 'error', label: tr('io.col.error', 'Erreur') }
           ],
           ioSlots
@@ -4978,11 +5281,10 @@
           tr('io.table.domainSlots', 'DomainSlots'),
           [
             { key: 'display_name', label: tr('io.col.domainSlot', 'Domaine') },
-            { key: 'endpoint_id', label: tr('io.col.endpoint', 'Endpoint') },
-            { key: 'io_slot', label: tr('io.col.slot', 'Slot'), render: (row) => ioSummarySlotLabel(row) },
+            { key: 'io_name', label: tr('io.col.ioName', 'IONAME'), render: (row) => ioSummaryText(row.io_name, '-') },
+            { key: 'io_slot', label: tr('io.col.ioSlot', 'IOSlot'), render: (row) => ioSummarySlotLabel(row) },
             { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
-            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
-            { key: 'pool_device', label: tr('io.col.poolDevice', 'PoolDevice'), render: (row) => row.pool_device && row.pool_device.label ? row.pool_device.label : '-' }
+            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
           ],
           domainSlots
         ));
@@ -10919,10 +11221,14 @@
     }
 
     function initGlobalUiBindings() {
+      if (themeToggle) {
+        themeToggle.addEventListener('change', () => {
+          applyThemePreference(themeToggle.checked ? 'dark' : 'light', true);
+        });
+      }
       document.addEventListener('visibilitychange', () => {
         const activePageId = getActivePageId();
         const onUpgradePage = activePageId === 'page-system';
-        const onTerminalPage = activePageId === 'page-terminal';
         if (document.hidden || !onUpgradePage) {
           stopUpgradeStatusPolling();
         } else {
@@ -10939,11 +11245,14 @@
           startIoSummaryTimer();
           refreshIoSummary(false).catch(() => {});
         }
-        if (document.hidden || !onTerminalPage) {
+        if (document.hidden || !logsOverlayOpen) {
           closeLogSocket();
-          setWsStatusText(tr('terminal.inactive', 'inactif'));
-        } else if (terminalActive) {
+          if (!logsOverlayOpen) setWsStatusText(tr('terminal.inactive', 'inactif'));
+        } else if (logsOverlayOpen) {
           connectLogSocket();
+        }
+        if (!document.hidden && activePageId === 'page-activity-log') {
+          refreshActivityLog(false).catch(() => {});
         }
         if (document.hidden || activePageId !== 'page-info') {
           stopInfoPolling();
@@ -10968,6 +11277,7 @@
     initConfigBindings();
     initGlobalUiBindings();
 
+    applyThemePreference(currentThemePreference(), false);
     applyWebUiLocale(webUiLocale);
     syncMenuIconFallbacks();
     renderUpgradeJourney(readUpgradeUiSession() || { phase: 'idle', target: '', detail: tr('updates.none', 'Aucune opération en cours.') });

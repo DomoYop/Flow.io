@@ -144,8 +144,14 @@ bool PoolLogicModule::cmdFiltrationWrite_(const CommandRequest& req, char* reply
 
     // A manual filtration command always disables auto mode explicitly so the
     // rest of the control loop stops fighting the operator's intent.
+    const bool wasAutoMode = autoMode_;
     (void)cfgStore_->set(autoModeVar_, false);
     autoMode_ = false;
+    if (wasAutoMode) {
+        emitAutoModeDisabledByManualActivity_(ActivityRole::Filtration,
+                                              filtrationDeviceSlot_,
+                                              "filtration");
+    }
 
     const PoolDeviceSvcStatus st = poolSvc_->writeDesired(poolSvc_->ctx, filtrationDeviceSlot_, requested ? 1U : 0U);
     if (st != POOLDEV_SVC_OK) {
@@ -271,7 +277,9 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
             return false;
         }
 
+        bool disabledAutoMode = false;
         if (forceManualAutoMode && cfgStore_) {
+            disabledAutoMode = autoMode_;
             (void)cfgStore_->set(autoModeVar_, false);
             autoMode_ = false;
         }
@@ -289,9 +297,19 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
             return false;
         }
 
+        if (disabledAutoMode) {
+            emitAutoModeDisabledByManualActivity_(ActivityRole::Filtration,
+                                                  slot,
+                                                  "filtration");
+        }
+
         // Keep behavior aligned with pooldevice.write: manual pump start disables
         // the corresponding automatic dosing only after the hardware write is accepted.
         if (requested && clearDosingModeKey && cfgStore_) {
+            const bool disabledPhAutoMode = (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) && phAutoMode_;
+            const bool disabledOrpAutoMode = (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) && orpAutoMode_;
+            const bool disabledDisinfection = (strcmp(clearDosingModeKey, "disinfection_type") == 0) &&
+                                              (disinfectionType_ != DisinfectionDisabled);
             char patch[96]{};
             if (strcmp(clearDosingModeKey, "disinfection_type") == 0) {
                 snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"disinfection_type\":%u}}", (unsigned)DisinfectionDisabled);
@@ -312,6 +330,15 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
                         writeCmdError_(reply, replyLen, where, ErrorCode::Failed);
                         return false;
                     }
+                }
+                if (disabledPhAutoMode) {
+                    emitAutoModeDisabledByManualActivity_(ActivityRole::Ph,
+                                                          slot,
+                                                          "pH");
+                } else if (disabledOrpAutoMode || disabledDisinfection) {
+                    emitAutoModeDisabledByManualActivity_(ActivityRole::Disinfection,
+                                                          slot,
+                                                          "ORP");
                 }
             }
         }

@@ -19,7 +19,7 @@
  */
 class MqttConfigRouteProducer {
 public:
-    static constexpr uint8_t MaxRoutes = 64;
+    static constexpr uint8_t MaxRoutes = 96;
 
     using CustomBuildFn = MqttBuildResult (*)(void* owner, uint16_t messageId, MqttBuildContext& ctx);
 
@@ -72,8 +72,8 @@ private:
     bool eventsSubscribed_ = false;
     bool configLoaded_ = false;
     bool mqttReadyLatched_ = false;
-    uint64_t pendingMask_ = 0;
-    uint64_t needsEnqueueMask_ = 0;
+    bool pendingFlags_[MaxRoutes]{};
+    bool needsEnqueueFlags_[MaxRoutes]{};
     uint32_t retryDueMs_ = 0;
     uint16_t retryBackoffMs_ = 0;
     uint8_t retryCursor_ = 0;
@@ -87,8 +87,8 @@ private:
     uint32_t metricsRetryTryTotal_ = 0;
     uint32_t metricsRetryOkTotal_ = 0;
     uint32_t metricsTimeoutTotal_ = 0;
-    uint64_t buildingMask_ = 0U;
-    uint64_t republishAfterPublishMask_ = 0U;
+    bool building_[MaxRoutes]{};
+    bool republishAfterPublish_[MaxRoutes]{};
 
     MqttPublishProducer producer_{};
 
@@ -101,7 +101,7 @@ private:
     void armRetry_(uint32_t nowMs);
     void resetRetry_();
     void expireTimedOutRoutes_(uint32_t nowMs);
-    uint8_t countPendingBits_(uint64_t mask) const;
+    uint8_t countPendingFlags_(const bool* flags) const;
     void reportMetrics_(uint32_t nowMs);
     void runRetryTick_(uint32_t nowMs);
     bool enqueueByRoute_(uint8_t idx, MqttPublishPriority prio);
@@ -129,7 +129,7 @@ private:
  */
 class MqttConfigRouteProducer {
 public:
-    static constexpr uint8_t MaxRoutes = 64;
+    static constexpr uint8_t MaxRoutes = 96;
     using CustomBuildFn = MqttBuildResult (*)(void* owner, uint16_t messageId, MqttBuildContext& ctx);
 
     struct Route {

@@ -510,6 +510,13 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         (uint8_t)(sizeof(FlowIoLayout::kBindingPorts) / sizeof(FlowIoLayout::kBindingPorts[0]))
     );
 
+    for (uint8_t i = 0; i < Limits::Io::MaxAnalogEndpoints; ++i) {
+        IOAnalogDefinition def{};
+        snprintf(def.id, sizeof(def.id), "a%02u", (unsigned)i);
+        def.ioId = (IoId)(IO_ID_AI_BASE + i);
+        requireSetup(modules.ioModule.defineAnalogInput(def), "define analog input slot");
+    }
+
     for (uint8_t i = 0; i < ctx.domain->domainSlotCount; ++i) {
         const DomainSlotPreset& preset = ctx.domain->domainSlots[i];
         const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset.id);
@@ -544,7 +551,7 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "analog");
         def.ioId = ioId;
         applyAnalogDefaultsForDomainSlot(preset.id, def);
-        requireSetup(modules.ioModule.defineAnalogInput(def), "define analog input");
+        requireSetup(modules.ioModule.applyAnalogInputDefaults(def), "apply analog input defaults");
     }
 
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
@@ -575,13 +582,6 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         requireSetup(modules.ioModule.defineDigitalInput(def), "define extra digital input");
     }
 #endif
-
-    for (uint8_t i = 6; i < 16; ++i) {
-        IOAnalogDefinition def{};
-        snprintf(def.id, sizeof(def.id), "a%02u", (unsigned)i);
-        def.ioId = (IoId)(IO_ID_AI_BASE + i);
-        requireSetup(modules.ioModule.defineAnalogInput(def), "define extra analog input");
-    }
 
     for (uint8_t i = 0; i < ctx.domain->domainSlotCount; ++i) {
         const DomainSlotPreset& preset = ctx.domain->domainSlots[i];

@@ -162,9 +162,9 @@ static inline void sendProgmemLiteral_(AsyncWebServerRequest* request, const cha
 
 namespace {
 constexpr uint32_t kHttpLatencyInfoMs = 40U;
-constexpr uint32_t kHttpLatencyWarnMs = 120U;
+constexpr uint32_t kHttpLatencyWarnMs = 1000U;
 constexpr uint32_t kHttpLatencyFlowCfgInfoMs = 200U;
-constexpr uint32_t kHttpLatencyFlowCfgWarnMs = 900U;
+constexpr uint32_t kHttpLatencyFlowCfgWarnMs = 1000U;
 constexpr uint32_t kHeapGuardAssetFreeBytesLight = 8192U;
 constexpr uint32_t kHeapGuardAssetFreeBytesMinor = 12288U;
 constexpr uint32_t kHeapGuardAssetFreeBytesMajor = 15360U;
@@ -221,6 +221,124 @@ struct BootLogJsonPageCtx {
     bool first = true;
     uint16_t count = 0;
 };
+
+struct ActivityLogJsonPageCtx {
+    AsyncResponseStream* response = nullptr;
+    bool first = true;
+    uint16_t count = 0;
+};
+
+static const char* activityDomainName_(uint8_t domain)
+{
+    switch ((ActivityDomain)domain) {
+        case ActivityDomain::System: return "system";
+        case ActivityDomain::PoolLogic: return "poollogic";
+        case ActivityDomain::PoolDevice: return "pooldevice";
+        default: return "unknown";
+    }
+}
+
+static const char* activitySourceName_(uint8_t source)
+{
+    switch ((ActivitySource)source) {
+        case ActivitySource::System: return "system";
+        case ActivitySource::Auto: return "auto";
+        case ActivitySource::Manual: return "manual";
+        case ActivitySource::Scheduler: return "scheduler";
+        case ActivitySource::Safety: return "safety";
+        case ActivitySource::Pid: return "pid";
+        case ActivitySource::Boot: return "boot";
+        default: return "unknown";
+    }
+}
+
+static const char* activitySeverityName_(uint8_t severity)
+{
+    switch ((ActivitySeverity)severity) {
+        case ActivitySeverity::Info: return "info";
+        case ActivitySeverity::Success: return "success";
+        case ActivitySeverity::Warning: return "warning";
+        case ActivitySeverity::Alarm: return "alarm";
+        default: return "info";
+    }
+}
+
+static const char* activityRoleName_(uint8_t role)
+{
+    switch ((ActivityRole)role) {
+        case ActivityRole::None: return "none";
+        case ActivityRole::Filtration: return "filtration";
+        case ActivityRole::Swg: return "swg";
+        case ActivityRole::Robot: return "robot";
+        case ActivityRole::Filling: return "filling";
+        case ActivityRole::Ph: return "ph";
+        case ActivityRole::Disinfection: return "disinfection";
+        case ActivityRole::Heater: return "heater";
+        default: return "unknown";
+    }
+}
+
+static const char* activityStateName_(uint8_t state)
+{
+    switch ((ActivityState)state) {
+        case ActivityState::None: return "none";
+        case ActivityState::RequestedOn: return "requested_on";
+        case ActivityState::RequestedOff: return "requested_off";
+        case ActivityState::On: return "on";
+        case ActivityState::Off: return "off";
+        default: return "unknown";
+    }
+}
+
+static void appendActivityModuleName_(char* out, size_t outLen, const char* moduleName)
+{
+    if (!out || outLen == 0U || !moduleName || moduleName[0] == '\0') return;
+    const size_t used = strnlen(out, outLen);
+    if (used >= outLen - 1U) return;
+
+    size_t pos = used;
+    if (pos > 0U) {
+        if (pos + 2U >= outLen) return;
+        out[pos++] = ',';
+        out[pos++] = ' ';
+    }
+
+    for (const char* p = moduleName; *p != '\0' && pos + 1U < outLen; ++p) {
+        const char c = *p;
+        out[pos++] = (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t') ? ' ' : c;
+    }
+    out[pos] = '\0';
+}
+
+static uint16_t summarizeConfigPatch_(const char* patchJson, char* modulesOut, size_t modulesOutLen)
+{
+    if (modulesOut && modulesOutLen > 0U) modulesOut[0] = '\0';
+    if (!patchJson || patchJson[0] == '\0') return 0;
+
+    DynamicJsonDocument doc(Limits::JsonConfigApplyBuf);
+    const DeserializationError err = deserializeJson(doc, patchJson);
+    if (err || !doc.is<JsonObjectConst>()) return 0;
+
+    uint16_t fieldCount = 0;
+    JsonObjectConst root = doc.as<JsonObjectConst>();
+    for (JsonPairConst moduleKv : root) {
+        const char* moduleName = moduleKv.key().c_str();
+        JsonVariantConst moduleVar = moduleKv.value();
+        if (!moduleVar.is<JsonObjectConst>()) continue;
+
+        uint16_t moduleFieldCount = 0;
+        JsonObjectConst moduleObj = moduleVar.as<JsonObjectConst>();
+        for (JsonPairConst valueKv : moduleObj) {
+            (void)valueKv;
+            if (fieldCount < UINT16_MAX) ++fieldCount;
+            if (moduleFieldCount < UINT16_MAX) ++moduleFieldCount;
+        }
+        if (moduleFieldCount > 0U) {
+            appendActivityModuleName_(modulesOut, modulesOutLen, moduleName);
+        }
+    }
+    return fieldCount;
+}
 
 struct FirmwareManifestChunkState {
     static constexpr size_t kUrlLen = 192U;
@@ -3061,6 +3179,8 @@ void wavesharePrintIoSlotJson_(AsyncResponseStream& response,
     response.print(state.hasValue ? (unsigned long)state.value.tsMs : 0UL);
     response.print(",\"label\":");
     printJsonEscaped_(response, domainPreset && domainPreset->displayName ? domainPreset->displayName : "");
+    response.print(",\"config_name\":");
+    printJsonEscaped_(response, state.hasMeta ? state.meta.name : "");
     response.print(",\"error\":");
     printJsonEscaped_(response, state.error);
     response.print(",\"pool_device\":");
@@ -3210,6 +3330,8 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         response.print((unsigned)preset.id);
         response.print(",\"endpoint_id\":");
         printJsonEscaped_(response, preset.endpointId ? preset.endpointId : "");
+        response.print(",\"io_name\":");
+        printJsonEscaped_(response, state.hasMeta ? state.meta.name : "");
         response.print(",\"display_name\":");
         printJsonEscaped_(response, preset.displayName ? preset.displayName : "");
         response.print(",\"slot_kind\":");
@@ -4429,6 +4551,170 @@ void WebInterfaceModule::sendBootLogHttpResponse_(AsyncWebServerRequest* request
     request->send(response);
 }
 
+bool WebInterfaceModule::writeActivityLogJsonEvent_(void* writerCtx,
+                                                    const ActivityEvent& e,
+                                                    uint16_t,
+                                                    uint16_t)
+{
+    ActivityLogJsonPageCtx* ctx = static_cast<ActivityLogJsonPageCtx*>(writerCtx);
+    if (!ctx || !ctx->response) return false;
+
+    if (!ctx->first) {
+        ctx->response->print(',');
+    }
+    ctx->first = false;
+    ctx->response->print('{');
+    ctx->response->printf("\"seq\":%lu,\"ts_ms\":%lu,\"epoch_s\":%lu,\"code\":%u",
+                          (unsigned long)e.seq,
+                          (unsigned long)e.ts_ms,
+                          (unsigned long)e.epoch_s,
+                          (unsigned)e.code);
+    ctx->response->printf(",\"domain\":%u,\"source\":%u,\"severity\":%u,\"role\":%u,\"state\":%u,\"reason\":%u,\"slot\":%u",
+                          (unsigned)e.domain,
+                          (unsigned)e.source,
+                          (unsigned)e.severity,
+                          (unsigned)e.role,
+                          (unsigned)e.state,
+                          (unsigned)e.reason,
+                          (unsigned)e.targetSlot);
+    ctx->response->print(",\"domain_name\":");
+    printJsonEscaped_(*ctx->response, activityDomainName_(e.domain));
+    ctx->response->print(",\"source_name\":");
+    printJsonEscaped_(*ctx->response, activitySourceName_(e.source));
+    ctx->response->print(",\"severity_name\":");
+    printJsonEscaped_(*ctx->response, activitySeverityName_(e.severity));
+    ctx->response->print(",\"role_name\":");
+    printJsonEscaped_(*ctx->response, activityRoleName_(e.role));
+    ctx->response->print(",\"state_name\":");
+    printJsonEscaped_(*ctx->response, activityStateName_(e.state));
+    ctx->response->print(",\"title\":");
+    printJsonEscaped_(*ctx->response, e.title);
+    ctx->response->print(",\"detail\":");
+    printJsonEscaped_(*ctx->response, e.detail);
+    ctx->response->print(",\"icon\":");
+    printJsonEscaped_(*ctx->response, e.icon);
+    ctx->response->print('}');
+    ++ctx->count;
+    return true;
+}
+
+void WebInterfaceModule::sendActivityLogHttpResponse_(AsyncWebServerRequest* request, bool statusOnly)
+{
+    if (!request) return;
+    noteHttpActivity_();
+
+    ActivityLogStats stats{};
+    bool available = false;
+    if (activityLog_ && activityLog_->getStats) {
+        activityLog_->getStats(activityLog_->ctx, &stats);
+        available = (stats.capacity > 0U);
+    }
+
+    int32_t requestedOffset = statusOnly ? 0 : requestIntParam_(request, "offset", 0);
+    int32_t requestedLimit = statusOnly ? 0 : requestIntParam_(request, "limit", 64);
+    if (requestedOffset < 0) requestedOffset = 0;
+    if (requestedLimit <= 0) requestedLimit = statusOnly ? 0 : 64;
+    if (requestedLimit > 128) requestedLimit = 128;
+
+    const uint16_t offset = (requestedOffset > UINT16_MAX) ? UINT16_MAX : (uint16_t)requestedOffset;
+    const uint16_t limit = (requestedLimit > UINT16_MAX) ? UINT16_MAX : (uint16_t)requestedLimit;
+
+    AsyncResponseStream* response = request->beginResponseStream("application/json");
+    addNoCacheHeaders_(response);
+    response->printf("{\"available\":%s,\"capacity\":%u,\"entries\":%u,\"dropped\":%lu,\"persisted\":%lu,\"persist_dropped\":%lu,\"psram\":%s,\"spiffs\":%s",
+                     available ? "true" : "false",
+                     (unsigned)stats.capacity,
+                     (unsigned)stats.count,
+                     (unsigned long)stats.droppedCount,
+                     (unsigned long)stats.persistedCount,
+                     (unsigned long)stats.persistDropCount,
+                     stats.psram ? "true" : "false",
+                     stats.spiffs ? "true" : "false");
+
+    if (statusOnly) {
+        response->print('}');
+        request->send(response);
+        return;
+    }
+
+    ActivityLogJsonPageCtx pageCtx{};
+    pageCtx.response = response;
+
+    const uint16_t writableLimit = available ? limit : 0U;
+    uint16_t expectedCount = 0U;
+    if (available && activityLog_ && activityLog_->readPage && offset < stats.count && writableLimit > 0U) {
+        const uint16_t remaining = (uint16_t)(stats.count - offset);
+        expectedCount = (writableLimit < remaining) ? writableLimit : remaining;
+    }
+    const bool expectedComplete = ((uint32_t)offset + (uint32_t)expectedCount >= stats.count) ||
+                                  expectedCount == 0U;
+    const int32_t expectedNext = expectedComplete ? -1 : (int32_t)offset + (int32_t)expectedCount;
+
+    response->printf(",\"offset\":%u,\"limit\":%u,\"count\":%u,\"next\":",
+                     (unsigned)offset,
+                     (unsigned)limit,
+                     (unsigned)expectedCount);
+    if (expectedNext < 0) {
+        response->print("null");
+    } else {
+        response->print((unsigned)expectedNext);
+    }
+    response->printf(",\"complete\":%s,\"events\":[", expectedComplete ? "true" : "false");
+
+    if (available && activityLog_ && activityLog_->readPage && offset < stats.count && writableLimit > 0U) {
+        (void)activityLog_->readPage(activityLog_->ctx,
+                                     offset,
+                                     writableLimit,
+                                     &WebInterfaceModule::writeActivityLogJsonEvent_,
+                                     &pageCtx);
+    }
+    response->print("]}");
+    request->send(response);
+}
+
+void WebInterfaceModule::emitConfigActivity_(const char* contextLabel, const char* modulesLabel, uint16_t fieldCount)
+{
+    if (fieldCount == 0U) return;
+    if (!activityLog_ && services_) {
+        activityLog_ = services_->get<ActivityLogService>(ServiceId::ActivityLog);
+    }
+    if (!activityLog_ || !activityLog_->emit) return;
+
+    ActivityEvent event{};
+    event.code = (uint16_t)ActivityCode::SystemConfigChanged;
+    event.domain = (uint8_t)ActivityDomain::System;
+    event.source = (uint8_t)ActivitySource::Manual;
+    event.severity = (uint8_t)ActivitySeverity::Info;
+    event.role = (uint8_t)ActivityRole::None;
+    event.state = (uint8_t)ActivityState::None;
+    event.reason = (uint8_t)ActivityReason::Manual;
+    event.targetSlot = ACTIVITY_TARGET_NONE;
+    snprintf(event.title, sizeof(event.title), "Configuration modifiée");
+    if (modulesLabel && modulesLabel[0] != '\0') {
+        snprintf(event.detail,
+                 sizeof(event.detail),
+                 "%s: %u champ(s) appliqué(s) dans %s.",
+                 (contextLabel && contextLabel[0] != '\0') ? contextLabel : "Configuration",
+                 (unsigned)fieldCount,
+                 modulesLabel);
+    } else {
+        snprintf(event.detail,
+                 sizeof(event.detail),
+                 "%s: %u champ(s) appliqué(s).",
+                 (contextLabel && contextLabel[0] != '\0') ? contextLabel : "Configuration",
+                 (unsigned)fieldCount);
+    }
+    snprintf(event.icon, sizeof(event.icon), "settings");
+    (void)activityLog_->emit(activityLog_->ctx, &event);
+}
+
+void WebInterfaceModule::emitConfigPatchActivity_(const char* contextLabel, const char* patchJson)
+{
+    char modules[72] = {0};
+    const uint16_t fieldCount = summarizeConfigPatch_(patchJson, modules, sizeof(modules));
+    emitConfigActivity_(contextLabel, modules, fieldCount);
+}
+
 void WebInterfaceModule::init(ConfigStore& cfg, ServiceRegistry& services)
 {
     cfgStore_ = &cfg;
@@ -4442,6 +4728,7 @@ void WebInterfaceModule::init(ConfigStore& cfg, ServiceRegistry& services)
 #else
     bootLogCapture_ = nullptr;
 #endif
+    activityLog_ = services.get<ActivityLogService>(ServiceId::ActivityLog);
     wifiSvc_ = services.get<WifiService>(ServiceId::Wifi);
     cmdSvc_ = services.get<CommandService>(ServiceId::Command);
     hmiSvc_ = services.get<HmiService>(ServiceId::Hmi);
@@ -5002,6 +5289,29 @@ void WebInterfaceModule::startServer_()
         HttpLatencyScope latency(request, "/api/logs/boot");
         sendBootLogHttpResponse_(request, false);
     });
+    server_.on("/api/activity/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/activity/status");
+        sendActivityLogHttpResponse_(request, true);
+    });
+    server_.on("/api/activity/logs", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/activity/logs");
+        sendActivityLogHttpResponse_(request, false);
+    });
+    server_.on("/api/activity/purge", HTTP_POST, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/activity/purge");
+        noteHttpActivity_();
+        if (!activityLog_ && services_) {
+            activityLog_ = services_->get<ActivityLogService>(ServiceId::ActivityLog);
+        }
+        if (!activityLog_ || !activityLog_->clear) {
+            request->send(503, "application/json", "{\"ok\":false,\"err\":{\"code\":\"NotReady\",\"where\":\"activity.clear\"}}");
+            return;
+        }
+        const bool ok = activityLog_->clear(activityLog_->ctx);
+        request->send(ok ? 200 : 500,
+                      "application/json",
+                      ok ? "{\"ok\":true}" : "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"activity.clear\"}}");
+    });
     server_.on("/api/cfgdoc/index", HTTP_GET, [this, beginSpiffsAssetResponse, sendPreparedAssetResponse](AsyncWebServerRequest* request) {
         HttpLatencyScope latency(request, "/api/cfgdoc/index");
         SpiffsAssetForensicMeta forensicMeta{};
@@ -5501,6 +5811,7 @@ void WebInterfaceModule::startServer_()
             return;
         }
 
+        emitConfigActivity_("Mise à jour", "fwupdate", (uint16_t)((hasHost ? 1U : 0U) + (hasUpdatePath ? 1U : 0U)));
         request->send(200, "application/json", "{\"ok\":true}");
     });
 
@@ -5707,6 +6018,7 @@ void WebInterfaceModule::startServer_()
                           "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"wifi.config.set\"}}");
             return;
         }
+        emitConfigPatchActivity_("WiFi", patchJson);
 
         if (!netAccessSvc_ && services_) {
             netAccessSvc_ = services_->get<NetworkAccessService>(ServiceId::NetworkAccess);
@@ -5879,6 +6191,7 @@ void WebInterfaceModule::startServer_()
                           "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"mqtt.config.set\"}}");
             return;
         }
+        emitConfigPatchActivity_("MQTT", patchJson);
         const bool provisioningConfigured =
             provisioningOnly_ &&
             provisioningDisableAfterConfigured_ &&
@@ -6591,6 +6904,7 @@ void WebInterfaceModule::startServer_()
                           "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"flowcfg.apply.exec\"}}");
             return;
         }
+        emitConfigPatchActivity_("Config flow.io", patchStr.data);
         request->send(200, "application/json", "{\"ok\":true}");
         return;
 #else
@@ -6797,6 +7111,7 @@ void WebInterfaceModule::startServer_()
                           "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"supervisorcfg.apply.exec\"}}");
             return;
         }
+        emitConfigPatchActivity_("Config locale", patchStr.data);
         request->send(200, "application/json", "{\"ok\":true}");
     });
 

@@ -15,6 +15,7 @@
 #include "Modules/Logs/LogDispatcherModule/LogDispatcherModule.h"
 #include "Modules/Logs/LogHubModule/LogHubModule.h"
 #include "Modules/Logs/LogSerialSinkModule/LogSerialSinkModule.h"
+#include "Modules/Logs/ActivityLogModule/ActivityLogModule.h"
 #include "Modules/Network/EthernetModule/EthernetModule.h"
 #include "Modules/Network/HAModule/HAModule.h"
 #include "Modules/Network/FirmwareUpdateModule/FirmwareUpdateModule.h"
@@ -66,6 +67,7 @@ struct ModuleInstances {
     SystemModule systemModule{};
     SystemMonitorModule systemMonitorModule{};
     LogSerialSinkModule logSerialSinkModule{};
+    ActivityLogModule activityLogModule{};
 #if FLOW_ENABLE_BOOT_LOG_CAPTURE
     BootLogCaptureModule bootLogCaptureModule{};
 #endif

@@ -8,6 +8,7 @@
 #include "IDataStore.h"
 #include "IHmi.h"
 #include "IAlarm.h"
+#include "IActivityLog.h"
 #include "IEventBus.h"
 #include "IHA.h"
 #include "ILogger.h"

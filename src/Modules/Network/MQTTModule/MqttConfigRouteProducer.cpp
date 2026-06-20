@@ -15,11 +15,6 @@ namespace {
 static constexpr uint16_t kRetryMinMs = 200U;
 static constexpr uint16_t kRetryMaxMs = 2000U;
 static constexpr uint32_t kRetryTimeoutMs = 10000U;
-
-uint64_t routeBit_(uint8_t idx)
-{
-    return (idx < MqttConfigRouteProducer::MaxRoutes) ? (1ULL << idx) : 0ULL;
-}
 }
 
 bool MqttConfigRouteProducer::buildRelativeTopic(char* dst,
@@ -100,34 +95,33 @@ int8_t MqttConfigRouteProducer::findRouteByMessage_(uint16_t messageId) const
 void MqttConfigRouteProducer::setPending_(uint8_t idx, bool pending)
 {
     if (idx >= routeCount_ || idx >= MaxRoutes) return;
-    const uint64_t mask = routeBit_(idx);
-    if (pending) pendingMask_ |= mask;
-    else pendingMask_ &= ~mask;
+    pendingFlags_[idx] = pending;
 }
 
 bool MqttConfigRouteProducer::isPending_(uint8_t idx) const
 {
     if (idx >= routeCount_ || idx >= MaxRoutes) return false;
-    return (pendingMask_ & routeBit_(idx)) != 0ULL;
+    return pendingFlags_[idx];
 }
 
 void MqttConfigRouteProducer::setNeedsEnqueue_(uint8_t idx, bool needed)
 {
     if (idx >= routeCount_ || idx >= MaxRoutes) return;
-    const uint64_t mask = routeBit_(idx);
-    if (needed) needsEnqueueMask_ |= mask;
-    else needsEnqueueMask_ &= ~mask;
+    needsEnqueueFlags_[idx] = needed;
 }
 
 bool MqttConfigRouteProducer::needsEnqueue_(uint8_t idx) const
 {
     if (idx >= routeCount_ || idx >= MaxRoutes) return false;
-    return (needsEnqueueMask_ & routeBit_(idx)) != 0ULL;
+    return needsEnqueueFlags_[idx];
 }
 
 bool MqttConfigRouteProducer::hasNeedsEnqueue_() const
 {
-    return needsEnqueueMask_ != 0ULL;
+    for (uint8_t i = 0; i < routeCount_ && i < MaxRoutes; ++i) {
+        if (needsEnqueueFlags_[i]) return true;
+    }
+    return false;
 }
 
 void MqttConfigRouteProducer::armRetry_(uint32_t nowMs)
@@ -164,11 +158,11 @@ void MqttConfigRouteProducer::expireTimedOutRoutes_(uint32_t nowMs)
     }
 }
 
-uint8_t MqttConfigRouteProducer::countPendingBits_(uint64_t mask) const
+uint8_t MqttConfigRouteProducer::countPendingFlags_(const bool* flags) const
 {
     uint8_t c = 0U;
     for (uint8_t i = 0; i < routeCount_ && i < MaxRoutes; ++i) {
-        if (mask & routeBit_(i)) ++c;
+        if (flags && flags[i]) ++c;
     }
     return c;
 }
@@ -182,8 +176,8 @@ void MqttConfigRouteProducer::reportMetrics_(uint32_t nowMs)
     if ((uint32_t)(nowMs - metricsWinStartMs_) < 5000U) return;
     metricsWinStartMs_ = nowMs;
 
-    const uint8_t pendingEnq = countPendingBits_(needsEnqueueMask_);
-    const uint8_t pendingAny = countPendingBits_(pendingMask_);
+    const uint8_t pendingEnq = countPendingFlags_(needsEnqueueFlags_);
+    const uint8_t pendingAny = countPendingFlags_(pendingFlags_);
     if (metricsRefusedWin_ == 0U && metricsRetryTryWin_ == 0U &&
         metricsRetryOkWin_ == 0U && metricsTimeoutWin_ == 0U &&
         pendingEnq == 0U && pendingAny == 0U) {
@@ -264,12 +258,9 @@ bool MqttConfigRouteProducer::enqueueByRoute_(uint8_t idx, MqttPublishPriority p
 {
     if (!mqttSvc_ || !mqttSvc_->enqueue) return false;
     if (idx >= routeCount_) return false;
-    const uint64_t bit = routeBit_(idx);
     const bool wasPending = isPending_(idx);
-    const bool wasBuilding = (bit != 0ULL) && ((buildingMask_ & bit) != 0ULL);
-    if (wasBuilding) {
-        republishAfterPublishMask_ |= bit;
-    }
+    const bool wasBuilding = (idx < MaxRoutes) && building_[idx];
+    if (wasBuilding) republishAfterPublish_[idx] = true;
     setPending_(idx, true);
     setNeedsEnqueue_(idx, true);
     constexpr uint8_t kFlags = (uint8_t)MqttEnqueueFlags::SilentRejectLog;
@@ -290,9 +281,7 @@ bool MqttConfigRouteProducer::enqueueByRoute_(uint8_t idx, MqttPublishPriority p
     ++metricsRefusedTotal_;
     // If a route was already pending and this enqueue was refused, preserve a
     // one-shot republish so changes that arrived in-between are not lost.
-    if (bit != 0ULL && wasPending) {
-        republishAfterPublishMask_ |= bit;
-    }
+    if (wasPending && idx < MaxRoutes) republishAfterPublish_[idx] = true;
     if (idx < MaxRoutes && retryFirstRefusedMs_[idx] == 0U) {
         retryFirstRefusedMs_[idx] = nowMs;
     }
@@ -377,10 +366,7 @@ MqttBuildResult MqttConfigRouteProducer::buildMessage_(uint16_t messageId, MqttB
     const uint8_t idx = (uint8_t)routeIdx;
     if (!isPending_(idx)) return MqttBuildResult::NoLongerNeeded;
     const Route& route = routes_[idx];
-    const uint64_t bit = routeBit_(idx);
-    if (bit != 0ULL) {
-        buildingMask_ |= bit;
-    }
+    if (idx < MaxRoutes) building_[idx] = true;
 
     if (route.customBuild) {
         return route.customBuild(owner_, messageId, ctx);
@@ -436,13 +422,10 @@ void MqttConfigRouteProducer::onMessagePublished_(uint16_t messageId)
     const int8_t routeIdx = findRouteByMessage_(messageId);
     if (routeIdx < 0) return;
     const uint8_t idx = (uint8_t)routeIdx;
-    const uint64_t bit = routeBit_(idx);
-    if (bit != 0ULL) {
-        buildingMask_ &= ~bit;
-    }
+    if (idx < MaxRoutes) building_[idx] = false;
 
-    if (bit != 0ULL && (republishAfterPublishMask_ & bit) != 0ULL) {
-        republishAfterPublishMask_ &= ~bit;
+    if (idx < MaxRoutes && republishAfterPublish_[idx]) {
+        republishAfterPublish_[idx] = false;
         (void)enqueueByRoute_(idx, routePriority_(routes_[idx]));
         return;
     }
@@ -460,13 +443,12 @@ void MqttConfigRouteProducer::onMessageDropped_(uint16_t messageId)
     const int8_t routeIdx = findRouteByMessage_(messageId);
     if (routeIdx < 0) return;
     const uint8_t idx = (uint8_t)routeIdx;
-    const uint64_t bit = routeBit_(idx);
     setPending_(idx, false);
     setNeedsEnqueue_(idx, false);
     retryFirstRefusedMs_[idx] = 0U;
-    if (bit != 0ULL) {
-        buildingMask_ &= ~bit;
-        republishAfterPublishMask_ &= ~bit;
+    if (idx < MaxRoutes) {
+        building_[idx] = false;
+        republishAfterPublish_[idx] = false;
     }
     if (!hasNeedsEnqueue_()) {
         resetRetry_();

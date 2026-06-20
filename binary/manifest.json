@@ -1,7 +1,7 @@
 {
   "schema": "flowio.firmware-manifest.v1",
-  "generated_at": "2026-06-19T23:02:15+02:00",
-  "release": "2026.06.19",
+  "generated_at": "2026-06-20T22:13:09+02:00",
+  "release": "2026.06.20",
   "artifacts": {
     "nextion": [
       {
@@ -43,12 +43,23 @@
         "title": "flowios3",
         "label": "flowios3",
         "version": "1.0.4",
-        "build_date": "2026-06-19T23:02:15+02:00",
+        "build_date": "2026-06-20T22:10:25+02:00",
         "target": "flowios3",
         "path": "flowios3-1.0.4.bin",
         "kind": "esp32-firmware",
         "route": "/fwupdate/waveshare",
-        "size": 1951552
+        "size": 1974752
+      },
+      {
+        "title": "flowios3",
+        "label": "flowios3",
+        "version": "2.0.1",
+        "build_date": "2026-06-20T22:12:33+02:00",
+        "target": "flowios3",
+        "path": "flowios3-2.0.1.bin",
+        "kind": "esp32-firmware",
+        "route": "/fwupdate/waveshare",
+        "size": 1973168
       },
       {
         "title": "waveshare",
@@ -78,9 +89,20 @@
         "title": "flowios3-spiffs",
         "label": "flowios3-spiffs",
         "version": "1.0.4",
-        "build_date": "2026-06-18T22:27:17+02:00",
+        "build_date": "2026-06-20T22:10:25+02:00",
         "target": "spiffs",
         "path": "flowios3-spiffs-1.0.4.bin",
+        "kind": "esp32-spiffs",
+        "route": "/fwupdate/spiffs",
+        "size": 4063232
+      },
+      {
+        "title": "flowios3-spiffs",
+        "label": "flowios3-spiffs",
+        "version": "2.0.1",
+        "build_date": "2026-06-20T22:13:09+02:00",
+        "target": "spiffs",
+        "path": "flowios3-spiffs-2.0.1.bin",
         "kind": "esp32-spiffs",
         "route": "/fwupdate/spiffs",
         "size": 8257536

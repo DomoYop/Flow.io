@@ -185,11 +185,46 @@ bool PoolLogicModule::recalcAndApplyFiltrationWindow_(uint8_t* startHourOut,
              (double)waterTemp,
              (unsigned)startHour,
              (unsigned)stopHour);
+        char detail[128] = {0};
+        snprintf(detail,
+                 sizeof(detail),
+                 "Température eau %.2f °C, durée %u h, plage %02u:00-%02u:00.",
+                 (double)waterTemp,
+                 (unsigned)duration,
+                 (unsigned)startHour,
+                 (unsigned)stopHour);
+        emitActivity_(ActivityCode::PoolLogicFiltrationWindowCalculated,
+                      ActivitySource::Scheduler,
+                      ActivitySeverity::Info,
+                      ActivityRole::Filtration,
+                      ActivityState::None,
+                      ActivityReason::Scheduler,
+                      filtrationDeviceSlot_,
+                      "Plage de filtration recalculée",
+                      detail,
+                      "schedule");
     } else {
         LOGI("Filtration duration=%uh water=unavailable start=%uh stop=%uh",
              (unsigned)duration,
              (unsigned)startHour,
              (unsigned)stopHour);
+        char detail[128] = {0};
+        snprintf(detail,
+                 sizeof(detail),
+                 "Température eau indisponible, durée %u h, plage %02u:00-%02u:00.",
+                 (unsigned)duration,
+                 (unsigned)startHour,
+                 (unsigned)stopHour);
+        emitActivity_(ActivityCode::PoolLogicFiltrationWindowCalculated,
+                      ActivitySource::Scheduler,
+                      ActivitySeverity::Warning,
+                      ActivityRole::Filtration,
+                      ActivityState::None,
+                      ActivityReason::Scheduler,
+                      filtrationDeviceSlot_,
+                      "Plage de filtration recalculée",
+                      detail,
+                      "schedule");
     }
     return true;
 }

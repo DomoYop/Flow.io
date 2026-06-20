@@ -52,9 +52,13 @@ static constexpr uint8_t poolDeviceCfgBranchFromSlot_(uint8_t slot)
 
 bool PoolDeviceModule::ensureStorage_()
 {
+    if (!stateMutex_) {
+        stateMutex_ = xSemaphoreCreateRecursiveMutexStatic(&stateMutexBuf_);
+    }
+
     if (runtimePersistBuf_ && slots_ && cfgEnabledVar_ && cfgDependsVar_ && cfgFlowVar_ &&
         cfgTankCapVar_ && cfgTankInitVar_ && cfgMaxUptimeVar_) {
-        return true;
+        return stateMutex_ != nullptr;
     }
 
     if (!runtimePersistBuf_) {
@@ -68,7 +72,7 @@ bool PoolDeviceModule::ensureStorage_()
     if (!cfgTankInitVar_) cfgTankInitVar_ = allocPsramArray_<ConfigVariable<float,0>>(POOL_DEVICE_MAX);
     if (!cfgMaxUptimeVar_) cfgMaxUptimeVar_ = allocPsramArray_<ConfigVariable<int32_t,0>>(POOL_DEVICE_MAX);
 
-    const bool ok = runtimePersistBuf_ && slots_ && cfgEnabledVar_ && cfgDependsVar_ && cfgFlowVar_ &&
+    const bool ok = stateMutex_ && runtimePersistBuf_ && slots_ && cfgEnabledVar_ && cfgDependsVar_ && cfgFlowVar_ &&
                     cfgTankCapVar_ && cfgTankInitVar_ && cfgMaxUptimeVar_;
     if (ok) {
         LOGI("PoolDevice scalable storage ready slots=%u persist_bytes=%u",
@@ -78,6 +82,19 @@ bool PoolDeviceModule::ensureStorage_()
         LOGE("PoolDevice scalable storage allocation failed");
     }
     return ok;
+}
+
+bool PoolDeviceModule::lockState_(TickType_t timeoutTicks) const
+{
+    if (!stateMutex_) return false;
+    return xSemaphoreTakeRecursive(stateMutex_, timeoutTicks) == pdTRUE;
+}
+
+void PoolDeviceModule::unlockState_() const
+{
+    if (stateMutex_) {
+        (void)xSemaphoreGiveRecursive(stateMutex_);
+    }
 }
 
 size_t PoolDeviceModule::runtimePersistUsage_() const
@@ -156,6 +173,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
     }
     cmdSvc_ = services.get<CommandService>(ServiceId::Command);
     haSvc_ = services.get<HAService>(ServiceId::Ha);
+    activityLogSvc_ = services.get<ActivityLogService>(ServiceId::ActivityLog);
     const EventBusService* ebSvc = services.get<EventBusService>(ServiceId::EventBus);
     eventBus_ = ebSvc ? ebSvc->bus : nullptr;
     const DataStoreService* dsSvc = services.get<DataStoreService>(ServiceId::DataStore);
@@ -545,13 +563,21 @@ void PoolDeviceModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
 
 void PoolDeviceModule::loop()
 {
+    if (!lockState_(pdMS_TO_TICKS(500))) {
+        LOGW("PoolDevice loop skipped: state lock timeout");
+        vTaskDelay(pdMS_TO_TICKS(200));
+        return;
+    }
+
     if (!runtimeReady_) {
         if (!configureRuntime_()) {
+            unlockState_();
             vTaskDelay(pdMS_TO_TICKS(250));
             return;
         }
     }
 
     tickDevices_(millis());
+    unlockState_();
     vTaskDelay(pdMS_TO_TICKS(200));
 }

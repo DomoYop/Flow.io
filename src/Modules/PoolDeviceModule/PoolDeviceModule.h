@@ -18,6 +18,7 @@
 #include "Core/Services/ITime.h"
 #include "Domain/DomainTypes.h"
 #include "Modules/PoolDeviceModule/PoolDeviceModuleDataModel.h"
+#include <freertos/semphr.h>
 
 enum PoolDeviceType : uint8_t {
     POOL_DEVICE_FILTRATION = 0,
@@ -196,7 +197,21 @@ private:
     bool handlePoolResetUptimeAll_(const CommandRequest& req, char* reply, size_t replyLen);
     bool resetUptimeSlot_(uint8_t slot);
     uint8_t resetUptimeAll_();
+    void emitActivity_(ActivityCode code,
+                       ActivitySource source,
+                       ActivitySeverity severity,
+                       ActivityRole role,
+                       ActivityState state,
+                       ActivityReason reason,
+                       uint8_t slot,
+                       const char* title,
+                       const char* detail,
+                       const char* icon) const;
+    void emitAutoModeDisabledByManualActivity_(ActivityRole role, uint8_t slot, const char* autoLabel) const;
+    ActivityRole activityRoleForSlot_(uint8_t slot) const;
     bool ensureStorage_();
+    bool lockState_(TickType_t timeoutTicks = pdMS_TO_TICKS(200)) const;
+    void unlockState_() const;
     size_t runtimePersistUsage_() const;
     size_t runtimePersistCapacity_() const { return (size_t)POOL_DEVICE_MAX * RUNTIME_PERSIST_BUF_LEN; }
 
@@ -204,6 +219,8 @@ private:
     bool runtimeReady_ = false;
     bool writesEnabled_ = false;
     portMUX_TYPE resetMux_ = portMUX_INITIALIZER_UNLOCKED;
+    mutable StaticSemaphore_t stateMutexBuf_{};
+    mutable SemaphoreHandle_t stateMutex_ = nullptr;
     uint8_t resetPendingMask_ = 0;
     bool periodReconcilePending_ = true;
 
@@ -217,6 +234,7 @@ private:
     const CommandService* cmdSvc_ = nullptr;
     const MqttService* mqttSvc_ = nullptr;
     const HAService* haSvc_ = nullptr;
+    const ActivityLogService* activityLogSvc_ = nullptr;
     PoolDeviceService poolSvc_{
         ServiceBinding::bind<&PoolDeviceModule::activeCount_>,
         ServiceBinding::bind<&PoolDeviceModule::svcMetaImpl_>,

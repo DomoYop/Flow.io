@@ -27,14 +27,17 @@ bool isFiniteNonNegative_(float value)
 bool PoolDeviceModule::defineDevice(const PoolDeviceDefinition& def)
 {
     if (!ensureStorage_()) return false;
+    if (!lockState_()) return false;
     if (def.slot >= POOL_DEVICE_MAX) {
         LOGW("Pool device definition missing explicit valid slot");
+        unlockState_();
         return false;
     }
 
     PoolDeviceSlot& s = slots_[def.slot];
     if (s.used) {
         LOGW("Pool device slot %u already defined", (unsigned)def.slot);
+        unlockState_();
         return false;
     }
 
@@ -49,17 +52,20 @@ bool PoolDeviceModule::defineDevice(const PoolDeviceDefinition& def)
     if (s.def.ioSlot == IO_SLOT_INVALID) {
         LOGW("Pool device %s missing IO slot binding", s.id);
         s.used = false;
+        unlockState_();
         return false;
     }
     if (ioSlotKind(s.def.ioSlot) != IO_SLOT_DIGITAL_OUTPUT) {
         LOGW("Pool device %s IO slot is not a digital output", s.id);
         s.used = false;
+        unlockState_();
         return false;
     }
     s.ioId = ioIdFromSlot(s.def.ioSlot);
     if (s.ioId == IO_ID_INVALID) {
         LOGW("Pool device %s IO slot cannot resolve ioId", s.id);
         s.used = false;
+        unlockState_();
         return false;
     }
     if (s.def.maxUptimeDaySec < 0) {
@@ -85,6 +91,7 @@ bool PoolDeviceModule::defineDevice(const PoolDeviceDefinition& def)
     s.persistDirty = false;
     s.persistImmediate = false;
 
+    unlockState_();
     return true;
 }
 
@@ -155,31 +162,40 @@ bool PoolDeviceModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wr
 
 bool PoolDeviceModule::snapshotRouteFromIndex_(uint8_t snapshotIdx, uint8_t& slotIdxOut, bool& metricsOut) const
 {
+    if (!lockState_()) return false;
     uint8_t seen = 0;
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
         if (!slots_[i].used) continue;
         if (seen == snapshotIdx) {
             slotIdxOut = i;
             metricsOut = false;
+            unlockState_();
             return true;
         }
         ++seen;
         if (seen == snapshotIdx) {
             slotIdxOut = i;
             metricsOut = true;
+            unlockState_();
             return true;
         }
         ++seen;
     }
+    unlockState_();
     return false;
 }
 
 bool PoolDeviceModule::slotRuntimePublishable_(uint8_t slotIdx) const
 {
-    if (slotIdx >= POOL_DEVICE_MAX) return false;
+    if (!lockState_()) return false;
+    if (slotIdx >= POOL_DEVICE_MAX) {
+        unlockState_();
+        return false;
+    }
     const PoolDeviceSlot& s = slots_[slotIdx];
-    if (!s.used) return false;
-    return runtimeReady_ ? s.runtimePublishable : true;
+    const bool out = s.used && (runtimeReady_ ? s.runtimePublishable : true);
+    unlockState_();
+    return out;
 }
 
 bool PoolDeviceModule::buildStateSnapshot_(uint8_t slotIdx, char* out, size_t len, uint32_t& maxTsOut) const
@@ -187,28 +203,41 @@ bool PoolDeviceModule::buildStateSnapshot_(uint8_t slotIdx, char* out, size_t le
     if (!out || len == 0) return false;
     if (!dataStore_) return false;
     if (slotIdx >= POOL_DEVICE_MAX) return false;
-    if (!slotRuntimePublishable_(slotIdx)) return false;
+    if (!lockState_()) return false;
+    if (!slotRuntimePublishable_(slotIdx)) {
+        unlockState_();
+        return false;
+    }
 
     PoolDeviceRuntimeStateEntry entry{};
-    if (!poolDeviceRuntimeState(*dataStore_, slotIdx, entry)) return false;
+    if (!poolDeviceRuntimeState(*dataStore_, slotIdx, entry)) {
+        unlockState_();
+        return false;
+    }
 
-    const char* label = deviceLabel(slotIdx);
+    char label[sizeof(PoolDeviceDefinition::label)] = {0};
+    const PoolDeviceSlot& s = slots_[slotIdx];
+    snprintf(label, sizeof(label), "%s", (s.def.label[0] != '\0') ? s.def.label : (s.id ? s.id : "pd"));
     const char* blockReason = blockReasonStr_(entry.blockReason);
     const int wrote = snprintf(
         out, len,
         "{\"id\":\"pd%u\",\"name\":\"%s\",\"enabled\":%s,\"desired\":%s,\"on\":%s,"
         "\"block\":\"%s\",\"ts\":%lu}",
         (unsigned)slotIdx,
-        (label && label[0] != '\0') ? label : "pd",
+        label[0] ? label : "pd",
         entry.enabled ? "true" : "false",
         entry.desiredOn ? "true" : "false",
         entry.actualOn ? "true" : "false",
         blockReason,
         (unsigned long)entry.tsMs
     );
-    if (wrote < 0 || (size_t)wrote >= len) return false;
+    if (wrote < 0 || (size_t)wrote >= len) {
+        unlockState_();
+        return false;
+    }
 
     maxTsOut = (entry.tsMs == 0U) ? 1U : entry.tsMs;
+    unlockState_();
     return true;
 }
 
@@ -217,12 +246,21 @@ bool PoolDeviceModule::buildMetricsSnapshot_(uint8_t slotIdx, char* out, size_t 
     if (!out || len == 0) return false;
     if (!dataStore_) return false;
     if (slotIdx >= POOL_DEVICE_MAX) return false;
-    if (!slotRuntimePublishable_(slotIdx)) return false;
+    if (!lockState_()) return false;
+    if (!slotRuntimePublishable_(slotIdx)) {
+        unlockState_();
+        return false;
+    }
 
     PoolDeviceRuntimeMetricsEntry entry{};
-    if (!poolDeviceRuntimeMetrics(*dataStore_, slotIdx, entry)) return false;
+    if (!poolDeviceRuntimeMetrics(*dataStore_, slotIdx, entry)) {
+        unlockState_();
+        return false;
+    }
 
-    const char* label = deviceLabel(slotIdx);
+    char label[sizeof(PoolDeviceDefinition::label)] = {0};
+    const PoolDeviceSlot& s = slots_[slotIdx];
+    snprintf(label, sizeof(label), "%s", (s.def.label[0] != '\0') ? s.def.label : (s.id ? s.id : "pd"));
     const int wrote = snprintf(
         out, len,
         "{\"id\":\"pd%u\",\"name\":\"%s\","
@@ -230,7 +268,7 @@ bool PoolDeviceModule::buildMetricsSnapshot_(uint8_t slotIdx, char* out, size_t 
         "\"injected\":{\"day_ml\":%.3f,\"week_ml\":%.3f,\"month_ml\":%.3f,\"total_ml\":%.3f},"
         "\"tank\":{\"remaining_ml\":%.3f},\"ts\":%lu}",
         (unsigned)slotIdx,
-        (label && label[0] != '\0') ? label : "pd",
+        label[0] ? label : "pd",
         (unsigned long)entry.runningSecDay,
         (unsigned long)entry.runningSecWeek,
         (unsigned long)entry.runningSecMonth,
@@ -242,9 +280,13 @@ bool PoolDeviceModule::buildMetricsSnapshot_(uint8_t slotIdx, char* out, size_t 
         (double)entry.tankRemainingMl,
         (unsigned long)entry.tsMs
     );
-    if (wrote < 0 || (size_t)wrote >= len) return false;
+    if (wrote < 0 || (size_t)wrote >= len) {
+        unlockState_();
+        return false;
+    }
 
     maxTsOut = (entry.tsMs == 0U) ? 1U : entry.tsMs;
+    unlockState_();
     return true;
 }
 
@@ -316,11 +358,12 @@ bool PoolDeviceModule::configureRuntime_()
         if (metaStatus == IO_OK && meta.kind == IO_KIND_DIGITAL_OUT && (meta.capabilities & IO_CAP_W) != 0) {
             ioReady = true;
         } else {
-            if (metaStatus != IO_OK) {
-                LOGW("Pool device %s unavailable ioId=%u", s.id, (unsigned)s.ioId);
-            } else {
-                LOGW("Pool device %s ioId=%u is not a writable bound digital output", s.id, (unsigned)s.ioId);
-            }
+            LOGD("Pool device %s sleeping ioId=%u status=%u kind=%u caps=0x%02X",
+                 s.id,
+                 (unsigned)s.ioId,
+                 (unsigned)metaStatus,
+                 (unsigned)meta.kind,
+                 (unsigned)meta.capabilities);
             s.actualOn = false;
             s.desiredOn = false;
             s.blockReason = s.def.enabled ? POOL_DEVICE_BLOCK_UNBOUND : POOL_DEVICE_BLOCK_DISABLED;
@@ -419,8 +462,17 @@ MqttBuildResult PoolDeviceModule::buildCfgBasePdm_(MqttBuildContext& buildCtx)
     bool truncatedPayload = false;
 
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
-        if (!slots_[i].used) continue;
-        if (runtimeReady_ && !slots_[i].runtimePublishable) continue;
+        char slotId[8] = {0};
+        bool includeSlot = false;
+        if (lockState_()) {
+            const PoolDeviceSlot& s = slots_[i];
+            includeSlot = s.used && (!runtimeReady_ || s.runtimePublishable);
+            if (includeSlot) {
+                snprintf(slotId, sizeof(slotId), "%s", s.id ? s.id : "");
+            }
+            unlockState_();
+        }
+        if (!includeSlot) continue;
 
         char moduleJson[640] = {0};
         bool truncatedModule = false;
@@ -435,7 +487,6 @@ MqttBuildResult PoolDeviceModule::buildCfgBasePdm_(MqttBuildContext& buildCtx)
         if (!hasAny) continue;
 
         const char* prefix = any ? "," : "";
-        const char* slotId = slots_[i].id ? slots_[i].id : "";
         const size_t prefixLen = strlen(prefix);
         const size_t idLen = strlen(slotId);
         const size_t jsonLen = strlen(moduleJson);

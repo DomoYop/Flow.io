@@ -29,6 +29,7 @@ enum class ServiceId : uint8_t {
     NetworkAccess,
     FlowCfg,
     Locale,
+    ActivityLog,
     Count
 };
 
@@ -68,6 +69,7 @@ constexpr const char* toString(ServiceId id)
         case ServiceId::NetworkAccess: return "network_access";
         case ServiceId::FlowCfg: return "flowcfg";
         case ServiceId::Locale: return "locale";
+        case ServiceId::ActivityLog: return "activitylog";
         case ServiceId::Count: return "count";
     }
     return "unknown";

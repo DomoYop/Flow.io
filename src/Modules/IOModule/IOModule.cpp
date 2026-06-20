@@ -108,6 +108,22 @@ static constexpr uint8_t kCfgBranchIoA12 = 39;
 static constexpr uint8_t kCfgBranchIoA13 = 40;
 static constexpr uint8_t kCfgBranchIoA14 = 41;
 static constexpr uint8_t kCfgBranchIoA15 = 42;
+static constexpr uint8_t kCfgBranchIoA16 = 57;
+static constexpr uint8_t kCfgBranchIoA17 = 58;
+static constexpr uint8_t kCfgBranchIoA18 = 59;
+static constexpr uint8_t kCfgBranchIoA19 = 60;
+static constexpr uint8_t kCfgBranchIoA20 = 61;
+static constexpr uint8_t kCfgBranchIoA21 = 62;
+static constexpr uint8_t kCfgBranchIoA22 = 63;
+static constexpr uint8_t kCfgBranchIoA23 = 64;
+static constexpr uint8_t kCfgBranchIoA24 = 65;
+static constexpr uint8_t kCfgBranchIoA25 = 66;
+static constexpr uint8_t kCfgBranchIoA26 = 67;
+static constexpr uint8_t kCfgBranchIoA27 = 68;
+static constexpr uint8_t kCfgBranchIoA28 = 69;
+static constexpr uint8_t kCfgBranchIoA29 = 70;
+static constexpr uint8_t kCfgBranchIoA30 = 71;
+static constexpr uint8_t kCfgBranchIoA31 = 72;
 static constexpr uint8_t kCfgBranchIoD0 = 9;
 static constexpr uint8_t kCfgBranchIoD1 = 10;
 static constexpr uint8_t kCfgBranchIoD2 = 11;
@@ -151,6 +167,43 @@ static constexpr uint8_t kCfgBranchIo1Wire2 = 59;
 static constexpr uint8_t kCfgBranchIoIna228 = 60;
 static constexpr PhysicalPortId kLegacyDisconnectedBindingPort = 65535U;
 static constexpr char kLegacyCounterRuntimeKeyFmt[] = "ioi%02urt";
+
+static constexpr uint8_t analogCfgBranch_(uint8_t idx)
+{
+    return (idx == 0U) ? kCfgBranchIoA0 :
+           (idx == 1U) ? kCfgBranchIoA1 :
+           (idx == 2U) ? kCfgBranchIoA2 :
+           (idx == 3U) ? kCfgBranchIoA3 :
+           (idx == 4U) ? kCfgBranchIoA4 :
+           (idx == 5U) ? kCfgBranchIoA5 :
+           (idx == 6U) ? kCfgBranchIoA6 :
+           (idx == 7U) ? kCfgBranchIoA7 :
+           (idx == 8U) ? kCfgBranchIoA8 :
+           (idx == 9U) ? kCfgBranchIoA9 :
+           (idx == 10U) ? kCfgBranchIoA10 :
+           (idx == 11U) ? kCfgBranchIoA11 :
+           (idx == 12U) ? kCfgBranchIoA12 :
+           (idx == 13U) ? kCfgBranchIoA13 :
+           (idx == 14U) ? kCfgBranchIoA14 :
+           (idx == 15U) ? kCfgBranchIoA15 :
+           (idx == 16U) ? kCfgBranchIoA16 :
+           (idx == 17U) ? kCfgBranchIoA17 :
+           (idx == 18U) ? kCfgBranchIoA18 :
+           (idx == 19U) ? kCfgBranchIoA19 :
+           (idx == 20U) ? kCfgBranchIoA20 :
+           (idx == 21U) ? kCfgBranchIoA21 :
+           (idx == 22U) ? kCfgBranchIoA22 :
+           (idx == 23U) ? kCfgBranchIoA23 :
+           (idx == 24U) ? kCfgBranchIoA24 :
+           (idx == 25U) ? kCfgBranchIoA25 :
+           (idx == 26U) ? kCfgBranchIoA26 :
+           (idx == 27U) ? kCfgBranchIoA27 :
+           (idx == 28U) ? kCfgBranchIoA28 :
+           (idx == 29U) ? kCfgBranchIoA29 :
+           (idx == 30U) ? kCfgBranchIoA30 :
+           (idx == 31U) ? kCfgBranchIoA31 :
+                           ConfigBranchRef::UnknownLocalBranch;
+}
 
 PhysicalPortId normalizeConfiguredBindingPort(PhysicalPortId port)
 {
@@ -229,9 +282,27 @@ static constexpr MqttConfigRouteProducer::Route kIoCfgRoutes[] = {
     FLOW_IO_DIGITAL_OUTPUT_ROUTE_ENTRY(54, kCfgBranchIoD13, "13"),
     FLOW_IO_DIGITAL_OUTPUT_ROUTE_ENTRY(55, kCfgBranchIoD14, "14"),
     FLOW_IO_DIGITAL_OUTPUT_ROUTE_ENTRY(56, kCfgBranchIoD15, "15"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(57, kCfgBranchIoA16, "16"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(58, kCfgBranchIoA17, "17"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(59, kCfgBranchIoA18, "18"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(60, kCfgBranchIoA19, "19"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(61, kCfgBranchIoA20, "20"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(62, kCfgBranchIoA21, "21"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(63, kCfgBranchIoA22, "22"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(64, kCfgBranchIoA23, "23"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(65, kCfgBranchIoA24, "24"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(66, kCfgBranchIoA25, "25"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(67, kCfgBranchIoA26, "26"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(68, kCfgBranchIoA27, "27"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(69, kCfgBranchIoA28, "28"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(70, kCfgBranchIoA29, "29"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(71, kCfgBranchIoA30, "30"),
+    FLOW_IO_ANALOG_ROUTE_ENTRY(72, kCfgBranchIoA31, "31"),
 };
 #undef FLOW_IO_ANALOG_ROUTE_ENTRY
 #undef FLOW_IO_DIGITAL_OUTPUT_ROUTE_ENTRY
+static_assert((sizeof(kIoCfgRoutes) / sizeof(kIoCfgRoutes[0])) <= MqttConfigRouteProducer::MaxRoutes,
+              "IOModule config routes exceed MqttConfigRouteProducer capacity");
 }
 
 static bool hasDecimalSuffixLocal(const char* p)
@@ -432,6 +503,32 @@ bool IOModule::defineAnalogInput(const IOAnalogDefinition& def)
     AnalogSlot& slot = analogSlots_[analogIdx];
     slot.used = true;
     slot.ioId = def.ioId;
+    slot.def = def;
+    slot.def.ioId = slot.ioId;
+
+    if (analogIdx < ANALOG_CFG_SLOTS) {
+        strncpy(analogCfg_[analogIdx].name, def.id, sizeof(analogCfg_[analogIdx].name) - 1);
+        analogCfg_[analogIdx].name[sizeof(analogCfg_[analogIdx].name) - 1] = '\0';
+        analogCfg_[analogIdx].bindingPort = def.bindingPort;
+        analogCfg_[analogIdx].c0 = def.c0;
+        analogCfg_[analogIdx].c1 = def.c1;
+        analogCfg_[analogIdx].precision = def.precision;
+    }
+
+    return true;
+}
+
+bool IOModule::applyAnalogInputDefaults(const IOAnalogDefinition& def)
+{
+    if (!ensureScalableStorage_()) return false;
+    if (def.id[0] == '\0') return false;
+    if (def.ioId == IO_ID_INVALID) return false;
+    if (def.ioId < IO_ID_AI_BASE || def.ioId >= IO_ID_AI_MAX) return false;
+
+    const uint8_t analogIdx = (uint8_t)(def.ioId - IO_ID_AI_BASE);
+    AnalogSlot& slot = analogSlots_[analogIdx];
+    if (!slot.used) return false;
+
     slot.def = def;
     slot.def.ioId = slot.ioId;
 
@@ -3396,24 +3493,16 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
 #undef FLOW_IO_REGISTER_ANALOG_CFG
 
     if (ensureExtraAnalogCfgVars_()) {
-        ExtraAnalogConfigVars& extra = *extraAnalogCfgVars_;
-#define FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(INDEX, BRANCH) \
-        cfg.registerVar(extra.a##INDEX##NameVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.a##INDEX##BindingVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.a##INDEX##C0Var_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.a##INDEX##C1Var_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.a##INDEX##PrecVar_, kCfgModuleId, BRANCH);
-        if (ANALOG_CFG_SLOTS > 6U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(6, kCfgBranchIoA6) }
-        if (ANALOG_CFG_SLOTS > 7U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(7, kCfgBranchIoA7) }
-        if (ANALOG_CFG_SLOTS > 8U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(8, kCfgBranchIoA8) }
-        if (ANALOG_CFG_SLOTS > 9U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(9, kCfgBranchIoA9) }
-        if (ANALOG_CFG_SLOTS > 10U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(10, kCfgBranchIoA10) }
-        if (ANALOG_CFG_SLOTS > 11U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(11, kCfgBranchIoA11) }
-        if (ANALOG_CFG_SLOTS > 12U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(12, kCfgBranchIoA12) }
-        if (ANALOG_CFG_SLOTS > 13U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(13, kCfgBranchIoA13) }
-        if (ANALOG_CFG_SLOTS > 14U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(14, kCfgBranchIoA14) }
-        if (ANALOG_CFG_SLOTS > 15U) { FLOW_IO_REGISTER_EXTRA_ANALOG_CFG(15, kCfgBranchIoA15) }
-#undef FLOW_IO_REGISTER_EXTRA_ANALOG_CFG
+        for (uint8_t i = ExtraAnalogConfigVars::FIRST_SLOT; i < ANALOG_CFG_SLOTS; ++i) {
+            if (i >= (ExtraAnalogConfigVars::FIRST_SLOT + ExtraAnalogConfigVars::SLOT_COUNT)) break;
+            ExtraAnalogConfigVars::SlotVars& vars = extraAnalogCfgVars_->slots[i - ExtraAnalogConfigVars::FIRST_SLOT];
+            const uint8_t branch = analogCfgBranch_(i);
+            cfg.registerVar(vars.nameVar_, kCfgModuleId, branch);
+            cfg.registerVar(vars.bindingVar_, kCfgModuleId, branch);
+            cfg.registerVar(vars.c0Var_, kCfgModuleId, branch);
+            cfg.registerVar(vars.c1Var_, kCfgModuleId, branch);
+            cfg.registerVar(vars.precVar_, kCfgModuleId, branch);
+        }
     } else {
         LOGE("failed to allocate extra analog config vars");
     }

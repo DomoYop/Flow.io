@@ -1690,6 +1690,438 @@
       "label_t": "cfgdocs.io.output.d15.retain_on_warm_reboot.label",
       "help_t": "cfgdocs.io.output.d15.retain_on_warm_reboot.help",
       "enum_set": "io_output_boot_behavior"
+    },
+    "io/input/a16/a16_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a16.a16_c0.label",
+      "help_t": "cfgdocs.io.input.a16.a16_c0.help"
+    },
+    "io/input/a16/a16_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a16.a16_c1.label",
+      "help_t": "cfgdocs.io.input.a16.a16_c1.help"
+    },
+    "io/input/a16/a16_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a16.a16_name.label",
+      "help_t": "cfgdocs.io.input.a16.a16_name.help"
+    },
+    "io/input/a16/a16_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a16.a16_prec.label",
+      "help_t": "cfgdocs.io.input.a16.a16_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a16/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a16.binding_port.label",
+      "help_t": "cfgdocs.io.input.a16.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a17/a17_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a17.a17_c0.label",
+      "help_t": "cfgdocs.io.input.a17.a17_c0.help"
+    },
+    "io/input/a17/a17_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a17.a17_c1.label",
+      "help_t": "cfgdocs.io.input.a17.a17_c1.help"
+    },
+    "io/input/a17/a17_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a17.a17_name.label",
+      "help_t": "cfgdocs.io.input.a17.a17_name.help"
+    },
+    "io/input/a17/a17_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a17.a17_prec.label",
+      "help_t": "cfgdocs.io.input.a17.a17_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a17/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a17.binding_port.label",
+      "help_t": "cfgdocs.io.input.a17.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a18/a18_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a18.a18_c0.label",
+      "help_t": "cfgdocs.io.input.a18.a18_c0.help"
+    },
+    "io/input/a18/a18_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a18.a18_c1.label",
+      "help_t": "cfgdocs.io.input.a18.a18_c1.help"
+    },
+    "io/input/a18/a18_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a18.a18_name.label",
+      "help_t": "cfgdocs.io.input.a18.a18_name.help"
+    },
+    "io/input/a18/a18_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a18.a18_prec.label",
+      "help_t": "cfgdocs.io.input.a18.a18_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a18/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a18.binding_port.label",
+      "help_t": "cfgdocs.io.input.a18.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a19/a19_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a19.a19_c0.label",
+      "help_t": "cfgdocs.io.input.a19.a19_c0.help"
+    },
+    "io/input/a19/a19_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a19.a19_c1.label",
+      "help_t": "cfgdocs.io.input.a19.a19_c1.help"
+    },
+    "io/input/a19/a19_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a19.a19_name.label",
+      "help_t": "cfgdocs.io.input.a19.a19_name.help"
+    },
+    "io/input/a19/a19_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a19.a19_prec.label",
+      "help_t": "cfgdocs.io.input.a19.a19_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a19/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a19.binding_port.label",
+      "help_t": "cfgdocs.io.input.a19.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a20/a20_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a20.a20_c0.label",
+      "help_t": "cfgdocs.io.input.a20.a20_c0.help"
+    },
+    "io/input/a20/a20_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a20.a20_c1.label",
+      "help_t": "cfgdocs.io.input.a20.a20_c1.help"
+    },
+    "io/input/a20/a20_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a20.a20_name.label",
+      "help_t": "cfgdocs.io.input.a20.a20_name.help"
+    },
+    "io/input/a20/a20_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a20.a20_prec.label",
+      "help_t": "cfgdocs.io.input.a20.a20_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a20/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a20.binding_port.label",
+      "help_t": "cfgdocs.io.input.a20.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a21/a21_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a21.a21_c0.label",
+      "help_t": "cfgdocs.io.input.a21.a21_c0.help"
+    },
+    "io/input/a21/a21_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a21.a21_c1.label",
+      "help_t": "cfgdocs.io.input.a21.a21_c1.help"
+    },
+    "io/input/a21/a21_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a21.a21_name.label",
+      "help_t": "cfgdocs.io.input.a21.a21_name.help"
+    },
+    "io/input/a21/a21_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a21.a21_prec.label",
+      "help_t": "cfgdocs.io.input.a21.a21_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a21/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a21.binding_port.label",
+      "help_t": "cfgdocs.io.input.a21.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a22/a22_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a22.a22_c0.label",
+      "help_t": "cfgdocs.io.input.a22.a22_c0.help"
+    },
+    "io/input/a22/a22_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a22.a22_c1.label",
+      "help_t": "cfgdocs.io.input.a22.a22_c1.help"
+    },
+    "io/input/a22/a22_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a22.a22_name.label",
+      "help_t": "cfgdocs.io.input.a22.a22_name.help"
+    },
+    "io/input/a22/a22_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a22.a22_prec.label",
+      "help_t": "cfgdocs.io.input.a22.a22_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a22/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a22.binding_port.label",
+      "help_t": "cfgdocs.io.input.a22.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a23/a23_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a23.a23_c0.label",
+      "help_t": "cfgdocs.io.input.a23.a23_c0.help"
+    },
+    "io/input/a23/a23_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a23.a23_c1.label",
+      "help_t": "cfgdocs.io.input.a23.a23_c1.help"
+    },
+    "io/input/a23/a23_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a23.a23_name.label",
+      "help_t": "cfgdocs.io.input.a23.a23_name.help"
+    },
+    "io/input/a23/a23_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a23.a23_prec.label",
+      "help_t": "cfgdocs.io.input.a23.a23_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a23/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a23.binding_port.label",
+      "help_t": "cfgdocs.io.input.a23.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a24/a24_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a24.a24_c0.label",
+      "help_t": "cfgdocs.io.input.a24.a24_c0.help"
+    },
+    "io/input/a24/a24_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a24.a24_c1.label",
+      "help_t": "cfgdocs.io.input.a24.a24_c1.help"
+    },
+    "io/input/a24/a24_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a24.a24_name.label",
+      "help_t": "cfgdocs.io.input.a24.a24_name.help"
+    },
+    "io/input/a24/a24_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a24.a24_prec.label",
+      "help_t": "cfgdocs.io.input.a24.a24_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a24/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a24.binding_port.label",
+      "help_t": "cfgdocs.io.input.a24.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a25/a25_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a25.a25_c0.label",
+      "help_t": "cfgdocs.io.input.a25.a25_c0.help"
+    },
+    "io/input/a25/a25_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a25.a25_c1.label",
+      "help_t": "cfgdocs.io.input.a25.a25_c1.help"
+    },
+    "io/input/a25/a25_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a25.a25_name.label",
+      "help_t": "cfgdocs.io.input.a25.a25_name.help"
+    },
+    "io/input/a25/a25_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a25.a25_prec.label",
+      "help_t": "cfgdocs.io.input.a25.a25_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a25/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a25.binding_port.label",
+      "help_t": "cfgdocs.io.input.a25.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a26/a26_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a26.a26_c0.label",
+      "help_t": "cfgdocs.io.input.a26.a26_c0.help"
+    },
+    "io/input/a26/a26_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a26.a26_c1.label",
+      "help_t": "cfgdocs.io.input.a26.a26_c1.help"
+    },
+    "io/input/a26/a26_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a26.a26_name.label",
+      "help_t": "cfgdocs.io.input.a26.a26_name.help"
+    },
+    "io/input/a26/a26_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a26.a26_prec.label",
+      "help_t": "cfgdocs.io.input.a26.a26_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a26/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a26.binding_port.label",
+      "help_t": "cfgdocs.io.input.a26.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a27/a27_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a27.a27_c0.label",
+      "help_t": "cfgdocs.io.input.a27.a27_c0.help"
+    },
+    "io/input/a27/a27_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a27.a27_c1.label",
+      "help_t": "cfgdocs.io.input.a27.a27_c1.help"
+    },
+    "io/input/a27/a27_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a27.a27_name.label",
+      "help_t": "cfgdocs.io.input.a27.a27_name.help"
+    },
+    "io/input/a27/a27_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a27.a27_prec.label",
+      "help_t": "cfgdocs.io.input.a27.a27_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a27/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a27.binding_port.label",
+      "help_t": "cfgdocs.io.input.a27.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a28/a28_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a28.a28_c0.label",
+      "help_t": "cfgdocs.io.input.a28.a28_c0.help"
+    },
+    "io/input/a28/a28_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a28.a28_c1.label",
+      "help_t": "cfgdocs.io.input.a28.a28_c1.help"
+    },
+    "io/input/a28/a28_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a28.a28_name.label",
+      "help_t": "cfgdocs.io.input.a28.a28_name.help"
+    },
+    "io/input/a28/a28_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a28.a28_prec.label",
+      "help_t": "cfgdocs.io.input.a28.a28_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a28/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a28.binding_port.label",
+      "help_t": "cfgdocs.io.input.a28.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a29/a29_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a29.a29_c0.label",
+      "help_t": "cfgdocs.io.input.a29.a29_c0.help"
+    },
+    "io/input/a29/a29_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a29.a29_c1.label",
+      "help_t": "cfgdocs.io.input.a29.a29_c1.help"
+    },
+    "io/input/a29/a29_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a29.a29_name.label",
+      "help_t": "cfgdocs.io.input.a29.a29_name.help"
+    },
+    "io/input/a29/a29_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a29.a29_prec.label",
+      "help_t": "cfgdocs.io.input.a29.a29_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a29/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a29.binding_port.label",
+      "help_t": "cfgdocs.io.input.a29.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a30/a30_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a30.a30_c0.label",
+      "help_t": "cfgdocs.io.input.a30.a30_c0.help"
+    },
+    "io/input/a30/a30_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a30.a30_c1.label",
+      "help_t": "cfgdocs.io.input.a30.a30_c1.help"
+    },
+    "io/input/a30/a30_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a30.a30_name.label",
+      "help_t": "cfgdocs.io.input.a30.a30_name.help"
+    },
+    "io/input/a30/a30_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a30.a30_prec.label",
+      "help_t": "cfgdocs.io.input.a30.a30_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a30/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a30.binding_port.label",
+      "help_t": "cfgdocs.io.input.a30.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
+    },
+    "io/input/a31/a31_c0": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a31.a31_c0.label",
+      "help_t": "cfgdocs.io.input.a31.a31_c0.help"
+    },
+    "io/input/a31/a31_c1": {
+      "type": "Float",
+      "label_t": "cfgdocs.io.input.a31.a31_c1.label",
+      "help_t": "cfgdocs.io.input.a31.a31_c1.help"
+    },
+    "io/input/a31/a31_name": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.input.a31.a31_name.label",
+      "help_t": "cfgdocs.io.input.a31.a31_name.help"
+    },
+    "io/input/a31/a31_prec": {
+      "type": "Int32",
+      "label_t": "cfgdocs.io.input.a31.a31_prec.label",
+      "help_t": "cfgdocs.io.input.a31.a31_prec.help",
+      "unit": "digits"
+    },
+    "io/input/a31/binding_port": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.io.input.a31.binding_port.label",
+      "help_t": "cfgdocs.io.input.a31.binding_port.help",
+      "enum_set": "flowio_binding_port_analog"
     }
   }
 }

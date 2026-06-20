@@ -42,19 +42,28 @@ Fixed3 fixed3FromMl_(float value)
 
 uint8_t PoolDeviceModule::activeCount_() const
 {
+    if (!lockState_()) return 0;
     uint8_t count = 0;
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
         if (slots_[i].used) ++count;
     }
+    unlockState_();
     return count;
 }
 
 PoolDeviceSvcStatus PoolDeviceModule::svcMetaImpl_(uint8_t slot, PoolDeviceSvcMeta* outMeta) const
 {
     if (!outMeta) return POOLDEV_SVC_ERR_INVALID_ARG;
-    if (slot >= POOL_DEVICE_MAX) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    if (!lockState_()) return POOLDEV_SVC_ERR_NOT_READY;
+    if (slot >= POOL_DEVICE_MAX) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
     const PoolDeviceSlot& s = slots_[slot];
-    if (!s.used) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    if (!s.used) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
 
     *outMeta = PoolDeviceSvcMeta{};
     outMeta->slot = slot;
@@ -67,47 +76,73 @@ PoolDeviceSvcStatus PoolDeviceModule::svcMetaImpl_(uint8_t slot, PoolDeviceSvcMe
     outMeta->runtimeId[sizeof(outMeta->runtimeId) - 1] = '\0';
     strncpy(outMeta->label, s.def.label, sizeof(outMeta->label) - 1);
     outMeta->label[sizeof(outMeta->label) - 1] = '\0';
+    unlockState_();
     return POOLDEV_SVC_OK;
 }
 
 PoolDeviceSvcStatus PoolDeviceModule::svcReadActualOnImpl_(uint8_t slot, uint8_t* outOn, uint32_t* outTsMs) const
 {
     if (!outOn) return POOLDEV_SVC_ERR_INVALID_ARG;
-    if (slot >= POOL_DEVICE_MAX) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    if (!lockState_()) return POOLDEV_SVC_ERR_NOT_READY;
+    if (slot >= POOL_DEVICE_MAX) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
     const PoolDeviceSlot& s = slots_[slot];
-    if (!s.used) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
-    if (!runtimeReady_) return POOLDEV_SVC_ERR_NOT_READY;
+    if (!s.used) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
+    if (!runtimeReady_) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_NOT_READY;
+    }
 
     *outOn = s.actualOn ? 1U : 0U;
     if (outTsMs) *outTsMs = s.stateTsMs;
+    unlockState_();
     return POOLDEV_SVC_OK;
 }
 
 PoolDeviceSvcStatus PoolDeviceModule::svcWriteDesiredImpl_(uint8_t slot, uint8_t on)
 {
-    if (slot >= POOL_DEVICE_MAX) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    if (!lockState_()) return POOLDEV_SVC_ERR_NOT_READY;
+    if (slot >= POOL_DEVICE_MAX) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
     PoolDeviceSlot& s = slots_[slot];
-    if (!s.used) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
-    if (!runtimeReady_) return POOLDEV_SVC_ERR_NOT_READY;
+    if (!s.used) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
+    if (!runtimeReady_) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_NOT_READY;
+    }
 
     const bool requested = (on != 0U);
     const bool maxUptimeReached = maxUptimeReached_(s);
     if (requested) {
         if (!s.def.enabled) {
             s.blockReason = POOL_DEVICE_BLOCK_DISABLED;
+            unlockState_();
             return POOLDEV_SVC_ERR_DISABLED;
         }
         if (s.blockReason == POOL_DEVICE_BLOCK_UNBOUND) {
+            unlockState_();
             return POOLDEV_SVC_ERR_IO;
         }
         if (maxUptimeReached) {
             s.blockReason = POOL_DEVICE_BLOCK_MAX_UPTIME;
             logStartInterlock_(slot, s.blockReason);
+            unlockState_();
             return POOLDEV_SVC_ERR_MAX_UPTIME;
         }
         if (!dependenciesSatisfied_(slot)) {
             s.blockReason = POOL_DEVICE_BLOCK_INTERLOCK;
             logStartInterlock_(slot, s.blockReason);
+            unlockState_();
             return POOLDEV_SVC_ERR_INTERLOCK;
         }
     }
@@ -117,6 +152,7 @@ PoolDeviceSvcStatus PoolDeviceModule::svcWriteDesiredImpl_(uint8_t slot, uint8_t
 
     if (!writesEnabled_) {
         tickDevices_(millis(), false);
+        unlockState_();
         return POOLDEV_SVC_OK;
     }
 
@@ -127,37 +163,57 @@ PoolDeviceSvcStatus PoolDeviceModule::svcWriteDesiredImpl_(uint8_t slot, uint8_t
         } else {
             s.blockReason = POOL_DEVICE_BLOCK_IO_ERROR;
             tickDevices_(millis(), false);
+            unlockState_();
             return POOLDEV_SVC_ERR_IO;
         }
     }
 
     tickDevices_(millis(), false);
+    unlockState_();
     return POOLDEV_SVC_OK;
 }
 
 PoolDeviceSvcStatus PoolDeviceModule::svcSetWritesEnabledImpl_(uint8_t enabled)
 {
-    if (!runtimeReady_) return POOLDEV_SVC_ERR_NOT_READY;
+    if (!lockState_()) return POOLDEV_SVC_ERR_NOT_READY;
+    if (!runtimeReady_) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_NOT_READY;
+    }
 
     const bool newValue = (enabled != 0U);
-    if (writesEnabled_ == newValue) return POOLDEV_SVC_OK;
+    if (writesEnabled_ == newValue) {
+        unlockState_();
+        return POOLDEV_SVC_OK;
+    }
 
     writesEnabled_ = newValue;
     LOGI("Pool actuator writes %s", writesEnabled_ ? "enabled" : "frozen");
     tickDevices_(millis(), false);
+    unlockState_();
     return POOLDEV_SVC_OK;
 }
 
 uint8_t PoolDeviceModule::svcWritesEnabledImpl_() const
 {
-    return writesEnabled_ ? 1U : 0U;
+    if (!lockState_()) return 0U;
+    const uint8_t out = writesEnabled_ ? 1U : 0U;
+    unlockState_();
+    return out;
 }
 
 PoolDeviceSvcStatus PoolDeviceModule::svcRefillTankImpl_(uint8_t slot, float remainingMl)
 {
-    if (slot >= POOL_DEVICE_MAX) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    if (!lockState_()) return POOLDEV_SVC_ERR_NOT_READY;
+    if (slot >= POOL_DEVICE_MAX) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
     PoolDeviceSlot& s = slots_[slot];
-    if (!s.used) return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    if (!s.used) {
+        unlockState_();
+        return POOLDEV_SVC_ERR_UNKNOWN_SLOT;
+    }
 
     float remaining = remainingMl;
     if (remaining < 0.0f) remaining = 0.0f;
@@ -170,6 +226,7 @@ PoolDeviceSvcStatus PoolDeviceModule::svcRefillTankImpl_(uint8_t slot, float rem
     s.persistDirty = true;
     s.persistImmediate = true;
     if (runtimeReady_) tickDevices_(millis(), false);
+    unlockState_();
     return POOLDEV_SVC_OK;
 }
 
@@ -391,11 +448,8 @@ bool PoolDeviceModule::persistMetrics_(uint8_t slotIdx, PoolDeviceSlot& slot, ui
     }
     const size_t encodedLen = strnlen(encoded, sizeof(encoded)) + 1U;
     bool persisted = false;
-    if (cfgSvc_ && cfgSvc_->writeRuntimeBlob) {
-        persisted = cfgSvc_->writeRuntimeBlob(cfgSvc_->ctx, runtimeKey, encoded, encodedLen);
-    }
-    if (!persisted) {
-        persisted = cfgStore_->writeRuntimeBlob(runtimeKey, encoded, encodedLen);
+    if (cfgSvc_ && cfgSvc_->writeRuntimeBlobAsync) {
+        persisted = cfgSvc_->writeRuntimeBlobAsync(cfgSvc_->ctx, runtimeKey, encoded, encodedLen);
     }
     if (!persisted) return false;
 

@@ -136,6 +136,7 @@ bool buildSystemSnapshot(MQTTModule* mqtt, char* out, size_t len)
 void registerModules(AppContext& ctx, ModuleInstances& modules)
 {
     ctx.moduleManager.add(&modules.logHubModule);
+    ctx.moduleManager.add(&modules.activityLogModule);
 #if FLOW_ENABLE_BOOT_LOG_CAPTURE
     ctx.moduleManager.add(&modules.bootLogCaptureModule);
 #endif
@@ -185,40 +186,31 @@ uint8_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset&
 
 void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
 {
-    static constexpr uint8_t kWaveshareCompDeviceBase = 8U;
-    static constexpr uint8_t kWaveshareCompDeviceCount = 8U;
-
-    for (uint8_t i = 0; i < ctx.domain->poolDeviceCount; ++i) {
-        const PoolDevicePreset& preset = ctx.domain->poolDevices[i];
-        const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset.commandSlot);
-        requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
-
+    for (uint8_t i = 0; i < Limits::Io::MaxPoolDevices; ++i) {
         PoolDeviceDefinition def{};
-        snprintf(def.label, sizeof(def.label), "%s", preset.displayName);
-        def.slot = preset.id;
-        def.commandSlot = preset.commandSlot;
-        def.ioSlot = ioSlot;
-        def.type = preset.poolDeviceType;
-        def.flowLPerHour = preset.flowLPerHour;
-        def.tankCapacityMl = preset.tankCapacityMl;
-        def.tankInitialMl = preset.tankInitialMl;
-        def.dependsOnMask = dependsOnMaskForPreset(*ctx.domain, preset);
-        def.maxUptimeDaySec = preset.maxUptimeDaySec;
-        requireSetup(modules.poolDeviceModule.defineDevice(def), "define pool device");
-    }
-
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    for (uint8_t i = 0; i < kWaveshareCompDeviceCount; ++i) {
-        PoolDeviceDefinition def{};
-        snprintf(def.label, sizeof(def.label), "COMP%02u", (unsigned)(i + 1U));
-        def.slot = (uint8_t)(kWaveshareCompDeviceBase + i);
-        def.commandSlot = DOMAIN_SLOT_INVALID;
-        def.ioSlot = digitalOutputSlot((uint8_t)(8U + i));
+        snprintf(def.label, sizeof(def.label), "PD%02u", (unsigned)i);
+        def.slot = i;
+        def.ioSlot = digitalOutputSlot(i);
         def.type = POOL_DEVICE_RELAY_STD;
         def.enabled = true;
-        requireSetup(modules.poolDeviceModule.defineDevice(def), "define comp pool device");
+
+        if (const PoolDevicePreset* preset = findPoolPresetById(*ctx.domain, i)) {
+            const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset->commandSlot);
+            requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
+            requireSetup(ioSlot == def.ioSlot, "pool device IO slot must match pdXX/dXX");
+
+            snprintf(def.label, sizeof(def.label), "%s", preset->displayName);
+            def.commandSlot = preset->commandSlot;
+            def.type = preset->poolDeviceType;
+            def.flowLPerHour = preset->flowLPerHour;
+            def.tankCapacityMl = preset->tankCapacityMl;
+            def.tankInitialMl = preset->tankInitialMl;
+            def.dependsOnMask = dependsOnMaskForPreset(*ctx.domain, *preset);
+            def.maxUptimeDaySec = preset->maxUptimeDaySec;
+        }
+
+        requireSetup(modules.poolDeviceModule.defineDevice(def), "define pool device");
     }
-#endif
 }
 
 void postInit(AppContext& ctx, ModuleInstances& modules)

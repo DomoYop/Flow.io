@@ -114,6 +114,156 @@ const char* PoolLogicModule::o2BlockReasonStr_(uint8_t reason)
     }
 }
 
+ActivityRole PoolLogicModule::activityRoleForDeviceSlot_(uint8_t deviceSlot) const
+{
+    if (deviceSlot == filtrationDeviceSlot_) return ActivityRole::Filtration;
+    if (deviceSlot == swgDeviceSlot_) return ActivityRole::Swg;
+    if (deviceSlot == robotDeviceSlot_) return ActivityRole::Robot;
+    if (deviceSlot == fillingDeviceSlot_) return ActivityRole::Filling;
+    if (deviceSlot == phPumpDeviceSlot_) return ActivityRole::Ph;
+    if (deviceSlot == orpPumpDeviceSlot_) return ActivityRole::Disinfection;
+    if (deviceSlot == heaterDeviceSlot_) return ActivityRole::Heater;
+    return ActivityRole::None;
+}
+
+const char* PoolLogicModule::activityRoleLabel_(ActivityRole role) const
+{
+    switch (role) {
+        case ActivityRole::Filtration: return "Filtration";
+        case ActivityRole::Swg: return "Électrolyseur";
+        case ActivityRole::Robot: return "Robot";
+        case ActivityRole::Filling: return "Remplissage";
+        case ActivityRole::Ph: return "Pompe pH";
+        case ActivityRole::Disinfection: return "Désinfection";
+        case ActivityRole::Heater: return "Chauffage";
+        case ActivityRole::None:
+        default: return "Équipement";
+    }
+}
+
+void PoolLogicModule::emitActivity_(ActivityCode code,
+                                    ActivitySource source,
+                                    ActivitySeverity severity,
+                                    ActivityRole role,
+                                    ActivityState state,
+                                    ActivityReason reason,
+                                    uint8_t deviceSlot,
+                                    const char* title,
+                                    const char* detail,
+                                    const char* icon) const
+{
+    if (!activityLogSvc_ || !activityLogSvc_->emit) return;
+    ActivityEvent event{};
+    event.code = (uint16_t)code;
+    event.domain = (uint8_t)ActivityDomain::PoolLogic;
+    event.source = (uint8_t)source;
+    event.severity = (uint8_t)severity;
+    event.role = (uint8_t)role;
+    event.state = (uint8_t)state;
+    event.reason = (uint8_t)reason;
+    event.targetSlot = deviceSlot;
+    snprintf(event.title, sizeof(event.title), "%s", title ? title : "PoolLogic");
+    snprintf(event.detail, sizeof(event.detail), "%s", detail ? detail : "");
+    snprintf(event.icon, sizeof(event.icon), "%s", icon ? icon : "pool");
+    (void)activityLogSvc_->emit(activityLogSvc_->ctx, &event);
+}
+
+void PoolLogicModule::emitDeviceActivity_(bool requested,
+                                          bool on,
+                                          uint8_t deviceSlot,
+                                          const char* label,
+                                          ActivityReason reason) const
+{
+    const ActivityRole role = activityRoleForDeviceSlot_(deviceSlot);
+    const char* roleLabel = activityRoleLabel_(role);
+    const char* deviceLabel = (label && label[0] != '\0') ? label : roleLabel;
+    char title[48] = {0};
+    char detail[128] = {0};
+    const char* icon = "power_settings_new";
+    if (role == ActivityRole::Filtration) icon = "pool";
+    else if (role == ActivityRole::Robot) icon = "cleaning_services";
+    else if (role == ActivityRole::Ph || role == ActivityRole::Disinfection) icon = "science";
+    else if (role == ActivityRole::Heater) icon = "heat_pump";
+    else if (role == ActivityRole::Filling) icon = "water_drop";
+    else if (role == ActivityRole::Swg) icon = "bolt";
+
+    if (requested) {
+        snprintf(title,
+                 sizeof(title),
+                 "%s %s demandé",
+                 deviceLabel,
+                 on ? "ON" : "OFF");
+        snprintf(detail,
+                 sizeof(detail),
+                 "PoolLogic demande %s pour %s (slot %u).",
+                 on ? "le démarrage" : "l'arrêt",
+                 roleLabel,
+                 (unsigned)deviceSlot);
+        emitActivity_(on ? ActivityCode::PoolLogicDeviceStartRequested
+                         : ActivityCode::PoolLogicDeviceStopRequested,
+                      ActivitySource::Auto,
+                      ActivitySeverity::Info,
+                      role,
+                      on ? ActivityState::RequestedOn : ActivityState::RequestedOff,
+                      reason,
+                      deviceSlot,
+                      title,
+                      detail,
+                      icon);
+        return;
+    }
+
+    snprintf(title,
+             sizeof(title),
+             "%s %s",
+             deviceLabel,
+             on ? "a démarré" : "s'est arrêté");
+    snprintf(detail,
+             sizeof(detail),
+             "État réel observé pour %s (slot %u).",
+             roleLabel,
+             (unsigned)deviceSlot);
+    emitActivity_(on ? ActivityCode::PoolLogicDeviceStarted : ActivityCode::PoolLogicDeviceStopped,
+                  ActivitySource::Auto,
+                  on ? ActivitySeverity::Success : ActivitySeverity::Info,
+                  role,
+                  on ? ActivityState::On : ActivityState::Off,
+                  ActivityReason::None,
+                  deviceSlot,
+                  title,
+                  detail,
+                  icon);
+}
+
+void PoolLogicModule::emitAutoModeDisabledByManualActivity_(ActivityRole role,
+                                                            uint8_t deviceSlot,
+                                                            const char* autoLabel) const
+{
+    const char* roleLabel = activityRoleLabel_(role);
+    const char* label = (autoLabel && autoLabel[0] != '\0') ? autoLabel : roleLabel;
+    const char* icon = "settings";
+    if (role == ActivityRole::Filtration) icon = "pool";
+    else if (role == ActivityRole::Ph || role == ActivityRole::Disinfection) icon = "science";
+
+    char title[48] = {0};
+    char detail[128] = {0};
+    snprintf(title, sizeof(title), "Mode auto %s désactivé", label);
+    snprintf(detail,
+             sizeof(detail),
+             "Commande manuelle sur %s: l'automatisme a été désactivé.",
+             roleLabel);
+    emitActivity_(ActivityCode::SystemConfigChanged,
+                  ActivitySource::Manual,
+                  ActivitySeverity::Info,
+                  role,
+                  ActivityState::None,
+                  ActivityReason::Manual,
+                  deviceSlot,
+                  title,
+                  detail,
+                  icon);
+}
+
 bool PoolLogicModule::readPoolDeviceFlowLh_(uint8_t deviceSlot, float& flowLhOut) const
 {
     flowLhOut = 0.0f;
@@ -216,6 +366,26 @@ void PoolLogicModule::setO2ProtocolState_(uint8_t state, uint8_t blockReason, ui
              o2BlockReasonStr_(o2BlockReason_),
              (double)o2PendingMl_,
              (double)o2WeeklyDoneMl_);
+        char detail[128] = {0};
+        snprintf(detail,
+                 sizeof(detail),
+                 "État=%s, blocage=%s, restant=%.1f ml, semaine=%.1f ml.",
+                 o2ProtocolStateStr_(o2ProtocolState_),
+                 o2BlockReasonStr_(o2BlockReason_),
+                 (double)o2PendingMl_,
+                 (double)o2WeeklyDoneMl_);
+        if (isDisinfectionType_(DisinfectionActiveOxygen)) {
+            emitActivity_(ActivityCode::PoolLogicO2StateChanged,
+                          (blockReason == O2BlockNone) ? ActivitySource::Auto : ActivitySource::Safety,
+                          (blockReason == O2BlockNone) ? ActivitySeverity::Info : ActivitySeverity::Warning,
+                          ActivityRole::Disinfection,
+                          ActivityState::None,
+                          ActivityReason::O2,
+                          orpPumpDeviceSlot_,
+                          "Protocole oxygène actif mis à jour",
+                          detail,
+                          "science");
+        }
     }
     persistO2Protocol_(nowMs, false);
 }
@@ -558,6 +728,14 @@ void PoolLogicModule::syncDeviceState_(uint8_t deviceSlot, DeviceFsm& fsm, uint3
         turnedOffOut = (fsm.on && !actualOn);
         fsm.on = actualOn;
         fsm.stateSinceMs = nowMs;
+        PoolDeviceSvcMeta meta{};
+        const char* label = nullptr;
+        if (poolSvc_ && poolSvc_->meta &&
+            poolSvc_->meta(poolSvc_->ctx, deviceSlot, &meta) == POOLDEV_SVC_OK &&
+            meta.label[0] != '\0') {
+            label = meta.label;
+        }
+        emitDeviceActivity_(false, actualOn, deviceSlot, label, ActivityReason::None);
     }
 }
 
@@ -730,6 +908,9 @@ void PoolLogicModule::applyDeviceControl_(uint8_t deviceSlot,
     if (desiredChanged || needRetry) {
         if (writeDeviceDesired_(deviceSlot, desired)) {
             LOGI("%s %s", desired ? "Start" : "Stop", label ? label : "Pool Device");
+            if (desiredChanged) {
+                emitDeviceActivity_(true, desired, deviceSlot, label, ActivityReason::Auto);
+            }
         }
         fsm.lastCmdMs = nowMs;
     }
@@ -826,6 +1007,23 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                      (double)psi,
                      (double)psiLowThreshold_,
                      (double)psiHighThreshold_);
+                char detail[128] = {0};
+                snprintf(detail,
+                         sizeof(detail),
+                         "Pression %.3f bar hors plage %.3f-%.3f bar.",
+                         (double)psi,
+                         (double)psiLowThreshold_,
+                         (double)psiHighThreshold_);
+                emitActivity_(ActivityCode::PoolLogicSafetyPressureLatched,
+                              ActivitySource::Safety,
+                              ActivitySeverity::Warning,
+                              ActivityRole::Filtration,
+                              ActivityState::None,
+                              ActivityReason::Safety,
+                              filtrationDeviceSlot_,
+                              "Sécurité pression piscine activée",
+                              detail,
+                              "warning");
             }
         }
     }
@@ -838,11 +1036,31 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         if (phAutoMode_ && !phPidEnabled_ && runMin >= delayPidsMin_) {
             phPidEnabled_ = true;
             LOGI("Activate pH regulation (delay=%umin)", (unsigned)runMin);
+            emitActivity_(ActivityCode::PoolLogicPhRegulationEnabled,
+                          ActivitySource::Pid,
+                          ActivitySeverity::Info,
+                          ActivityRole::Ph,
+                          ActivityState::None,
+                          ActivityReason::Pid,
+                          phPumpDeviceSlot_,
+                          "Régulation pH activée",
+                          "La filtration est stable, le PID pH peut piloter la pompe.",
+                          "science");
         }
         if (orpAutoMode_ && isDisinfectionType_(DisinfectionChlorineBromine) &&
             !orpPidEnabled_ && runMin >= delayPidsMin_) {
             orpPidEnabled_ = true;
             LOGI("Activate ORP regulation (delay=%umin)", (unsigned)runMin);
+            emitActivity_(ActivityCode::PoolLogicOrpRegulationEnabled,
+                          ActivitySource::Pid,
+                          ActivitySeverity::Info,
+                          ActivityRole::Disinfection,
+                          ActivityState::None,
+                          ActivityReason::Pid,
+                          orpPumpDeviceSlot_,
+                          "Régulation ORP activée",
+                          "La filtration est stable, le PID ORP peut piloter la désinfection.",
+                          "science");
         }
     } else {
         phPidEnabled_ = false;

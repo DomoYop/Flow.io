@@ -39,7 +39,8 @@ public:
     ModuleId moduleId() const override { return ModuleId::Ethernet; }
     const char* taskName() const override { return "ethernet"; }
     BaseType_t taskCore() const override { return 0; }
-    uint16_t taskStackSize() const override { return 5120; }
+    uint16_t taskStackSize() const override { return 6144; }
+    uint32_t startDelayMs() const override { return 1500U; }
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
 
@@ -106,6 +107,7 @@ private:
 
     void setState_(EthernetState next);
     void resetRuntimeState_();
+    void resetPhyHardware_();
     bool ensureDriverStarted_();
     bool installDriver_();
     void cleanupDriver_();

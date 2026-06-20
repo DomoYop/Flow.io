@@ -29,7 +29,7 @@ constexpr size_t JsonConfigApplyBuf = JsonCfgBuf;
 /** @brief Maximum number of registered config variables in `ConfigStore` metadata table.
  *  Sized for current FlowIO/Supervisor profiles with additional headroom for local TFT
  *  sensor/alarm slots, dashboard/LCD and PoolLogic extensions while staying bounded. */
-constexpr size_t MaxConfigVars = 640;
+constexpr size_t MaxConfigVars = 768;
 /** @brief Maximum NVS key length (without null terminator) enforced by `ConfigTypes::NVS_KEY`. */
 constexpr size_t MaxNvsKeyLen = 15;
 /** @brief FreeRTOS log queue length used by `LogHub` (`LogHubModule::init`).
@@ -66,6 +66,10 @@ namespace Config {
 namespace Capacity {
 /** @brief Maximum number of unique config branches returned by `ConfigStore::listModules`. */
 constexpr uint8_t ModuleListMax = 160;
+/** @brief FreeRTOS queue length for serialized ConfigStore persistence requests. */
+constexpr uint8_t PersistenceQueueLen = 16;
+/** @brief Maximum runtime blob payload length accepted by ConfigStore async persistence. */
+constexpr size_t RuntimeBlobAsyncMax = 192;
 }  // namespace Capacity
 }  // namespace Config
 
@@ -199,7 +203,7 @@ constexpr uint8_t JitterPct = 15;
 
 }  // namespace Mqtt
 /** @brief Maximum number of runtime MQTT routes stored in the runtime mux (`RuntimeProducer`). */
-constexpr uint8_t MaxRuntimeRoutes = 80;
+constexpr uint8_t MaxRuntimeRoutes = 112;
 /** @brief Default momentary digital output pulse duration in ms (`IOModule`). */
 constexpr uint16_t MomentaryPulseMs = 500;
 /** @brief Default periodic trace interval for ORP/pH/PSI calc logs (`IOModule`, `trace_period_ms`). */
