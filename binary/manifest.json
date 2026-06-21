@@ -1,6 +1,6 @@
 {
   "schema": "flowio.firmware-manifest.v1",
-  "generated_at": "2026-06-21T20:02:36+02:00",
+  "generated_at": "2026-06-21T21:01:42+02:00",
   "release": "2026.06.21",
   "artifacts": {
     "nextion": [
@@ -100,7 +100,7 @@
         "title": "flowios3-spiffs",
         "label": "flowios3-spiffs",
         "version": "2.0.1",
-        "build_date": "2026-06-21T20:02:36+02:00",
+        "build_date": "2026-06-21T21:01:42+02:00",
         "target": "spiffs",
         "path": "flowios3-spiffs-2.0.1.bin",
         "kind": "esp32-spiffs",

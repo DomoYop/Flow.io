@@ -5248,50 +5248,47 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSection(); }
       });
 
+      const head = document.createElement('div');
+      head.className = 'io-card-head';
       const badge = document.createElement('span');
-      badge.className = 'update-component-badge update-component-badge-lg update-component-blue';
+      badge.className = 'update-component-badge update-component-blue io-card-badge';
       const bicon = document.createElement('span');
       bicon.className = 'ui-msr';
       bicon.setAttribute('aria-hidden', 'true');
       bicon.textContent = spec.icon;
       badge.appendChild(bicon);
-      card.appendChild(badge);
-
-      const body = document.createElement('div');
-      body.className = 'update-summary-body';
-      const title = document.createElement('h3');
-      title.textContent = spec.title + ' ';
+      head.appendChild(badge);
+      const titles = document.createElement('div');
+      titles.className = 'io-card-titles';
+      const title = document.createElement('span');
+      title.className = 'io-card-title';
+      title.textContent = spec.title;
       const subtitle = document.createElement('span');
-      subtitle.textContent = '(' + spec.subtitle + ')';
-      title.appendChild(subtitle);
-      body.appendChild(title);
+      subtitle.className = 'io-card-sub';
+      subtitle.textContent = spec.subtitle;
+      titles.appendChild(title);
+      titles.appendChild(subtitle);
+      head.appendChild(titles);
+      card.appendChild(head);
 
-      const line1 = document.createElement('div');
-      line1.className = 'update-summary-line';
-      line1.appendChild(document.createTextNode(spec.activeLabel));
-      const pill1 = document.createElement('b');
-      if (spec.total > 0 && spec.active === spec.total) pill1.className = 'is-green';
-      pill1.textContent = String(spec.active);
-      line1.appendChild(pill1);
-      body.appendChild(line1);
+      const divider = document.createElement('div');
+      divider.className = 'io-card-divider';
+      card.appendChild(divider);
 
-      const line2 = document.createElement('div');
-      line2.className = 'update-summary-line';
-      line2.appendChild(document.createTextNode(tr('io.cards.total', 'Total')));
-      const pill2 = document.createElement('b');
-      pill2.textContent = String(spec.total);
-      line2.appendChild(pill2);
-      body.appendChild(line2);
-      card.appendChild(body);
-
-      const stateIcon = document.createElement('span');
-      stateIcon.className = 'ui-msr update-summary-state';
-      stateIcon.setAttribute('aria-hidden', 'true');
-      stateIcon.textContent = 'chevron_right';
-      card.appendChild(stateIcon);
+      const line = document.createElement('div');
+      line.className = 'io-card-line';
+      const label = document.createElement('span');
+      label.className = 'io-card-line-label';
+      label.textContent = spec.activeLabel;
+      const pill = document.createElement('span');
+      pill.className = 'io-card-pill' + ((spec.total > 0 && spec.active === spec.total) ? ' is-green' : '');
+      pill.textContent = spec.active + ' / ' + spec.total;
+      line.appendChild(label);
+      line.appendChild(pill);
+      card.appendChild(line);
 
       const foot = document.createElement('div');
-      foot.className = 'update-summary-foot';
+      foot.className = 'io-card-foot';
       const dot = document.createElement('span');
       dot.className = 'update-dot ' + (spec.active > 0 ? 'is-green' : 'is-blue');
       foot.appendChild(dot);
