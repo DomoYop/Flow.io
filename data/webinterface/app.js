@@ -2093,6 +2093,7 @@
     let ioSummaryReqSeq = 0;
     let ioSummaryLoadedOnce = false;
     let ioSummaryLastData = null;
+    const ioOpenSections = new Set();
     const ioHideInactiveBindingsKey = 'flow_io_hide_inactive_bindings';
     let ioHideInactiveBindings = getStorageValue(localStorage, ioHideInactiveBindingsKey) === '1';
     fieldApplyCheckIcon = iconCheckText();
@@ -5085,7 +5086,12 @@
       opts = opts || {};
       const section = document.createElement('details');
       section.className = 'io-table-section io-acc';
-      if (opts.open) section.open = true;
+      const accId = opts.accId || title;
+      section.open = ioOpenSections.has(accId);
+      section.addEventListener('toggle', () => {
+        if (section.open) ioOpenSections.add(accId);
+        else ioOpenSections.delete(accId);
+      });
 
       const heading = document.createElement('summary');
       heading.className = 'control-section-title ui-heading-inline io-acc-head';
@@ -5262,7 +5268,7 @@
           { key: 'error_slots', label: tr('io.col.errors', 'Erreurs') }
         ],
         drivers,
-        { countActive: drivers.filter((d) => d.enabled).length, countTotal: drivers.length }
+        { accId: 'drivers', countActive: drivers.filter((d) => d.enabled).length, countTotal: drivers.length }
       ));
 
       // Binding ports — tous, avec masquage des inactifs.
@@ -5293,7 +5299,7 @@
           { key: 'io_id', label: tr('io.col.ioId', 'IoId'), render: (row) => ioSummaryIoIdLabel(row) }
         ],
         bindingRows,
-        { countActive: bindingPorts.filter(ioBindingActive).length, countTotal: bindingPorts.length, extraHead: hideToggle }
+        { accId: 'binding', countActive: bindingPorts.filter(ioBindingActive).length, countTotal: bindingPorts.length, extraHead: hideToggle }
       );
       ioSummaryTables.appendChild(bindingDetails);
 
@@ -5310,7 +5316,7 @@
           { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
         ],
         ioSlots,
-        { countActive: ioSlots.filter((s) => ioSummaryText(s.domain, '') !== '-' && String(s.domain || '').trim() !== '').length, countTotal: ioSlots.length }
+        { accId: 'ioslots', countActive: ioSlots.filter((s) => ioSummaryText(s.domain, '') !== '-' && String(s.domain || '').trim() !== '').length, countTotal: ioSlots.length }
       ));
 
       // Domain slots.
@@ -5324,7 +5330,7 @@
           { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
         ],
         domainSlots,
-        { countActive: domainSlots.filter((s) => ioBindingActive(s)).length, countTotal: domainSlots.length }
+        { accId: 'domains', countActive: domainSlots.filter((s) => ioBindingActive(s)).length, countTotal: domainSlots.length }
       ));
     }
 
