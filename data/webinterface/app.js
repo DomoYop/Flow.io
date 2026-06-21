@@ -5087,6 +5087,7 @@
       const section = document.createElement('details');
       section.className = 'io-table-section io-acc';
       const accId = opts.accId || title;
+      section.dataset.accId = accId;
       section.open = ioOpenSections.has(accId);
       section.addEventListener('toggle', () => {
         if (section.open) ioOpenSections.add(accId);
@@ -5100,6 +5101,7 @@
       icon.setAttribute('aria-hidden', 'true');
       icon.textContent = 'table_chart';
       const text = document.createElement('span');
+      text.className = 'io-acc-title';
       text.textContent = title;
       heading.appendChild(icon);
       heading.appendChild(text);
@@ -5230,6 +5232,74 @@
       return String(row && row.state || '').trim().toLowerCase() === 'active';
     }
 
+    function buildIoLayerCard(spec) {
+      const card = document.createElement('article');
+      card.className = 'update-summary-card io-layer-card';
+      card.setAttribute('role', 'button');
+      card.tabIndex = 0;
+      const openSection = () => {
+        ioOpenSections.add(spec.accId);
+        if (ioSummaryLastData) renderIoSummary(ioSummaryLastData);
+        const target = document.querySelector('details.io-acc[data-acc-id="' + spec.accId + '"]');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      card.addEventListener('click', openSection);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSection(); }
+      });
+
+      const badge = document.createElement('span');
+      badge.className = 'update-component-badge update-component-badge-lg update-component-blue';
+      const bicon = document.createElement('span');
+      bicon.className = 'ui-msr';
+      bicon.setAttribute('aria-hidden', 'true');
+      bicon.textContent = spec.icon;
+      badge.appendChild(bicon);
+      card.appendChild(badge);
+
+      const body = document.createElement('div');
+      body.className = 'update-summary-body';
+      const title = document.createElement('h3');
+      title.textContent = spec.title + ' ';
+      const subtitle = document.createElement('span');
+      subtitle.textContent = '(' + spec.subtitle + ')';
+      title.appendChild(subtitle);
+      body.appendChild(title);
+
+      const line1 = document.createElement('div');
+      line1.className = 'update-summary-line';
+      line1.appendChild(document.createTextNode(spec.activeLabel));
+      const pill1 = document.createElement('b');
+      if (spec.total > 0 && spec.active === spec.total) pill1.className = 'is-green';
+      pill1.textContent = String(spec.active);
+      line1.appendChild(pill1);
+      body.appendChild(line1);
+
+      const line2 = document.createElement('div');
+      line2.className = 'update-summary-line';
+      line2.appendChild(document.createTextNode(tr('io.cards.total', 'Total')));
+      const pill2 = document.createElement('b');
+      pill2.textContent = String(spec.total);
+      line2.appendChild(pill2);
+      body.appendChild(line2);
+      card.appendChild(body);
+
+      const stateIcon = document.createElement('span');
+      stateIcon.className = 'ui-msr update-summary-state';
+      stateIcon.setAttribute('aria-hidden', 'true');
+      stateIcon.textContent = 'chevron_right';
+      card.appendChild(stateIcon);
+
+      const foot = document.createElement('div');
+      foot.className = 'update-summary-foot';
+      const dot = document.createElement('span');
+      dot.className = 'update-dot ' + (spec.active > 0 ? 'is-green' : 'is-blue');
+      foot.appendChild(dot);
+      foot.appendChild(document.createTextNode(spec.footText));
+      card.appendChild(foot);
+      return card;
+    }
+
     function renderIoSummary(data) {
       ioSummaryLastData = data;
       const drivers = Array.isArray(data && data.drivers) ? data.drivers : [];
@@ -5237,7 +5307,38 @@
       const ioSlots = Array.isArray(data && data.io_slots) ? data.io_slots : [];
       const domainSlots = Array.isArray(data && data.domain_slots) ? data.domain_slots : [];
 
-      if (ioSummaryCards) ioSummaryCards.innerHTML = '';
+      const driversActive = drivers.filter((d) => d.enabled).length;
+      const bindingActiveN = bindingPorts.filter(ioBindingActive).length;
+      const ioAssigned = ioSlots.filter((s) => String(s.domain || '').trim() !== '').length;
+      const domainActiveN = domainSlots.filter(ioBindingActive).length;
+
+      if (ioSummaryCards) {
+        ioSummaryCards.innerHTML = '';
+        ioSummaryCards.appendChild(buildIoLayerCard({
+          accId: 'drivers', icon: 'memory',
+          title: tr('io.cards.drivers', 'Drivers'), subtitle: tr('io.cards.drivers.sub', 'backends'),
+          activeLabel: tr('io.col.active', 'Actifs'), active: driversActive, total: drivers.length,
+          footText: driversActive + ' ' + tr('io.cards.enabledFoot', 'activés')
+        }));
+        ioSummaryCards.appendChild(buildIoLayerCard({
+          accId: 'binding', icon: 'cable',
+          title: tr('io.cards.bindingPorts', 'Binding ports'), subtitle: tr('io.cards.bindingPorts.sub', 'points physiques'),
+          activeLabel: tr('io.col.active', 'Actifs'), active: bindingActiveN, total: bindingPorts.length,
+          footText: bindingActiveN + ' ' + tr('io.cards.activeFoot', 'actifs')
+        }));
+        ioSummaryCards.appendChild(buildIoLayerCard({
+          accId: 'ioslots', icon: 'lan',
+          title: tr('io.cards.ioslots', 'IO slots'), subtitle: tr('io.cards.ioslots.sub', 'endpoints'),
+          activeLabel: tr('io.cards.assigned', 'Affectés'), active: ioAssigned, total: ioSlots.length,
+          footText: ioAssigned + ' ' + tr('io.cards.assignedFoot', 'rattachés')
+        }));
+        ioSummaryCards.appendChild(buildIoLayerCard({
+          accId: 'domains', icon: 'category',
+          title: tr('io.cards.domainSlots', 'Domain slots'), subtitle: tr('io.cards.domainSlots.sub', 'rôles'),
+          activeLabel: tr('io.col.active', 'Actifs'), active: domainActiveN, total: domainSlots.length,
+          footText: domainActiveN + ' ' + tr('io.cards.okFoot', 'OK')
+        }));
+      }
       if (!ioSummaryTables) return;
       ioSummaryTables.innerHTML = '';
 
@@ -5251,7 +5352,7 @@
           { key: 'error_slots', label: tr('io.col.errors', 'Erreurs') }
         ],
         drivers,
-        { accId: 'drivers', countActive: drivers.filter((d) => d.enabled).length, countTotal: drivers.length }
+        { accId: 'drivers', countActive: driversActive, countTotal: drivers.length }
       ));
 
       // Binding ports — tous, avec masquage des inactifs (bouton en-tête).
@@ -5281,7 +5382,7 @@
           { key: 'io_id', label: tr('io.col.ioId', 'IoId'), render: (row) => ioSummaryIoIdLabel(row) }
         ],
         bindingRows,
-        { accId: 'binding', countActive: bindingPorts.filter(ioBindingActive).length, countTotal: bindingPorts.length, headAction: hideToggle }
+        { accId: 'binding', countActive: bindingActiveN, countTotal: bindingPorts.length, headAction: hideToggle }
       );
       ioSummaryTables.appendChild(bindingDetails);
 
@@ -5298,7 +5399,7 @@
           { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
         ],
         ioSlots,
-        { accId: 'ioslots', countActive: ioSlots.filter((s) => ioSummaryText(s.domain, '') !== '-' && String(s.domain || '').trim() !== '').length, countTotal: ioSlots.length }
+        { accId: 'ioslots', countActive: ioAssigned, countTotal: ioSlots.length }
       ));
 
       // Domain slots.
@@ -5312,7 +5413,7 @@
           { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
         ],
         domainSlots,
-        { accId: 'domains', countActive: domainSlots.filter((s) => ioBindingActive(s)).length, countTotal: domainSlots.length }
+        { accId: 'domains', countActive: domainActiveN, countTotal: domainSlots.length }
       ));
     }
 

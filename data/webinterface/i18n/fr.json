@@ -409,6 +409,17 @@
     "calibration.err.rawConversionImpossible": "conversion brute impossible",
     "calibration.err.rawPointsTooClose": "les points bruts sont trop proches",
     "calibration.err.coeffCalcImpossible": "calcul des coefficients impossible",
-    "calibration.err.c1CalcImpossible": "calcul C1 impossible"
+    "calibration.err.c1CalcImpossible": "calcul C1 impossible",
+    "io.cards.drivers": "Drivers",
+    "io.cards.drivers.sub": "backends",
+    "io.cards.bindingPorts.sub": "points physiques",
+    "io.cards.ioslots.sub": "endpoints",
+    "io.cards.domainSlots.sub": "rôles",
+    "io.cards.assigned": "Affectés",
+    "io.cards.total": "Total",
+    "io.cards.enabledFoot": "activés",
+    "io.cards.activeFoot": "actifs",
+    "io.cards.assignedFoot": "rattachés",
+    "io.cards.okFoot": "OK"
   }
 }
