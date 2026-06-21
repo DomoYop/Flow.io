@@ -138,6 +138,7 @@
     "io.driver.enabled": "Enabled",
     "io.driver.disabled": "Disabled",
     "io.hideInactive": "Hide inactive",
+    "io.showInactive": "Show inactive",
     "io.col.active": "Active",
     "io.col.errors": "Errors",
     "io.col.port": "Port",

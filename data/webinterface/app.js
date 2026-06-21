@@ -2095,7 +2095,7 @@
     let ioSummaryLastData = null;
     const ioOpenSections = new Set();
     const ioHideInactiveBindingsKey = 'flow_io_hide_inactive_bindings';
-    let ioHideInactiveBindings = getStorageValue(localStorage, ioHideInactiveBindingsKey) === '1';
+    let ioHideInactiveBindings = getStorageValue(localStorage, ioHideInactiveBindingsKey) !== '0';
     fieldApplyCheckIcon = iconCheckText();
     const flowCfgBackupFormat = 'flowio-configstore-backup';
     const flowCfgBackupVersion = 1;
@@ -5109,6 +5109,7 @@
         count.textContent = ioSummaryNumber(opts.countActive) + '/' + ioSummaryNumber(opts.countTotal);
         heading.appendChild(count);
       }
+      if (opts.headAction instanceof Node) heading.appendChild(opts.headAction);
       section.appendChild(heading);
 
       const body = document.createElement('div');
@@ -5174,25 +5175,7 @@
     }
 
     function renderIoSummarySkeleton() {
-      if (ioSummaryCards) {
-        ioSummaryCards.innerHTML = '';
-        appendIoSummarySkeletonCard(
-          tr('io.cards.bindingPorts', 'BindingPorts'),
-          tr('io.cards.bindingPorts.summary', 'ports physiques actifs')
-        );
-        appendIoSummarySkeletonCard(
-          tr('io.cards.ioslots', 'IOSlots'),
-          tr('io.cards.ioslots.summary', 'slots logiques actifs')
-        );
-        appendIoSummarySkeletonCard(
-          tr('io.cards.domainSlots', 'DomainSlots'),
-          tr('io.cards.domainSlots.summary', 'slots domaine actifs')
-        );
-        appendIoSummarySkeletonCard(
-          tr('io.cards.errors', 'Slots en erreur'),
-          tr('io.status.loading', 'Chargement...')
-        );
-      }
+      if (ioSummaryCards) ioSummaryCards.innerHTML = '';
       if (ioSummaryTables) {
         ioSummaryTables.innerHTML = '';
         ioSummaryTables.appendChild(createIoSummaryTableSkeleton(
@@ -5271,21 +5254,20 @@
         { accId: 'drivers', countActive: drivers.filter((d) => d.enabled).length, countTotal: drivers.length }
       ));
 
-      // Binding ports — tous, avec masquage des inactifs.
-      const hideToggle = document.createElement('label');
-      hideToggle.className = 'io-acc-toggle';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = ioHideInactiveBindings;
-      cb.addEventListener('change', () => {
-        ioHideInactiveBindings = cb.checked;
-        setStorageValue(localStorage, ioHideInactiveBindingsKey, cb.checked ? '1' : '0');
+      // Binding ports — tous, avec masquage des inactifs (bouton en-tête).
+      const hideToggle = document.createElement('button');
+      hideToggle.type = 'button';
+      hideToggle.className = 'io-acc-action';
+      hideToggle.textContent = ioHideInactiveBindings
+        ? tr('io.showInactive', 'Afficher les inactifs')
+        : tr('io.hideInactive', 'Masquer les inactifs');
+      hideToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ioHideInactiveBindings = !ioHideInactiveBindings;
+        setStorageValue(localStorage, ioHideInactiveBindingsKey, ioHideInactiveBindings ? '1' : '0');
         if (ioSummaryLastData) renderIoSummary(ioSummaryLastData);
       });
-      const cbText = document.createElement('span');
-      cbText.textContent = tr('io.hideInactive', 'Masquer les inactifs');
-      hideToggle.appendChild(cb);
-      hideToggle.appendChild(cbText);
       const bindingRows = ioHideInactiveBindings ? bindingPorts.filter(ioBindingActive) : bindingPorts;
       const bindingDetails = createIoCompactTable(
         tr('io.table.bindingPorts', 'Binding ports'),
@@ -5299,7 +5281,7 @@
           { key: 'io_id', label: tr('io.col.ioId', 'IoId'), render: (row) => ioSummaryIoIdLabel(row) }
         ],
         bindingRows,
-        { accId: 'binding', countActive: bindingPorts.filter(ioBindingActive).length, countTotal: bindingPorts.length, extraHead: hideToggle }
+        { accId: 'binding', countActive: bindingPorts.filter(ioBindingActive).length, countTotal: bindingPorts.length, headAction: hideToggle }
       );
       ioSummaryTables.appendChild(bindingDetails);
 
