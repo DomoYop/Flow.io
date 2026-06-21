@@ -164,6 +164,12 @@ struct IOServiceV2 {
     IoStatus (*sensorStatus)(void* ctx, IoId id, IoSensorStatus* outStatus);
     /** List enabled sensor endpoints that are currently invalid. */
     IoStatus (*listInvalidSensors)(void* ctx, IoId* outIds, uint8_t maxIds, uint8_t* outCount);
+    /**
+     * Config status of a driver backend (IO_BACKEND_*): outEnabled = driver
+     * active per config, outConfigurable = driver has an on/off config toggle
+     * (0 = always-on driver like GPIO/ADS/TCA). Used by the I/O summary page.
+     */
+    IoStatus (*backendInfo)(void* ctx, uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable);
 
     /** Opaque implementation context. */
     void* ctx;

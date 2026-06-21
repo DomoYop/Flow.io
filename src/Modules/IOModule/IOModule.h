@@ -165,6 +165,7 @@ private:
     IoStatus ioLastCycle_(IoCycleInfo* outCycle) const;
     IoStatus ioSensorStatus_(IoId id, IoSensorStatus* outStatus) const;
     IoStatus ioListInvalidSensors_(IoId* outIds, uint8_t maxIds, uint8_t* outCount) const;
+    IoStatus ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable) const;
 
     bool setLedMask_(uint8_t mask, uint32_t tsMs);
     bool turnLedOn_(uint8_t bit, uint32_t tsMs);
@@ -579,6 +580,7 @@ private:
         ServiceBinding::bind<&IOModule::ioLastCycle_>,
         ServiceBinding::bind<&IOModule::ioSensorStatus_>,
         ServiceBinding::bind<&IOModule::ioListInvalidSensors_>,
+        ServiceBinding::bind<&IOModule::ioBackendInfo_>,
         this
     };
     StatusLedsService statusLedsSvc_{

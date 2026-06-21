@@ -2092,6 +2092,9 @@
     let flowStatusReqSeq = 0;
     let ioSummaryReqSeq = 0;
     let ioSummaryLoadedOnce = false;
+    let ioSummaryLastData = null;
+    const ioHideInactiveBindingsKey = 'flow_io_hide_inactive_bindings';
+    let ioHideInactiveBindings = getStorageValue(localStorage, ioHideInactiveBindingsKey) === '1';
     fieldApplyCheckIcon = iconCheckText();
     const flowCfgBackupFormat = 'flowio-configstore-backup';
     const flowCfgBackupVersion = 1;
@@ -5062,12 +5065,30 @@
       return badge;
     }
 
-    function createIoCompactTable(title, columns, rows) {
-      const section = document.createElement('section');
-      section.className = 'io-table-section';
+    function createIoEnabledBadge(row) {
+      const span = document.createElement('span');
+      span.className = 'io-state-badge';
+      if (row && row.configurable === false) {
+        span.className += ' is-sleeping';
+        span.textContent = tr('io.driver.always', 'Toujours actif');
+      } else if (row && row.enabled) {
+        span.className += ' is-active';
+        span.textContent = tr('io.driver.enabled', 'Actif');
+      } else {
+        span.className += ' is-error';
+        span.textContent = tr('io.driver.disabled', 'Désactivé');
+      }
+      return span;
+    }
 
-      const heading = document.createElement('div');
-      heading.className = 'control-section-title ui-heading-inline';
+    function createIoCompactTable(title, columns, rows, opts) {
+      opts = opts || {};
+      const section = document.createElement('details');
+      section.className = 'io-table-section io-acc';
+      if (opts.open) section.open = true;
+
+      const heading = document.createElement('summary');
+      heading.className = 'control-section-title ui-heading-inline io-acc-head';
       const icon = document.createElement('span');
       icon.className = 'ui-msr ui-msr-sm';
       icon.setAttribute('aria-hidden', 'true');
@@ -5076,7 +5097,17 @@
       text.textContent = title;
       heading.appendChild(icon);
       heading.appendChild(text);
+      if (opts.countTotal !== undefined && opts.countTotal !== null) {
+        const count = document.createElement('span');
+        count.className = 'io-acc-count';
+        count.textContent = ioSummaryNumber(opts.countActive) + '/' + ioSummaryNumber(opts.countTotal);
+        heading.appendChild(count);
+      }
       section.appendChild(heading);
+
+      const body = document.createElement('div');
+      body.className = 'io-acc-body';
+      if (opts.extraHead instanceof Node) body.appendChild(opts.extraHead);
 
       const shell = document.createElement('div');
       shell.className = 'io-table-shell';
@@ -5120,7 +5151,8 @@
       }
       table.appendChild(tbody);
       shell.appendChild(table);
-      section.appendChild(shell);
+      body.appendChild(shell);
+      section.appendChild(body);
       return section;
     }
 
@@ -5205,90 +5237,95 @@
       }
     }
 
+    function ioBindingActive(row) {
+      return String(row && row.state || '').trim().toLowerCase() === 'active';
+    }
+
     function renderIoSummary(data) {
-      const summary = data && typeof data.summary === 'object' ? data.summary : {};
+      ioSummaryLastData = data;
       const drivers = Array.isArray(data && data.drivers) ? data.drivers : [];
       const bindingPorts = Array.isArray(data && data.binding_ports) ? data.binding_ports : [];
       const ioSlots = Array.isArray(data && data.io_slots) ? data.io_slots : [];
       const domainSlots = Array.isArray(data && data.domain_slots) ? data.domain_slots : [];
-      const errors = Array.isArray(data && data.error_slots) ? data.error_slots : [];
 
-      if (ioSummaryCards) {
-        ioSummaryCards.innerHTML = '';
-        appendIoSummaryCard(
-          tr('io.cards.bindingPorts', 'BindingPorts'),
-          ioSummaryNumber(summary.binding_ports_active) + '/' + ioSummaryNumber(summary.binding_ports_total),
-          tr('io.cards.bindingPorts.summary', 'ports physiques actifs'),
-          ioSummaryNumber(summary.binding_ports_error) ? 'error' : 'active'
-        );
-        appendIoSummaryCard(
-          tr('io.cards.ioslots', 'IOSlots'),
-          ioSummaryNumber(summary.io_slots_active) + '/' + ioSummaryNumber(summary.io_slots_total),
-          tr('io.cards.ioslots.summary', 'slots logiques actifs'),
-          ioSummaryNumber(summary.io_slots_error) ? 'error' : 'active'
-        );
-        appendIoSummaryCard(
-          tr('io.cards.domainSlots', 'DomainSlots'),
-          ioSummaryNumber(summary.domain_slots_active) + '/' + ioSummaryNumber(summary.domain_slots_total),
-          tr('io.cards.domainSlots.summary', 'slots domaine actifs'),
-          ioSummaryNumber(summary.domain_slots_error) ? 'error' : 'active'
-        );
-        appendIoSummaryCard(
-          tr('io.cards.errors', 'Slots en erreur'),
-          ioSummaryNumber(summary.error_slots),
-          errors.length ? errors.map((slot) => ioSummaryText(slot.label, slot.io_slot)).slice(0, 3).join(', ') : tr('io.cards.errors.none', 'aucune erreur active'),
-          errors.length ? 'error' : 'active'
-        );
-      }
+      if (ioSummaryCards) ioSummaryCards.innerHTML = '';
+      if (!ioSummaryTables) return;
+      ioSummaryTables.innerHTML = '';
 
-      if (ioSummaryTables) {
-        ioSummaryTables.innerHTML = '';
-        ioSummaryTables.appendChild(createIoCompactTable(
-          tr('io.table.drivers', 'Affectations par driver'),
-          [
-            { key: 'driver', label: tr('io.col.driver', 'Driver') },
-            { key: 'active_slots', label: tr('io.col.active', 'Actifs') },
-            { key: 'error_slots', label: tr('io.col.errors', 'Erreurs') }
-          ],
-          drivers
-        ));
-        ioSummaryTables.appendChild(createIoCompactTable(
-          tr('io.table.bindingPorts', 'BindingPorts'),
-          [
-            { key: 'port_id', label: tr('io.col.port', 'Port') },
-            { key: 'driver', label: tr('io.col.driver', 'Driver') },
-            { key: 'channel', label: tr('io.col.channel', 'Canal') },
-            { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
-            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
-            { key: 'io_id', label: tr('io.col.ioId', 'IoId'), render: (row) => ioSummaryIoIdLabel(row) }
-          ],
-          bindingPorts
-        ));
-        ioSummaryTables.appendChild(createIoCompactTable(
-          tr('io.table.ioSlots', 'IOSlots'),
-          [
-            { key: 'io_slot', label: tr('io.col.slot', 'Slot'), render: (row) => ioSummarySlotLabel(row) },
-            { key: 'config_name', label: tr('io.col.configName', 'Nom config'), render: (row) => ioSummaryText(row.config_name, '-') },
-            { key: 'kind', label: tr('io.col.kind', 'Type') },
-            { key: 'driver', label: tr('io.col.driver', 'Driver') },
-            { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
-            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
-            { key: 'error', label: tr('io.col.error', 'Erreur') }
-          ],
-          ioSlots
-        ));
-        ioSummaryTables.appendChild(createIoCompactTable(
-          tr('io.table.domainSlots', 'DomainSlots'),
-          [
-            { key: 'display_name', label: tr('io.col.domainSlot', 'Domaine') },
-            { key: 'io_name', label: tr('io.col.ioName', 'IONAME'), render: (row) => ioSummaryText(row.io_name, '-') },
-            { key: 'io_slot', label: tr('io.col.ioSlot', 'IOSlot'), render: (row) => ioSummarySlotLabel(row) },
-            { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
-            { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
-          ],
-          domainSlots
-        ));
-      }
+      // Drivers — tous les backends, badge état.
+      ioSummaryTables.appendChild(createIoCompactTable(
+        tr('io.table.drivers', 'Drivers'),
+        [
+          { key: 'driver', label: tr('io.col.driver', 'Driver') },
+          { key: 'enabled', label: tr('io.col.status', 'État'), render: (row) => createIoEnabledBadge(row) },
+          { key: 'active_slots', label: tr('io.col.active', 'Actifs') },
+          { key: 'error_slots', label: tr('io.col.errors', 'Erreurs') }
+        ],
+        drivers,
+        { countActive: drivers.filter((d) => d.enabled).length, countTotal: drivers.length }
+      ));
+
+      // Binding ports — tous, avec masquage des inactifs.
+      const hideToggle = document.createElement('label');
+      hideToggle.className = 'io-acc-toggle';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = ioHideInactiveBindings;
+      cb.addEventListener('change', () => {
+        ioHideInactiveBindings = cb.checked;
+        setStorageValue(localStorage, ioHideInactiveBindingsKey, cb.checked ? '1' : '0');
+        if (ioSummaryLastData) renderIoSummary(ioSummaryLastData);
+      });
+      const cbText = document.createElement('span');
+      cbText.textContent = tr('io.hideInactive', 'Masquer les inactifs');
+      hideToggle.appendChild(cb);
+      hideToggle.appendChild(cbText);
+      const bindingRows = ioHideInactiveBindings ? bindingPorts.filter(ioBindingActive) : bindingPorts;
+      const bindingDetails = createIoCompactTable(
+        tr('io.table.bindingPorts', 'Binding ports'),
+        [
+          { key: 'port_id', label: tr('io.col.port', 'Port') },
+          { key: 'kind', label: tr('io.col.kind', 'Type') },
+          { key: 'driver', label: tr('io.col.driver', 'Driver') },
+          { key: 'channel', label: tr('io.col.channel', 'Canal') },
+          { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
+          { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') },
+          { key: 'io_id', label: tr('io.col.ioId', 'IoId'), render: (row) => ioSummaryIoIdLabel(row) }
+        ],
+        bindingRows,
+        { countActive: bindingPorts.filter(ioBindingActive).length, countTotal: bindingPorts.length, extraHead: hideToggle }
+      );
+      ioSummaryTables.appendChild(bindingDetails);
+
+      // IO slots — tous les endpoints, avec colonne domaine.
+      ioSummaryTables.appendChild(createIoCompactTable(
+        tr('io.table.ioSlots', 'IO slots'),
+        [
+          { key: 'name', label: tr('io.col.configName', 'Nom') },
+          { key: 'kind', label: tr('io.col.kind', 'Type') },
+          { key: 'driver', label: tr('io.col.driver', 'Driver') },
+          { key: 'channel', label: tr('io.col.channel', 'Canal') },
+          { key: 'domain', label: tr('io.col.domain', 'Domaine'), render: (row) => ioSummaryText(row.domain, '—') },
+          { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
+          { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
+        ],
+        ioSlots,
+        { countActive: ioSlots.filter((s) => ioSummaryText(s.domain, '') !== '-' && String(s.domain || '').trim() !== '').length, countTotal: ioSlots.length }
+      ));
+
+      // Domain slots.
+      ioSummaryTables.appendChild(createIoCompactTable(
+        tr('io.table.domainSlots', 'Domain slots'),
+        [
+          { key: 'display_name', label: tr('io.col.domainSlot', 'Domaine') },
+          { key: 'io_name', label: tr('io.col.ioName', 'IONAME'), render: (row) => ioSummaryText(row.io_name, '-') },
+          { key: 'io_slot', label: tr('io.col.ioSlot', 'IOSlot'), render: (row) => ioSummarySlotLabel(row) },
+          { key: 'state', label: tr('io.col.state', 'Etat'), render: (row) => createIoStateBadge(row.state) },
+          { key: 'last_value', label: tr('io.col.lastValue', 'Dernière valeur') }
+        ],
+        domainSlots,
+        { countActive: domainSlots.filter((s) => ioBindingActive(s)).length, countTotal: domainSlots.length }
+      ));
     }
 
     async function fetchIoSummary() {

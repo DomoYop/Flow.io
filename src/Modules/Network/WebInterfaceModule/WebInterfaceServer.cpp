@@ -2842,6 +2842,7 @@ const char* waveshareIoBackendLabel_(uint8_t backend)
         case IO_BACKEND_BMP280: return "BMP280";
         case IO_BACKEND_BME680: return "BME680";
         case IO_BACKEND_INA226: return "INA226";
+        case IO_BACKEND_INA228: return "INA228";
         case IO_BACKEND_TCA9554: return "TCA9554";
         case IO_BACKEND_MCP23017: return "MCP23017";
         default: return "unknown";
@@ -2869,6 +2870,7 @@ const char* waveshareIoPortKindLabel_(uint8_t kind)
         case IO_PORT_KIND_DS18_WATER: return "ds18b20_water";
         case IO_PORT_KIND_DS18_AIR: return "ds18b20_air";
         case IO_PORT_KIND_INA226: return "ina226";
+        case IO_PORT_KIND_INA228: return "ina228";
         case IO_PORT_KIND_SHT40: return "sht40";
         case IO_PORT_KIND_BMP280: return "bmp280";
         case IO_PORT_KIND_BME680: return "bme680";
@@ -2918,6 +2920,10 @@ bool waveshareIoPortBackendChannel_(const IOBindingPortSpec& spec, uint8_t& back
             return true;
         case IO_PORT_KIND_INA226:
             backendOut = IO_BACKEND_INA226;
+            channelOut = spec.param0;
+            return true;
+        case IO_PORT_KIND_INA228:
+            backendOut = IO_BACKEND_INA228;
             channelOut = spec.param0;
             return true;
         case IO_PORT_KIND_SHT40:
@@ -3143,7 +3149,7 @@ void wavesharePrintPoolDeviceJson_(AsyncResponseStream& response, const Waveshar
     response.print("}");
 }
 
-void wavesharePrintIoSlotJson_(AsyncResponseStream& response,
+[[maybe_unused]] void wavesharePrintIoSlotJson_(AsyncResponseStream& response,
                                const IOServiceV2* ioSvc,
                                const PoolDeviceService* poolSvc,
                                IoSlotId ioSlot,
@@ -3199,20 +3205,28 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     uint16_t ioError = 0U;
     uint16_t domainActive = 0U;
     uint16_t domainError = 0U;
-    uint8_t driverActive[11] = {0};
-    uint8_t driverError[11] = {0};
+    uint8_t driverActive[12] = {0};
+    uint8_t driverError[12] = {0};
 
     for (const DomainIoSlotBinding& binding : PoolDomain::kDomainIoSlots) {
         const WaveshareIoSummaryState state = waveshareIoSummaryStateForSlot_(ioSvc, poolSvc, binding.ioSlot, binding.domainSlot);
-        if (state.active) {
-            ++ioActive;
-            ++domainActive;
-            if (state.hasMeta && state.meta.backend < 11U) ++driverActive[state.meta.backend];
-        }
-        if (state.errorState) {
-            ++ioError;
-            ++domainError;
-            if (state.hasMeta && state.meta.backend < 11U) ++driverError[state.meta.backend];
+        if (state.active) { ++ioActive; ++domainActive; }
+        if (state.errorState) { ++ioError; ++domainError; }
+    }
+
+    // Driver active/error tally over ALL exposed endpoints (not just domain slots).
+    if (ioSvc && ioSvc->count && ioSvc->idAt && ioSvc->meta) {
+        const uint8_t epCount = ioSvc->count(ioSvc->ctx);
+        for (uint8_t i = 0; i < epCount; ++i) {
+            IoId ioId = IO_ID_INVALID;
+            if (ioSvc->idAt(ioSvc->ctx, i, &ioId) != IO_OK) continue;
+            IoEndpointMeta meta{};
+            if (ioSvc->meta(ioSvc->ctx, ioId, &meta) != IO_OK) continue;
+            if (meta.backend >= 12U) continue;
+            IoValue value{};
+            const bool ok = ioSvc->readValue && ioSvc->readValue(ioSvc->ctx, ioId, &value) == IO_OK && value.valid;
+            if (ok) ++driverActive[meta.backend];
+            else ++driverError[meta.backend];
         }
     }
 
@@ -3252,11 +3266,20 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     response.print((unsigned)domainError);
     response.print("},\"drivers\":[");
     bool first = true;
-    for (uint8_t backend = 0U; backend < 11U; ++backend) {
-        if (driverActive[backend] == 0U && driverError[backend] == 0U) continue;
+    for (uint8_t backend = 0U; backend <= IO_BACKEND_INA228; ++backend) {
+        uint8_t enabled = 0U;
+        uint8_t configurable = 0U;
+        if (!ioSvc || !ioSvc->backendInfo ||
+            ioSvc->backendInfo(ioSvc->ctx, backend, &enabled, &configurable) != IO_OK) {
+            continue;  // Unknown backend id.
+        }
         if (!first) response.print(',');
         response.print("{\"driver\":");
         printJsonEscaped_(response, waveshareIoBackendLabel_(backend));
+        response.print(",\"enabled\":");
+        response.print(enabled ? "true" : "false");
+        response.print(",\"configurable\":");
+        response.print(configurable ? "true" : "false");
         response.print(",\"active_slots\":");
         response.print((unsigned)driverActive[backend]);
         response.print(",\"error_slots\":");
@@ -3306,15 +3329,51 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
 
     response.print("],\"io_slots\":[");
     first = true;
-    for (const DomainIoSlotBinding& binding : PoolDomain::kDomainIoSlots) {
-        if (!first) response.print(',');
-        wavesharePrintIoSlotJson_(response,
-                                  ioSvc,
-                                  poolSvc,
-                                  binding.ioSlot,
-                                  binding.domainSlot,
-                                  waveshareFindDomainSlotPreset_(binding.domainSlot));
-        first = false;
+    if (ioSvc && ioSvc->count && ioSvc->idAt && ioSvc->meta) {
+        const uint8_t epCount = ioSvc->count(ioSvc->ctx);
+        for (uint8_t i = 0; i < epCount; ++i) {
+            IoId ioId = IO_ID_INVALID;
+            if (ioSvc->idAt(ioSvc->ctx, i, &ioId) != IO_OK) continue;
+            IoEndpointMeta meta{};
+            if (ioSvc->meta(ioSvc->ctx, ioId, &meta) != IO_OK) continue;
+
+            // Reverse-lookup the domain slot bound to this endpoint, if any.
+            const char* domainName = "";
+            for (const DomainIoSlotBinding& binding : PoolDomain::kDomainIoSlots) {
+                if (ioIdFromSlot(binding.ioSlot) == ioId) {
+                    const DomainSlotPreset* preset = waveshareFindDomainSlotPreset_(binding.domainSlot);
+                    if (preset && preset->displayName) domainName = preset->displayName;
+                    break;
+                }
+            }
+
+            IoValue value{};
+            const bool valueOk = ioSvc->readValue && ioSvc->readValue(ioSvc->ctx, ioId, &value) == IO_OK && value.valid;
+            char valueText[32] = {0};
+            if (valueOk) waveshareFormatIoValue_(meta, value, valueText, sizeof(valueText));
+
+            if (!first) response.print(',');
+            response.print("{\"io_id\":");
+            response.print((unsigned)ioId);
+            response.print(",\"name\":");
+            printJsonEscaped_(response, meta.name);
+            response.print(",\"kind\":");
+            printJsonEscaped_(response, meta.kind == IO_KIND_DIGITAL_OUT ? "do" : (meta.kind == IO_KIND_DIGITAL_IN ? "di" : "ai"));
+            response.print(",\"driver\":");
+            printJsonEscaped_(response, waveshareIoBackendLabel_(meta.backend));
+            response.print(",\"channel\":");
+            response.print((unsigned)meta.channel);
+            response.print(",\"domain\":");
+            printJsonEscaped_(response, domainName);
+            response.print(",\"state\":");
+            printJsonEscaped_(response, valueOk ? "active" : "error");
+            response.print(",\"last_value\":");
+            printJsonEscaped_(response, valueOk ? valueText : "-");
+            response.print(",\"ts_ms\":");
+            response.print(valueOk ? (unsigned long)value.tsMs : 0UL);
+            response.print("}");
+            first = false;
+        }
     }
 
     response.print("],\"domain_slots\":[");

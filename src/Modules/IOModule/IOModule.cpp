@@ -2075,6 +2075,38 @@ IoStatus IOModule::ioListInvalidSensors_(IoId* outIds, uint8_t maxIds, uint8_t* 
     return IO_OK;
 }
 
+IoStatus IOModule::ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable) const
+{
+    bool configurable = true;
+    bool enabled = false;
+    switch (backend) {
+        // Always-on drivers (no config toggle).
+        case IO_BACKEND_GPIO:
+        case IO_BACKEND_ADS1115_INT:
+        case IO_BACKEND_ADS1115_EXT_DIFF:
+        case IO_BACKEND_TCA9554:
+            configurable = false;
+            enabled = true;
+            break;
+        case IO_BACKEND_PCF8574:    enabled = cfgData_.pcfEnabled; break;
+        // DS18B20 are read through any enabled 1-Wire transport (DS2484 or GPIO buses).
+        case IO_BACKEND_DS18B20:
+            enabled = cfgData_.ds2484Enabled || cfgData_.oneWire1Enabled || cfgData_.oneWire2Enabled;
+            break;
+        case IO_BACKEND_SHT40:      enabled = cfgData_.sht40Enabled; break;
+        case IO_BACKEND_BMP280:     enabled = cfgData_.bmp280Enabled; break;
+        case IO_BACKEND_BME680:     enabled = cfgData_.bme680Enabled; break;
+        case IO_BACKEND_INA226:     enabled = cfgData_.ina226Enabled; break;
+        case IO_BACKEND_MCP23017:   enabled = cfgData_.mcp23017Enabled; break;
+        case IO_BACKEND_INA228:     enabled = cfgData_.ina228Enabled; break;
+        default:
+            return IO_ERR_INVALID_ARG;
+    }
+    if (outEnabled) *outEnabled = enabled ? 1U : 0U;
+    if (outConfigurable) *outConfigurable = configurable ? 1U : 0U;
+    return IO_OK;
+}
+
 bool IOModule::getLedMaskSvc_(uint8_t* mask) const
 {
     if (!mask) return false;
