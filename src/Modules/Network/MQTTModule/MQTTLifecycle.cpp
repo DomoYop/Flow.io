@@ -476,6 +476,11 @@ void MQTTModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
 void MQTTModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
 {
+    // La config NVS (dont l'override `mq_tid`) est desormais chargee : on
+    // recalcule le deviceId pour que les topics figes plus tard par le profil
+    // (rt/network/state, rt/system/state dans postInit) utilisent le bon prefixe.
+    buildTopics_();
+
     if (!cfgProducer_) {
         cfgProducer_ = new (std::nothrow) MqttConfigRouteProducer();
     }
