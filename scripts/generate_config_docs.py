@@ -262,11 +262,14 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
                 135: "BME680Humidity - BME680 canal 1 [135]",
                 136: "BME680Pressure - BME680 canal 2 [136]",
                 137: "BME680Gas - BME680 canal 3 [137]",
-                138: "INA226ShuntMv - INA226 canal 0 [138]",
-                139: "INA226BusV - INA226 canal 1 [139]",
-                140: "INA226CurrentMa - INA226 canal 2 [140]",
-                141: "INA226PowerMw - INA226 canal 3 [141]",
-                142: "INA226LoadV - INA226 canal 4 [142]",
+                143: "PowermonShuntMv - Moniteur puissance canal 0 [143]",
+                144: "PowermonBusV - Moniteur puissance canal 1 [144]",
+                145: "PowermonCurrentMa - Moniteur puissance canal 2 [145]",
+                146: "PowermonPowerMw - Moniteur puissance canal 3 [146]",
+                147: "PowermonLoadV - Moniteur puissance canal 4 [147]",
+                148: "PowermonTemp - Moniteur puissance canal 5 (INA228) [148]",
+                149: "PowermonEnergy - Moniteur puissance canal 6 (INA228) [149]",
+                150: "PowermonCharge - Moniteur puissance canal 7 (INA228) [150]",
             }
             analog_filtered = [
                 sanitize_enum_entry(entry, analog_labels_waveshare[value])

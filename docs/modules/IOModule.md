@@ -85,8 +85,7 @@ Backends actuellement gérés par le module:
 - entrées analogiques `ADS1115`
 - sondes `DS18B20`
 - capteurs `SHT40`, `BMP280`, `BME680`
-- mesures électriques `INA226`
-- mesures électriques `INA228` (20 bits: tension, courant, puissance, température, énergie, charge)
+- moniteur de puissance `INA226`/`INA228`, unifié sous une source `powermon` (le champ de config `model` choisit la puce ; l'INA228 ajoute température, énergie, charge — inactives en 226)
 - compteur d'impulsions sur GPIO avec debounce
 
 Les `IoBackend` visibles dans le service sont:
@@ -99,8 +98,7 @@ Les `IoBackend` visibles dans le service sont:
 - `IO_BACKEND_SHT40`
 - `IO_BACKEND_BMP280`
 - `IO_BACKEND_BME680`
-- `IO_BACKEND_INA226`
-- `IO_BACKEND_INA228`
+- `IO_BACKEND_POWERMON`
 
 ## Modèle de binding actuel
 
@@ -124,8 +122,7 @@ Ports déclarés actuellement:
 - SHT40: `PortSht40Temp`, `PortSht40Humidity`
 - BMP280: `PortBmp280Temp`, `PortBmp280Pressure`
 - BME680: `PortBme680Temp`, `PortBme680Humidity`, `PortBme680Pressure`, `PortBme680Gas`
-- INA226: `PortIna226ShuntMv`, `PortIna226BusV`, `PortIna226CurrentMa`, `PortIna226PowerMw`, `PortIna226LoadV`
-- INA228: `PortIna228ShuntMv`, `PortIna228BusV`, `PortIna228CurrentMa`, `PortIna228PowerMw`, `PortIna228LoadV`, `PortIna228Temp`, `PortIna228Energy`, `PortIna228Charge`
+- moniteur de puissance: `PortPowermonShuntMv`, `PortPowermonBusV`, `PortPowermonCurrentMa`, `PortPowermonPowerMw`, `PortPowermonLoadV`, `PortPowermonTemp`, `PortPowermonEnergy`, `PortPowermonCharge` (les 3 derniers alimentés uniquement par un INA228)
 - entrées digitales GPIO: `PortDigitalIn1..4`
 - sorties relais GPIO: `PortRelay1..8`
 - sorties PCF8574: `PortPcf0Bit0..7`

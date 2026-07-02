@@ -17,10 +17,7 @@
     "io/drivers/bmp280/address": {
       "display_format": "hex"
     },
-    "io/drivers/ina226/address": {
-      "display_format": "hex"
-    },
-    "io/drivers/ina228/address": {
+    "io/drivers/powermon/address": {
       "display_format": "hex"
     },
     "io/drivers/pcf857x/address": {
@@ -480,56 +477,36 @@
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.16.label"
         },
         {
-          "value": 138,
+          "value": 143,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.17.label"
         },
         {
-          "value": 139,
+          "value": 144,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.18.label"
         },
         {
-          "value": 140,
+          "value": 145,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.19.label"
         },
         {
-          "value": 141,
+          "value": 146,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.20.label"
         },
         {
-          "value": 142,
+          "value": 147,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.21.label"
         },
         {
-          "value": 143,
+          "value": 148,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.22.label"
         },
         {
-          "value": 144,
+          "value": 149,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.23.label"
         },
         {
-          "value": 145,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.24.label"
-        },
-        {
-          "value": 146,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.25.label"
-        },
-        {
-          "value": 147,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.26.label"
-        },
-        {
-          "value": 148,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.27.label"
-        },
-        {
-          "value": 149,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.28.label"
-        },
-        {
           "value": 150,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.29.label"
+          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_binding_port_analog.24.label"
         }
       ],
       "flowio_binding_port_digital_input": [

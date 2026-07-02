@@ -34,14 +34,13 @@ struct IOModuleConfig {
     bool bme680Enabled = false;
     uint8_t bme680Address = 0x77;
     int32_t bme680PollMs = 2000;
-    bool ina226Enabled = false;
-    uint8_t ina226Address = 0x40;
-    int32_t ina226PollMs = 500;
-    float ina226ShuntOhms = 0.1f;
-    bool ina228Enabled = false;
-    uint8_t ina228Address = 0x40;
-    int32_t ina228PollMs = 500;
-    float ina228ShuntOhms = 0.1f;
+    // Moniteur de puissance unifie (INA226 ou INA228). Le modele choisit la puce
+    // physique ; les grandeurs temperature/energie/charge restent inactives en 226.
+    bool powermonEnabled = false;
+    uint8_t powermonModel = 228;  // 226 ou 228.
+    uint8_t powermonAddress = 0x40;
+    int32_t powermonPollMs = 500;
+    float powermonShuntOhms = 0.1f;
     bool pcfEnabled = FLOW_WIRDEF_IO_PCFEN;
     uint8_t pcfAddress = FLOW_WIRDEF_IO_PCFAD;
     uint8_t pcfMaskDefault = FLOW_WIRDEF_IO_PCFMK;
@@ -74,9 +73,8 @@ enum IOAnalogSource : uint8_t {
     IO_SRC_SHT40 = 4,
     IO_SRC_BMP280 = 5,
     IO_SRC_BME680 = 6,
-    IO_SRC_INA226 = 7,
-    IO_SRC_INA228 = 8,
-    IO_SRC_COUNT = 9
+    IO_SRC_POWERMON = 7,
+    IO_SRC_COUNT = 8
 };
 
 constexpr uint8_t IO_ANALOG_SOURCE_INVALID = 0xFFu;
@@ -90,13 +88,12 @@ enum IOBindingPortKind : uint8_t {
     IO_PORT_KIND_ADS_EXTERNAL_DIFF = 5,
     IO_PORT_KIND_DS18_WATER = 6,
     IO_PORT_KIND_DS18_AIR = 7,
-    IO_PORT_KIND_INA226 = 8,
+    IO_PORT_KIND_POWERMON = 8,
     IO_PORT_KIND_SHT40 = 9,
     IO_PORT_KIND_BMP280 = 10,
     IO_PORT_KIND_BME680 = 11,
     IO_PORT_KIND_TCA9554_OUTPUT = 12,
-    IO_PORT_KIND_MCP23017_OUTPUT = 13,
-    IO_PORT_KIND_INA228 = 14
+    IO_PORT_KIND_MCP23017_OUTPUT = 13
 };
 
 struct IOBindingPortSpec {

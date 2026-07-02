@@ -17,13 +17,13 @@ struct RuntimeUiAlarmFlagLabelItem {
 };
 
 inline constexpr RuntimeUiAlarmFlagLabelItem kRuntimeUiAlarmActiveFlagLabels[] = {
-    {1, "Pression Filtration Basse", "Water Pressure Low"},
-    {2, "Pression Filtration Haute", "Water Pressure High"},
-    {4, "Bidon pH bas", "pH Tank Low"},
-    {8, "Bidon chlore bas", "Chlorine Tank Low"},
-    {16, "Pompe pH dur\303\251e max atteinte", "pH Pump Maximum Uptime Reached"},
-    {32, "Pompe Orp dur\303\251e max atteinte", "Orp Pump Maximum Uptime Reached"},
-    {64, "Niveau d'eau bas dans le bassin", "Pool water level low"},
+    {1, "Pression Filtration Basse", "Pressure Filtration Basse"},
+    {2, "Pression Filtration Haute", "Pressure Filtration Haute"},
+    {4, "Bidon pH bas", "Bidon pH bas"},
+    {8, "Bidon chlore bas", "Bidon chlore bas"},
+    {16, "Pompe pH dur\303\251e max atteinte", "Pompe pH duration max atteinte"},
+    {32, "Pompe Orp dur\303\251e max atteinte", "Pompe Orp duration max atteinte"},
+    {64, "Niveau d'eau bas dans le bassin", "Niveau of eau bas dans the bassin"},
 };
 
 inline constexpr size_t kRuntimeUiAlarmActiveFlagLabelCount = (sizeof(kRuntimeUiAlarmActiveFlagLabels) / sizeof(kRuntimeUiAlarmActiveFlagLabels[0]));

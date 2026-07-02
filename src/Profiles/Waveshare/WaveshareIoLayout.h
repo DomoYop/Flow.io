@@ -9,67 +9,62 @@ namespace Waveshare {
 namespace IoLayout {
 
 enum : PhysicalPortId {
-    PortAdsInternal0 = 100, // ADS1115 interne, entree single-ended A0.
-    PortAdsInternal1 = 101, // ADS1115 interne, entree single-ended A1.
-    PortAdsInternal2 = 102, // ADS1115 interne, entree single-ended A2.
-    PortAdsInternal3 = 103, // ADS1115 interne, entree single-ended A3.
-    PortAdsExternal0 = 110, // ADS1115 externe, paire differentielle 0.
-    PortAdsExternal1 = 111, // ADS1115 externe, paire differentielle 1.
-    PortOneWire1 = 120, // DS18B20 bus 1.
-    PortOneWire2 = 121, // DS18B20 bus 2.
-    PortSht40Temp = 130, // SHT40: temperature.
-    PortSht40Humidity = 131, // SHT40: humidite.
-    PortBmp280Temp = 132, // BMP280: temperature.
-    PortBmp280Pressure = 133, // BMP280: pression.
-    PortBme680Temp = 134, // BME680: temperature.
-    PortBme680Humidity = 135, // BME680: humidite.
-    PortBme680Pressure = 136, // BME680: pression.
-    PortBme680Gas = 137, // BME680: resistance gaz.
-    PortIna226ShuntMv = 138, // INA226: tension shunt (mV).
-    PortIna226BusV = 139, // INA226: tension bus (V).
-    PortIna226CurrentMa = 140, // INA226: courant (mA).
-    PortIna226PowerMw = 141, // INA226: puissance (mW).
-    PortIna226LoadV = 142, // INA226: tension charge (V).
-    PortIna228ShuntMv = 143, // INA228: tension shunt (mV).
-    PortIna228BusV = 144, // INA228: tension bus (V).
-    PortIna228CurrentMa = 145, // INA228: courant (mA).
-    PortIna228PowerMw = 146, // INA228: puissance (mW).
-    PortIna228LoadV = 147, // INA228: tension charge (V).
-    PortIna228Temp = 148, // INA228: temperature (degC).
-    PortIna228Energy = 149, // INA228: energie (Wh).
-    PortIna228Charge = 150, // INA228: charge (mAh).
-    PortDin0 = 200, // DIN0.
-    PortDin1 = 201, // DIN1.
-    PortDin2 = 202, // DIN2.
-    PortDin3 = 203, // DIN3.
-    PortDin4 = 204, // DIN4.
-    PortDin5 = 205, // DIN5.
-    PortDin6 = 206, // DIN6.
-    PortDin7 = 207, // DIN7.
-    PortExio1 = 300, // TCA9554 sortie bit 0.
-    PortExio2 = 301, // TCA9554 sortie bit 1.
-    PortExio3 = 302, // TCA9554 sortie bit 2.
-    PortExio4 = 303, // TCA9554 sortie bit 3.
-    PortExio5 = 304, // TCA9554 sortie bit 4.
-    PortExio6 = 305, // TCA9554 sortie bit 5.
-    PortExio7 = 306, // TCA9554 sortie bit 6.
-    PortExio8 = 307, // TCA9554 sortie bit 7.
-    PortMcpOut1 = 400, // MCP23017 sortie bit 0.
-    PortMcpOut2 = 401, // MCP23017 sortie bit 1.
-    PortMcpOut3 = 402, // MCP23017 sortie bit 2.
-    PortMcpOut4 = 403, // MCP23017 sortie bit 3.
-    PortMcpOut5 = 404, // MCP23017 sortie bit 4.
-    PortMcpOut6 = 405, // MCP23017 sortie bit 5.
-    PortMcpOut7 = 406, // MCP23017 sortie bit 6.
-    PortMcpOut8 = 407, // MCP23017 sortie bit 7.
-    PortMcpOut9 = 408, // MCP23017 sortie bit 8.
-    PortMcpOut10 = 409, // MCP23017 sortie bit 9.
-    PortMcpOut11 = 410, // MCP23017 sortie bit 10.
-    PortMcpOut12 = 411, // MCP23017 sortie bit 11.
-    PortMcpOut13 = 412, // MCP23017 sortie bit 12.
-    PortMcpOut14 = 413, // MCP23017 sortie bit 13.
-    PortMcpOut15 = 414, // MCP23017 sortie bit 14.
-    PortMcpOut16 = 415 // MCP23017 sortie bit 15.
+    PortAdsInternal0    = 100, // ADS1115 interne, entree single-ended A0.
+    PortAdsInternal1    = 101, // ADS1115 interne, entree single-ended A1.
+    PortAdsInternal2    = 102, // ADS1115 interne, entree single-ended A2.
+    PortAdsInternal3    = 103, // ADS1115 interne, entree single-ended A3.
+    PortAdsExternal0    = 110, // ADS1115 externe, paire differentielle 0.
+    PortAdsExternal1    = 111, // ADS1115 externe, paire differentielle 1.
+    PortOneWire1        = 120, // DS18B20 bus 1.
+    PortOneWire2        = 121, // DS18B20 bus 2.
+    PortSht40Temp       = 130, // SHT40: temperature.
+    PortSht40Humidity   = 131, // SHT40: humidite.
+    PortBmp280Temp      = 132, // BMP280: temperature.
+    PortBmp280Pressure  = 133, // BMP280: pression.
+    PortBme680Temp      = 134, // BME680: temperature.
+    PortBme680Humidity  = 135, // BME680: humidite.
+    PortBme680Pressure  = 136, // BME680: pression.
+    PortBme680Gas       = 137, // BME680: resistance gaz.
+    PortPowermonShuntMv   = 143, // Moniteur puissance: tension shunt (mV).
+    PortPowermonBusV      = 144, // Moniteur puissance: tension bus (V).
+    PortPowermonCurrentMa = 145, // Moniteur puissance: courant (mA).
+    PortPowermonPowerMw   = 146, // Moniteur puissance: puissance (mW).
+    PortPowermonLoadV     = 147, // Moniteur puissance: tension charge (V).
+    PortPowermonTemp      = 148, // Moniteur puissance: temperature (degC, INA228 seul).
+    PortPowermonEnergy    = 149, // Moniteur puissance: energie (Wh, INA228 seul).
+    PortPowermonCharge    = 150, // Moniteur puissance: charge (mAh, INA228 seul).
+    PortDin0            = 200, // DIN0.
+    PortDin1            = 201, // DIN1.
+    PortDin2            = 202, // DIN2.
+    PortDin3            = 203, // DIN3.
+    PortDin4            = 204, // DIN4.
+    PortDin5            = 205, // DIN5.
+    PortDin6            = 206, // DIN6.
+    PortDin7            = 207, // DIN7.
+    PortExio1           = 300, // TCA9554 sortie bit 0.
+    PortExio2           = 301, // TCA9554 sortie bit 1.
+    PortExio3           = 302, // TCA9554 sortie bit 2.
+    PortExio4           = 303, // TCA9554 sortie bit 3.
+    PortExio5           = 304, // TCA9554 sortie bit 4.
+    PortExio6           = 305, // TCA9554 sortie bit 5.
+    PortExio7           = 306, // TCA9554 sortie bit 6.
+    PortExio8           = 307, // TCA9554 sortie bit 7.
+    PortMcpOut1         = 400, // MCP23017 sortie bit 0.
+    PortMcpOut2         = 401, // MCP23017 sortie bit 1.
+    PortMcpOut3         = 402, // MCP23017 sortie bit 2.
+    PortMcpOut4         = 403, // MCP23017 sortie bit 3.
+    PortMcpOut5         = 404, // MCP23017 sortie bit 4.
+    PortMcpOut6         = 405, // MCP23017 sortie bit 5.
+    PortMcpOut7         = 406, // MCP23017 sortie bit 6.
+    PortMcpOut8         = 407, // MCP23017 sortie bit 7.
+    PortMcpOut9         = 408, // MCP23017 sortie bit 8.
+    PortMcpOut10        = 409, // MCP23017 sortie bit 9.
+    PortMcpOut11        = 410, // MCP23017 sortie bit 10.
+    PortMcpOut12        = 411, // MCP23017 sortie bit 11.
+    PortMcpOut13        = 412, // MCP23017 sortie bit 12.
+    PortMcpOut14        = 413, // MCP23017 sortie bit 13.
+    PortMcpOut15        = 414, // MCP23017 sortie bit 14.
+    PortMcpOut16        = 415  // MCP23017 sortie bit 15.
 };
 
 inline constexpr IOBindingPortSpec kBindingPorts[] = {
@@ -78,38 +73,33 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortAdsInternal1, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 1, 0}, // ADS1115 interne canal 1.
     {PortAdsInternal2, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 2, 0}, // ADS1115 interne canal 2.
     {PortAdsInternal3, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 3, 0}, // ADS1115 interne canal 3.
-    {PortAdsExternal0, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 0, 0}, // ADS1115 externe paire 0.
-    {PortAdsExternal1, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 1, 0}, // ADS1115 externe paire 1.
-    {PortOneWire1, IO_PORT_KIND_DS18_WATER, 47, 0}, // DS18B20 bus 1 GPIO47.
-    {PortOneWire2, IO_PORT_KIND_DS18_AIR, 48, 0}, // DS18B20 bus 2 GPIO48.
-    {PortSht40Temp, IO_PORT_KIND_SHT40, 0, 0}, // SHT40 temperature.
-    {PortSht40Humidity, IO_PORT_KIND_SHT40, 1, 0}, // SHT40 humidite.
-    {PortBmp280Temp, IO_PORT_KIND_BMP280, 0, 0}, // BMP280 temperature.
-    {PortBmp280Pressure, IO_PORT_KIND_BMP280, 1, 0}, // BMP280 pression.
-    {PortBme680Temp, IO_PORT_KIND_BME680, 0, 0}, // BME680 temperature.
-    {PortBme680Humidity, IO_PORT_KIND_BME680, 1, 0}, // BME680 humidite.
-    {PortBme680Pressure, IO_PORT_KIND_BME680, 2, 0}, // BME680 pression.
-    {PortBme680Gas, IO_PORT_KIND_BME680, 3, 0}, // BME680 gaz.
-    {PortIna226ShuntMv, IO_PORT_KIND_INA226, 0, 0}, // INA226 shunt.
-    {PortIna226BusV, IO_PORT_KIND_INA226, 1, 0}, // INA226 bus.
-    {PortIna226CurrentMa, IO_PORT_KIND_INA226, 2, 0}, // INA226 courant.
-    {PortIna226PowerMw, IO_PORT_KIND_INA226, 3, 0}, // INA226 puissance.
-    {PortIna226LoadV, IO_PORT_KIND_INA226, 4, 0}, // INA226 tension charge.
-    {PortIna228ShuntMv, IO_PORT_KIND_INA228, 0, 0}, // INA228 shunt.
-    {PortIna228BusV, IO_PORT_KIND_INA228, 1, 0}, // INA228 bus.
-    {PortIna228CurrentMa, IO_PORT_KIND_INA228, 2, 0}, // INA228 courant.
-    {PortIna228PowerMw, IO_PORT_KIND_INA228, 3, 0}, // INA228 puissance.
-    {PortIna228LoadV, IO_PORT_KIND_INA228, 4, 0}, // INA228 tension charge.
-    {PortIna228Temp, IO_PORT_KIND_INA228, 5, 0}, // INA228 temperature.
-    {PortIna228Energy, IO_PORT_KIND_INA228, 6, 0}, // INA228 energie.
-    {PortIna228Charge, IO_PORT_KIND_INA228, 7, 0}, // INA228 charge.
+    {PortAdsExternal0, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 0, 0},   // ADS1115 externe paire 0.
+    {PortAdsExternal1, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 1, 0},   // ADS1115 externe paire 1.
+    {PortOneWire1, IO_PORT_KIND_DS18_WATER, 47, 0},             // DS18B20 bus 1 GPIO47.
+    {PortOneWire2, IO_PORT_KIND_DS18_AIR, 48, 0},               // DS18B20 bus 2 GPIO48.
+    {PortSht40Temp, IO_PORT_KIND_SHT40, 0, 0},                  // SHT40 temperature.
+    {PortSht40Humidity, IO_PORT_KIND_SHT40, 1, 0},              // SHT40 humidite.
+    {PortBmp280Temp, IO_PORT_KIND_BMP280, 0, 0},                // BMP280 temperature.
+    {PortBmp280Pressure, IO_PORT_KIND_BMP280, 1, 0},            // BMP280 pression.
+    {PortBme680Temp, IO_PORT_KIND_BME680, 0, 0},                // BME680 temperature.
+    {PortBme680Humidity, IO_PORT_KIND_BME680, 1, 0},            // BME680 humidite.
+    {PortBme680Pressure, IO_PORT_KIND_BME680, 2, 0},            // BME680 pression.
+    {PortBme680Gas, IO_PORT_KIND_BME680, 3, 0},                 // BME680 gaz.
+    {PortPowermonShuntMv, IO_PORT_KIND_POWERMON, 0, 0},         // Moniteur puissance shunt.
+    {PortPowermonBusV, IO_PORT_KIND_POWERMON, 1, 0},            // Moniteur puissance bus.
+    {PortPowermonCurrentMa, IO_PORT_KIND_POWERMON, 2, 0},       // Moniteur puissance courant.
+    {PortPowermonPowerMw, IO_PORT_KIND_POWERMON, 3, 0},         // Moniteur puissance puissance.
+    {PortPowermonLoadV, IO_PORT_KIND_POWERMON, 4, 0},           // Moniteur puissance tension charge.
+    {PortPowermonTemp, IO_PORT_KIND_POWERMON, 5, 0},            // Moniteur puissance temperature (INA228 seul).
+    {PortPowermonEnergy, IO_PORT_KIND_POWERMON, 6, 0},          // Moniteur puissance energie (INA228 seul).
+    {PortPowermonCharge, IO_PORT_KIND_POWERMON, 7, 0},          // Moniteur puissance charge (INA228 seul).
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {PortDin0, IO_PORT_KIND_GPIO_INPUT, 4, 0}, // DIN0 GPIO4.
-    {PortDin1, IO_PORT_KIND_GPIO_INPUT, 5, 0}, // DIN1 GPIO5.
-    {PortDin2, IO_PORT_KIND_GPIO_INPUT, 6, 0}, // DIN2 GPIO6.
-    {PortDin3, IO_PORT_KIND_GPIO_INPUT, 7, 0}, // DIN3 GPIO7.
-    {PortDin4, IO_PORT_KIND_GPIO_INPUT, 8, 0}, // DIN4 GPIO8.
-    {PortDin5, IO_PORT_KIND_GPIO_INPUT, 9, 0}, // DIN5 GPIO9.
+    {PortDin0, IO_PORT_KIND_GPIO_INPUT, 4, 0},  // DIN0 GPIO4.
+    {PortDin1, IO_PORT_KIND_GPIO_INPUT, 5, 0},  // DIN1 GPIO5.
+    {PortDin2, IO_PORT_KIND_GPIO_INPUT, 6, 0},  // DIN2 GPIO6.
+    {PortDin3, IO_PORT_KIND_GPIO_INPUT, 7, 0},  // DIN3 GPIO7.
+    {PortDin4, IO_PORT_KIND_GPIO_INPUT, 8, 0},  // DIN4 GPIO8.
+    {PortDin5, IO_PORT_KIND_GPIO_INPUT, 9, 0},  // DIN5 GPIO9.
     {PortDin6, IO_PORT_KIND_GPIO_INPUT, 10, 0}, // DIN6 GPIO10.
     {PortDin7, IO_PORT_KIND_GPIO_INPUT, 11, 0}, // DIN7 GPIO11.
 #else
@@ -177,12 +167,12 @@ struct AnalogRoleDefault {
 
 inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
     // {domainSlot, bindingPort, c0, c1, precision}
-    {PoolIds::SensorOrp, analogPortFromLegacy(FLOW_WIRDEF_IO_A0S, FLOW_WIRDEF_IO_A0C), FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
-    {PoolIds::SensorPh, analogPortFromLegacy(FLOW_WIRDEF_IO_A1S, FLOW_WIRDEF_IO_A1C), FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
-    {PoolIds::SensorPsi, analogPortFromLegacy(FLOW_WIRDEF_IO_A2S, FLOW_WIRDEF_IO_A2C), FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
-    {PoolIds::SensorSpareAnalog, analogPortFromLegacy(FLOW_WIRDEF_IO_A3S, FLOW_WIRDEF_IO_A3C), FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
-    {PoolIds::SensorWaterTemp, analogPortFromLegacy(FLOW_WIRDEF_IO_A4S, FLOW_WIRDEF_IO_A4C), FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
-    {PoolIds::SensorAirTemp, analogPortFromLegacy(FLOW_WIRDEF_IO_A5S, FLOW_WIRDEF_IO_A5C), FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
+    {PoolIds::SensorOrp,        analogPortFromLegacy(FLOW_WIRDEF_IO_A0S, FLOW_WIRDEF_IO_A0C), FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
+    {PoolIds::SensorPh,         analogPortFromLegacy(FLOW_WIRDEF_IO_A1S, FLOW_WIRDEF_IO_A1C), FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
+    {PoolIds::SensorPsi,        analogPortFromLegacy(FLOW_WIRDEF_IO_A2S, FLOW_WIRDEF_IO_A2C), FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
+    {PoolIds::SensorSpareAnalog,analogPortFromLegacy(FLOW_WIRDEF_IO_A3S, FLOW_WIRDEF_IO_A3C), FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
+    {PoolIds::SensorWaterTemp,  analogPortFromLegacy(FLOW_WIRDEF_IO_A4S, FLOW_WIRDEF_IO_A4C), FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
+    {PoolIds::SensorAirTemp,    analogPortFromLegacy(FLOW_WIRDEF_IO_A5S, FLOW_WIRDEF_IO_A5C), FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
 };
 
 struct DigitalInputRoleDefault {
@@ -196,15 +186,15 @@ struct DigitalInputRoleDefault {
 inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {
     // {role, bindingPort, mode, edgeMode, debounceUs}
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {PoolIds::SensorPoolLevel, PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine (GPIO6).
-    {PoolIds::SensorPhLevel, PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH (GPIO4).
-    {PoolIds::SensorChlorineLevel, PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau desinfectant (GPIO5).
-    {PoolIds::SensorWaterCounter, PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (GPIO7, 100 ms debounce).
+    {PoolIds::SensorPoolLevel,      PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine (GPIO6).
+    {PoolIds::SensorPhLevel,        PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH (GPIO4).
+    {PoolIds::SensorChlorineLevel,  PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau desinfectant (GPIO5).
+    {PoolIds::SensorWaterCounter,   PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (GPIO7, 100 ms debounce).
 #else
-    {PoolIds::SensorPoolLevel, PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
-    {PoolIds::SensorPhLevel, PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
-    {PoolIds::SensorChlorineLevel, PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore.
-    {PoolIds::SensorWaterCounter, PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (100 ms debounce).
+    {PoolIds::SensorPoolLevel,      PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
+    {PoolIds::SensorPhLevel,        PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
+    {PoolIds::SensorChlorineLevel,  PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore.
+    {PoolIds::SensorWaterCounter,   PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (100 ms debounce).
 #endif
 };
 
@@ -219,14 +209,14 @@ struct DigitalOutputRoleDefault {
 
 inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     // {domainSlot, bindingPort, activeHigh, retainOnWarmReboot, momentary, pulseMs}
-    {PoolIds::ActuatorFiltrationPump, PortExio1, true, true, false, 0U}, // Pompe filtration.
-    {PoolIds::ActuatorPhPump, PortExio2, true, false, false, 0U}, // Pompe pH.
-    {PoolIds::ActuatorChlorinePump, PortExio3, true, false, false, 0U}, // Pompe chlore.
-    {PoolIds::ActuatorRobot, PortExio4, true, false, false, 0U}, // Robot.
-    {PoolIds::ActuatorFillPump, PortExio5, true, false, false, 0U}, // Pompe de remplissage.
-    {PoolIds::ActuatorChlorineGenerator, PortExio6, true, false, false, 0U}, // Electrolyseur.
-    {PoolIds::ActuatorLights, PortExio7, true, false, false, 0U}, // Eclairage.
-    {PoolIds::ActuatorWaterHeater, PortExio8, true, false, false, 0U}, // Chauffage.
+    {PoolIds::ActuatorFiltrationPump,   PortExio1, true, true,  false, 0U}, // Pompe filtration.
+    {PoolIds::ActuatorPhPump,           PortExio2, true, false, false, 0U}, // Pompe pH.
+    {PoolIds::ActuatorChlorinePump,     PortExio3, true, false, false, 0U}, // Pompe chlore.
+    {PoolIds::ActuatorRobot,            PortExio4, true, false, false, 0U}, // Robot.
+    {PoolIds::ActuatorFillPump,         PortExio5, true, false, false, 0U}, // Pompe de remplissage.
+    {PoolIds::ActuatorChlorineGenerator,PortExio6, true, false, false, 0U}, // Electrolyseur.
+    {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
+    {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
 };
 
 inline constexpr const AnalogRoleDefault* analogDefaultForDomainSlot(DomainSlotId domainSlot)

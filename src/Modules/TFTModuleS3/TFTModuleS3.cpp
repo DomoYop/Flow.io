@@ -1351,9 +1351,9 @@ bool TFTModuleS3::readRuntimeValue_(RuntimeUiId runtimeId, RuntimeValue& out) co
                 case 12: return readIoBackendValue_(IO_BACKEND_BME680, 1U, out);
                 case 13: return readIoBackendValue_(IO_BACKEND_BME680, 2U, out);
                 case 14: return readIoBackendValue_(IO_BACKEND_BME680, 3U, out);
-                case 15: return readIoBackendValue_(IO_BACKEND_INA226, 1U, out);
-                case 16: return readIoBackendValue_(IO_BACKEND_INA226, 2U, out);
-                case 17: return readIoBackendValue_(IO_BACKEND_INA226, 3U, out);
+                case 15: return readIoBackendValue_(IO_BACKEND_POWERMON, 1U, out);
+                case 16: return readIoBackendValue_(IO_BACKEND_POWERMON, 2U, out);
+                case 17: return readIoBackendValue_(IO_BACKEND_POWERMON, 3U, out);
                 default: return false;
             }
 

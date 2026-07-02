@@ -61,10 +61,9 @@ enum IoBackend : uint8_t {
     IO_BACKEND_SHT40 = 5,
     IO_BACKEND_BMP280 = 6,
     IO_BACKEND_BME680 = 7,
-    IO_BACKEND_INA226 = 8,
+    IO_BACKEND_POWERMON = 8,
     IO_BACKEND_TCA9554 = 9,
-    IO_BACKEND_MCP23017 = 10,
-    IO_BACKEND_INA228 = 11
+    IO_BACKEND_MCP23017 = 10
 };
 
 /** Endpoint capability bitmask. */

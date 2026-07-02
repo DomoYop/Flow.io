@@ -2699,9 +2699,9 @@ bool waveshareReadDashboardRuntimeValue_(DataStore* dataStore,
             if (valueId == 12U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_BME680, 1U, out);
             if (valueId == 13U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_BME680, 2U, out);
             if (valueId == 14U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_BME680, 3U, out);
-            if (valueId == 15U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_INA226, 1U, out);
-            if (valueId == 16U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_INA226, 2U, out);
-            if (valueId == 17U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_INA226, 3U, out);
+            if (valueId == 15U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_POWERMON, 1U, out);
+            if (valueId == 16U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_POWERMON, 2U, out);
+            if (valueId == 17U) return waveshareReadDashboardIoBackendValue_(ioSvc, IO_BACKEND_POWERMON, 3U, out);
             return false;
 
         case ModuleId::System:
@@ -2841,8 +2841,7 @@ const char* waveshareIoBackendLabel_(uint8_t backend)
         case IO_BACKEND_SHT40: return "SHT40";
         case IO_BACKEND_BMP280: return "BMP280";
         case IO_BACKEND_BME680: return "BME680";
-        case IO_BACKEND_INA226: return "INA226";
-        case IO_BACKEND_INA228: return "INA228";
+        case IO_BACKEND_POWERMON: return "INA22x";
         case IO_BACKEND_TCA9554: return "TCA9554";
         case IO_BACKEND_MCP23017: return "MCP23017";
         default: return "unknown";
@@ -2869,8 +2868,7 @@ const char* waveshareIoPortKindLabel_(uint8_t kind)
         case IO_PORT_KIND_ADS_EXTERNAL_DIFF: return "ads1115_external_diff";
         case IO_PORT_KIND_DS18_WATER: return "ds18b20_water";
         case IO_PORT_KIND_DS18_AIR: return "ds18b20_air";
-        case IO_PORT_KIND_INA226: return "ina226";
-        case IO_PORT_KIND_INA228: return "ina228";
+        case IO_PORT_KIND_POWERMON: return "powermon";
         case IO_PORT_KIND_SHT40: return "sht40";
         case IO_PORT_KIND_BMP280: return "bmp280";
         case IO_PORT_KIND_BME680: return "bme680";
@@ -2918,12 +2916,8 @@ bool waveshareIoPortBackendChannel_(const IOBindingPortSpec& spec, uint8_t& back
             backendOut = IO_BACKEND_DS18B20;
             channelOut = spec.param0;
             return true;
-        case IO_PORT_KIND_INA226:
-            backendOut = IO_BACKEND_INA226;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_INA228:
-            backendOut = IO_BACKEND_INA228;
+        case IO_PORT_KIND_POWERMON:
+            backendOut = IO_BACKEND_POWERMON;
             channelOut = spec.param0;
             return true;
         case IO_PORT_KIND_SHT40:
@@ -3266,7 +3260,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     response.print((unsigned)domainError);
     response.print("},\"drivers\":[");
     bool first = true;
-    for (uint8_t backend = 0U; backend <= IO_BACKEND_INA228; ++backend) {
+    for (uint8_t backend = 0U; backend <= IO_BACKEND_MCP23017; ++backend) {
         uint8_t enabled = 0U;
         uint8_t configurable = 0U;
         if (!ioSvc || !ioSvc->backendInfo ||

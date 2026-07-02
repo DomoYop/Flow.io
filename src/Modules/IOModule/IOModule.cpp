@@ -159,12 +159,11 @@ static constexpr uint8_t kCfgBranchIoPcf857x = 28;
 static constexpr uint8_t kCfgBranchIoSht40 = 29;
 static constexpr uint8_t kCfgBranchIoBmp280 = 30;
 static constexpr uint8_t kCfgBranchIoBme680 = 31;
-static constexpr uint8_t kCfgBranchIoIna226 = 32;
 static constexpr uint8_t kCfgBranchIoMcp23017 = 48;
 static constexpr uint8_t kCfgBranchIoDs2484 = 57;
 static constexpr uint8_t kCfgBranchIo1Wire1 = 58;
 static constexpr uint8_t kCfgBranchIo1Wire2 = 59;
-static constexpr uint8_t kCfgBranchIoIna228 = 60;
+static constexpr uint8_t kCfgBranchIoPowermon = 60;
 static constexpr PhysicalPortId kLegacyDisconnectedBindingPort = 65535U;
 static constexpr char kLegacyCounterRuntimeKeyFmt[] = "ioi%02urt";
 
@@ -258,8 +257,7 @@ static constexpr MqttConfigRouteProducer::Route kIoCfgRoutes[] = {
     {29, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoSht40}, "io/drivers/sht40", "io/drivers/sht40", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {30, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoBmp280}, "io/drivers/bmp280", "io/drivers/bmp280", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {31, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoBme680}, "io/drivers/bme680", "io/drivers/bme680", (uint8_t)MqttPublishPriority::Normal, nullptr},
-    {32, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoIna226}, "io/drivers/ina226", "io/drivers/ina226", (uint8_t)MqttPublishPriority::Normal, nullptr},
-    {43, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoIna228}, "io/drivers/ina228", "io/drivers/ina228", (uint8_t)MqttPublishPriority::Normal, nullptr},
+    {43, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoPowermon}, "io/drivers/powermon", "io/drivers/powermon", (uint8_t)MqttPublishPriority::Normal, nullptr},
     FLOW_IO_ANALOG_ROUTE_ENTRY(33, kCfgBranchIoA6, "06"),
     FLOW_IO_ANALOG_ROUTE_ENTRY(34, kCfgBranchIoA7, "07"),
     FLOW_IO_ANALOG_ROUTE_ENTRY(35, kCfgBranchIoA8, "08"),
@@ -879,24 +877,18 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_BME680, 2U, writer);
         case RuntimeUiBme680Gaz:
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_BME680, 3U, writer);
-        case RuntimeUiIna226Voltage:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA226, 1U, writer);
-        case RuntimeUiIna226Current:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA226, 2U, writer);
-        case RuntimeUiIna226Power:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA226, 3U, writer);
-        case RuntimeUiIna228Voltage:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA228, 1U, writer);
-        case RuntimeUiIna228Current:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA228, 2U, writer);
-        case RuntimeUiIna228Power:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA228, 3U, writer);
-        case RuntimeUiIna228Temperature:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA228, 5U, writer);
-        case RuntimeUiIna228Energy:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA228, 6U, writer);
-        case RuntimeUiIna228Charge:
-            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_INA228, 7U, writer);
+        case RuntimeUiPowermonVoltage:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 1U, writer);
+        case RuntimeUiPowermonCurrent:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 2U, writer);
+        case RuntimeUiPowermonPower:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 3U, writer);
+        case RuntimeUiPowermonTemperature:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 5U, writer);
+        case RuntimeUiPowermonEnergy:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 6U, writer);
+        case RuntimeUiPowermonCharge:
+            return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 7U, writer);
         case RuntimeUiWaterTemp:
             runtimeIndex = 4;
             break;
@@ -1214,13 +1206,12 @@ bool IOModule::tickI2cAnalogs_(void* ctx, uint32_t nowMs)
     self->analogProviders_[IO_SRC_SHT40].tick(nowMs);
     self->analogProviders_[IO_SRC_BMP280].tick(nowMs);
     self->analogProviders_[IO_SRC_BME680].tick(nowMs);
-    self->analogProviders_[IO_SRC_INA226].tick(nowMs);
-    self->analogProviders_[IO_SRC_INA228].tick(nowMs);
+    self->analogProviders_[IO_SRC_POWERMON].tick(nowMs);
 
     for (uint8_t i = 0; i < MAX_ANALOG_ENDPOINTS; ++i) {
         if (!self->analogSlots_[i].used) continue;
         const uint8_t src = self->analogSlots_[i].source;
-        if (src == IO_SRC_SHT40 || src == IO_SRC_BMP280 || src == IO_SRC_BME680 || src == IO_SRC_INA226 || src == IO_SRC_INA228) {
+        if (src == IO_SRC_SHT40 || src == IO_SRC_BMP280 || src == IO_SRC_BME680 || src == IO_SRC_POWERMON) {
             self->processAnalogDefinition_(i, nowMs);
         }
     }
@@ -1266,8 +1257,7 @@ bool IOModule::analogSourceRequiresDriverEnable_(uint8_t source) const
     return source == IO_SRC_SHT40 ||
            source == IO_SRC_BMP280 ||
            source == IO_SRC_BME680 ||
-           source == IO_SRC_INA226 ||
-           source == IO_SRC_INA228;
+           source == IO_SRC_POWERMON;
 }
 
 bool IOModule::analogSourceDriverEnabled_(uint8_t source) const
@@ -1279,10 +1269,8 @@ bool IOModule::analogSourceDriverEnabled_(uint8_t source) const
             return cfgData_.bmp280Enabled;
         case IO_SRC_BME680:
             return cfgData_.bme680Enabled;
-        case IO_SRC_INA226:
-            return cfgData_.ina226Enabled;
-        case IO_SRC_INA228:
-            return cfgData_.ina228Enabled;
+        case IO_SRC_POWERMON:
+            return cfgData_.powermonEnabled;
         default:
             return true;
     }
@@ -2096,9 +2084,8 @@ IoStatus IOModule::ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t*
         case IO_BACKEND_SHT40:      enabled = cfgData_.sht40Enabled; break;
         case IO_BACKEND_BMP280:     enabled = cfgData_.bmp280Enabled; break;
         case IO_BACKEND_BME680:     enabled = cfgData_.bme680Enabled; break;
-        case IO_BACKEND_INA226:     enabled = cfgData_.ina226Enabled; break;
+        case IO_BACKEND_POWERMON:   enabled = cfgData_.powermonEnabled; break;
         case IO_BACKEND_MCP23017:   enabled = cfgData_.mcp23017Enabled; break;
-        case IO_BACKEND_INA228:     enabled = cfgData_.ina228Enabled; break;
         default:
             return IO_ERR_INVALID_ARG;
     }
@@ -2221,15 +2208,10 @@ bool IOModule::resolveAnalogBinding_(PhysicalPortId portId, uint8_t& sourceOut, 
             channelOut = spec->param0;
             backendOut = IO_BACKEND_BME680;
             return channelOut <= 3U;
-        case IO_PORT_KIND_INA226:
-            sourceOut = IO_SRC_INA226;
+        case IO_PORT_KIND_POWERMON:
+            sourceOut = IO_SRC_POWERMON;
             channelOut = spec->param0;
-            backendOut = IO_BACKEND_INA226;
-            return channelOut <= 4U;
-        case IO_PORT_KIND_INA228:
-            sourceOut = IO_SRC_INA228;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_INA228;
+            backendOut = IO_BACKEND_POWERMON;
             return channelOut <= 7U;
         default:
             return false;
@@ -2632,13 +2614,11 @@ bool IOModule::configureRuntime_()
         needAnalogSource[IO_SRC_SHT40] ||
         needAnalogSource[IO_SRC_BMP280] ||
         needAnalogSource[IO_SRC_BME680] ||
-        needAnalogSource[IO_SRC_INA226] ||
-        needAnalogSource[IO_SRC_INA228] ||
+        needAnalogSource[IO_SRC_POWERMON] ||
         cfgData_.sht40Enabled ||
         cfgData_.bmp280Enabled ||
         cfgData_.bme680Enabled ||
-        cfgData_.ina226Enabled ||
-        cfgData_.ina228Enabled ||
+        cfgData_.powermonEnabled ||
         needPcfOutput ||
         needTcaOutput ||
         needMcpOutput;
@@ -2946,14 +2926,10 @@ bool IOModule::configureRuntime_()
         LOGI("BME680 probe 0x%02X: %s", cfgData_.bme680Address, present ? "found" : "not found");
     }
 
-    if (needAnalogSource[IO_SRC_INA226] || cfgData_.ina226Enabled) {
-        const bool present = i2cBus_.probe(cfgData_.ina226Address);
-        LOGI("INA226 probe 0x%02X: %s", cfgData_.ina226Address, present ? "found" : "not found");
-    }
-
-    if (needAnalogSource[IO_SRC_INA228] || cfgData_.ina228Enabled) {
-        const bool present = i2cBus_.probe(cfgData_.ina228Address);
-        LOGI("INA228 probe 0x%02X: %s", cfgData_.ina228Address, present ? "found" : "not found");
+    if (needAnalogSource[IO_SRC_POWERMON] || cfgData_.powermonEnabled) {
+        const bool present = i2cBus_.probe(cfgData_.powermonAddress);
+        LOGI("Power monitor INA%u probe 0x%02X: %s", (unsigned)cfgData_.powermonModel,
+             cfgData_.powermonAddress, present ? "found" : "not found");
     }
 
     if (needTcaOutput && !needPcfOutput && cfgData_.pcfEnabled) {
@@ -3086,43 +3062,36 @@ bool IOModule::configureRuntime_()
         }
     }
 
-    if (needAnalogSource[IO_SRC_INA226]) {
-        if (!cfgData_.ina226Enabled) {
-            LOGW("INA226 required by analog slots but disabled");
+    if (needAnalogSource[IO_SRC_POWERMON]) {
+        if (!cfgData_.powermonEnabled) {
+            LOGW("Power monitor required by analog slots but disabled");
         } else {
-            Ina226DriverConfig inaCfg{};
-            inaCfg.address = cfgData_.ina226Address;
-            inaCfg.pollMs = (cfgData_.ina226PollMs < 100) ? 100U : (uint32_t)cfgData_.ina226PollMs;
-            inaCfg.shuntOhms = (cfgData_.ina226ShuntOhms > 0.0f) ? cfgData_.ina226ShuntOhms : 0.1f;
+            const uint32_t pollMs = (cfgData_.powermonPollMs < 100) ? 100U : (uint32_t)cfgData_.powermonPollMs;
+            const float shuntOhms = (cfgData_.powermonShuntOhms > 0.0f) ? cfgData_.powermonShuntOhms : 0.1f;
 
-            IAnalogSourceDriver* driver = allocIna226Driver_("ina226", &i2cBus_, inaCfg);
-            if (!driver) {
-                LOGW("INA226 pool exhausted");
+            // Le modele choisit la puce physique. En 226, les canaux temperature/
+            // energie/charge (5-7) ne sont pas fournis par le driver -> endpoints inactifs.
+            IAnalogSourceDriver* driver = nullptr;
+            if (cfgData_.powermonModel == 226) {
+                Ina226DriverConfig inaCfg{};
+                inaCfg.address = cfgData_.powermonAddress;
+                inaCfg.pollMs = pollMs;
+                inaCfg.shuntOhms = shuntOhms;
+                driver = allocIna226Driver_("powermon", &i2cBus_, inaCfg);
             } else {
-                IOAnalogProvider provider = makeAnalogProvider(driver);
-                if (provider.begin()) {
-                    analogProviders_[IO_SRC_INA226] = provider;
-                }
+                Ina228DriverConfig inaCfg{};
+                inaCfg.address = cfgData_.powermonAddress;
+                inaCfg.pollMs = pollMs;
+                inaCfg.shuntOhms = shuntOhms;
+                driver = allocIna228Driver_("powermon", &i2cBus_, inaCfg);
             }
-        }
-    }
 
-    if (needAnalogSource[IO_SRC_INA228]) {
-        if (!cfgData_.ina228Enabled) {
-            LOGW("INA228 required by analog slots but disabled");
-        } else {
-            Ina228DriverConfig inaCfg{};
-            inaCfg.address = cfgData_.ina228Address;
-            inaCfg.pollMs = (cfgData_.ina228PollMs < 100) ? 100U : (uint32_t)cfgData_.ina228PollMs;
-            inaCfg.shuntOhms = (cfgData_.ina228ShuntOhms > 0.0f) ? cfgData_.ina228ShuntOhms : 0.1f;
-
-            IAnalogSourceDriver* driver = allocIna228Driver_("ina228", &i2cBus_, inaCfg);
             if (!driver) {
-                LOGW("INA228 pool exhausted");
+                LOGW("Power monitor pool exhausted");
             } else {
                 IOAnalogProvider provider = makeAnalogProvider(driver);
                 if (provider.begin()) {
-                    analogProviders_[IO_SRC_INA228] = provider;
+                    analogProviders_[IO_SRC_POWERMON] = provider;
                 }
             }
         }
@@ -3202,8 +3171,7 @@ bool IOModule::configureRuntime_()
     const bool needI2cAnalogJob = needAnalogSource[IO_SRC_SHT40]
         || needAnalogSource[IO_SRC_BMP280]
         || needAnalogSource[IO_SRC_BME680]
-        || needAnalogSource[IO_SRC_INA226]
-        || needAnalogSource[IO_SRC_INA228];
+        || needAnalogSource[IO_SRC_POWERMON];
     IOScheduledJob i2cAnalogJob{};
     if (needI2cAnalogJob) {
         i2cAnalogJob.id = "i2c_analog";
@@ -3482,14 +3450,11 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(bme680EnabledVar_, kCfgModuleId, kCfgBranchIoBme680);
     cfg.registerVar(bme680AddressVar_, kCfgModuleId, kCfgBranchIoBme680);
     cfg.registerVar(bme680PollVar_, kCfgModuleId, kCfgBranchIoBme680);
-    cfg.registerVar(ina226EnabledVar_, kCfgModuleId, kCfgBranchIoIna226);
-    cfg.registerVar(ina226AddressVar_, kCfgModuleId, kCfgBranchIoIna226);
-    cfg.registerVar(ina226PollVar_, kCfgModuleId, kCfgBranchIoIna226);
-    cfg.registerVar(ina226ShuntOhmsVar_, kCfgModuleId, kCfgBranchIoIna226);
-    cfg.registerVar(ina228EnabledVar_, kCfgModuleId, kCfgBranchIoIna228);
-    cfg.registerVar(ina228AddressVar_, kCfgModuleId, kCfgBranchIoIna228);
-    cfg.registerVar(ina228PollVar_, kCfgModuleId, kCfgBranchIoIna228);
-    cfg.registerVar(ina228ShuntOhmsVar_, kCfgModuleId, kCfgBranchIoIna228);
+    cfg.registerVar(powermonEnabledVar_, kCfgModuleId, kCfgBranchIoPowermon);
+    cfg.registerVar(powermonModelVar_, kCfgModuleId, kCfgBranchIoPowermon);
+    cfg.registerVar(powermonAddressVar_, kCfgModuleId, kCfgBranchIoPowermon);
+    cfg.registerVar(powermonPollVar_, kCfgModuleId, kCfgBranchIoPowermon);
+    cfg.registerVar(powermonShuntOhmsVar_, kCfgModuleId, kCfgBranchIoPowermon);
     cfg.registerVar(pcfEnabledVar_, kCfgModuleId, kCfgBranchIoPcf857x);
     cfg.registerVar(pcfAddressVar_, kCfgModuleId, kCfgBranchIoPcf857x);
     cfg.registerVar(pcfMaskDefaultVar_, kCfgModuleId, kCfgBranchIoPcf857x);

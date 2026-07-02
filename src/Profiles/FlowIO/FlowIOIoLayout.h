@@ -27,19 +27,14 @@ enum : PhysicalPortId {
     PortBme680Humidity = 135, // BME680: humidite.
     PortBme680Pressure = 136, // BME680: pression.
     PortBme680Gas = 137, // BME680: resistance gaz.
-    PortIna226ShuntMv = 138, // INA226: tension shunt (mV).
-    PortIna226BusV = 139, // INA226: tension bus (V).
-    PortIna226CurrentMa = 140, // INA226: courant (mA).
-    PortIna226PowerMw = 141, // INA226: puissance (mW).
-    PortIna226LoadV = 142, // INA226: tension charge (V).
-    PortIna228ShuntMv = 143, // INA228: tension shunt (mV).
-    PortIna228BusV = 144, // INA228: tension bus (V).
-    PortIna228CurrentMa = 145, // INA228: courant (mA).
-    PortIna228PowerMw = 146, // INA228: puissance (mW).
-    PortIna228LoadV = 147, // INA228: tension charge (V).
-    PortIna228Temp = 148, // INA228: temperature (degC).
-    PortIna228Energy = 149, // INA228: energie (Wh).
-    PortIna228Charge = 150, // INA228: charge (mAh).
+    PortPowermonShuntMv = 143, // Moniteur puissance: tension shunt (mV).
+    PortPowermonBusV = 144, // Moniteur puissance: tension bus (V).
+    PortPowermonCurrentMa = 145, // Moniteur puissance: courant (mA).
+    PortPowermonPowerMw = 146, // Moniteur puissance: puissance (mW).
+    PortPowermonLoadV = 147, // Moniteur puissance: tension charge (V).
+    PortPowermonTemp = 148, // Moniteur puissance: temperature (degC, INA228 seul).
+    PortPowermonEnergy = 149, // Moniteur puissance: energie (Wh, INA228 seul).
+    PortPowermonCharge = 150, // Moniteur puissance: charge (mAh, INA228 seul).
     PortDigitalIn1 = 200, // Entree digitale 1 (GPIO board).
     PortDigitalIn2 = 201, // Entree digitale 2 (GPIO board).
     PortDigitalIn3 = 202, // Entree digitale 3 (GPIO board).
@@ -80,19 +75,14 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortBme680Humidity, IO_PORT_KIND_BME680, 1, 0}, // BME680 humidite.
     {PortBme680Pressure, IO_PORT_KIND_BME680, 2, 0}, // BME680 pression.
     {PortBme680Gas, IO_PORT_KIND_BME680, 3, 0}, // BME680 gaz.
-    {PortIna226ShuntMv, IO_PORT_KIND_INA226, 0, 0}, // INA226 shunt.
-    {PortIna226BusV, IO_PORT_KIND_INA226, 1, 0}, // INA226 bus.
-    {PortIna226CurrentMa, IO_PORT_KIND_INA226, 2, 0}, // INA226 courant.
-    {PortIna226PowerMw, IO_PORT_KIND_INA226, 3, 0}, // INA226 puissance.
-    {PortIna226LoadV, IO_PORT_KIND_INA226, 4, 0}, // INA226 tension charge.
-    {PortIna228ShuntMv, IO_PORT_KIND_INA228, 0, 0}, // INA228 shunt.
-    {PortIna228BusV, IO_PORT_KIND_INA228, 1, 0}, // INA228 bus.
-    {PortIna228CurrentMa, IO_PORT_KIND_INA228, 2, 0}, // INA228 courant.
-    {PortIna228PowerMw, IO_PORT_KIND_INA228, 3, 0}, // INA228 puissance.
-    {PortIna228LoadV, IO_PORT_KIND_INA228, 4, 0}, // INA228 tension charge.
-    {PortIna228Temp, IO_PORT_KIND_INA228, 5, 0}, // INA228 temperature.
-    {PortIna228Energy, IO_PORT_KIND_INA228, 6, 0}, // INA228 energie.
-    {PortIna228Charge, IO_PORT_KIND_INA228, 7, 0}, // INA228 charge.
+    {PortPowermonShuntMv, IO_PORT_KIND_POWERMON, 0, 0}, // Moniteur puissance shunt.
+    {PortPowermonBusV, IO_PORT_KIND_POWERMON, 1, 0}, // Moniteur puissance bus.
+    {PortPowermonCurrentMa, IO_PORT_KIND_POWERMON, 2, 0}, // Moniteur puissance courant.
+    {PortPowermonPowerMw, IO_PORT_KIND_POWERMON, 3, 0}, // Moniteur puissance puissance.
+    {PortPowermonLoadV, IO_PORT_KIND_POWERMON, 4, 0}, // Moniteur puissance tension charge.
+    {PortPowermonTemp, IO_PORT_KIND_POWERMON, 5, 0}, // Moniteur puissance temperature (INA228 seul).
+    {PortPowermonEnergy, IO_PORT_KIND_POWERMON, 6, 0}, // Moniteur puissance energie (INA228 seul).
+    {PortPowermonCharge, IO_PORT_KIND_POWERMON, 7, 0}, // Moniteur puissance charge (INA228 seul).
     {PortDigitalIn1, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[8].pin, 0}, // Entree digitale 1 via GPIO de la board.
     {PortDigitalIn2, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[9].pin, 0}, // Entree digitale 2 via GPIO de la board.
     {PortDigitalIn3, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[10].pin, 0}, // Entree digitale 3 via GPIO de la board.
