@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include <ADS1X15.h>  // FLOW_MODDEF_IO_AGAI (defaults generes) reference ADS1X15_GAIN_*.
+
 #include "Core/Services/IIO.h"
 #include "Core/WokwiDefaultOverrides.h"
 
@@ -79,28 +81,24 @@ enum IOAnalogSource : uint8_t {
 
 constexpr uint8_t IO_ANALOG_SOURCE_INVALID = 0xFFu;
 
-enum IOBindingPortKind : uint8_t {
-    IO_PORT_KIND_NONE = 0,
-    IO_PORT_KIND_GPIO_INPUT = 1,
-    IO_PORT_KIND_GPIO_OUTPUT = 2,
-    IO_PORT_KIND_PCF8574_OUTPUT = 3,
-    IO_PORT_KIND_ADS_INTERNAL_SINGLE = 4,
-    IO_PORT_KIND_ADS_EXTERNAL_DIFF = 5,
-    IO_PORT_KIND_DS18_WATER = 6,
-    IO_PORT_KIND_DS18_AIR = 7,
-    IO_PORT_KIND_POWERMON = 8,
-    IO_PORT_KIND_SHT40 = 9,
-    IO_PORT_KIND_BMP280 = 10,
-    IO_PORT_KIND_BME680 = 11,
-    IO_PORT_KIND_TCA9554_OUTPUT = 12,
-    IO_PORT_KIND_MCP23017_OUTPUT = 13
+/** Direction bitmask of a binding port. */
+enum IoPortDirMask : uint8_t {
+    IO_PORT_DIR_IN = 0x01,
+    IO_PORT_DIR_OUT = 0x02
 };
 
+/**
+ * One physical binding point. The backend (IO_BACKEND_*) is the single
+ * hardware identity; `channel` is the GPIO pin, expander bit, sensor channel
+ * or 1-Wire bus index (DS18B20: 0 = water bus, 1 = air bus). Backend
+ * capabilities (direction, channel range, labels) live in kBackendTraits.
+ */
 struct IOBindingPortSpec {
     PhysicalPortId portId = IO_PORT_INVALID;
-    uint8_t kind = IO_PORT_KIND_NONE;
-    uint8_t param0 = 0;
-    uint8_t param1 = 0;
+    uint8_t backend = IO_BACKEND_GPIO;
+    uint8_t channel = 0;
+    uint8_t flags = 0;          // IoPortDirMask bits.
+    const char* name = nullptr; // Default display name ("DIN0", "EXIO1"...).
 };
 
 typedef void (*IOAnalogValueCallback)(void* ctx, float value);

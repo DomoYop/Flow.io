@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Domain/Pool/PoolIds.h"
-#include "Modules/IOModule/IODrivers/Ads1115Driver.h"
 #include "Modules/IOModule/IOModuleTypes.h"
 
 namespace Profiles {
@@ -68,74 +67,63 @@ enum : PhysicalPortId {
 };
 
 inline constexpr IOBindingPortSpec kBindingPorts[] = {
-    // {portId, kind, param0, param1}
-    {PortAdsInternal0, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 0, 0}, // ADS1115 interne canal 0.
-    {PortAdsInternal1, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 1, 0}, // ADS1115 interne canal 1.
-    {PortAdsInternal2, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 2, 0}, // ADS1115 interne canal 2.
-    {PortAdsInternal3, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 3, 0}, // ADS1115 interne canal 3.
-    {PortAdsExternal0, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 0, 0},   // ADS1115 externe paire 0.
-    {PortAdsExternal1, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 1, 0},   // ADS1115 externe paire 1.
-    {PortOneWire1, IO_PORT_KIND_DS18_WATER, 47, 0},             // DS18B20 bus 1 GPIO47.
-    {PortOneWire2, IO_PORT_KIND_DS18_AIR, 48, 0},               // DS18B20 bus 2 GPIO48.
-    {PortSht40Temp, IO_PORT_KIND_SHT40, 0, 0},                  // SHT40 temperature.
-    {PortSht40Humidity, IO_PORT_KIND_SHT40, 1, 0},              // SHT40 humidite.
-    {PortBmp280Temp, IO_PORT_KIND_BMP280, 0, 0},                // BMP280 temperature.
-    {PortBmp280Pressure, IO_PORT_KIND_BMP280, 1, 0},            // BMP280 pression.
-    {PortBme680Temp, IO_PORT_KIND_BME680, 0, 0},                // BME680 temperature.
-    {PortBme680Humidity, IO_PORT_KIND_BME680, 1, 0},            // BME680 humidite.
-    {PortBme680Pressure, IO_PORT_KIND_BME680, 2, 0},            // BME680 pression.
-    {PortBme680Gas, IO_PORT_KIND_BME680, 3, 0},                 // BME680 gaz.
-    {PortPowermonShuntMv, IO_PORT_KIND_POWERMON, 0, 0},         // Moniteur puissance shunt.
-    {PortPowermonBusV, IO_PORT_KIND_POWERMON, 1, 0},            // Moniteur puissance bus.
-    {PortPowermonCurrentMa, IO_PORT_KIND_POWERMON, 2, 0},       // Moniteur puissance courant.
-    {PortPowermonPowerMw, IO_PORT_KIND_POWERMON, 3, 0},         // Moniteur puissance puissance.
-    {PortPowermonLoadV, IO_PORT_KIND_POWERMON, 4, 0},           // Moniteur puissance tension charge.
-    {PortPowermonTemp, IO_PORT_KIND_POWERMON, 5, 0},            // Moniteur puissance temperature (INA228 seul).
-    {PortPowermonEnergy, IO_PORT_KIND_POWERMON, 6, 0},          // Moniteur puissance energie (INA228 seul).
-    {PortPowermonCharge, IO_PORT_KIND_POWERMON, 7, 0},          // Moniteur puissance charge (INA228 seul).
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {PortDin0, IO_PORT_KIND_GPIO_INPUT, 4, 0},  // DIN0 GPIO4.
-    {PortDin1, IO_PORT_KIND_GPIO_INPUT, 5, 0},  // DIN1 GPIO5.
-    {PortDin2, IO_PORT_KIND_GPIO_INPUT, 6, 0},  // DIN2 GPIO6.
-    {PortDin3, IO_PORT_KIND_GPIO_INPUT, 7, 0},  // DIN3 GPIO7.
-    {PortDin4, IO_PORT_KIND_GPIO_INPUT, 8, 0},  // DIN4 GPIO8.
-    {PortDin5, IO_PORT_KIND_GPIO_INPUT, 9, 0},  // DIN5 GPIO9.
-    {PortDin6, IO_PORT_KIND_GPIO_INPUT, 10, 0}, // DIN6 GPIO10.
-    {PortDin7, IO_PORT_KIND_GPIO_INPUT, 11, 0}, // DIN7 GPIO11.
-#else
-    {PortDin0, IO_PORT_KIND_GPIO_INPUT, 4, 0}, // Entree digitale 1 (GPIO4).
-    {PortDin1, IO_PORT_KIND_GPIO_INPUT, 5, 0}, // Entree digitale 2 (GPIO5).
-    {PortDin2, IO_PORT_KIND_GPIO_INPUT, 6, 0}, // Entree digitale 3 (GPIO6).
-    {PortDin3, IO_PORT_KIND_GPIO_INPUT, 7, 0}, // Entree digitale 4 (GPIO7).
-    {PortDin4, IO_PORT_KIND_GPIO_INPUT, 8, 0}, // Entree digitale 5 (GPIO8).
-    {PortDin5, IO_PORT_KIND_GPIO_INPUT, 9, 0}, // Entree digitale 6 (GPIO9).
-    {PortDin6, IO_PORT_KIND_GPIO_INPUT, 10, 0}, // Entree digitale 7 (GPIO10).
-    {PortDin7, IO_PORT_KIND_GPIO_INPUT, 11, 0}, // Entree digitale 8 (GPIO11).
-#endif
-    {PortExio1, IO_PORT_KIND_TCA9554_OUTPUT, 0, 0}, // TCA9554 bit 0.
-    {PortExio2, IO_PORT_KIND_TCA9554_OUTPUT, 1, 0}, // TCA9554 bit 1.
-    {PortExio3, IO_PORT_KIND_TCA9554_OUTPUT, 2, 0}, // TCA9554 bit 2.
-    {PortExio4, IO_PORT_KIND_TCA9554_OUTPUT, 3, 0}, // TCA9554 bit 3.
-    {PortExio5, IO_PORT_KIND_TCA9554_OUTPUT, 4, 0}, // TCA9554 bit 4.
-    {PortExio6, IO_PORT_KIND_TCA9554_OUTPUT, 5, 0}, // TCA9554 bit 5.
-    {PortExio7, IO_PORT_KIND_TCA9554_OUTPUT, 6, 0}, // TCA9554 bit 6.
-    {PortExio8, IO_PORT_KIND_TCA9554_OUTPUT, 7, 0}, // TCA9554 bit 7.
-    {PortMcpOut1, IO_PORT_KIND_MCP23017_OUTPUT, 0, 0}, // MCP23017 bit 0.
-    {PortMcpOut2, IO_PORT_KIND_MCP23017_OUTPUT, 1, 0}, // MCP23017 bit 1.
-    {PortMcpOut3, IO_PORT_KIND_MCP23017_OUTPUT, 2, 0}, // MCP23017 bit 2.
-    {PortMcpOut4, IO_PORT_KIND_MCP23017_OUTPUT, 3, 0}, // MCP23017 bit 3.
-    {PortMcpOut5, IO_PORT_KIND_MCP23017_OUTPUT, 4, 0}, // MCP23017 bit 4.
-    {PortMcpOut6, IO_PORT_KIND_MCP23017_OUTPUT, 5, 0}, // MCP23017 bit 5.
-    {PortMcpOut7, IO_PORT_KIND_MCP23017_OUTPUT, 6, 0}, // MCP23017 bit 6.
-    {PortMcpOut8, IO_PORT_KIND_MCP23017_OUTPUT, 7, 0}, // MCP23017 bit 7.
-    {PortMcpOut9, IO_PORT_KIND_MCP23017_OUTPUT, 8, 0}, // MCP23017 bit 8.
-    {PortMcpOut10, IO_PORT_KIND_MCP23017_OUTPUT, 9, 0}, // MCP23017 bit 9.
-    {PortMcpOut11, IO_PORT_KIND_MCP23017_OUTPUT, 10, 0}, // MCP23017 bit 10.
-    {PortMcpOut12, IO_PORT_KIND_MCP23017_OUTPUT, 11, 0}, // MCP23017 bit 11.
-    {PortMcpOut13, IO_PORT_KIND_MCP23017_OUTPUT, 12, 0}, // MCP23017 bit 12.
-    {PortMcpOut14, IO_PORT_KIND_MCP23017_OUTPUT, 13, 0}, // MCP23017 bit 13.
-    {PortMcpOut15, IO_PORT_KIND_MCP23017_OUTPUT, 14, 0}, // MCP23017 bit 14.
-    {PortMcpOut16, IO_PORT_KIND_MCP23017_OUTPUT, 15, 0}, // MCP23017 bit 15.
+    // {portId, backend, channel, flags, name}
+    {PortAdsInternal0, IO_BACKEND_ADS1115_INT, 0, IO_PORT_DIR_IN, "ADS int A0"},
+    {PortAdsInternal1, IO_BACKEND_ADS1115_INT, 1, IO_PORT_DIR_IN, "ADS int A1"},
+    {PortAdsInternal2, IO_BACKEND_ADS1115_INT, 2, IO_PORT_DIR_IN, "ADS int A2"},
+    {PortAdsInternal3, IO_BACKEND_ADS1115_INT, 3, IO_PORT_DIR_IN, "ADS int A3"},
+    {PortAdsExternal0, IO_BACKEND_ADS1115_EXT_DIFF, 0, IO_PORT_DIR_IN, "ADS ext D0"},
+    {PortAdsExternal1, IO_BACKEND_ADS1115_EXT_DIFF, 1, IO_PORT_DIR_IN, "ADS ext D1"},
+    {PortOneWire1, IO_BACKEND_DS18B20, 0, IO_PORT_DIR_IN, "1-Wire 1"},        // Bus eau (GPIO via config oneWire1Gpio).
+    {PortOneWire2, IO_BACKEND_DS18B20, 1, IO_PORT_DIR_IN, "1-Wire 2"},        // Bus air (GPIO via config oneWire2Gpio).
+    {PortSht40Temp, IO_BACKEND_SHT40, 0, IO_PORT_DIR_IN, "SHT40 temp"},
+    {PortSht40Humidity, IO_BACKEND_SHT40, 1, IO_PORT_DIR_IN, "SHT40 hum"},
+    {PortBmp280Temp, IO_BACKEND_BMP280, 0, IO_PORT_DIR_IN, "BMP280 temp"},
+    {PortBmp280Pressure, IO_BACKEND_BMP280, 1, IO_PORT_DIR_IN, "BMP280 press"},
+    {PortBme680Temp, IO_BACKEND_BME680, 0, IO_PORT_DIR_IN, "BME680 temp"},
+    {PortBme680Humidity, IO_BACKEND_BME680, 1, IO_PORT_DIR_IN, "BME680 hum"},
+    {PortBme680Pressure, IO_BACKEND_BME680, 2, IO_PORT_DIR_IN, "BME680 press"},
+    {PortBme680Gas, IO_BACKEND_BME680, 3, IO_PORT_DIR_IN, "BME680 gas"},
+    {PortPowermonShuntMv, IO_BACKEND_POWERMON, 0, IO_PORT_DIR_IN, "PM shunt mV"},
+    {PortPowermonBusV, IO_BACKEND_POWERMON, 1, IO_PORT_DIR_IN, "PM bus V"},
+    {PortPowermonCurrentMa, IO_BACKEND_POWERMON, 2, IO_PORT_DIR_IN, "PM curr mA"},
+    {PortPowermonPowerMw, IO_BACKEND_POWERMON, 3, IO_PORT_DIR_IN, "PM power mW"},
+    {PortPowermonLoadV, IO_BACKEND_POWERMON, 4, IO_PORT_DIR_IN, "PM load V"},
+    {PortPowermonTemp, IO_BACKEND_POWERMON, 5, IO_PORT_DIR_IN, "PM temp"},     // INA228 seul.
+    {PortPowermonEnergy, IO_BACKEND_POWERMON, 6, IO_PORT_DIR_IN, "PM energy"}, // INA228 seul.
+    {PortPowermonCharge, IO_BACKEND_POWERMON, 7, IO_PORT_DIR_IN, "PM charge"}, // INA228 seul.
+    {PortDin0, IO_BACKEND_GPIO, 4, IO_PORT_DIR_IN, "DIN0"},
+    {PortDin1, IO_BACKEND_GPIO, 5, IO_PORT_DIR_IN, "DIN1"},
+    {PortDin2, IO_BACKEND_GPIO, 6, IO_PORT_DIR_IN, "DIN2"},
+    {PortDin3, IO_BACKEND_GPIO, 7, IO_PORT_DIR_IN, "DIN3"},
+    {PortDin4, IO_BACKEND_GPIO, 8, IO_PORT_DIR_IN, "DIN4"},
+    {PortDin5, IO_BACKEND_GPIO, 9, IO_PORT_DIR_IN, "DIN5"},
+    {PortDin6, IO_BACKEND_GPIO, 10, IO_PORT_DIR_IN, "DIN6"},
+    {PortDin7, IO_BACKEND_GPIO, 11, IO_PORT_DIR_IN, "DIN7"},
+    {PortExio1, IO_BACKEND_TCA9554, 0, IO_PORT_DIR_OUT, "EXIO1"},
+    {PortExio2, IO_BACKEND_TCA9554, 1, IO_PORT_DIR_OUT, "EXIO2"},
+    {PortExio3, IO_BACKEND_TCA9554, 2, IO_PORT_DIR_OUT, "EXIO3"},
+    {PortExio4, IO_BACKEND_TCA9554, 3, IO_PORT_DIR_OUT, "EXIO4"},
+    {PortExio5, IO_BACKEND_TCA9554, 4, IO_PORT_DIR_OUT, "EXIO5"},
+    {PortExio6, IO_BACKEND_TCA9554, 5, IO_PORT_DIR_OUT, "EXIO6"},
+    {PortExio7, IO_BACKEND_TCA9554, 6, IO_PORT_DIR_OUT, "EXIO7"},
+    {PortExio8, IO_BACKEND_TCA9554, 7, IO_PORT_DIR_OUT, "EXIO8"},
+    {PortMcpOut1, IO_BACKEND_MCP23017, 0, IO_PORT_DIR_OUT, "COMP01"},
+    {PortMcpOut2, IO_BACKEND_MCP23017, 1, IO_PORT_DIR_OUT, "COMP02"},
+    {PortMcpOut3, IO_BACKEND_MCP23017, 2, IO_PORT_DIR_OUT, "COMP03"},
+    {PortMcpOut4, IO_BACKEND_MCP23017, 3, IO_PORT_DIR_OUT, "COMP04"},
+    {PortMcpOut5, IO_BACKEND_MCP23017, 4, IO_PORT_DIR_OUT, "COMP05"},
+    {PortMcpOut6, IO_BACKEND_MCP23017, 5, IO_PORT_DIR_OUT, "COMP06"},
+    {PortMcpOut7, IO_BACKEND_MCP23017, 6, IO_PORT_DIR_OUT, "COMP07"},
+    {PortMcpOut8, IO_BACKEND_MCP23017, 7, IO_PORT_DIR_OUT, "COMP08"},
+    {PortMcpOut9, IO_BACKEND_MCP23017, 8, IO_PORT_DIR_OUT, "MCP OUT9"},
+    {PortMcpOut10, IO_BACKEND_MCP23017, 9, IO_PORT_DIR_OUT, "MCP OUT10"},
+    {PortMcpOut11, IO_BACKEND_MCP23017, 10, IO_PORT_DIR_OUT, "MCP OUT11"},
+    {PortMcpOut12, IO_BACKEND_MCP23017, 11, IO_PORT_DIR_OUT, "MCP OUT12"},
+    {PortMcpOut13, IO_BACKEND_MCP23017, 12, IO_PORT_DIR_OUT, "MCP OUT13"},
+    {PortMcpOut14, IO_BACKEND_MCP23017, 13, IO_PORT_DIR_OUT, "MCP OUT14"},
+    {PortMcpOut15, IO_BACKEND_MCP23017, 14, IO_PORT_DIR_OUT, "MCP OUT15"},
+    {PortMcpOut16, IO_BACKEND_MCP23017, 15, IO_PORT_DIR_OUT, "MCP OUT16"},
 };
 
 constexpr PhysicalPortId analogPortFromLegacy(uint8_t source, uint8_t channel)

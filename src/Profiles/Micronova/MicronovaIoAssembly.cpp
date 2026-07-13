@@ -32,15 +32,17 @@ bool configureIoModule(const BoardSpec& board, ModuleInstances& modules)
 
     modules.ioBindingPorts[0] = IOBindingPortSpec{
         kMicronovaAuxOutputPort,
-        IO_PORT_KIND_GPIO_OUTPUT,
+        IO_BACKEND_GPIO,
         aux->pin,
-        0
+        IO_PORT_DIR_OUT,
+        "aux_output"
     };
     modules.ioBindingPorts[1] = IOBindingPortSpec{
         kMicronovaTemperaturePort,
-        IO_PORT_KIND_DS18_WATER,
-        0,
-        0
+        IO_BACKEND_DS18B20,
+        0, // Bus 0 (eau).
+        IO_PORT_DIR_IN,
+        "DS18 temp"
     };
 
     modules.ioModule.setBindingPorts(modules.ioBindingPorts, 2);

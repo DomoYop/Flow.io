@@ -26,6 +26,7 @@
 #include "Domain/Pool/PoolDomain.h"
 #include "Core/Services/IPoolDevice.h"
 #include "Modules/IOModule/IORuntime.h"
+#include "Modules/IOModule/IoBackendTraits.h"
 #include "Modules/PoolDeviceModule/PoolDeviceRuntime.h"
 #include "Modules/Network/MQTTModule/MQTTRuntime.h"
 #include "Profiles/Waveshare/WaveshareIoLayout.h"
@@ -2830,24 +2831,6 @@ void waveshareFormatDashboardRuntimeValue_(RuntimeUiId id,
     }
 }
 
-const char* waveshareIoBackendLabel_(uint8_t backend)
-{
-    switch (backend) {
-        case IO_BACKEND_GPIO: return "GPIO";
-        case IO_BACKEND_PCF8574: return "PCF8574";
-        case IO_BACKEND_ADS1115_INT: return "ADS1115 int";
-        case IO_BACKEND_ADS1115_EXT_DIFF: return "ADS1115 ext";
-        case IO_BACKEND_DS18B20: return "DS18B20";
-        case IO_BACKEND_SHT40: return "SHT40";
-        case IO_BACKEND_BMP280: return "BMP280";
-        case IO_BACKEND_BME680: return "BME680";
-        case IO_BACKEND_POWERMON: return "INA22x";
-        case IO_BACKEND_TCA9554: return "TCA9554";
-        case IO_BACKEND_MCP23017: return "MCP23017";
-        default: return "unknown";
-    }
-}
-
 const char* waveshareIoSlotKindLabel_(uint8_t kind)
 {
     switch (kind) {
@@ -2855,26 +2838,6 @@ const char* waveshareIoSlotKindLabel_(uint8_t kind)
         case IO_SLOT_DIGITAL_INPUT: return "digital_in";
         case IO_SLOT_DIGITAL_OUTPUT: return "digital_out";
         default: return "unknown";
-    }
-}
-
-const char* waveshareIoPortKindLabel_(uint8_t kind)
-{
-    switch (kind) {
-        case IO_PORT_KIND_GPIO_INPUT: return "gpio_input";
-        case IO_PORT_KIND_GPIO_OUTPUT: return "gpio_output";
-        case IO_PORT_KIND_PCF8574_OUTPUT: return "pcf8574_output";
-        case IO_PORT_KIND_ADS_INTERNAL_SINGLE: return "ads1115_internal";
-        case IO_PORT_KIND_ADS_EXTERNAL_DIFF: return "ads1115_external_diff";
-        case IO_PORT_KIND_DS18_WATER: return "ds18b20_water";
-        case IO_PORT_KIND_DS18_AIR: return "ds18b20_air";
-        case IO_PORT_KIND_POWERMON: return "powermon";
-        case IO_PORT_KIND_SHT40: return "sht40";
-        case IO_PORT_KIND_BMP280: return "bmp280";
-        case IO_PORT_KIND_BME680: return "bme680";
-        case IO_PORT_KIND_TCA9554_OUTPUT: return "tca9554_output";
-        case IO_PORT_KIND_MCP23017_OUTPUT: return "mcp23017_output";
-        default: return "none";
     }
 }
 
@@ -2891,66 +2854,9 @@ const char* wavesharePoolDeviceBlockReasonLabel_(uint8_t reason)
     }
 }
 
-bool waveshareIoPortBackendChannel_(const IOBindingPortSpec& spec, uint8_t& backendOut, uint8_t& channelOut)
-{
-    switch (spec.kind) {
-        case IO_PORT_KIND_GPIO_INPUT:
-        case IO_PORT_KIND_GPIO_OUTPUT:
-            backendOut = IO_BACKEND_GPIO;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_PCF8574_OUTPUT:
-            backendOut = IO_BACKEND_PCF8574;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_ADS_INTERNAL_SINGLE:
-            backendOut = IO_BACKEND_ADS1115_INT;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_ADS_EXTERNAL_DIFF:
-            backendOut = IO_BACKEND_ADS1115_EXT_DIFF;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_DS18_WATER:
-        case IO_PORT_KIND_DS18_AIR:
-            backendOut = IO_BACKEND_DS18B20;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_POWERMON:
-            backendOut = IO_BACKEND_POWERMON;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_SHT40:
-            backendOut = IO_BACKEND_SHT40;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_BMP280:
-            backendOut = IO_BACKEND_BMP280;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_BME680:
-            backendOut = IO_BACKEND_BME680;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_TCA9554_OUTPUT:
-            backendOut = IO_BACKEND_TCA9554;
-            channelOut = spec.param0;
-            return true;
-        case IO_PORT_KIND_MCP23017_OUTPUT:
-            backendOut = IO_BACKEND_MCP23017;
-            channelOut = spec.param0;
-            return true;
-        default:
-            return false;
-    }
-}
-
 bool waveshareIoPortMatchesMeta_(const IOBindingPortSpec& spec, const IoEndpointMeta& meta)
 {
-    uint8_t backend = IO_BACKEND_GPIO;
-    uint8_t channel = 0U;
-    if (!waveshareIoPortBackendChannel_(spec, backend, channel)) return false;
-    return meta.backend == backend && meta.channel == channel;
+    return meta.backend == spec.backend && meta.channel == spec.channel;
 }
 
 const IOBindingPortSpec* waveshareFindPortForMeta_(const IoEndpointMeta& meta)
@@ -3165,7 +3071,7 @@ void wavesharePrintPoolDeviceJson_(AsyncResponseStream& response, const Waveshar
     response.print(",\"kind\":");
     printJsonEscaped_(response, ioSlot == IO_SLOT_INVALID ? "unknown" : waveshareIoSlotKindLabel_(ioSlotKind(ioSlot)));
     response.print(",\"driver\":");
-    printJsonEscaped_(response, state.hasMeta ? waveshareIoBackendLabel_(state.meta.backend) : "-");
+    printJsonEscaped_(response, state.hasMeta ? ioBackendLabel(state.meta.backend) : "-");
     response.print(",\"channel\":");
     response.print(state.hasMeta ? (unsigned)state.meta.channel : 0U);
     response.print(",\"binding_port\":");
@@ -3269,7 +3175,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         }
         if (!first) response.print(',');
         response.print("{\"driver\":");
-        printJsonEscaped_(response, waveshareIoBackendLabel_(backend));
+        printJsonEscaped_(response, ioBackendLabel(backend));
         response.print(",\"enabled\":");
         response.print(enabled ? "true" : "false");
         response.print(",\"configurable\":");
@@ -3285,9 +3191,8 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     response.print("],\"binding_ports\":[");
     first = true;
     for (const IOBindingPortSpec& spec : kBindingPorts) {
-        uint8_t backend = IO_BACKEND_GPIO;
-        uint8_t channel = 0U;
-        (void)waveshareIoPortBackendChannel_(spec, backend, channel);
+        const uint8_t backend = spec.backend;
+        const uint8_t channel = spec.channel;
         IoId ioId = IO_ID_INVALID;
         IoEndpointMeta meta{};
         IoValue value{};
@@ -3302,9 +3207,9 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         response.print("{\"port_id\":");
         response.print((unsigned)spec.portId);
         response.print(",\"kind\":");
-        printJsonEscaped_(response, waveshareIoPortKindLabel_(spec.kind));
+        printJsonEscaped_(response, ioPortKindLabel(spec));
         response.print(",\"driver\":");
-        printJsonEscaped_(response, waveshareIoBackendLabel_(backend));
+        printJsonEscaped_(response, ioBackendLabel(backend));
         response.print(",\"channel\":");
         response.print((unsigned)channel);
         response.print(",\"io_id\":");
@@ -3354,7 +3259,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
             response.print(",\"kind\":");
             printJsonEscaped_(response, meta.kind == IO_KIND_DIGITAL_OUT ? "do" : (meta.kind == IO_KIND_DIGITAL_IN ? "di" : "ai"));
             response.print(",\"driver\":");
-            printJsonEscaped_(response, waveshareIoBackendLabel_(meta.backend));
+            printJsonEscaped_(response, ioBackendLabel(meta.backend));
             response.print(",\"channel\":");
             response.print((unsigned)meta.channel);
             response.print(",\"domain\":");

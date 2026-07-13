@@ -8,6 +8,7 @@
 #include "Core/ModuleLog.h"
 #include "Domain/Pool/PoolIds.h"
 #include "Modules/IOModule/IORuntime.h"
+#include "Modules/IOModule/IoBackendTraits.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <esp_rom_sys.h>
@@ -2065,17 +2066,12 @@ IoStatus IOModule::ioListInvalidSensors_(IoId* outIds, uint8_t maxIds, uint8_t* 
 
 IoStatus IOModule::ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable) const
 {
-    bool configurable = true;
-    bool enabled = false;
+    const IoBackendTraits* traits = backendTraits(backend);
+    if (!traits) return IO_ERR_INVALID_ARG;
+
+    // Always-on drivers (no config toggle) report enabled unconditionally.
+    bool enabled = true;
     switch (backend) {
-        // Always-on drivers (no config toggle).
-        case IO_BACKEND_GPIO:
-        case IO_BACKEND_ADS1115_INT:
-        case IO_BACKEND_ADS1115_EXT_DIFF:
-        case IO_BACKEND_TCA9554:
-            configurable = false;
-            enabled = true;
-            break;
         case IO_BACKEND_PCF8574:    enabled = cfgData_.pcfEnabled; break;
         // DS18B20 are read through any enabled 1-Wire transport (DS2484 or GPIO buses).
         case IO_BACKEND_DS18B20:
@@ -2086,11 +2082,10 @@ IoStatus IOModule::ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t*
         case IO_BACKEND_BME680:     enabled = cfgData_.bme680Enabled; break;
         case IO_BACKEND_POWERMON:   enabled = cfgData_.powermonEnabled; break;
         case IO_BACKEND_MCP23017:   enabled = cfgData_.mcp23017Enabled; break;
-        default:
-            return IO_ERR_INVALID_ARG;
+        default: break;
     }
     if (outEnabled) *outEnabled = enabled ? 1U : 0U;
-    if (outConfigurable) *outConfigurable = configurable ? 1U : 0U;
+    if (outConfigurable) *outConfigurable = traits->configurableToggle ? 1U : 0U;
     return IO_OK;
 }
 
@@ -2166,67 +2161,53 @@ const IOBindingPortSpec* IOModule::bindingPortSpec_(PhysicalPortId portId) const
     return nullptr;
 }
 
+namespace {
+
+// Transitional mapping to the analog provider pool index (IOAnalogSource).
+// DS18B20 buses map by channel (0 = water bus, 1 = air bus).
+uint8_t analogProviderSourceForSpec_(const IOBindingPortSpec& spec)
+{
+    switch (spec.backend) {
+        case IO_BACKEND_ADS1115_INT: return IO_SRC_ADS_INTERNAL_SINGLE;
+        case IO_BACKEND_ADS1115_EXT_DIFF: return IO_SRC_ADS_EXTERNAL_DIFF;
+        case IO_BACKEND_DS18B20: return (spec.channel == 0U) ? IO_SRC_DS18_WATER : IO_SRC_DS18_AIR;
+        case IO_BACKEND_SHT40: return IO_SRC_SHT40;
+        case IO_BACKEND_BMP280: return IO_SRC_BMP280;
+        case IO_BACKEND_BME680: return IO_SRC_BME680;
+        case IO_BACKEND_POWERMON: return IO_SRC_POWERMON;
+        default: return IO_ANALOG_SOURCE_INVALID;
+    }
+}
+
+}  // namespace
+
 bool IOModule::resolveAnalogBinding_(PhysicalPortId portId, uint8_t& sourceOut, uint8_t& channelOut, uint8_t& backendOut) const
 {
     const IOBindingPortSpec* spec = bindingPortSpec_(portId);
     if (!spec) return false;
+    const IoBackendTraits* traits = backendTraits(spec->backend);
+    if (!traits || !traits->analog) return false;
+    if ((spec->flags & IO_PORT_DIR_IN) == 0U) return false;
+    if (spec->channel > traits->maxChannel) return false;
 
     // `sourceOut` identifies the shared physical provider, while `channelOut` selects the logical measurement.
-    switch (spec->kind) {
-        case IO_PORT_KIND_ADS_INTERNAL_SINGLE:
-            sourceOut = IO_SRC_ADS_INTERNAL_SINGLE;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_ADS1115_INT;
-            return true;
-        case IO_PORT_KIND_ADS_EXTERNAL_DIFF:
-            sourceOut = IO_SRC_ADS_EXTERNAL_DIFF;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_ADS1115_EXT_DIFF;
-            return true;
-        case IO_PORT_KIND_DS18_WATER:
-            sourceOut = IO_SRC_DS18_WATER;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_DS18B20;
-            return true;
-        case IO_PORT_KIND_DS18_AIR:
-            sourceOut = IO_SRC_DS18_AIR;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_DS18B20;
-            return true;
-        case IO_PORT_KIND_SHT40:
-            sourceOut = IO_SRC_SHT40;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_SHT40;
-            return channelOut <= 1U;
-        case IO_PORT_KIND_BMP280:
-            sourceOut = IO_SRC_BMP280;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_BMP280;
-            return channelOut <= 1U;
-        case IO_PORT_KIND_BME680:
-            sourceOut = IO_SRC_BME680;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_BME680;
-            return channelOut <= 3U;
-        case IO_PORT_KIND_POWERMON:
-            sourceOut = IO_SRC_POWERMON;
-            channelOut = spec->param0;
-            backendOut = IO_BACKEND_POWERMON;
-            return channelOut <= 7U;
-        default:
-            return false;
-    }
+    const uint8_t source = analogProviderSourceForSpec_(*spec);
+    if (source == IO_ANALOG_SOURCE_INVALID) return false;
+    sourceOut = source;
+    channelOut = spec->channel;
+    backendOut = spec->backend;
+    return true;
 }
 
 bool IOModule::resolveDigitalInputBinding_(PhysicalPortId portId, uint8_t& pinOut, uint8_t& backendOut, uint8_t& channelOut) const
 {
     const IOBindingPortSpec* spec = bindingPortSpec_(portId);
     if (!spec) return false;
-    if (spec->kind != IO_PORT_KIND_GPIO_INPUT) return false;
+    if (spec->backend != IO_BACKEND_GPIO || (spec->flags & IO_PORT_DIR_IN) == 0U) return false;
 
-    pinOut = spec->param0;
+    pinOut = spec->channel;
     backendOut = IO_BACKEND_GPIO;
-    channelOut = spec->param0;
+    channelOut = spec->channel;
     return true;
 }
 
@@ -2240,45 +2221,19 @@ bool IOModule::resolveDigitalOutputBinding_(PhysicalPortId portId,
 {
     const IOBindingPortSpec* spec = bindingPortSpec_(portId);
     if (!spec) return false;
+    const IoBackendTraits* traits = backendTraits(spec->backend);
+    if (!traits || (spec->flags & IO_PORT_DIR_OUT) == 0U) return false;
+    if (spec->channel > traits->maxChannel) return false;
 
-    if (spec->kind == IO_PORT_KIND_GPIO_OUTPUT) {
-        pinOut = spec->param0;
-        backendOut = IO_BACKEND_GPIO;
-        channelOut = spec->param0;
-        usesPcfOut = false;
-        usesTcaOut = false;
-        usesMcpOut = false;
-        return true;
-    }
-    if (spec->kind == IO_PORT_KIND_PCF8574_OUTPUT) {
-        pinOut = 0U;
-        backendOut = IO_BACKEND_PCF8574;
-        channelOut = spec->param0;
-        usesPcfOut = true;
-        usesTcaOut = false;
-        usesMcpOut = false;
-        return true;
-    }
-    if (spec->kind == IO_PORT_KIND_TCA9554_OUTPUT) {
-        pinOut = 0U;
-        backendOut = IO_BACKEND_TCA9554;
-        channelOut = spec->param0;
-        usesPcfOut = false;
-        usesTcaOut = true;
-        usesMcpOut = false;
-        return true;
-    }
-    if (spec->kind == IO_PORT_KIND_MCP23017_OUTPUT) {
-        if (spec->param0 > 15U) return false;
-        pinOut = 0U;
-        backendOut = IO_BACKEND_MCP23017;
-        channelOut = spec->param0;
-        usesPcfOut = false;
-        usesTcaOut = false;
-        usesMcpOut = true;
-        return true;
-    }
-    return false;
+    usesPcfOut = spec->backend == IO_BACKEND_PCF8574;
+    usesTcaOut = spec->backend == IO_BACKEND_TCA9554;
+    usesMcpOut = spec->backend == IO_BACKEND_MCP23017;
+    if (spec->backend != IO_BACKEND_GPIO && !usesPcfOut && !usesTcaOut && !usesMcpOut) return false;
+
+    pinOut = (spec->backend == IO_BACKEND_GPIO) ? spec->channel : 0U;
+    backendOut = spec->backend;
+    channelOut = spec->channel;
+    return true;
 }
 
 bool IOModule::resolveDsBusAddress_(OneWireBus* bus, const char* runtimeKey, uint8_t outAddr[8])
@@ -2594,16 +2549,16 @@ bool IOModule::configureRuntime_()
             startupPolicy = digitalCfg_[s.logicalIdx].startupPolicy;
         }
         const IOBindingPortSpec* spec = bindingPortSpec_(bindingPort);
-        if (spec && spec->kind == IO_PORT_KIND_PCF8574_OUTPUT) {
+        if (spec && spec->backend == IO_BACKEND_PCF8574) {
             needPcfOutput = true;
         }
-        if (spec && spec->kind == IO_PORT_KIND_TCA9554_OUTPUT) {
+        if (spec && spec->backend == IO_BACKEND_TCA9554) {
             needTcaOutput = true;
             if (startupPolicy == IOOutputStartupPolicy::PreserveHardwareState) {
                 needTcaPreserveStartup = true;
             }
         }
-        if (spec && spec->kind == IO_PORT_KIND_MCP23017_OUTPUT) {
+        if (spec && spec->backend == IO_BACKEND_MCP23017) {
             needMcpOutput = true;
         }
     }

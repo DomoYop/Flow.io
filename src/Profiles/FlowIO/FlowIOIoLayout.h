@@ -3,7 +3,6 @@
 #include "Board/FlowIODINBoard.h"
 #include "Domain/DomainTypes.h"
 #include "Domain/Pool/PoolIds.h"
-#include "Modules/IOModule/IODrivers/Ads1115Driver.h"
 #include "Modules/IOModule/IOModuleTypes.h"
 
 namespace Profiles {
@@ -58,51 +57,51 @@ enum : PhysicalPortId {
 };
 
 inline constexpr IOBindingPortSpec kBindingPorts[] = {
-    // {portId, kind, param0, param1}
-    {PortAdsInternal0, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 0, 0}, // ADS1115 interne canal 0.
-    {PortAdsInternal1, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 1, 0}, // ADS1115 interne canal 1.
-    {PortAdsInternal2, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 2, 0}, // ADS1115 interne canal 2.
-    {PortAdsInternal3, IO_PORT_KIND_ADS_INTERNAL_SINGLE, 3, 0}, // ADS1115 interne canal 3.
-    {PortAdsExternal0, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 0, 0}, // ADS1115 externe paire 0.
-    {PortAdsExternal1, IO_PORT_KIND_ADS_EXTERNAL_DIFF, 1, 0}, // ADS1115 externe paire 1.
-    {PortDsWater, IO_PORT_KIND_DS18_WATER, 0, 0}, // DS18B20 eau.
-    {PortDsAir, IO_PORT_KIND_DS18_AIR, 0, 0}, // DS18B20 air.
-    {PortSht40Temp, IO_PORT_KIND_SHT40, 0, 0}, // SHT40 temperature.
-    {PortSht40Humidity, IO_PORT_KIND_SHT40, 1, 0}, // SHT40 humidite.
-    {PortBmp280Temp, IO_PORT_KIND_BMP280, 0, 0}, // BMP280 temperature.
-    {PortBmp280Pressure, IO_PORT_KIND_BMP280, 1, 0}, // BMP280 pression.
-    {PortBme680Temp, IO_PORT_KIND_BME680, 0, 0}, // BME680 temperature.
-    {PortBme680Humidity, IO_PORT_KIND_BME680, 1, 0}, // BME680 humidite.
-    {PortBme680Pressure, IO_PORT_KIND_BME680, 2, 0}, // BME680 pression.
-    {PortBme680Gas, IO_PORT_KIND_BME680, 3, 0}, // BME680 gaz.
-    {PortPowermonShuntMv, IO_PORT_KIND_POWERMON, 0, 0}, // Moniteur puissance shunt.
-    {PortPowermonBusV, IO_PORT_KIND_POWERMON, 1, 0}, // Moniteur puissance bus.
-    {PortPowermonCurrentMa, IO_PORT_KIND_POWERMON, 2, 0}, // Moniteur puissance courant.
-    {PortPowermonPowerMw, IO_PORT_KIND_POWERMON, 3, 0}, // Moniteur puissance puissance.
-    {PortPowermonLoadV, IO_PORT_KIND_POWERMON, 4, 0}, // Moniteur puissance tension charge.
-    {PortPowermonTemp, IO_PORT_KIND_POWERMON, 5, 0}, // Moniteur puissance temperature (INA228 seul).
-    {PortPowermonEnergy, IO_PORT_KIND_POWERMON, 6, 0}, // Moniteur puissance energie (INA228 seul).
-    {PortPowermonCharge, IO_PORT_KIND_POWERMON, 7, 0}, // Moniteur puissance charge (INA228 seul).
-    {PortDigitalIn1, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[8].pin, 0}, // Entree digitale 1 via GPIO de la board.
-    {PortDigitalIn2, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[9].pin, 0}, // Entree digitale 2 via GPIO de la board.
-    {PortDigitalIn3, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[10].pin, 0}, // Entree digitale 3 via GPIO de la board.
-    {PortDigitalIn4, IO_PORT_KIND_GPIO_INPUT, BoardProfiles::kFlowIODINv1IoPoints[11].pin, 0}, // Entree digitale 4 via GPIO de la board.
-    {PortRelay1, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[0].pin, 0}, // Relais 1 via GPIO de la board.
-    {PortRelay2, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[1].pin, 0}, // Relais 2 via GPIO de la board.
-    {PortRelay3, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[2].pin, 0}, // Relais 3 via GPIO de la board.
-    {PortRelay4, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[3].pin, 0}, // Relais 4 via GPIO de la board.
-    {PortRelay5, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[4].pin, 0}, // Relais 5 via GPIO de la board.
-    {PortRelay6, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[5].pin, 0}, // Relais 6 via GPIO de la board.
-    {PortRelay7, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[6].pin, 0}, // Relais 7 via GPIO de la board.
-    {PortRelay8, IO_PORT_KIND_GPIO_OUTPUT, BoardProfiles::kFlowIODINv1IoPoints[7].pin, 0}, // Relais 8 via GPIO de la board.
-    {PortPcf0Bit0, IO_PORT_KIND_PCF8574_OUTPUT, 0, 0}, // PCF8574 bit 0.
-    {PortPcf0Bit1, IO_PORT_KIND_PCF8574_OUTPUT, 1, 0}, // PCF8574 bit 1.
-    {PortPcf0Bit2, IO_PORT_KIND_PCF8574_OUTPUT, 2, 0}, // PCF8574 bit 2.
-    {PortPcf0Bit3, IO_PORT_KIND_PCF8574_OUTPUT, 3, 0}, // PCF8574 bit 3.
-    {PortPcf0Bit4, IO_PORT_KIND_PCF8574_OUTPUT, 4, 0}, // PCF8574 bit 4.
-    {PortPcf0Bit5, IO_PORT_KIND_PCF8574_OUTPUT, 5, 0}, // PCF8574 bit 5.
-    {PortPcf0Bit6, IO_PORT_KIND_PCF8574_OUTPUT, 6, 0}, // PCF8574 bit 6.
-    {PortPcf0Bit7, IO_PORT_KIND_PCF8574_OUTPUT, 7, 0}, // PCF8574 bit 7.
+    // {portId, backend, channel, flags, name}
+    {PortAdsInternal0, IO_BACKEND_ADS1115_INT, 0, IO_PORT_DIR_IN, "ADS int A0"},
+    {PortAdsInternal1, IO_BACKEND_ADS1115_INT, 1, IO_PORT_DIR_IN, "ADS int A1"},
+    {PortAdsInternal2, IO_BACKEND_ADS1115_INT, 2, IO_PORT_DIR_IN, "ADS int A2"},
+    {PortAdsInternal3, IO_BACKEND_ADS1115_INT, 3, IO_PORT_DIR_IN, "ADS int A3"},
+    {PortAdsExternal0, IO_BACKEND_ADS1115_EXT_DIFF, 0, IO_PORT_DIR_IN, "ADS ext D0"},
+    {PortAdsExternal1, IO_BACKEND_ADS1115_EXT_DIFF, 1, IO_PORT_DIR_IN, "ADS ext D1"},
+    {PortDsWater, IO_BACKEND_DS18B20, 0, IO_PORT_DIR_IN, "DS18 eau"},  // Bus 0 (eau).
+    {PortDsAir, IO_BACKEND_DS18B20, 1, IO_PORT_DIR_IN, "DS18 air"},    // Bus 1 (air).
+    {PortSht40Temp, IO_BACKEND_SHT40, 0, IO_PORT_DIR_IN, "SHT40 temp"},
+    {PortSht40Humidity, IO_BACKEND_SHT40, 1, IO_PORT_DIR_IN, "SHT40 hum"},
+    {PortBmp280Temp, IO_BACKEND_BMP280, 0, IO_PORT_DIR_IN, "BMP280 temp"},
+    {PortBmp280Pressure, IO_BACKEND_BMP280, 1, IO_PORT_DIR_IN, "BMP280 press"},
+    {PortBme680Temp, IO_BACKEND_BME680, 0, IO_PORT_DIR_IN, "BME680 temp"},
+    {PortBme680Humidity, IO_BACKEND_BME680, 1, IO_PORT_DIR_IN, "BME680 hum"},
+    {PortBme680Pressure, IO_BACKEND_BME680, 2, IO_PORT_DIR_IN, "BME680 press"},
+    {PortBme680Gas, IO_BACKEND_BME680, 3, IO_PORT_DIR_IN, "BME680 gas"},
+    {PortPowermonShuntMv, IO_BACKEND_POWERMON, 0, IO_PORT_DIR_IN, "PM shunt mV"},
+    {PortPowermonBusV, IO_BACKEND_POWERMON, 1, IO_PORT_DIR_IN, "PM bus V"},
+    {PortPowermonCurrentMa, IO_BACKEND_POWERMON, 2, IO_PORT_DIR_IN, "PM curr mA"},
+    {PortPowermonPowerMw, IO_BACKEND_POWERMON, 3, IO_PORT_DIR_IN, "PM power mW"},
+    {PortPowermonLoadV, IO_BACKEND_POWERMON, 4, IO_PORT_DIR_IN, "PM load V"},
+    {PortPowermonTemp, IO_BACKEND_POWERMON, 5, IO_PORT_DIR_IN, "PM temp"},     // INA228 seul.
+    {PortPowermonEnergy, IO_BACKEND_POWERMON, 6, IO_PORT_DIR_IN, "PM energy"}, // INA228 seul.
+    {PortPowermonCharge, IO_BACKEND_POWERMON, 7, IO_PORT_DIR_IN, "PM charge"}, // INA228 seul.
+    {PortDigitalIn1, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[8].pin, IO_PORT_DIR_IN, "DI Pin 1"},
+    {PortDigitalIn2, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[9].pin, IO_PORT_DIR_IN, "DI Pin 2"},
+    {PortDigitalIn3, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[10].pin, IO_PORT_DIR_IN, "DI Pin 3"},
+    {PortDigitalIn4, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[11].pin, IO_PORT_DIR_IN, "DI Pin 4"},
+    {PortRelay1, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[0].pin, IO_PORT_DIR_OUT, "Relay 1"},
+    {PortRelay2, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[1].pin, IO_PORT_DIR_OUT, "Relay 2"},
+    {PortRelay3, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[2].pin, IO_PORT_DIR_OUT, "Relay 3"},
+    {PortRelay4, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[3].pin, IO_PORT_DIR_OUT, "Relay 4"},
+    {PortRelay5, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[4].pin, IO_PORT_DIR_OUT, "Relay 5"},
+    {PortRelay6, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[5].pin, IO_PORT_DIR_OUT, "Relay 6"},
+    {PortRelay7, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[6].pin, IO_PORT_DIR_OUT, "Relay 7"},
+    {PortRelay8, IO_BACKEND_GPIO, BoardProfiles::kFlowIODINv1IoPoints[7].pin, IO_PORT_DIR_OUT, "Relay 8"},
+    {PortPcf0Bit0, IO_BACKEND_PCF8574, 0, IO_PORT_DIR_OUT, "PCF bit 0"},
+    {PortPcf0Bit1, IO_BACKEND_PCF8574, 1, IO_PORT_DIR_OUT, "PCF bit 1"},
+    {PortPcf0Bit2, IO_BACKEND_PCF8574, 2, IO_PORT_DIR_OUT, "PCF bit 2"},
+    {PortPcf0Bit3, IO_BACKEND_PCF8574, 3, IO_PORT_DIR_OUT, "PCF bit 3"},
+    {PortPcf0Bit4, IO_BACKEND_PCF8574, 4, IO_PORT_DIR_OUT, "PCF bit 4"},
+    {PortPcf0Bit5, IO_BACKEND_PCF8574, 5, IO_PORT_DIR_OUT, "PCF bit 5"},
+    {PortPcf0Bit6, IO_BACKEND_PCF8574, 6, IO_PORT_DIR_OUT, "PCF bit 6"},
+    {PortPcf0Bit7, IO_BACKEND_PCF8574, 7, IO_PORT_DIR_OUT, "PCF bit 7"},
 };
 
 constexpr PhysicalPortId analogPortFromLegacy(uint8_t source, uint8_t channel)
