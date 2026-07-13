@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+    branches:
+      - "claude/**"
+      - flowio-waveshare-16mb-pioarduino
+  workflow_dispatch:
+
+jobs:
+  waveshare:
+    name: pio run -e Waveshare-ESP32-S3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: pio-waveshare-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-waveshare-${{ runner.os }}-
+      - run: pip install platformio
+      - run: pio run -e Waveshare-ESP32-S3
+      - name: Taille du binaire
+        run: ls -l .pio/build/Waveshare-ESP32-S3/*.bin || true
+
+  flowio-compile:
+    # L'env FlowIO ne linke plus (derive du core Arduino-ESP32, probleme
+    # preexistant) : ce job est informatif — verifier dans le log que
+    # l'echec est bien au link et pas a la compilation.
+    name: pio run -e FlowIO (compile only, informatif)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: pio-flowio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-flowio-${{ runner.os }}-
+      - run: pip install platformio
+      - run: pio run -e FlowIO
