@@ -9,7 +9,7 @@
 
 #ifndef FLOW_WIRDEF_WIFI_SSID
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_WIFI_SSID "CasaParigi_IoT"
+#define FLOW_WIRDEF_WIFI_SSID "Wokwi-GUEST"
 #else
 #define FLOW_WIRDEF_WIFI_SSID "Wokwi-GUEST"
 #endif
@@ -17,7 +17,7 @@
 
 #ifndef FLOW_WIRDEF_WIFI_PASS
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_WIFI_PASS "PassF0rI0T"
+#define FLOW_WIRDEF_WIFI_PASS ""
 #else
 #define FLOW_WIRDEF_WIFI_PASS ""
 #endif
@@ -33,7 +33,7 @@
 
 #ifndef FLOW_WIRDEF_MQ_HOST
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_MQ_HOST "192.168.86.250"
+#define FLOW_WIRDEF_MQ_HOST "flowio.cloud.shiftr.io"
 #else
 #define FLOW_WIRDEF_MQ_HOST "flowio.cloud.shiftr.io"
 #endif
@@ -49,7 +49,7 @@
 
 #ifndef FLOW_WIRDEF_MQ_USER
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_MQ_USER ""
+#define FLOW_WIRDEF_MQ_USER "flowio"
 #else
 #define FLOW_WIRDEF_MQ_USER "flowio"
 #endif
@@ -57,7 +57,7 @@
 
 #ifndef FLOW_WIRDEF_MQ_PASS
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_MQ_PASS ""
+#define FLOW_WIRDEF_MQ_PASS "LNqGl1OPt4RhFuNE"
 #else
 #define FLOW_WIRDEF_MQ_PASS "LNqGl1OPt4RhFuNE"
 #endif
@@ -65,7 +65,7 @@
 
 #ifndef FLOW_WIRDEF_MQ_BASE
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_MQ_BASE "waveshare"
+#define FLOW_WIRDEF_MQ_BASE "flowio"
 #else
 #define FLOW_WIRDEF_MQ_BASE "flowio"
 #endif
@@ -73,7 +73,7 @@
 
 #ifndef FLOW_WIRDEF_MQ_TID
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_MQ_TID "ESP32-123456"
+#define FLOW_WIRDEF_MQ_TID "ESP32-670D34"
 #else
 #define FLOW_WIRDEF_MQ_TID ""
 #endif
@@ -81,7 +81,7 @@
 
 #ifndef FLOW_WIRDEF_HA_ENTITY_PREFIX
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_HA_ENTITY_PREFIX "fios3"
+#define FLOW_WIRDEF_HA_ENTITY_PREFIX "fio"
 #else
 #define FLOW_WIRDEF_HA_ENTITY_PREFIX "fio"
 #endif
@@ -195,35 +195,27 @@
 #endif
 #endif
 
-#ifndef FLOW_WIRDEF_IO_A0S
+#ifndef FLOW_WIRDEF_IO_A0PORT
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A0S IO_SRC_ADS_INTERNAL_SINGLE
+#define FLOW_WIRDEF_IO_A0PORT 110u
 #else
-#define FLOW_WIRDEF_IO_A0S IO_SRC_ADS_INTERNAL_SINGLE
-#endif
-#endif
-
-#ifndef FLOW_WIRDEF_IO_A0C
-#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A0C 0u
-#else
-#define FLOW_WIRDEF_IO_A0C 0u
+#define FLOW_WIRDEF_IO_A0PORT 100u
 #endif
 #endif
 
 #ifndef FLOW_WIRDEF_IO_A00
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A00 ((FLOW_WIRDEF_IO_A0S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Orp::ExternalC0 : Calib::Orp::InternalC0)
+#define FLOW_WIRDEF_IO_A00 (((FLOW_WIRDEF_IO_A0PORT == 110u) || (FLOW_WIRDEF_IO_A0PORT == 111u)) ? Calib::Orp::ExternalC0 : Calib::Orp::InternalC0)
 #else
-#define FLOW_WIRDEF_IO_A00 ((FLOW_WIRDEF_IO_A0S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Orp::ExternalC0 : Calib::Orp::InternalC0)
+#define FLOW_WIRDEF_IO_A00 (((FLOW_WIRDEF_IO_A0PORT == 110u) || (FLOW_WIRDEF_IO_A0PORT == 111u)) ? Calib::Orp::ExternalC0 : Calib::Orp::InternalC0)
 #endif
 #endif
 
 #ifndef FLOW_WIRDEF_IO_A01
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A01 ((FLOW_WIRDEF_IO_A0S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Orp::ExternalC1 : Calib::Orp::InternalC1)
+#define FLOW_WIRDEF_IO_A01 (((FLOW_WIRDEF_IO_A0PORT == 110u) || (FLOW_WIRDEF_IO_A0PORT == 111u)) ? Calib::Orp::ExternalC1 : Calib::Orp::InternalC1)
 #else
-#define FLOW_WIRDEF_IO_A01 ((FLOW_WIRDEF_IO_A0S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Orp::ExternalC1 : Calib::Orp::InternalC1)
+#define FLOW_WIRDEF_IO_A01 (((FLOW_WIRDEF_IO_A0PORT == 110u) || (FLOW_WIRDEF_IO_A0PORT == 111u)) ? Calib::Orp::ExternalC1 : Calib::Orp::InternalC1)
 #endif
 #endif
 
@@ -251,35 +243,27 @@
 #endif
 #endif
 
-#ifndef FLOW_WIRDEF_IO_A1S
+#ifndef FLOW_WIRDEF_IO_A1PORT
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A1S IO_SRC_ADS_INTERNAL_SINGLE
+#define FLOW_WIRDEF_IO_A1PORT 101u
 #else
-#define FLOW_WIRDEF_IO_A1S IO_SRC_ADS_INTERNAL_SINGLE
-#endif
-#endif
-
-#ifndef FLOW_WIRDEF_IO_A1C
-#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A1C 1u
-#else
-#define FLOW_WIRDEF_IO_A1C 1u
+#define FLOW_WIRDEF_IO_A1PORT 101u
 #endif
 #endif
 
 #ifndef FLOW_WIRDEF_IO_A10
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A10 ((FLOW_WIRDEF_IO_A1S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Ph::ExternalC0 : Calib::Ph::InternalC0)
+#define FLOW_WIRDEF_IO_A10 (((FLOW_WIRDEF_IO_A1PORT == 110u) || (FLOW_WIRDEF_IO_A1PORT == 111u)) ? Calib::Ph::ExternalC0 : Calib::Ph::InternalC0)
 #else
-#define FLOW_WIRDEF_IO_A10 ((FLOW_WIRDEF_IO_A1S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Ph::ExternalC0 : Calib::Ph::InternalC0)
+#define FLOW_WIRDEF_IO_A10 (((FLOW_WIRDEF_IO_A1PORT == 110u) || (FLOW_WIRDEF_IO_A1PORT == 111u)) ? Calib::Ph::ExternalC0 : Calib::Ph::InternalC0)
 #endif
 #endif
 
 #ifndef FLOW_WIRDEF_IO_A11
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A11 ((FLOW_WIRDEF_IO_A1S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Ph::ExternalC1 : Calib::Ph::InternalC1)
+#define FLOW_WIRDEF_IO_A11 (((FLOW_WIRDEF_IO_A1PORT == 110u) || (FLOW_WIRDEF_IO_A1PORT == 111u)) ? Calib::Ph::ExternalC1 : Calib::Ph::InternalC1)
 #else
-#define FLOW_WIRDEF_IO_A11 ((FLOW_WIRDEF_IO_A1S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Ph::ExternalC1 : Calib::Ph::InternalC1)
+#define FLOW_WIRDEF_IO_A11 (((FLOW_WIRDEF_IO_A1PORT == 110u) || (FLOW_WIRDEF_IO_A1PORT == 111u)) ? Calib::Ph::ExternalC1 : Calib::Ph::InternalC1)
 #endif
 #endif
 
@@ -307,19 +291,11 @@
 #endif
 #endif
 
-#ifndef FLOW_WIRDEF_IO_A2S
+#ifndef FLOW_WIRDEF_IO_A2PORT
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A2S IO_SRC_ADS_INTERNAL_SINGLE
+#define FLOW_WIRDEF_IO_A2PORT 102u
 #else
-#define FLOW_WIRDEF_IO_A2S IO_SRC_ADS_INTERNAL_SINGLE
-#endif
-#endif
-
-#ifndef FLOW_WIRDEF_IO_A2C
-#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A2C 2u
-#else
-#define FLOW_WIRDEF_IO_A2C 2u
+#define FLOW_WIRDEF_IO_A2PORT 102u
 #endif
 #endif
 
@@ -363,19 +339,11 @@
 #endif
 #endif
 
-#ifndef FLOW_WIRDEF_IO_A3S
+#ifndef FLOW_WIRDEF_IO_A3PORT
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A3S IO_SRC_ADS_INTERNAL_SINGLE
+#define FLOW_WIRDEF_IO_A3PORT 103u
 #else
-#define FLOW_WIRDEF_IO_A3S IO_SRC_ADS_INTERNAL_SINGLE
-#endif
-#endif
-
-#ifndef FLOW_WIRDEF_IO_A3C
-#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A3C 3u
-#else
-#define FLOW_WIRDEF_IO_A3C 3u
+#define FLOW_WIRDEF_IO_A3PORT 103u
 #endif
 #endif
 
@@ -419,19 +387,11 @@
 #endif
 #endif
 
-#ifndef FLOW_WIRDEF_IO_A4S
+#ifndef FLOW_WIRDEF_IO_A4PORT
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A4S IO_SRC_DS18_WATER
+#define FLOW_WIRDEF_IO_A4PORT 120u
 #else
-#define FLOW_WIRDEF_IO_A4S IO_SRC_DS18_WATER
-#endif
-#endif
-
-#ifndef FLOW_WIRDEF_IO_A4C
-#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A4C 0u
-#else
-#define FLOW_WIRDEF_IO_A4C 0u
+#define FLOW_WIRDEF_IO_A4PORT 120u
 #endif
 #endif
 
@@ -475,19 +435,11 @@
 #endif
 #endif
 
-#ifndef FLOW_WIRDEF_IO_A5S
+#ifndef FLOW_WIRDEF_IO_A5PORT
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A5S IO_SRC_DS18_AIR
+#define FLOW_WIRDEF_IO_A5PORT 121u
 #else
-#define FLOW_WIRDEF_IO_A5S IO_SRC_DS18_AIR
-#endif
-#endif
-
-#ifndef FLOW_WIRDEF_IO_A5C
-#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A5C 0u
-#else
-#define FLOW_WIRDEF_IO_A5C 0u
+#define FLOW_WIRDEF_IO_A5PORT 121u
 #endif
 #endif
 

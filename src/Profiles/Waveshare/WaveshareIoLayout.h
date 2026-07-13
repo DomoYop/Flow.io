@@ -126,25 +126,6 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortMcpOut16, IO_BACKEND_MCP23017, 15, IO_PORT_DIR_OUT, "MCP OUT16"},
 };
 
-constexpr PhysicalPortId analogPortFromLegacy(uint8_t source, uint8_t channel)
-{
-    switch (source) {
-        case IO_SRC_ADS_INTERNAL_SINGLE:
-            return (channel == 0U) ? PortAdsInternal0 :
-                   (channel == 1U) ? PortAdsInternal1 :
-                   (channel == 2U) ? PortAdsInternal2 :
-                                     PortAdsInternal3;
-        case IO_SRC_ADS_EXTERNAL_DIFF:
-            return (channel == 0U) ? PortAdsExternal0 : PortAdsExternal1;
-        case IO_SRC_DS18_WATER:
-            return PortOneWire1;
-        case IO_SRC_DS18_AIR:
-            return PortOneWire2;
-        default:
-            return IO_PORT_INVALID;
-    }
-}
-
 struct AnalogRoleDefault {
     DomainSlotId domainSlot; // Besoin fonctionnel de la sonde.
     PhysicalPortId bindingPort; // Port physique associe.
@@ -155,12 +136,12 @@ struct AnalogRoleDefault {
 
 inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
     // {domainSlot, bindingPort, c0, c1, precision}
-    {PoolIds::SensorOrp,        analogPortFromLegacy(FLOW_WIRDEF_IO_A0S, FLOW_WIRDEF_IO_A0C), FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
-    {PoolIds::SensorPh,         analogPortFromLegacy(FLOW_WIRDEF_IO_A1S, FLOW_WIRDEF_IO_A1C), FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
-    {PoolIds::SensorPsi,        analogPortFromLegacy(FLOW_WIRDEF_IO_A2S, FLOW_WIRDEF_IO_A2C), FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
-    {PoolIds::SensorSpareAnalog,analogPortFromLegacy(FLOW_WIRDEF_IO_A3S, FLOW_WIRDEF_IO_A3C), FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
-    {PoolIds::SensorWaterTemp,  analogPortFromLegacy(FLOW_WIRDEF_IO_A4S, FLOW_WIRDEF_IO_A4C), FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
-    {PoolIds::SensorAirTemp,    analogPortFromLegacy(FLOW_WIRDEF_IO_A5S, FLOW_WIRDEF_IO_A5C), FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
+    {PoolIds::SensorOrp,        (PhysicalPortId)FLOW_WIRDEF_IO_A0PORT, FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
+    {PoolIds::SensorPh,         (PhysicalPortId)FLOW_WIRDEF_IO_A1PORT, FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
+    {PoolIds::SensorPsi,        (PhysicalPortId)FLOW_WIRDEF_IO_A2PORT, FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
+    {PoolIds::SensorSpareAnalog,(PhysicalPortId)FLOW_WIRDEF_IO_A3PORT, FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
+    {PoolIds::SensorWaterTemp,  (PhysicalPortId)FLOW_WIRDEF_IO_A4PORT, FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
+    {PoolIds::SensorAirTemp,    (PhysicalPortId)FLOW_WIRDEF_IO_A5PORT, FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
 };
 
 struct DigitalInputRoleDefault {

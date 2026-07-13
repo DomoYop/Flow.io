@@ -65,48 +65,42 @@ SPECS: List[Tuple[str, str, str, str, str]] = [
     ("io_pcfal", "FLOW_WIRDEF_IO_PCFAL", "profile", "bool", "true"),
 
     # IO analog wiring defaults (a0..a5)
-    ("io_a0s", "FLOW_WIRDEF_IO_A0S", "profile", "uint8", "IO_SRC_ADS_INTERNAL_SINGLE"),
-    ("io_a0c", "FLOW_WIRDEF_IO_A0C", "profile", "uint8", "0u"),
-    ("io_a00", "FLOW_WIRDEF_IO_A00", "profile", "float", "((FLOW_WIRDEF_IO_A0S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Orp::ExternalC0 : Calib::Orp::InternalC0)"),
-    ("io_a01", "FLOW_WIRDEF_IO_A01", "profile", "float", "((FLOW_WIRDEF_IO_A0S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Orp::ExternalC1 : Calib::Orp::InternalC1)"),
+    ("io_a0port", "FLOW_WIRDEF_IO_A0PORT", "profile", "uint16", "100u"),
+    ("io_a00", "FLOW_WIRDEF_IO_A00", "profile", "float", "(((FLOW_WIRDEF_IO_A0PORT == 110u) || (FLOW_WIRDEF_IO_A0PORT == 111u)) ? Calib::Orp::ExternalC0 : Calib::Orp::InternalC0)"),
+    ("io_a01", "FLOW_WIRDEF_IO_A01", "profile", "float", "(((FLOW_WIRDEF_IO_A0PORT == 110u) || (FLOW_WIRDEF_IO_A0PORT == 111u)) ? Calib::Orp::ExternalC1 : Calib::Orp::InternalC1)"),
     ("io_a0p", "FLOW_WIRDEF_IO_A0P", "profile", "int32", "0"),
     ("io_a0n", "FLOW_WIRDEF_IO_A0N", "profile", "float", "-32768.0f"),
     ("io_a0x", "FLOW_WIRDEF_IO_A0X", "profile", "float", "32767.0f"),
 
-    ("io_a1s", "FLOW_WIRDEF_IO_A1S", "profile", "uint8", "IO_SRC_ADS_INTERNAL_SINGLE"),
-    ("io_a1c", "FLOW_WIRDEF_IO_A1C", "profile", "uint8", "1u"),
-    ("io_a10", "FLOW_WIRDEF_IO_A10", "profile", "float", "((FLOW_WIRDEF_IO_A1S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Ph::ExternalC0 : Calib::Ph::InternalC0)"),
-    ("io_a11", "FLOW_WIRDEF_IO_A11", "profile", "float", "((FLOW_WIRDEF_IO_A1S == IO_SRC_ADS_EXTERNAL_DIFF) ? Calib::Ph::ExternalC1 : Calib::Ph::InternalC1)"),
+    ("io_a1port", "FLOW_WIRDEF_IO_A1PORT", "profile", "uint16", "101u"),
+    ("io_a10", "FLOW_WIRDEF_IO_A10", "profile", "float", "(((FLOW_WIRDEF_IO_A1PORT == 110u) || (FLOW_WIRDEF_IO_A1PORT == 111u)) ? Calib::Ph::ExternalC0 : Calib::Ph::InternalC0)"),
+    ("io_a11", "FLOW_WIRDEF_IO_A11", "profile", "float", "(((FLOW_WIRDEF_IO_A1PORT == 110u) || (FLOW_WIRDEF_IO_A1PORT == 111u)) ? Calib::Ph::ExternalC1 : Calib::Ph::InternalC1)"),
     ("io_a1p", "FLOW_WIRDEF_IO_A1P", "profile", "int32", "1"),
     ("io_a1n", "FLOW_WIRDEF_IO_A1N", "profile", "float", "-32768.0f"),
     ("io_a1x", "FLOW_WIRDEF_IO_A1X", "profile", "float", "32767.0f"),
 
-    ("io_a2s", "FLOW_WIRDEF_IO_A2S", "profile", "uint8", "IO_SRC_ADS_INTERNAL_SINGLE"),
-    ("io_a2c", "FLOW_WIRDEF_IO_A2C", "profile", "uint8", "2u"),
+    ("io_a2port", "FLOW_WIRDEF_IO_A2PORT", "profile", "uint16", "102u"),
     ("io_a20", "FLOW_WIRDEF_IO_A20", "profile", "float", "Calib::Psi::DefaultC0"),
     ("io_a21", "FLOW_WIRDEF_IO_A21", "profile", "float", "Calib::Psi::DefaultC1"),
     ("io_a2p", "FLOW_WIRDEF_IO_A2P", "profile", "int32", "1"),
     ("io_a2n", "FLOW_WIRDEF_IO_A2N", "profile", "float", "-32768.0f"),
     ("io_a2x", "FLOW_WIRDEF_IO_A2X", "profile", "float", "32767.0f"),
 
-    ("io_a3s", "FLOW_WIRDEF_IO_A3S", "profile", "uint8", "IO_SRC_ADS_INTERNAL_SINGLE"),
-    ("io_a3c", "FLOW_WIRDEF_IO_A3C", "profile", "uint8", "3u"),
+    ("io_a3port", "FLOW_WIRDEF_IO_A3PORT", "profile", "uint16", "103u"),
     ("io_a30", "FLOW_WIRDEF_IO_A30", "profile", "float", "1.0f"),
     ("io_a31", "FLOW_WIRDEF_IO_A31", "profile", "float", "0.0f"),
     ("io_a3p", "FLOW_WIRDEF_IO_A3P", "profile", "int32", "3"),
     ("io_a3n", "FLOW_WIRDEF_IO_A3N", "profile", "float", "-32768.0f"),
     ("io_a3x", "FLOW_WIRDEF_IO_A3X", "profile", "float", "32767.0f"),
 
-    ("io_a4s", "FLOW_WIRDEF_IO_A4S", "profile", "uint8", "IO_SRC_DS18_WATER"),
-    ("io_a4c", "FLOW_WIRDEF_IO_A4C", "profile", "uint8", "0u"),
+    ("io_a4port", "FLOW_WIRDEF_IO_A4PORT", "profile", "uint16", "120u"),
     ("io_a40", "FLOW_WIRDEF_IO_A40", "profile", "float", "1.0f"),
     ("io_a41", "FLOW_WIRDEF_IO_A41", "profile", "float", "0.0f"),
     ("io_a4p", "FLOW_WIRDEF_IO_A4P", "profile", "int32", "1"),
     ("io_a4n", "FLOW_WIRDEF_IO_A4N", "profile", "float", "Calib::Temperature::Ds18MinValidC"),
     ("io_a4x", "FLOW_WIRDEF_IO_A4X", "profile", "float", "Calib::Temperature::Ds18MaxValidC"),
 
-    ("io_a5s", "FLOW_WIRDEF_IO_A5S", "profile", "uint8", "IO_SRC_DS18_AIR"),
-    ("io_a5c", "FLOW_WIRDEF_IO_A5C", "profile", "uint8", "0u"),
+    ("io_a5port", "FLOW_WIRDEF_IO_A5PORT", "profile", "uint16", "121u"),
     ("io_a50", "FLOW_WIRDEF_IO_A50", "profile", "float", "1.0f"),
     ("io_a51", "FLOW_WIRDEF_IO_A51", "profile", "float", "0.0f"),
     ("io_a5p", "FLOW_WIRDEF_IO_A5P", "profile", "int32", "1"),
@@ -169,6 +163,14 @@ def _coerce_uint8(value):
     return value
 
 
+def _coerce_uint16(value):
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"expected uint16, got {value!r}")
+    if value < 0 or value > 65535:
+        raise ValueError(f"uint16 out of range: {value}")
+    return value
+
+
 def _coerce_float(value):
     if isinstance(value, bool):
         raise ValueError(f"expected float, got {value!r}")
@@ -193,6 +195,8 @@ def _format_override(value_type: str, value) -> str:
         return str(_coerce_int32(value))
     if value_type == "uint8":
         return f"{_coerce_uint8(value)}u"
+    if value_type == "uint16":
+        return f"{_coerce_uint16(value)}u"
     if value_type == "float":
         f = _coerce_float(value)
         s = format(f, ".9g")

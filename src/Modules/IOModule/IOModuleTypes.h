@@ -67,20 +67,6 @@ struct IOModuleConfig {
     int32_t tracePeriodMs = FLOW_MODDEF_IO_TRMS;
 };
 
-enum IOAnalogSource : uint8_t {
-    IO_SRC_ADS_INTERNAL_SINGLE = 0,
-    IO_SRC_ADS_EXTERNAL_DIFF = 1,
-    IO_SRC_DS18_WATER = 2,
-    IO_SRC_DS18_AIR = 3,
-    IO_SRC_SHT40 = 4,
-    IO_SRC_BMP280 = 5,
-    IO_SRC_BME680 = 6,
-    IO_SRC_POWERMON = 7,
-    IO_SRC_COUNT = 8
-};
-
-constexpr uint8_t IO_ANALOG_SOURCE_INVALID = 0xFFu;
-
 /** Direction bitmask of a binding port. */
 enum IoPortDirMask : uint8_t {
     IO_PORT_DIR_IN = 0x01,

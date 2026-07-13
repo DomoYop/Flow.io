@@ -1,5 +1,5 @@
 {
-    "io_a0s": 1,
+    "io_a0port": 110,
     "mq_host": "flowio.cloud.shiftr.io",
     "mq_tid": "ESP32-670D34"
 }

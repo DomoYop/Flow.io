@@ -46,6 +46,25 @@
 class DataStore;
 class OneWireBus;
 
+/**
+ * Internal index of the analog provider pool (one provider per physical
+ * device). Derived from the binding port (backend + DS18 bus index); not part
+ * of the public topology types.
+ */
+enum IOAnalogSource : uint8_t {
+    IO_SRC_ADS_INTERNAL_SINGLE = 0,
+    IO_SRC_ADS_EXTERNAL_DIFF = 1,
+    IO_SRC_DS18_WATER = 2,
+    IO_SRC_DS18_AIR = 3,
+    IO_SRC_SHT40 = 4,
+    IO_SRC_BMP280 = 5,
+    IO_SRC_BME680 = 6,
+    IO_SRC_POWERMON = 7,
+    IO_SRC_COUNT = 8
+};
+
+constexpr uint8_t IO_ANALOG_SOURCE_INVALID = 0xFFu;
+
 class IOModule : public Module, public IRuntimeSnapshotProvider, public IRuntimeUiValueProvider {
 public:
     IOModule() = default;
