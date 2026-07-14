@@ -2888,22 +2888,6 @@ bool waveshareFindIoEndpointByPort_(const IOServiceV2* ioSvc,
     return false;
 }
 
-const DomainIoSlotBinding* waveshareFindDomainBinding_(DomainSlotId domainSlot)
-{
-    for (const DomainIoSlotBinding& binding : PoolDomain::kDomainIoSlots) {
-        if (binding.domainSlot == domainSlot) return &binding;
-    }
-    return nullptr;
-}
-
-const DomainSlotPreset* waveshareFindDomainSlotPreset_(DomainSlotId domainSlot)
-{
-    for (const DomainSlotPreset& preset : PoolDomain::kDomainSlots) {
-        if (preset.id == domainSlot) return &preset;
-    }
-    return nullptr;
-}
-
 const PoolDevicePreset* waveshareFindPoolDeviceForCommandSlot_(DomainSlotId domainSlot)
 {
     for (const PoolDevicePreset& preset : PoolDomain::kPoolDevices) {
@@ -3054,7 +3038,7 @@ void wavesharePrintPoolDeviceJson_(AsyncResponseStream& response, const Waveshar
                                const PoolDeviceService* poolSvc,
                                IoSlotId ioSlot,
                                DomainSlotId domainSlot,
-                               const DomainSlotPreset* domainPreset)
+                               const PoolRoleSpec* domainPreset)
 {
     const WaveshareIoSummaryState state = waveshareIoSummaryStateForSlot_(ioSvc, poolSvc, ioSlot, domainSlot);
     char valueText[32] = {0};
@@ -3108,8 +3092,8 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     uint8_t driverActive[12] = {0};
     uint8_t driverError[12] = {0};
 
-    for (const DomainIoSlotBinding& binding : PoolDomain::kDomainIoSlots) {
-        const WaveshareIoSummaryState state = waveshareIoSummaryStateForSlot_(ioSvc, poolSvc, binding.ioSlot, binding.domainSlot);
+    for (const PoolRoleSpec& role : PoolDomain::kPoolRoles) {
+        const WaveshareIoSummaryState state = waveshareIoSummaryStateForSlot_(ioSvc, poolSvc, role.ioSlot, role.id);
         if (state.active) { ++ioActive; ++domainActive; }
         if (state.errorState) { ++ioError; ++domainError; }
     }
@@ -3151,13 +3135,13 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     response.print(",\"binding_ports_error\":");
     response.print((unsigned)bindingError);
     response.print(",\"io_slots_total\":");
-    response.print((unsigned)(sizeof(PoolDomain::kDomainIoSlots) / sizeof(PoolDomain::kDomainIoSlots[0])));
+    response.print((unsigned)(sizeof(PoolDomain::kPoolRoles) / sizeof(PoolDomain::kPoolRoles[0])));
     response.print(",\"io_slots_active\":");
     response.print((unsigned)ioActive);
     response.print(",\"io_slots_error\":");
     response.print((unsigned)ioError);
     response.print(",\"domain_slots_total\":");
-    response.print((unsigned)(sizeof(PoolDomain::kDomainSlots) / sizeof(PoolDomain::kDomainSlots[0])));
+    response.print((unsigned)(sizeof(PoolDomain::kPoolRoles) / sizeof(PoolDomain::kPoolRoles[0])));
     response.print(",\"domain_slots_active\":");
     response.print((unsigned)domainActive);
     response.print(",\"domain_slots_error\":");
@@ -3238,10 +3222,9 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
 
             // Reverse-lookup the domain slot bound to this endpoint, if any.
             const char* domainName = "";
-            for (const DomainIoSlotBinding& binding : PoolDomain::kDomainIoSlots) {
-                if (ioIdFromSlot(binding.ioSlot) == ioId) {
-                    const DomainSlotPreset* preset = waveshareFindDomainSlotPreset_(binding.domainSlot);
-                    if (preset && preset->displayName) domainName = preset->displayName;
+            for (const PoolRoleSpec& role : PoolDomain::kPoolRoles) {
+                if (ioIdFromSlot(role.ioSlot) == ioId) {
+                    if (role.displayName) domainName = role.displayName;
                     break;
                 }
             }
@@ -3277,10 +3260,9 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
 
     response.print("],\"domain_slots\":[");
     first = true;
-    for (const DomainSlotPreset& preset : PoolDomain::kDomainSlots) {
-        const DomainIoSlotBinding* binding = waveshareFindDomainBinding_(preset.id);
+    for (const PoolRoleSpec& preset : PoolDomain::kPoolRoles) {
         if (!first) response.print(',');
-        const IoSlotId ioSlot = binding ? binding->ioSlot : IO_SLOT_INVALID;
+        const IoSlotId ioSlot = preset.ioSlot;
         const WaveshareIoSummaryState state = waveshareIoSummaryStateForSlot_(ioSvc, poolSvc, ioSlot, preset.id);
         char valueText[32] = {0};
         if (state.hasValue) waveshareFormatIoValue_(state.meta, state.value, valueText, sizeof(valueText));
@@ -3293,7 +3275,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         response.print(",\"display_name\":");
         printJsonEscaped_(response, preset.displayName ? preset.displayName : "");
         response.print(",\"slot_kind\":");
-        printJsonEscaped_(response, waveshareIoSlotKindLabel_(preset.slotKind));
+        printJsonEscaped_(response, waveshareIoSlotKindLabel_(ioSlotKind(preset.ioSlot)));
         response.print(",\"io_slot\":");
         printJsonEscaped_(response, ioSlot == IO_SLOT_INVALID ? "" : waveshareIoSlotKindLabel_(ioSlotKind(ioSlot)));
         response.print(",\"io_slot_index\":");
@@ -3310,9 +3292,8 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
 
     response.print("],\"error_slots\":[");
     first = true;
-    for (const DomainSlotPreset& preset : PoolDomain::kDomainSlots) {
-        const DomainIoSlotBinding* binding = waveshareFindDomainBinding_(preset.id);
-        const IoSlotId ioSlot = binding ? binding->ioSlot : IO_SLOT_INVALID;
+    for (const PoolRoleSpec& preset : PoolDomain::kPoolRoles) {
+        const IoSlotId ioSlot = preset.ioSlot;
         const WaveshareIoSummaryState state = waveshareIoSummaryStateForSlot_(ioSvc, poolSvc, ioSlot, preset.id);
         if (!state.errorState) continue;
         if (!first) response.print(',');

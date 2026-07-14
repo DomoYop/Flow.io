@@ -3,235 +3,21 @@
 
 #include <Arduino.h>
 #include <stdint.h>
-#include <string.h>
-#include <esp_heap_caps.h>
 
 #include "App/AppContext.h"
-#include "Board/BoardSpec.h"
 #include "Board/BoardSerialMap.h"
-#include "Core/MqttTopics.h"
 #include "Core/Log.h"
 #include "Core/LogModuleIds.h"
 #include "Core/Services/Services.h"
-#include "Domain/Pool/PoolBehaviors.h"
-#include "Domain/Pool/PoolIds.h"
-#include "Modules/IOModule/IORuntime.h"
-#include "Modules/Network/HAModule/HARuntime.h"
+#include "Domain/Pool/PoolDomain.h"
+#include "Domain/Pool/PoolIoAssembly.h"
+#include "Domain/Pool/PoolIoHaDiscovery.h"
 #include "Profiles/Waveshare/WaveshareProfile.h"
-
-#ifndef FLOW_HA_BOOT_TRACE
-#define FLOW_HA_BOOT_TRACE 0
-#endif
-
-#if FLOW_HA_BOOT_TRACE
-#define WAVESHARE_HA_BOOT_TRACE(FMT, ...) Board::SerialMap::logSerial().printf("[HA-BOOT] " FMT "\r\n", ##__VA_ARGS__)
-#else
-#define WAVESHARE_HA_BOOT_TRACE(FMT, ...) do {} while (0)
-#endif
 
 namespace {
 
 using Profiles::Waveshare::ModuleInstances;
 namespace FlowIoLayout = Profiles::Waveshare::IoLayout;
-static constexpr uint8_t kFlowIoAnalogHaSlots = 17;
-
-struct FlowIoAnalogHaSpec {
-    const char* objectSuffix = nullptr;
-    const char* name = nullptr;
-    const char* icon = nullptr;
-    const char* unit = nullptr;
-};
-
-struct FlowIoDigitalHaSpec {
-    uint8_t logicalIdx = 0;
-    const char* objectSuffix = nullptr;
-    const char* name = nullptr;
-    const char* icon = nullptr;
-    const char* unit = nullptr;
-};
-
-constexpr FlowIoAnalogHaSpec kAnalogHaSpecs[kFlowIoAnalogHaSlots] = {
-    {"io_orp", "ORP", "mdi:flash", "mV"},
-    {"io_ph", "pH", "mdi:ph", ""},
-    {"io_psi", "PSI", "mdi:gauge", "PSI"},
-    {"io_spare", "Spare", "mdi:sine-wave", nullptr},
-    {"io_wat_tmp", "Water Temperature", "mdi:water-thermometer", "\xC2\xB0""C"},
-    {"io_air_tmp", "Air Temperature", "mdi:thermometer", "\xC2\xB0""C"},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-    {nullptr, nullptr, "mdi:sine-wave", nullptr},
-};
-
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-constexpr FlowIoDigitalHaSpec kDigitalHaSpecs[] = {
-    {0, "io_ph_lvl", "pH Level", "mdi:flask-outline", nullptr},
-    {1, "io_dis_lvl", "Disinfectant Level", "mdi:test-tube", nullptr},
-    {2, "io_pool_lvl", "Pool Level", "mdi:waves-arrow-up", nullptr},
-    {3, "io_wat_cnt", "Water Counter", "mdi:water-sync", "L"},
-    {4, "io_di5", "Digital Input 5", "mdi:electric-switch", nullptr},
-    {5, "io_di6", "Digital Input 6", "mdi:electric-switch", nullptr},
-    {6, "io_di7", "Digital Input 7", "mdi:electric-switch", nullptr},
-    {7, "io_di8", "Digital Input 8", "mdi:electric-switch", nullptr},
-};
-#else
-constexpr FlowIoDigitalHaSpec kDigitalHaSpecs[] = {
-    {0, "io_pool_lvl", "Pool Level", "mdi:waves-arrow-up", nullptr},
-    {1, "io_ph_lvl", "pH Level", "mdi:flask-outline", nullptr},
-    {2, "io_chl_lvl", "Chlorine Level", "mdi:test-tube", nullptr},
-    {3, "io_wat_cnt", "Water Counter", "mdi:water-sync", "L"},
-};
-#endif
-
-struct FlowIoDiscoveryHeap {
-    char analogObjectSuffix[kFlowIoAnalogHaSlots][24]{};
-    char analogFallbackName[kFlowIoAnalogHaSlots][24]{};
-    char analogValueTpl[kFlowIoAnalogHaSlots][128]{};
-    char analogStateSuffix[kFlowIoAnalogHaSlots][24]{};
-    char digitalStateSuffix[sizeof(kDigitalHaSpecs) / sizeof(kDigitalHaSpecs[0])][24]{};
-    char switchStateSuffix[Limits::Io::MaxPoolDevices][24]{};
-    char switchPayloadOn[Limits::Io::MaxPoolDevices][Limits::IoHaSwitchPayloadBuf]{};
-    char switchPayloadOff[Limits::Io::MaxPoolDevices][Limits::IoHaSwitchPayloadBuf]{};
-};
-
-FlowIoDiscoveryHeap* gDiscoveryHeap = nullptr;
-bool gDiscoveryHeapReleaseWaitLogged = false;
-bool gOneShotRefreshBypassedLogged = false;
-
-bool ensureDiscoveryHeap()
-{
-    if (gDiscoveryHeap) return true;
-    gDiscoveryHeap = static_cast<FlowIoDiscoveryHeap*>(
-        heap_caps_calloc(1, sizeof(FlowIoDiscoveryHeap), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
-    );
-    if (!gDiscoveryHeap) {
-        gDiscoveryHeap = static_cast<FlowIoDiscoveryHeap*>(
-            heap_caps_calloc(1, sizeof(FlowIoDiscoveryHeap), MALLOC_CAP_8BIT)
-        );
-    }
-    if (gDiscoveryHeap) {
-        WAVESHARE_HA_BOOT_TRACE("flow.io discovery heap allocated (%u bytes)", (unsigned)sizeof(FlowIoDiscoveryHeap));
-    } else {
-        WAVESHARE_HA_BOOT_TRACE("flow.io discovery heap allocation failed (%u bytes)", (unsigned)sizeof(FlowIoDiscoveryHeap));
-    }
-    return gDiscoveryHeap != nullptr;
-}
-
-void releaseDiscoveryHeapIfReady(ModuleInstances& modules)
-{
-#if FLOW_HA_ONESHOT_DISCOVERY
-    if (!gDiscoveryHeap || !modules.ioDataStore) return;
-    if (!haAutoconfigPublished(*modules.ioDataStore)) {
-        if (!gDiscoveryHeapReleaseWaitLogged) {
-            WAVESHARE_HA_BOOT_TRACE("flow.io discovery heap waiting for HA publish completion");
-            gDiscoveryHeapReleaseWaitLogged = true;
-        }
-        return;
-    }
-    heap_caps_free(gDiscoveryHeap);
-    gDiscoveryHeap = nullptr;
-    gDiscoveryHeapReleaseWaitLogged = false;
-    WAVESHARE_HA_BOOT_TRACE("flow.io discovery heap released after HA one-shot publish");
-#else
-    (void)modules;
-#endif
-}
-
-const DomainSlotPreset* findDomainSlotById(const DomainSpec& domain, DomainSlotId id)
-{
-    for (uint8_t i = 0; i < domain.domainSlotCount; ++i) {
-        const DomainSlotPreset& slot = domain.domainSlots[i];
-        if (slot.id == id) return &slot;
-    }
-    return nullptr;
-}
-
-IoSlotId findIoSlotForDomainSlot(const DomainSpec& domain, DomainSlotId id)
-{
-    for (uint8_t i = 0; i < domain.domainIoSlotBindingCount; ++i) {
-        const DomainIoSlotBinding& binding = domain.domainIoSlotBindings[i];
-        if (binding.domainSlot == id) return binding.ioSlot;
-    }
-    return IO_SLOT_INVALID;
-}
-
-const PoolDevicePreset* findPoolPresetById(const DomainSpec& domain, PoolDeviceId id)
-{
-    for (uint8_t i = 0; i < domain.poolDeviceCount; ++i) {
-        const PoolDevicePreset& preset = domain.poolDevices[i];
-        if (preset.id == id) return &preset;
-    }
-    return nullptr;
-}
-
-uint8_t digitalInputOrdinalFromPort(PhysicalPortId port)
-{
-    switch (port) {
-        case FlowIoLayout::PortDin0: return 1;
-        case FlowIoLayout::PortDin1: return 2;
-        case FlowIoLayout::PortDin2: return 3;
-        case FlowIoLayout::PortDin3: return 4;
-        case FlowIoLayout::PortDin4: return 5;
-        case FlowIoLayout::PortDin5: return 6;
-        case FlowIoLayout::PortDin6: return 7;
-        case FlowIoLayout::PortDin7: return 8;
-        default: return 0;
-    }
-}
-
-PhysicalPortId digitalInputPortFromOrdinal(uint8_t ordinal)
-{
-    switch (ordinal) {
-        case 1: return FlowIoLayout::PortDin0;
-        case 2: return FlowIoLayout::PortDin1;
-        case 3: return FlowIoLayout::PortDin2;
-        case 4: return FlowIoLayout::PortDin3;
-        case 5: return FlowIoLayout::PortDin4;
-        case 6: return FlowIoLayout::PortDin5;
-        case 7: return FlowIoLayout::PortDin6;
-        case 8: return FlowIoLayout::PortDin7;
-        default: return IO_PORT_INVALID;
-    }
-}
-
-uint8_t exioOrdinalFromPort(PhysicalPortId port)
-{
-    switch (port) {
-        case FlowIoLayout::PortExio1: return 1;
-        case FlowIoLayout::PortExio2: return 2;
-        case FlowIoLayout::PortExio3: return 3;
-        case FlowIoLayout::PortExio4: return 4;
-        case FlowIoLayout::PortExio5: return 5;
-        case FlowIoLayout::PortExio6: return 6;
-        case FlowIoLayout::PortExio7: return 7;
-        case FlowIoLayout::PortExio8: return 8;
-        default: return 0;
-    }
-}
-
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-PhysicalPortId waveshareCompOutputPort(uint8_t idx)
-{
-    switch (idx) {
-        case 0: return FlowIoLayout::PortMcpOut1;
-        case 1: return FlowIoLayout::PortMcpOut2;
-        case 2: return FlowIoLayout::PortMcpOut3;
-        case 3: return FlowIoLayout::PortMcpOut4;
-        case 4: return FlowIoLayout::PortMcpOut5;
-        case 5: return FlowIoLayout::PortMcpOut6;
-        case 6: return FlowIoLayout::PortMcpOut7;
-        case 7: return FlowIoLayout::PortMcpOut8;
-        default: return IO_PORT_INVALID;
-    }
-}
-#endif
 
 void requireSetup(bool ok, const char* step)
 {
@@ -243,256 +29,58 @@ void requireSetup(bool ok, const char* step)
     while (true) delay(1000);
 }
 
-void applyAnalogDefaultsForDomainSlot(DomainSlotId domainSlot, IOAnalogSlotConfig& cfg)
-{
-    const FlowIoLayout::AnalogRoleDefault* spec = FlowIoLayout::analogDefaultForDomainSlot(domainSlot);
-    requireSetup(spec != nullptr, "unsupported analog domain role");
-    cfg.bindingPort = spec->bindingPort;
-    cfg.c0 = spec->c0;
-    cfg.c1 = spec->c1;
-    cfg.precision = spec->precision;
-}
-
-void applyDigitalDefaultsForDomainSlot(DomainSlotId domainSlot, IODigitalInputSlotConfig& cfg)
-{
-    const FlowIoLayout::DigitalInputRoleDefault* spec = FlowIoLayout::digitalInputDefaultForDomainSlot(domainSlot);
-    requireSetup(spec != nullptr, "unsupported digital input domain role");
-    cfg.bindingPort = spec->bindingPort;
-    cfg.mode = spec->mode;
-    cfg.edgeMode = spec->edgeMode;
-    cfg.counterDebounceUs = (int32_t)spec->debounceUs;
-}
+constexpr PoolIoExtraEndpoint kExtraDigitalInputs[] = {
+    {(IoId)(IO_ID_DI_BASE + 0), FlowIoLayout::PortDin0},
+    {(IoId)(IO_ID_DI_BASE + 1), FlowIoLayout::PortDin1},
+    {(IoId)(IO_ID_DI_BASE + 2), FlowIoLayout::PortDin2},
+    {(IoId)(IO_ID_DI_BASE + 3), FlowIoLayout::PortDin3},
+    {(IoId)(IO_ID_DI_BASE + 4), FlowIoLayout::PortDin4},
+    {(IoId)(IO_ID_DI_BASE + 5), FlowIoLayout::PortDin5},
+    {(IoId)(IO_ID_DI_BASE + 6), FlowIoLayout::PortDin6},
+    {(IoId)(IO_ID_DI_BASE + 7), FlowIoLayout::PortDin7},
+};
 
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-const char* waveshareDigitalInputNameForDomainSlot(DomainSlotId domainSlot)
-{
-    switch (domainSlot) {
-        case PoolIds::SensorPoolLevel: return "DIN2";
-        case PoolIds::SensorPhLevel: return "DIN0";
-        case PoolIds::SensorChlorineLevel: return "DIN1";
-        case PoolIds::SensorWaterCounter: return "DIN3";
-        default: return nullptr;
-    }
-}
-
-const char* waveshareDigitalInputNameForLogical(uint8_t logicalIdx)
-{
-    switch (logicalIdx) {
-        case 0: return "DIN0";
-        case 1: return "DIN1";
-        case 2: return "DIN2";
-        case 3: return "DIN3";
-        case 4: return "DIN4";
-        case 5: return "DIN5";
-        case 6: return "DIN6";
-        case 7: return "DIN7";
-        default: return "DIN";
-    }
-}
+constexpr PoolIoExtraEndpoint kExtraDigitalOutputs[] = {
+    {(IoId)(IO_ID_DO_BASE + 8), FlowIoLayout::PortMcpOut1},
+    {(IoId)(IO_ID_DO_BASE + 9), FlowIoLayout::PortMcpOut2},
+    {(IoId)(IO_ID_DO_BASE + 10), FlowIoLayout::PortMcpOut3},
+    {(IoId)(IO_ID_DO_BASE + 11), FlowIoLayout::PortMcpOut4},
+    {(IoId)(IO_ID_DO_BASE + 12), FlowIoLayout::PortMcpOut5},
+    {(IoId)(IO_ID_DO_BASE + 13), FlowIoLayout::PortMcpOut6},
+    {(IoId)(IO_ID_DO_BASE + 14), FlowIoLayout::PortMcpOut7},
+    {(IoId)(IO_ID_DO_BASE + 15), FlowIoLayout::PortMcpOut8},
+};
 #endif
 
-void buildAnalogValueTemplate(const IOModule& ioModule, uint8_t analogIdx, char* out, size_t outLen)
+constexpr PoolIoProfileSpec kIoProfileSpec{
+    FlowIoLayout::kBindingPorts,
+    (uint8_t)(sizeof(FlowIoLayout::kBindingPorts) / sizeof(FlowIoLayout::kBindingPorts[0])),
+    FlowIoLayout::kAnalogRoleDefaults,
+    (uint8_t)(sizeof(FlowIoLayout::kAnalogRoleDefaults) / sizeof(FlowIoLayout::kAnalogRoleDefaults[0])),
+    FlowIoLayout::kDigitalInputRoleDefaults,
+    (uint8_t)(sizeof(FlowIoLayout::kDigitalInputRoleDefaults) / sizeof(FlowIoLayout::kDigitalInputRoleDefaults[0])),
+    FlowIoLayout::kDigitalOutputRoleDefaults,
+    (uint8_t)(sizeof(FlowIoLayout::kDigitalOutputRoleDefaults) / sizeof(FlowIoLayout::kDigitalOutputRoleDefaults[0])),
+    kExtraDigitalInputs,
+    (uint8_t)(sizeof(kExtraDigitalInputs) / sizeof(kExtraDigitalInputs[0])),
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    kExtraDigitalOutputs,
+    (uint8_t)(sizeof(kExtraDigitalOutputs) / sizeof(kExtraDigitalOutputs[0])),
+#else
+    nullptr,
+    0,
+#endif
+};
+
+PoolIoHaContext haContext(ModuleInstances& modules, const AppContext* ctx)
 {
-    if (!out || outLen == 0) return;
-    const int32_t precision = ioModule.analogPrecision(analogIdx);
-    snprintf(
-        out,
-        outLen,
-        "{%% if value_json.value is number %%}{{ value_json.value | float | round(%ld) }}{%% else %%}unavailable{%% endif %%}",
-        (long)precision
-    );
-}
-
-void syncAnalogSensors(ModuleInstances& modules)
-{
-    if (!modules.haService || !modules.haService->addSensor) return;
-    requireSetup(ensureDiscoveryHeap(), "ha discovery heap");
-    static constexpr const char* kAvailabilityTpl = "{{ 'online' if value_json.available else 'offline' }}";
-
-    for (uint8_t i = 0; i < kFlowIoAnalogHaSlots; ++i) {
-        if (!modules.ioModule.analogSlotPublished(i)) continue;
-        const FlowIoAnalogHaSpec& spec = kAnalogHaSpecs[i];
-
-        buildAnalogValueTemplate(
-            modules.ioModule,
-            i,
-            gDiscoveryHeap->analogValueTpl[i],
-            sizeof(gDiscoveryHeap->analogValueTpl[i])
-        );
-        snprintf(
-            gDiscoveryHeap->analogStateSuffix[i],
-            sizeof(gDiscoveryHeap->analogStateSuffix[i]),
-            "rt/io/input/a%02u",
-            (unsigned)i
-        );
-        if (spec.objectSuffix) {
-            snprintf(
-                gDiscoveryHeap->analogObjectSuffix[i],
-                sizeof(gDiscoveryHeap->analogObjectSuffix[i]),
-                "%s",
-                spec.objectSuffix
-            );
-        } else {
-            snprintf(
-                gDiscoveryHeap->analogObjectSuffix[i],
-                sizeof(gDiscoveryHeap->analogObjectSuffix[i]),
-                "io_a%02u",
-                (unsigned)i
-            );
-        }
-        snprintf(
-            gDiscoveryHeap->analogFallbackName[i],
-            sizeof(gDiscoveryHeap->analogFallbackName[i]),
-            "A%02u",
-            (unsigned)i
-        );
-        char endpointId[8] = {0};
-        snprintf(endpointId, sizeof(endpointId), "a%02u", (unsigned)i);
-        const char* label = spec.name;
-        if (!label || label[0] == '\0') {
-            label = modules.ioModule.endpointLabel(endpointId);
-        }
-        if (!label || label[0] == '\0') {
-            label = gDiscoveryHeap->analogFallbackName[i];
-        }
-        const HASensorEntry entry{
-            "io",
-            gDiscoveryHeap->analogObjectSuffix[i],
-            label,
-            gDiscoveryHeap->analogStateSuffix[i],
-            gDiscoveryHeap->analogValueTpl[i],
-            nullptr,
-            spec.icon,
-            spec.unit,
-            false,
-            kAvailabilityTpl
-        };
-        (void)modules.haService->addSensor(modules.haService->ctx, &entry);
-    }
-}
-
-void syncDigitalInputBinarySensors(ModuleInstances& modules)
-{
-    if (!modules.haService || !modules.haService->addBinarySensor || !modules.haService->addSensor) return;
-    requireSetup(ensureDiscoveryHeap(), "ha discovery heap");
-    static constexpr const char* kBoolTpl = "{{ 'True' if value_json.value else 'False' }}";
-    static constexpr const char* kAvailabilityTpl = "{{ 'online' if value_json.available else 'offline' }}";
-    static constexpr const char* kNumericTpl =
-        "{% if value_json.value is number %}{{ value_json.value | float }}{% else %}unavailable{% endif %}";
-
-    for (uint8_t i = 0; i < (uint8_t)(sizeof(kDigitalHaSpecs) / sizeof(kDigitalHaSpecs[0])); ++i) {
-        const FlowIoDigitalHaSpec& spec = kDigitalHaSpecs[i];
-        if (!modules.ioModule.digitalInputSlotPublished(spec.logicalIdx)) continue;
-
-        snprintf(
-            gDiscoveryHeap->digitalStateSuffix[i],
-            sizeof(gDiscoveryHeap->digitalStateSuffix[i]),
-            "rt/io/input/i%02u",
-            (unsigned)spec.logicalIdx
-        );
-        if (modules.ioModule.digitalInputValueType(spec.logicalIdx) != IO_VAL_BOOL) {
-            const HASensorEntry entry{
-                "io",
-                spec.objectSuffix,
-                spec.name,
-                gDiscoveryHeap->digitalStateSuffix[i],
-                kNumericTpl,
-                nullptr,
-                spec.icon,
-                spec.unit,
-                false,
-                kAvailabilityTpl
-            };
-            (void)modules.haService->addSensor(modules.haService->ctx, &entry);
-            continue;
-        }
-
-        const HABinarySensorEntry entry{
-            "io",
-            spec.objectSuffix,
-            spec.name,
-            gDiscoveryHeap->digitalStateSuffix[i],
-            kBoolTpl,
-            nullptr,
-            nullptr,
-            spec.icon
-        };
-        (void)modules.haService->addBinarySensor(modules.haService->ctx, &entry);
-    }
-}
-
-void syncSwitches(const DomainSpec& domain, ModuleInstances& modules)
-{
-    if (!modules.haService || !modules.haService->addSwitch) return;
-    requireSetup(ensureDiscoveryHeap(), "ha discovery heap");
-
-    for (uint8_t i = 0; i < domain.poolDeviceCount; ++i) {
-        const PoolDevicePreset& device = domain.poolDevices[i];
-        const DomainSlotPreset* commandSlot = findDomainSlotById(domain, device.commandSlot);
-        if (!commandSlot) continue;
-        const IoSlotId ioSlot = findIoSlotForDomainSlot(domain, device.commandSlot);
-        if (ioSlot == IO_SLOT_INVALID || ioSlotKind(ioSlot) != IO_SLOT_DIGITAL_OUTPUT) continue;
-
-        const uint8_t logical = ioSlotIndex(ioSlot);
-        if (!modules.ioModule.digitalOutputSlotWritable(logical)) continue;
-
-        snprintf(
-            gDiscoveryHeap->switchStateSuffix[i],
-            sizeof(gDiscoveryHeap->switchStateSuffix[i]),
-            "rt/pdm/state/pd%u",
-            (unsigned)device.id
-        );
-        bool payloadOk = true;
-
-        if (device.id == PoolIds::DeviceFiltrationPump) {
-            int wrote = snprintf(
-                gDiscoveryHeap->switchPayloadOn[i],
-                sizeof(gDiscoveryHeap->switchPayloadOn[i]),
-                "{\\\"cmd\\\":\\\"poollogic.filtration.write\\\",\\\"args\\\":{\\\"value\\\":true}}"
-            );
-            if (!(wrote > 0 && wrote < (int)sizeof(gDiscoveryHeap->switchPayloadOn[i]))) payloadOk = false;
-            wrote = snprintf(
-                gDiscoveryHeap->switchPayloadOff[i],
-                sizeof(gDiscoveryHeap->switchPayloadOff[i]),
-                "{\\\"cmd\\\":\\\"poollogic.filtration.write\\\",\\\"args\\\":{\\\"value\\\":false}}"
-            );
-            if (!(wrote > 0 && wrote < (int)sizeof(gDiscoveryHeap->switchPayloadOff[i]))) payloadOk = false;
-        } else {
-            int wrote = snprintf(
-                gDiscoveryHeap->switchPayloadOn[i],
-                sizeof(gDiscoveryHeap->switchPayloadOn[i]),
-                "{\\\"cmd\\\":\\\"pooldevice.write\\\",\\\"args\\\":{\\\"slot\\\":%u,\\\"value\\\":true}}",
-                (unsigned)device.id
-            );
-            if (!(wrote > 0 && wrote < (int)sizeof(gDiscoveryHeap->switchPayloadOn[i]))) payloadOk = false;
-            wrote = snprintf(
-                gDiscoveryHeap->switchPayloadOff[i],
-                sizeof(gDiscoveryHeap->switchPayloadOff[i]),
-                "{\\\"cmd\\\":\\\"pooldevice.write\\\",\\\"args\\\":{\\\"slot\\\":%u,\\\"value\\\":false}}",
-                (unsigned)device.id
-            );
-            if (!(wrote > 0 && wrote < (int)sizeof(gDiscoveryHeap->switchPayloadOff[i]))) payloadOk = false;
-        }
-
-        if (!payloadOk) {
-            requireSetup(false, "ha switch payload");
-            continue;
-        }
-
-        const HASwitchEntry entry{
-            "io",
-            device.objectSuffix,
-            commandSlot->displayName,
-            gDiscoveryHeap->switchStateSuffix[i],
-            "{% if value_json.on %}ON{% else %}OFF{% endif %}",
-            MqttTopics::SuffixCmd,
-            gDiscoveryHeap->switchPayloadOn[i],
-            gDiscoveryHeap->switchPayloadOff[i],
-            device.haIcon,
-            nullptr
-        };
-        (void)modules.haService->addSwitch(modules.haService->ctx, &entry);
-    }
+    PoolIoHaContext haCtx{};
+    haCtx.io = &modules.ioModule;
+    haCtx.ha = modules.haService;
+    haCtx.dataStore = modules.ioDataStore;
+    haCtx.domain = ctx ? ctx->domain : &PoolDomain::kPoolDomain;
+    return haCtx;
 }
 
 }  // namespace
@@ -503,176 +91,26 @@ namespace Waveshare {
 void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
 {
     requireSetup(ctx.domain != nullptr, "missing domain spec");
-
     modules.ioModule.setOneWireBuses(&modules.oneWireWater, &modules.oneWireAir);
-    modules.ioModule.setBindingPorts(
-        FlowIoLayout::kBindingPorts,
-        (uint8_t)(sizeof(FlowIoLayout::kBindingPorts) / sizeof(FlowIoLayout::kBindingPorts[0]))
-    );
-
-    for (uint8_t i = 0; i < Limits::Io::MaxAnalogEndpoints; ++i) {
-        IOEndpointRegistration reg{};
-        snprintf(reg.id, sizeof(reg.id), "a%02u", (unsigned)i);
-        reg.ioId = (IoId)(IO_ID_AI_BASE + i);
-        requireSetup(modules.ioModule.defineAnalogInput(reg, IOAnalogSlotConfig{}), "define analog input slot");
-    }
-
-    for (uint8_t i = 0; i < ctx.domain->domainSlotCount; ++i) {
-        const DomainSlotPreset& preset = ctx.domain->domainSlots[i];
-        const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset.id);
-        if (ioSlot == IO_SLOT_INVALID) continue;
-        const IoId ioId = ioIdFromSlot(ioSlot);
-        requireSetup(ioId != IO_ID_INVALID, "invalid domain slot IO mapping");
-
-        if (preset.slotKind == IO_SLOT_DIGITAL_INPUT) {
-            IOEndpointRegistration reg{};
-            snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "input");
-            reg.ioId = ioId;
-            IODigitalInputSlotConfig cfg{};
-            cfg.activeHigh = false;
-            cfg.pullMode = IO_PULL_UP;
-            applyDigitalDefaultsForDomainSlot(preset.id, cfg);
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-            if (const char* defaultName = waveshareDigitalInputNameForDomainSlot(preset.id)) {
-                snprintf(reg.id, sizeof(reg.id), "%s", defaultName);
-            }
-#else
-            const uint8_t diOrdinal = digitalInputOrdinalFromPort(cfg.bindingPort);
-            if (diOrdinal != 0U) {
-                snprintf(reg.id, sizeof(reg.id), "DI Pin %u", (unsigned)diOrdinal);
-            }
-#endif
-            requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define digital input");
-            continue;
-        }
-
-        if (preset.slotKind != IO_SLOT_ANALOG_INPUT) continue;
-
-        IOEndpointRegistration reg{};
-        snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "analog");
-        reg.ioId = ioId;
-        IOAnalogSlotConfig cfg{};
-        applyAnalogDefaultsForDomainSlot(preset.id, cfg);
-        requireSetup(modules.ioModule.applyAnalogInputDefaults(reg, cfg), "apply analog input defaults");
-    }
-
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    for (uint8_t i = 0; i < 8; ++i) {
-        if (modules.ioModule.digitalInputSlotUsed(i)) continue;
-        IOEndpointRegistration reg{};
-        snprintf(reg.id, sizeof(reg.id), "%s", waveshareDigitalInputNameForLogical(i));
-        reg.ioId = (IoId)(IO_ID_DI_BASE + i);
-        IODigitalInputSlotConfig cfg{};
-        cfg.activeHigh = false;
-        cfg.pullMode = IO_PULL_UP;
-        cfg.mode = IO_DIGITAL_INPUT_STATE;
-        cfg.edgeMode = IO_EDGE_RISING;
-        cfg.counterDebounceUs = 0;
-        cfg.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
-        requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define waveshare digital input");
-    }
-#else
-    for (uint8_t i = 4; i < 8; ++i) {
-        IOEndpointRegistration reg{};
-        snprintf(reg.id, sizeof(reg.id), "DI Pin %u", (unsigned)(i + 1));
-        reg.ioId = (IoId)(IO_ID_DI_BASE + i);
-        IODigitalInputSlotConfig cfg{};
-        cfg.activeHigh = false;
-        cfg.pullMode = IO_PULL_UP;
-        cfg.mode = IO_DIGITAL_INPUT_STATE;
-        cfg.edgeMode = IO_EDGE_RISING;
-        cfg.counterDebounceUs = 0;
-        cfg.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
-        requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define extra digital input");
-    }
-#endif
-
-    for (uint8_t i = 0; i < ctx.domain->domainSlotCount; ++i) {
-        const DomainSlotPreset& preset = ctx.domain->domainSlots[i];
-        if (preset.slotKind != IO_SLOT_DIGITAL_OUTPUT) continue;
-        const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset.id);
-        if (ioSlot == IO_SLOT_INVALID) continue;
-        requireSetup(ioSlotKind(ioSlot) == IO_SLOT_DIGITAL_OUTPUT, "domain output mapped to non-output slot");
-
-        const FlowIoLayout::DigitalOutputRoleDefault* spec = FlowIoLayout::digitalOutputDefaultForDomainSlot(preset.id);
-        requireSetup(spec != nullptr, "missing output layout binding");
-
-        IOEndpointRegistration reg{};
-        const uint8_t exioOrdinal = exioOrdinalFromPort(spec->bindingPort);
-        if (exioOrdinal != 0U) {
-            snprintf(reg.id, sizeof(reg.id), "EXIO%u", (unsigned)exioOrdinal);
-        } else {
-            snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "output");
-        }
-        reg.ioId = ioIdFromSlot(ioSlot);
-        IODigitalOutputSlotConfig cfg{};
-        cfg.bindingPort = spec->bindingPort;
-        cfg.activeHigh = spec->activeHigh;
-        cfg.initialOn = false;
-        cfg.startupPolicy = spec->retainOnWarmReboot
-            ? IOOutputStartupPolicy::PreserveHardwareState
-            : IOOutputStartupPolicy::ApplyInitial;
-        cfg.retainOnWarmReboot = spec->retainOnWarmReboot;
-        cfg.momentary = spec->momentary;
-        cfg.pulseMs = spec->momentary ? (int32_t)spec->pulseMs : 0;
-        requireSetup(modules.ioModule.defineDigitalOutput(reg, cfg), "define digital output");
-    }
-
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    for (uint8_t i = 0; i < 8; ++i) {
-        IOEndpointRegistration reg{};
-        snprintf(reg.id, sizeof(reg.id), "COMP%02u", (unsigned)(i + 1U));
-        reg.ioId = (IoId)(IO_ID_DO_BASE + 8U + i);
-        IODigitalOutputSlotConfig cfg{};
-        cfg.bindingPort = waveshareCompOutputPort(i);
-        cfg.activeHigh = true;
-        cfg.initialOn = false;
-        cfg.startupPolicy = IOOutputStartupPolicy::ApplyInitial;
-        cfg.retainOnWarmReboot = false;
-        cfg.momentary = false;
-        cfg.pulseMs = 0;
-        requireSetup(modules.ioModule.defineDigitalOutput(reg, cfg), "define comp digital output");
-    }
-#endif
+    requireSetup(PoolIo::configure(*ctx.domain, modules.ioModule, kIoProfileSpec), "pool io configure");
 }
 
 void registerIoHomeAssistant(AppContext& ctx, ModuleInstances& modules)
 {
     modules.haService = ctx.services.get<HAService>(ServiceId::Ha);
     if (!modules.haService) return;
-
-    syncAnalogSensors(modules);
-    syncDigitalInputBinarySensors(modules);
-    if (ctx.domain) syncSwitches(*ctx.domain, modules);
-
-    if (modules.haService->requestRefresh) {
-        (void)modules.haService->requestRefresh(modules.haService->ctx);
-    }
+    PoolIoHa::registerDiscovery(haContext(modules, &ctx));
 }
 
 void refreshIoHomeAssistantIfNeeded(ModuleInstances& modules)
 {
-#if FLOW_HA_ONESHOT_DISCOVERY
-    if (!gOneShotRefreshBypassedLogged) {
-        WAVESHARE_HA_BOOT_TRACE("flow.io IO->HA dynamic refresh bypassed in one-shot mode");
-        gOneShotRefreshBypassedLogged = true;
-    }
-    releaseDiscoveryHeapIfReady(modules);
-    return;
-#endif
     if (!modules.haService) return;
-    const uint32_t dirtyMask = modules.ioModule.takeAnalogConfigDirtyMask();
-    if (dirtyMask == 0) return;
-
-    syncAnalogSensors(modules);
-    if (modules.haService->requestRefresh) {
-        (void)modules.haService->requestRefresh(modules.haService->ctx);
-    }
+    PoolIoHa::refreshIfNeeded(haContext(modules, nullptr));
 }
 
 void releaseIoHomeAssistantDiscoveryHeapIfDone(ModuleInstances& modules)
 {
-    releaseDiscoveryHeapIfReady(modules);
+    PoolIoHa::releaseDiscoveryHeapIfDone(haContext(modules, nullptr));
 }
 
 }  // namespace Waveshare

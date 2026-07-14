@@ -41,15 +41,6 @@ const PoolDevicePreset* findPoolPresetById(const DomainSpec& domain, PoolDeviceI
     return nullptr;
 }
 
-IoSlotId findIoSlotForDomainSlot(const DomainSpec& domain, DomainSlotId id)
-{
-    for (uint8_t i = 0; i < domain.domainIoSlotBindingCount; ++i) {
-        const DomainIoSlotBinding& binding = domain.domainIoSlotBindings[i];
-        if (binding.domainSlot == id) return binding.ioSlot;
-    }
-    return IO_SLOT_INVALID;
-}
-
 void requireSetup(bool ok, const char* step)
 {
     if (ok) return;
@@ -171,7 +162,7 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
 {
     for (uint8_t i = 0; i < ctx.domain->poolDeviceCount; ++i) {
         const PoolDevicePreset& preset = ctx.domain->poolDevices[i];
-        const IoSlotId ioSlot = findIoSlotForDomainSlot(*ctx.domain, preset.commandSlot);
+        const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset.commandSlot);
         requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
 
         PoolDeviceDefinition def{};

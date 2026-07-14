@@ -4,22 +4,14 @@
 
 namespace PoolBehaviors {
 
-inline const DomainSlotPreset* domainSlotById(DomainSlotId id)
+inline const PoolRoleSpec* domainSlotById(DomainSlotId id)
 {
-    for (uint8_t i = 0; i < PoolDomain::kPoolDomain.domainSlotCount; ++i) {
-        const DomainSlotPreset& preset = PoolDomain::kPoolDomain.domainSlots[i];
-        if (preset.id == id) return &preset;
-    }
-    return nullptr;
+    return domainRoleById(PoolDomain::kPoolDomain, id);
 }
 
 inline IoSlotId ioSlotForDomainSlot(DomainSlotId id)
 {
-    for (uint8_t i = 0; i < PoolDomain::kPoolDomain.domainIoSlotBindingCount; ++i) {
-        const DomainIoSlotBinding& binding = PoolDomain::kPoolDomain.domainIoSlotBindings[i];
-        if (binding.domainSlot == id) return binding.ioSlot;
-    }
-    return IO_SLOT_INVALID;
+    return domainIoSlotForRole(PoolDomain::kPoolDomain, id);
 }
 
 inline const PoolDevicePreset* poolDeviceById(PoolDeviceId id)

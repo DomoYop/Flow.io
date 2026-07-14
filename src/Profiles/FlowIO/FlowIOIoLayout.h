@@ -3,6 +3,7 @@
 #include "Board/FlowIODINBoard.h"
 #include "Domain/DomainTypes.h"
 #include "Domain/Pool/PoolIds.h"
+#include "Domain/IoRoleDefaults.h"
 #include "Modules/IOModule/IOModuleTypes.h"
 
 namespace Profiles {
@@ -104,14 +105,6 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortPcf0Bit7, IO_BACKEND_PCF8574, 7, IO_PORT_DIR_OUT, "PCF bit 7"},
 };
 
-struct AnalogRoleDefault {
-    DomainSlotId domainSlot; // Besoin fonctionnel porte par le domaine.
-    PhysicalPortId bindingPort; // Port physique associe.
-    float c0; // Coefficient de calibration offset/intercept.
-    float c1; // Coefficient de calibration gain/slope.
-    int32_t precision; // Precision d'affichage (nb de decimales).
-};
-
 inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
     // {domainSlot, bindingPort, c0, c1, precision}
     {PoolIds::SensorOrp, (PhysicalPortId)FLOW_WIRDEF_IO_A0PORT, FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
@@ -122,29 +115,12 @@ inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
     {PoolIds::SensorAirTemp, (PhysicalPortId)FLOW_WIRDEF_IO_A5PORT, FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
 };
 
-struct DigitalInputRoleDefault {
-    DomainSlotId domainSlot; // Besoin fonctionnel porte par le domaine.
-    PhysicalPortId bindingPort; // Port physique associe.
-    uint8_t mode; // Mode de lecture (etat/counter).
-    uint8_t edgeMode; // Type de front pris en compte.
-    uint32_t debounceUs; // Debounce en microsecondes.
-};
-
 inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {
     // {domainSlot, bindingPort, mode, edgeMode, debounceUs}
     {PoolIds::SensorPoolLevel, PortDigitalIn1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
     {PoolIds::SensorPhLevel, PortDigitalIn2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
     {PoolIds::SensorChlorineLevel, PortDigitalIn3, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore.
     {PoolIds::SensorWaterCounter, PortDigitalIn4, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (100 ms debounce).
-};
-
-struct DigitalOutputRoleDefault {
-    DomainSlotId domainSlot; // Besoin fonctionnel porte par le domaine.
-    PhysicalPortId bindingPort; // Port physique associe.
-    bool activeHigh; // Polarite de commande logique.
-    bool retainOnWarmReboot; // Conserve le latch expander sur reboot ESP32 chaud.
-    bool momentary; // True si sortie impulsionnelle.
-    uint16_t pulseMs; // Duree d'impulsion en ms.
 };
 
 inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
@@ -159,29 +135,6 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     {PoolIds::ActuatorWaterHeater, PortRelay8, false, false, false, 0U}, // Chauffage.
 };
 
-inline constexpr const AnalogRoleDefault* analogDefaultForDomainSlot(DomainSlotId domainSlot)
-{
-    for (const AnalogRoleDefault& entry : kAnalogRoleDefaults) {
-        if (entry.domainSlot == domainSlot) return &entry;
-    }
-    return nullptr;
-}
-
-inline constexpr const DigitalInputRoleDefault* digitalInputDefaultForDomainSlot(DomainSlotId domainSlot)
-{
-    for (const DigitalInputRoleDefault& entry : kDigitalInputRoleDefaults) {
-        if (entry.domainSlot == domainSlot) return &entry;
-    }
-    return nullptr;
-}
-
-inline constexpr const DigitalOutputRoleDefault* digitalOutputDefaultForDomainSlot(DomainSlotId domainSlot)
-{
-    for (const DigitalOutputRoleDefault& entry : kDigitalOutputRoleDefaults) {
-        if (entry.domainSlot == domainSlot) return &entry;
-    }
-    return nullptr;
-}
 
 }  // namespace IoLayout
 }  // namespace FlowIO

@@ -12,8 +12,6 @@ inline constexpr DomainSpec kSupervisorDomain{
     nullptr,
     0,
     nullptr,
-    0,
-    nullptr,
     nullptr
 };
 

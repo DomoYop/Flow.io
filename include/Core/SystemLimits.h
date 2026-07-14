@@ -220,7 +220,6 @@ constexpr uint8_t AnalogConfigSlots = BoardCapacityProfile::kIoCapacity.analogCo
 constexpr uint8_t DigitalInputConfigSlots = BoardCapacityProfile::kIoCapacity.digitalInputConfigSlots;
 constexpr uint8_t DigitalOutputConfigSlots = BoardCapacityProfile::kIoCapacity.digitalOutputConfigSlots;
 constexpr uint8_t MaxDomainSlots = 24;
-constexpr uint8_t MaxDomainIoSlotBindings = 24;
 constexpr uint8_t MaxPoolDevices = 16;
 
 static_assert(MaxAnalogEndpoints > 0, "IO analogEndpoints must be at least 1");
@@ -230,7 +229,6 @@ static_assert(AnalogConfigSlots >= MaxAnalogEndpoints, "analog config slots must
 static_assert(DigitalInputConfigSlots >= MaxDigitalInputs, "digital input config slots must cover runtime inputs");
 static_assert(DigitalOutputConfigSlots >= MaxDigitalOutputs, "digital output config slots must cover runtime outputs");
 static_assert(MaxDomainSlots > 0, "domain slot capacity must be non-zero");
-static_assert(MaxDomainIoSlotBindings >= MaxDomainSlots, "domain IO binding capacity must cover domain slots");
 static_assert(MaxPoolDevices > 0, "pool device capacity must be non-zero");
 }  // namespace Io
 

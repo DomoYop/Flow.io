@@ -59,19 +59,21 @@ constexpr IoId ioIdFromSlot(IoSlotId slot)
                                                            IO_ID_INVALID;
 }
 
-struct DomainSlotPreset {
+/**
+ * One functional role of the domain: identity, bound IO slot and Home
+ * Assistant presentation, in a single row. The slot kind is carried by
+ * `ioSlot` (ioSlotKind). Outputs leave the HA fields null: their HA entity
+ * comes from the owning PoolDevice.
+ */
+struct PoolRoleSpec {
     DomainSlotId id = DOMAIN_SLOT_INVALID;
-    uint8_t slotKind = IO_SLOT_ANALOG_INPUT;
+    IoSlotId ioSlot = IO_SLOT_INVALID;
     const char* endpointId = nullptr;
     const char* displayName = nullptr;
-    uint8_t runtimeIndex = 0;
-    bool activeHigh = true;
-    uint8_t pullMode = 0;
-};
-
-struct DomainIoSlotBinding {
-    DomainSlotId domainSlot = DOMAIN_SLOT_INVALID;
-    IoSlotId ioSlot = IO_SLOT_INVALID;
+    const char* haObjectSuffix = nullptr;
+    const char* haName = nullptr; // nullptr = displayName.
+    const char* haIcon = nullptr;
+    const char* haUnit = nullptr;
 };
 
 struct PoolDevicePreset {

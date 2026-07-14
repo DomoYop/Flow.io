@@ -7,53 +7,36 @@
 
 namespace PoolDomain {
 
-inline constexpr DomainSlotPreset kDomainSlots[] = {
-    {PoolIds::SensorOrp, IO_SLOT_ANALOG_INPUT, "ORP", "ORP", 0, true, 0},
-    {PoolIds::SensorPh, IO_SLOT_ANALOG_INPUT, "pH", "pH", 1, true, 0},
-    {PoolIds::SensorPsi, IO_SLOT_ANALOG_INPUT, "PSI", "PSI", 2, true, 0},
-    {PoolIds::SensorSpareAnalog, IO_SLOT_ANALOG_INPUT, "Spare", "Spare", 3, true, 0},
-    {PoolIds::SensorWaterTemp, IO_SLOT_ANALOG_INPUT, "Water Temperature", "Water Temperature", 4, true, 0},
-    {PoolIds::SensorAirTemp, IO_SLOT_ANALOG_INPUT, "Air Temperature", "Air Temperature", 5, true, 0},
-    {PoolIds::SensorPoolLevel, IO_SLOT_DIGITAL_INPUT, "Pool Level", "Pool Level", 6, true, 0},
-    {PoolIds::SensorPhLevel, IO_SLOT_DIGITAL_INPUT, "pH Level", "pH Level", 7, true, 0},
-    {PoolIds::SensorChlorineLevel, IO_SLOT_DIGITAL_INPUT, "Chlorine Level", "Chlorine Level", 8, true, 0},
-    {PoolIds::SensorWaterCounter, IO_SLOT_DIGITAL_INPUT, "Water Counter", "Water Counter", 9, true, 0},
-    {PoolIds::ActuatorFiltrationPump, IO_SLOT_DIGITAL_OUTPUT, "io_flt_pmp", "Filtration Pump", 0, true, 0},
-    {PoolIds::ActuatorPhPump, IO_SLOT_DIGITAL_OUTPUT, "io_ph_pmp", "pH Pump", 1, true, 0},
-    {PoolIds::ActuatorChlorinePump, IO_SLOT_DIGITAL_OUTPUT, "io_chl_pmp", "Chlorine Pump", 2, true, 0},
-    {PoolIds::ActuatorRobot, IO_SLOT_DIGITAL_OUTPUT, "io_robot", "Robot", 3, true, 0},
-    {PoolIds::ActuatorFillPump, IO_SLOT_DIGITAL_OUTPUT, "io_fill_pmp", "Fill Pump", 4, true, 0},
-    {PoolIds::ActuatorChlorineGenerator, IO_SLOT_DIGITAL_OUTPUT, "io_chl_gen", "Chlorine Generator", 5, true, 0},
-    {PoolIds::ActuatorLights, IO_SLOT_DIGITAL_OUTPUT, "io_lights", "Lights", 6, true, 0},
-    {PoolIds::ActuatorWaterHeater, IO_SLOT_DIGITAL_OUTPUT, "io_wat_htr", "Water Heater", 7, true, 0},
-};
-
-inline constexpr DomainIoSlotBinding kDomainIoSlots[] = {
-    {PoolIds::SensorOrp, analogInputSlot(0)},
-    {PoolIds::SensorPh, analogInputSlot(1)},
-    {PoolIds::SensorPsi, analogInputSlot(2)},
-    {PoolIds::SensorSpareAnalog, analogInputSlot(3)},
-    {PoolIds::SensorWaterTemp, analogInputSlot(4)},
-    {PoolIds::SensorAirTemp, analogInputSlot(5)},
+// Une ligne par role metier : identite + slot IO + presentation Home
+// Assistant. Le brochage d'usine (port physique, calibration, polarites)
+// reste par profil dans les *IoLayout.h.
+inline constexpr PoolRoleSpec kPoolRoles[] = {
+    // {role, ioSlot, endpointId, displayName, haObjectSuffix, haName, haIcon, haUnit}
+    {PoolIds::SensorOrp, analogInputSlot(0), "ORP", "ORP", "io_orp", nullptr, "mdi:flash", "mV"},
+    {PoolIds::SensorPh, analogInputSlot(1), "pH", "pH", "io_ph", nullptr, "mdi:ph", ""},
+    {PoolIds::SensorPsi, analogInputSlot(2), "PSI", "PSI", "io_psi", nullptr, "mdi:gauge", "PSI"},
+    {PoolIds::SensorSpareAnalog, analogInputSlot(3), "Spare", "Spare", "io_spare", nullptr, "mdi:sine-wave", nullptr},
+    {PoolIds::SensorWaterTemp, analogInputSlot(4), "Water Temperature", "Water Temperature", "io_wat_tmp", nullptr, "mdi:water-thermometer", "\xC2\xB0""C"},
+    {PoolIds::SensorAirTemp, analogInputSlot(5), "Air Temperature", "Air Temperature", "io_air_tmp", nullptr, "mdi:thermometer", "\xC2\xB0""C"},
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {PoolIds::SensorPoolLevel, digitalInputSlot(2)},
-    {PoolIds::SensorPhLevel, digitalInputSlot(0)},
-    {PoolIds::SensorChlorineLevel, digitalInputSlot(1)},
-    {PoolIds::SensorWaterCounter, digitalInputSlot(3)},
+    {PoolIds::SensorPoolLevel, digitalInputSlot(2), "Pool Level", "Pool Level", "io_pool_lvl", nullptr, "mdi:waves-arrow-up", nullptr},
+    {PoolIds::SensorPhLevel, digitalInputSlot(0), "pH Level", "pH Level", "io_ph_lvl", nullptr, "mdi:flask-outline", nullptr},
+    {PoolIds::SensorChlorineLevel, digitalInputSlot(1), "Chlorine Level", "Chlorine Level", "io_dis_lvl", "Disinfectant Level", "mdi:test-tube", nullptr},
+    {PoolIds::SensorWaterCounter, digitalInputSlot(3), "Water Counter", "Water Counter", "io_wat_cnt", nullptr, "mdi:water-sync", "L"},
 #else
-    {PoolIds::SensorPoolLevel, digitalInputSlot(0)},
-    {PoolIds::SensorPhLevel, digitalInputSlot(1)},
-    {PoolIds::SensorChlorineLevel, digitalInputSlot(2)},
-    {PoolIds::SensorWaterCounter, digitalInputSlot(3)},
+    {PoolIds::SensorPoolLevel, digitalInputSlot(0), "Pool Level", "Pool Level", "io_pool_lvl", nullptr, "mdi:waves-arrow-up", nullptr},
+    {PoolIds::SensorPhLevel, digitalInputSlot(1), "pH Level", "pH Level", "io_ph_lvl", nullptr, "mdi:flask-outline", nullptr},
+    {PoolIds::SensorChlorineLevel, digitalInputSlot(2), "Chlorine Level", "Chlorine Level", "io_chl_lvl", nullptr, "mdi:test-tube", nullptr},
+    {PoolIds::SensorWaterCounter, digitalInputSlot(3), "Water Counter", "Water Counter", "io_wat_cnt", nullptr, "mdi:water-sync", "L"},
 #endif
-    {PoolIds::ActuatorFiltrationPump, digitalOutputSlot(0)},
-    {PoolIds::ActuatorPhPump, digitalOutputSlot(1)},
-    {PoolIds::ActuatorChlorinePump, digitalOutputSlot(2)},
-    {PoolIds::ActuatorRobot, digitalOutputSlot(3)},
-    {PoolIds::ActuatorFillPump, digitalOutputSlot(4)},
-    {PoolIds::ActuatorChlorineGenerator, digitalOutputSlot(5)},
-    {PoolIds::ActuatorLights, digitalOutputSlot(6)},
-    {PoolIds::ActuatorWaterHeater, digitalOutputSlot(7)},
+    {PoolIds::ActuatorFiltrationPump, digitalOutputSlot(0), "io_flt_pmp", "Filtration Pump", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorPhPump, digitalOutputSlot(1), "io_ph_pmp", "pH Pump", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorChlorinePump, digitalOutputSlot(2), "io_chl_pmp", "Chlorine Pump", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorRobot, digitalOutputSlot(3), "io_robot", "Robot", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorFillPump, digitalOutputSlot(4), "io_fill_pmp", "Fill Pump", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorChlorineGenerator, digitalOutputSlot(5), "io_chl_gen", "Chlorine Generator", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorLights, digitalOutputSlot(6), "io_lights", "Lights", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorWaterHeater, digitalOutputSlot(7), "io_wat_htr", "Water Heater", nullptr, nullptr, nullptr, nullptr},
 };
 
 inline constexpr PoolDevicePreset kPoolDevices[] = {
@@ -76,10 +59,8 @@ inline constexpr PoolDevicePreset kPoolDevices[] = {
 
 inline constexpr DomainSpec kPoolDomain{
     "Pool",
-    kDomainSlots,
-    (uint8_t)(sizeof(kDomainSlots) / sizeof(kDomainSlots[0])),
-    kDomainIoSlots,
-    (uint8_t)(sizeof(kDomainIoSlots) / sizeof(kDomainIoSlots[0])),
+    kPoolRoles,
+    (uint8_t)(sizeof(kPoolRoles) / sizeof(kPoolRoles[0])),
     kPoolDevices,
     (uint8_t)(sizeof(kPoolDevices) / sizeof(kPoolDevices[0])),
     &PoolDefaults::kLogicDefaults,
