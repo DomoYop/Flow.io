@@ -205,6 +205,40 @@ static constexpr uint8_t analogCfgBranch_(uint8_t idx)
                            ConfigBranchRef::UnknownLocalBranch;
 }
 
+static constexpr uint8_t digitalInCfgBranch_(uint8_t idx)
+{
+    return (idx == 0U) ? kCfgBranchIoI0 :
+           (idx == 1U) ? kCfgBranchIoI1 :
+           (idx == 2U) ? kCfgBranchIoI2 :
+           (idx == 3U) ? kCfgBranchIoI3 :
+           (idx == 4U) ? kCfgBranchIoI4 :
+           (idx == 5U) ? kCfgBranchIoI5 :
+           (idx == 6U) ? kCfgBranchIoI6 :
+           (idx == 7U) ? kCfgBranchIoI7 :
+                          ConfigBranchRef::UnknownLocalBranch;
+}
+
+static constexpr uint8_t digitalOutCfgBranch_(uint8_t idx)
+{
+    return (idx == 0U) ? kCfgBranchIoD0 :
+           (idx == 1U) ? kCfgBranchIoD1 :
+           (idx == 2U) ? kCfgBranchIoD2 :
+           (idx == 3U) ? kCfgBranchIoD3 :
+           (idx == 4U) ? kCfgBranchIoD4 :
+           (idx == 5U) ? kCfgBranchIoD5 :
+           (idx == 6U) ? kCfgBranchIoD6 :
+           (idx == 7U) ? kCfgBranchIoD7 :
+           (idx == 8U) ? kCfgBranchIoD8 :
+           (idx == 9U) ? kCfgBranchIoD9 :
+           (idx == 10U) ? kCfgBranchIoD10 :
+           (idx == 11U) ? kCfgBranchIoD11 :
+           (idx == 12U) ? kCfgBranchIoD12 :
+           (idx == 13U) ? kCfgBranchIoD13 :
+           (idx == 14U) ? kCfgBranchIoD14 :
+           (idx == 15U) ? kCfgBranchIoD15 :
+                           ConfigBranchRef::UnknownLocalBranch;
+}
+
 PhysicalPortId normalizeConfiguredBindingPort(PhysicalPortId port)
 {
     return (port == kLegacyDisconnectedBindingPort) ? IO_PORT_INVALID : port;
@@ -383,43 +417,13 @@ void IOModule::setBindingPorts(const IOBindingPortSpec* ports, uint8_t count)
     bindingPortCount_ = count;
 }
 
-bool IOModule::ensureExtraAnalogCfgVars_()
+bool IOModule::ensureSlotConfigVars_()
 {
-    if (extraAnalogCfgVars_) return true;
-    void* mem = heap_caps_malloc(sizeof(ExtraAnalogConfigVars), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!mem) mem = heap_caps_malloc(sizeof(ExtraAnalogConfigVars), MALLOC_CAP_8BIT);
+    if (slotCfgVars_) return true;
+    void* mem = heap_caps_malloc(sizeof(IoSlotConfigVars), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!mem) mem = heap_caps_malloc(sizeof(IoSlotConfigVars), MALLOC_CAP_8BIT);
     if (!mem) return false;
-    extraAnalogCfgVars_ = new (mem) ExtraAnalogConfigVars(analogCfg_);
-    return true;
-}
-
-bool IOModule::ensureDigitalCounterCfgVars_()
-{
-    if (extraDigitalCounterCfgVars_) return true;
-    void* mem = heap_caps_malloc(sizeof(ExtraDigitalCounterConfigVars), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!mem) mem = heap_caps_malloc(sizeof(ExtraDigitalCounterConfigVars), MALLOC_CAP_8BIT);
-    if (!mem) return false;
-    extraDigitalCounterCfgVars_ = new (mem) ExtraDigitalCounterConfigVars(digitalInCfg_);
-    return true;
-}
-
-bool IOModule::ensureDigitalInputModeCfgVars_()
-{
-    if (extraDigitalInputModeCfgVars_) return true;
-    void* mem = heap_caps_malloc(sizeof(ExtraDigitalInputModeConfigVars), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!mem) mem = heap_caps_malloc(sizeof(ExtraDigitalInputModeConfigVars), MALLOC_CAP_8BIT);
-    if (!mem) return false;
-    extraDigitalInputModeCfgVars_ = new (mem) ExtraDigitalInputModeConfigVars(digitalInCfg_);
-    return true;
-}
-
-bool IOModule::ensureExtraDigitalOutputCfgVars_()
-{
-    if (extraDigitalOutputCfgVars_) return true;
-    void* mem = heap_caps_malloc(sizeof(ExtraDigitalOutputConfigVars), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!mem) mem = heap_caps_malloc(sizeof(ExtraDigitalOutputConfigVars), MALLOC_CAP_8BIT);
-    if (!mem) return false;
-    extraDigitalOutputCfgVars_ = new (mem) ExtraDigitalOutputConfigVars(digitalCfg_);
+    slotCfgVars_ = new (mem) IoSlotConfigVars(analogCfg_, digitalInCfg_, digitalCfg_);
     return true;
 }
 
@@ -583,19 +587,9 @@ bool IOModule::findDigitalSlotByIoId_(IoId id, uint8_t& slotIdxOut) const
 ConfigVariable<float,0>* IOModule::counterTotalVar_(uint8_t logicalIdx)
 {
     if (logicalIdx >= MAX_DIGITAL_INPUTS) return nullptr;
-    if (!extraDigitalCounterCfgVars_ && !ensureDigitalCounterCfgVars_()) return nullptr;
-
-    switch (logicalIdx) {
-        case 0: return &extraDigitalCounterCfgVars_->i0TotalVar_;
-        case 1: return &extraDigitalCounterCfgVars_->i1TotalVar_;
-        case 2: return &extraDigitalCounterCfgVars_->i2TotalVar_;
-        case 3: return &extraDigitalCounterCfgVars_->i3TotalVar_;
-        case 4: return &extraDigitalCounterCfgVars_->i4TotalVar_;
-        case 5: return &extraDigitalCounterCfgVars_->i5TotalVar_;
-        case 6: return &extraDigitalCounterCfgVars_->i6TotalVar_;
-        case 7: return &extraDigitalCounterCfgVars_->i7TotalVar_;
-        default: return nullptr;
-    }
+    if (!slotCfgVars_ && !ensureSlotConfigVars_()) return nullptr;
+    if (logicalIdx >= IoSlotConfigVars::DigitalInSlots) return nullptr;
+    return &slotCfgVars_->din[logicalIdx].counterTotal;
 }
 
 float* IOModule::counterConfigTotalState_(uint8_t logicalIdx)
@@ -3425,102 +3419,10 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(traceEnabledVar_, kCfgModuleId, kCfgBranchIoDebug);
     cfg.registerVar(tracePeriodVar_, kCfgModuleId, kCfgBranchIoDebug);
 
-#define FLOW_IO_REGISTER_ANALOG_CFG(INDEX, BRANCH) \
-    cfg.registerVar(a##INDEX##NameVar_, kCfgModuleId, BRANCH); \
-    cfg.registerVar(a##INDEX##BindingVar_, kCfgModuleId, BRANCH); \
-    cfg.registerVar(a##INDEX##C0Var_, kCfgModuleId, BRANCH); \
-    cfg.registerVar(a##INDEX##C1Var_, kCfgModuleId, BRANCH); \
-    cfg.registerVar(a##INDEX##PrecVar_, kCfgModuleId, BRANCH);
-    FLOW_IO_REGISTER_ANALOG_CFG(0, kCfgBranchIoA0)
-    FLOW_IO_REGISTER_ANALOG_CFG(1, kCfgBranchIoA1)
-    FLOW_IO_REGISTER_ANALOG_CFG(2, kCfgBranchIoA2)
-    FLOW_IO_REGISTER_ANALOG_CFG(3, kCfgBranchIoA3)
-    FLOW_IO_REGISTER_ANALOG_CFG(4, kCfgBranchIoA4)
-    FLOW_IO_REGISTER_ANALOG_CFG(5, kCfgBranchIoA5)
-#undef FLOW_IO_REGISTER_ANALOG_CFG
-
-    if (ensureExtraAnalogCfgVars_()) {
-        for (uint8_t i = ExtraAnalogConfigVars::FIRST_SLOT; i < ANALOG_CFG_SLOTS; ++i) {
-            if (i >= (ExtraAnalogConfigVars::FIRST_SLOT + ExtraAnalogConfigVars::SLOT_COUNT)) break;
-            ExtraAnalogConfigVars::SlotVars& vars = extraAnalogCfgVars_->slots[i - ExtraAnalogConfigVars::FIRST_SLOT];
-            const uint8_t branch = analogCfgBranch_(i);
-            cfg.registerVar(vars.nameVar_, kCfgModuleId, branch);
-            cfg.registerVar(vars.bindingVar_, kCfgModuleId, branch);
-            cfg.registerVar(vars.c0Var_, kCfgModuleId, branch);
-            cfg.registerVar(vars.c1Var_, kCfgModuleId, branch);
-            cfg.registerVar(vars.precVar_, kCfgModuleId, branch);
-        }
+    if (ensureSlotConfigVars_()) {
+        slotCfgVars_->registerAll(cfg, kCfgModuleId, analogCfgBranch_, digitalInCfgBranch_, digitalOutCfgBranch_);
     } else {
-        LOGE("failed to allocate extra analog config vars");
-    }
-
-    cfg.registerVar(i0NameVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0BindingVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0ActiveHighVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0PullModeVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0EdgeModeVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0C0Var_, kCfgModuleId, kCfgBranchIoI0); cfg.registerVar(i0PrecVar_, kCfgModuleId, kCfgBranchIoI0);
-    cfg.registerVar(i1NameVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1BindingVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1ActiveHighVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1PullModeVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1EdgeModeVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1C0Var_, kCfgModuleId, kCfgBranchIoI1); cfg.registerVar(i1PrecVar_, kCfgModuleId, kCfgBranchIoI1);
-    cfg.registerVar(i2NameVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2BindingVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2ActiveHighVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2PullModeVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2EdgeModeVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2C0Var_, kCfgModuleId, kCfgBranchIoI2); cfg.registerVar(i2PrecVar_, kCfgModuleId, kCfgBranchIoI2);
-    cfg.registerVar(i3NameVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3BindingVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3ActiveHighVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3PullModeVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3EdgeModeVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3C0Var_, kCfgModuleId, kCfgBranchIoI3); cfg.registerVar(i3PrecVar_, kCfgModuleId, kCfgBranchIoI3);
-    cfg.registerVar(i4NameVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4BindingVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4ActiveHighVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4PullModeVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4EdgeModeVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4C0Var_, kCfgModuleId, kCfgBranchIoI4); cfg.registerVar(i4PrecVar_, kCfgModuleId, kCfgBranchIoI4);
-    if (DIGITAL_INPUT_CFG_SLOTS > 5U) { cfg.registerVar(i5NameVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5BindingVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5ActiveHighVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5PullModeVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5EdgeModeVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5C0Var_, kCfgModuleId, kCfgBranchIoI5); cfg.registerVar(i5PrecVar_, kCfgModuleId, kCfgBranchIoI5); }
-    if (DIGITAL_INPUT_CFG_SLOTS > 6U) { cfg.registerVar(i6NameVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6BindingVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6ActiveHighVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6PullModeVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6EdgeModeVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6C0Var_, kCfgModuleId, kCfgBranchIoI6); cfg.registerVar(i6PrecVar_, kCfgModuleId, kCfgBranchIoI6); }
-    if (DIGITAL_INPUT_CFG_SLOTS > 7U) { cfg.registerVar(i7NameVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7BindingVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7ActiveHighVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7PullModeVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7EdgeModeVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7CounterDebounceVar_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7C0Var_, kCfgModuleId, kCfgBranchIoI7); cfg.registerVar(i7PrecVar_, kCfgModuleId, kCfgBranchIoI7); }
-
-    if (ensureDigitalInputModeCfgVars_()) {
-        ExtraDigitalInputModeConfigVars& modes = *extraDigitalInputModeCfgVars_;
-        cfg.registerVar(modes.i0ModeVar_, kCfgModuleId, kCfgBranchIoI0);
-        cfg.registerVar(modes.i1ModeVar_, kCfgModuleId, kCfgBranchIoI1);
-        cfg.registerVar(modes.i2ModeVar_, kCfgModuleId, kCfgBranchIoI2);
-        cfg.registerVar(modes.i3ModeVar_, kCfgModuleId, kCfgBranchIoI3);
-        cfg.registerVar(modes.i4ModeVar_, kCfgModuleId, kCfgBranchIoI4);
-        if (DIGITAL_INPUT_CFG_SLOTS > 5U) cfg.registerVar(modes.i5ModeVar_, kCfgModuleId, kCfgBranchIoI5);
-        if (DIGITAL_INPUT_CFG_SLOTS > 6U) cfg.registerVar(modes.i6ModeVar_, kCfgModuleId, kCfgBranchIoI6);
-        if (DIGITAL_INPUT_CFG_SLOTS > 7U) cfg.registerVar(modes.i7ModeVar_, kCfgModuleId, kCfgBranchIoI7);
-    } else {
-        LOGE("failed to allocate digital input mode config vars");
-    }
-
-    if (ensureDigitalCounterCfgVars_()) {
-        ExtraDigitalCounterConfigVars& totals = *extraDigitalCounterCfgVars_;
-        cfg.registerVar(totals.i0TotalVar_, kCfgModuleId, kCfgBranchIoI0);
-        cfg.registerVar(totals.i1TotalVar_, kCfgModuleId, kCfgBranchIoI1);
-        cfg.registerVar(totals.i2TotalVar_, kCfgModuleId, kCfgBranchIoI2);
-        cfg.registerVar(totals.i3TotalVar_, kCfgModuleId, kCfgBranchIoI3);
-        cfg.registerVar(totals.i4TotalVar_, kCfgModuleId, kCfgBranchIoI4);
-        if (DIGITAL_INPUT_CFG_SLOTS > 5U) cfg.registerVar(totals.i5TotalVar_, kCfgModuleId, kCfgBranchIoI5);
-        if (DIGITAL_INPUT_CFG_SLOTS > 6U) cfg.registerVar(totals.i6TotalVar_, kCfgModuleId, kCfgBranchIoI6);
-        if (DIGITAL_INPUT_CFG_SLOTS > 7U) cfg.registerVar(totals.i7TotalVar_, kCfgModuleId, kCfgBranchIoI7);
-    } else {
-        LOGE("failed to allocate digital counter config vars");
-    }
-
-    cfg.registerVar(d0NameVar_, kCfgModuleId, kCfgBranchIoD0); cfg.registerVar(d0BindingVar_, kCfgModuleId, kCfgBranchIoD0); cfg.registerVar(d0ActiveHighVar_, kCfgModuleId, kCfgBranchIoD0); cfg.registerVar(d0InitialOnVar_, kCfgModuleId, kCfgBranchIoD0); cfg.registerVar(d0RetainWarmVar_, kCfgModuleId, kCfgBranchIoD0); cfg.registerVar(d0MomentaryVar_, kCfgModuleId, kCfgBranchIoD0); cfg.registerVar(d0PulseVar_, kCfgModuleId, kCfgBranchIoD0);
-    cfg.registerVar(d1NameVar_, kCfgModuleId, kCfgBranchIoD1); cfg.registerVar(d1BindingVar_, kCfgModuleId, kCfgBranchIoD1); cfg.registerVar(d1ActiveHighVar_, kCfgModuleId, kCfgBranchIoD1); cfg.registerVar(d1InitialOnVar_, kCfgModuleId, kCfgBranchIoD1); cfg.registerVar(d1RetainWarmVar_, kCfgModuleId, kCfgBranchIoD1); cfg.registerVar(d1MomentaryVar_, kCfgModuleId, kCfgBranchIoD1); cfg.registerVar(d1PulseVar_, kCfgModuleId, kCfgBranchIoD1);
-    cfg.registerVar(d2NameVar_, kCfgModuleId, kCfgBranchIoD2); cfg.registerVar(d2BindingVar_, kCfgModuleId, kCfgBranchIoD2); cfg.registerVar(d2ActiveHighVar_, kCfgModuleId, kCfgBranchIoD2); cfg.registerVar(d2InitialOnVar_, kCfgModuleId, kCfgBranchIoD2); cfg.registerVar(d2RetainWarmVar_, kCfgModuleId, kCfgBranchIoD2); cfg.registerVar(d2MomentaryVar_, kCfgModuleId, kCfgBranchIoD2); cfg.registerVar(d2PulseVar_, kCfgModuleId, kCfgBranchIoD2);
-    cfg.registerVar(d3NameVar_, kCfgModuleId, kCfgBranchIoD3); cfg.registerVar(d3BindingVar_, kCfgModuleId, kCfgBranchIoD3); cfg.registerVar(d3ActiveHighVar_, kCfgModuleId, kCfgBranchIoD3); cfg.registerVar(d3InitialOnVar_, kCfgModuleId, kCfgBranchIoD3); cfg.registerVar(d3RetainWarmVar_, kCfgModuleId, kCfgBranchIoD3); cfg.registerVar(d3MomentaryVar_, kCfgModuleId, kCfgBranchIoD3); cfg.registerVar(d3PulseVar_, kCfgModuleId, kCfgBranchIoD3);
-    cfg.registerVar(d4NameVar_, kCfgModuleId, kCfgBranchIoD4); cfg.registerVar(d4BindingVar_, kCfgModuleId, kCfgBranchIoD4); cfg.registerVar(d4ActiveHighVar_, kCfgModuleId, kCfgBranchIoD4); cfg.registerVar(d4InitialOnVar_, kCfgModuleId, kCfgBranchIoD4); cfg.registerVar(d4RetainWarmVar_, kCfgModuleId, kCfgBranchIoD4); cfg.registerVar(d4MomentaryVar_, kCfgModuleId, kCfgBranchIoD4); cfg.registerVar(d4PulseVar_, kCfgModuleId, kCfgBranchIoD4);
-    cfg.registerVar(d5NameVar_, kCfgModuleId, kCfgBranchIoD5); cfg.registerVar(d5BindingVar_, kCfgModuleId, kCfgBranchIoD5); cfg.registerVar(d5ActiveHighVar_, kCfgModuleId, kCfgBranchIoD5); cfg.registerVar(d5InitialOnVar_, kCfgModuleId, kCfgBranchIoD5); cfg.registerVar(d5RetainWarmVar_, kCfgModuleId, kCfgBranchIoD5); cfg.registerVar(d5MomentaryVar_, kCfgModuleId, kCfgBranchIoD5); cfg.registerVar(d5PulseVar_, kCfgModuleId, kCfgBranchIoD5);
-    cfg.registerVar(d6NameVar_, kCfgModuleId, kCfgBranchIoD6); cfg.registerVar(d6BindingVar_, kCfgModuleId, kCfgBranchIoD6); cfg.registerVar(d6ActiveHighVar_, kCfgModuleId, kCfgBranchIoD6); cfg.registerVar(d6InitialOnVar_, kCfgModuleId, kCfgBranchIoD6); cfg.registerVar(d6RetainWarmVar_, kCfgModuleId, kCfgBranchIoD6); cfg.registerVar(d6MomentaryVar_, kCfgModuleId, kCfgBranchIoD6); cfg.registerVar(d6PulseVar_, kCfgModuleId, kCfgBranchIoD6);
-    cfg.registerVar(d7NameVar_, kCfgModuleId, kCfgBranchIoD7); cfg.registerVar(d7BindingVar_, kCfgModuleId, kCfgBranchIoD7); cfg.registerVar(d7ActiveHighVar_, kCfgModuleId, kCfgBranchIoD7); cfg.registerVar(d7InitialOnVar_, kCfgModuleId, kCfgBranchIoD7); cfg.registerVar(d7RetainWarmVar_, kCfgModuleId, kCfgBranchIoD7); cfg.registerVar(d7MomentaryVar_, kCfgModuleId, kCfgBranchIoD7); cfg.registerVar(d7PulseVar_, kCfgModuleId, kCfgBranchIoD7);
-
-    if (ensureExtraDigitalOutputCfgVars_()) {
-        ExtraDigitalOutputConfigVars& extra = *extraDigitalOutputCfgVars_;
-#define FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(INDEX, BRANCH) \
-        cfg.registerVar(extra.d##INDEX##NameVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.d##INDEX##BindingVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.d##INDEX##ActiveHighVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.d##INDEX##InitialOnVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.d##INDEX##RetainWarmVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.d##INDEX##MomentaryVar_, kCfgModuleId, BRANCH); \
-        cfg.registerVar(extra.d##INDEX##PulseVar_, kCfgModuleId, BRANCH);
-        if (DIGITAL_CFG_SLOTS > 8U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(8, kCfgBranchIoD8) }
-        if (DIGITAL_CFG_SLOTS > 9U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(9, kCfgBranchIoD9) }
-        if (DIGITAL_CFG_SLOTS > 10U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(10, kCfgBranchIoD10) }
-        if (DIGITAL_CFG_SLOTS > 11U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(11, kCfgBranchIoD11) }
-        if (DIGITAL_CFG_SLOTS > 12U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(12, kCfgBranchIoD12) }
-        if (DIGITAL_CFG_SLOTS > 13U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(13, kCfgBranchIoD13) }
-        if (DIGITAL_CFG_SLOTS > 14U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(14, kCfgBranchIoD14) }
-        if (DIGITAL_CFG_SLOTS > 15U) { FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG(15, kCfgBranchIoD15) }
-#undef FLOW_IO_REGISTER_EXTRA_DIGITAL_OUTPUT_CFG
-    } else {
-        LOGE("failed to allocate extra digital output config vars");
+        LOGE("failed to allocate IO slot config vars");
     }
 
     LOGI("I/O config registered");
