@@ -1,5 +1,22 @@
 # Du capteur à la mesure : comment se combinent carte, domaine et E/S
 
+> **⚠ Page partiellement obsolète depuis la refonte E/S de juillet 2026**
+> (voir [io-refonte-architecture.md](io-refonte-architecture.md)). Les concepts
+> (4 couches, `bindingPort` seul reconfigurable au runtime) restent valables,
+> mais les tables citées ont changé :
+> - `kBindingPorts[]` porte désormais directement `{portId, backend, channel,
+>   flags, name}` — plus de `kind` ni de switch de résolution (les capacités
+>   par backend sont dans `src/Modules/IOModule/IoBackendTraits.h`).
+> - `kDomainSlots[]` + `kDomainIoSlots[]` + les specs HA sont fusionnés en une
+>   table unique `kPoolRoles[]` (`src/Domain/Pool/PoolDomain.h`).
+> - Les défauts `kAnalogRoleDefaults`/`kDigital*RoleDefaults` restent par
+>   profil, avec des structs partagées (`src/Domain/IoRoleDefaults.h`).
+> - La construction des endpoints et la discovery HA sont mutualisées dans
+>   `src/Domain/Pool/PoolIoAssembly.cpp` et `PoolIoHaDiscovery.cpp`.
+> - Ajouter une sonde = 1 ligne dans `kPoolRoles` + 1 ligne de default par
+>   profil ; ajouter un backend = 1 valeur d'enum + 1 ligne de traits + le
+>   driver.
+
 Cette page répond à une question précise : **où et comment décide-t-on quel capteur
 physique alimente quelle mesure** (pH, ORP, température d'eau…) sur flow.io ?
 

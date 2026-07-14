@@ -144,6 +144,21 @@ tombent à ~80 lignes chacune (tableaux extra + appels).
 - **Renumérotation des `PhysicalPortId`** (100/110/120…) : exposés dans l'API web, lisibles,
   aucun gain.
 
+## État d'implémentation
+
+**Implémenté** (branche `claude/simplify-code-architecture-20jngd`, juillet 2026) :
+sections A à E réalisées en 5 commits, chacun poussé et compilé par la CI GitHub
+(`.github/workflows/build.yml`). Bilan net sur `src/` + `include/` : **≈ −1 150 lignes**.
+Écarts assumés vs ce document :
+- Les vues dérivées `kDomainSlots`/`kDomainIoSlots` n'ont pas été conservées :
+  `kPoolRoles` remplace tout, les champs morts (`runtimeIndex`, `activeHigh`,
+  `pullMode` des presets — aucun consommateur) ont été supprimés.
+- L'ordre d'export JSON des vars de slots DI est désormais groupé par slot
+  (name…counter_total) au lieu de « 8 champs, puis modes, puis totaux ».
+- Les noms d'endpoints par défaut viennent du champ `name` des ports
+  (« DIN0 », « Relay 1 », « COMP01 »…) sur les deux profils (harmonisation
+  permise par l'absence de compatibilité NVS).
+
 ## Étapes et validation
 
 Sept étapes, chacune compilable et committée — le détail (fichiers, volumes estimés,
