@@ -111,10 +111,10 @@ public:
 
     void setOneWireBuses(OneWireBus* gpio1, OneWireBus* gpio2);
     void setBindingPorts(const IOBindingPortSpec* ports, uint8_t count);
-    bool defineAnalogInput(const IOAnalogDefinition& def);
-    bool applyAnalogInputDefaults(const IOAnalogDefinition& def);
-    bool defineDigitalInput(const IODigitalInputDefinition& def);
-    bool defineDigitalOutput(const IODigitalOutputDefinition& def);
+    bool defineAnalogInput(const IOEndpointRegistration& reg, const IOAnalogSlotConfig& defaults);
+    bool applyAnalogInputDefaults(const IOEndpointRegistration& reg, const IOAnalogSlotConfig& defaults);
+    bool defineDigitalInput(const IOEndpointRegistration& reg, const IODigitalInputSlotConfig& defaults);
+    bool defineDigitalOutput(const IOEndpointRegistration& reg, const IODigitalOutputSlotConfig& defaults);
     const char* analogSlotName(uint8_t idx) const;
     bool analogSlotUsed(uint8_t idx) const;
     bool analogSlotPublished(uint8_t idx) const;
@@ -297,7 +297,11 @@ private:
     struct AnalogSlot {
         bool used = false;
         IoId ioId = IO_ID_INVALID;
-        IOAnalogDefinition def{};
+        char id[24] = {0};
+        // Snapshot of the slot config captured at configureRuntime_ time.
+        IOAnalogSlotConfig cfg{};
+        IOAnalogValueCallback onValueChanged = nullptr;
+        void* onValueCtx = nullptr;
         // `source` identifies the shared physical driver; `channel` selects one logical measurement.
         uint8_t source = IO_SRC_ADS_INTERNAL_SINGLE;
         uint8_t channel = 0;
@@ -320,8 +324,14 @@ private:
         uint8_t kind = DIGITAL_SLOT_INPUT;
         uint8_t logicalIdx = 0;
         char endpointId[8] = {0};
-        IODigitalInputDefinition inDef{};
-        IODigitalOutputDefinition outDef{};
+        char id[24] = {0};
+        // Snapshots of the slot config captured at configureRuntime_ time.
+        IODigitalInputSlotConfig inCfg{};
+        IODigitalOutputSlotConfig outCfg{};
+        IODigitalValueCallback onValueChanged = nullptr;
+        void* onValueCtx = nullptr;
+        IODigitalCounterValueCallback onCounterChanged = nullptr;
+        void* onCounterCtx = nullptr;
         uint8_t backend = IO_BACKEND_GPIO;
         uint8_t channel = 0;
         IODigitalProvider provider{};

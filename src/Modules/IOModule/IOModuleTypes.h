@@ -113,16 +113,21 @@ enum class IOOutputStartupPolicy : uint8_t {
     PreserveHardwareState = 1
 };
 
-struct IOAnalogDefinition {
+/**
+ * Endpoint identity handed over at registration time. The per-family
+ * defaults travel in the matching IO*SlotConfig struct (same shape as the
+ * persisted slot config), so there is a single description of a slot.
+ */
+struct IOEndpointRegistration {
     char id[24] = {0};
-    /** Required explicit AI id in [IO_ID_AI_BASE..IO_ID_AI_BASE+MAX_ANALOG_ENDPOINTS). */
+    /** Required explicit id inside the family range (AI/DI/DO base). */
     IoId ioId = IO_ID_INVALID;
-    PhysicalPortId bindingPort = IO_PORT_INVALID;
-    float c0 = 1.0f;
-    float c1 = 0.0f;
-    int32_t precision = 1;
-    IOAnalogValueCallback onValueChanged = nullptr;
-    void* onValueCtx = nullptr;
+    IOAnalogValueCallback onAnalogValueChanged = nullptr;
+    void* onAnalogValueCtx = nullptr;
+    IODigitalValueCallback onDigitalValueChanged = nullptr;
+    void* onDigitalValueCtx = nullptr;
+    IODigitalCounterValueCallback onCounterChanged = nullptr;
+    void* onCounterCtx = nullptr;
 };
 
 struct IOAnalogSlotConfig {
@@ -131,19 +136,6 @@ struct IOAnalogSlotConfig {
     float c0 = 1.0f;
     float c1 = 0.0f;
     int32_t precision = 1;
-};
-
-struct IODigitalOutputDefinition {
-    char id[24] = {0};
-    /** Required explicit DO id in [IO_ID_DO_BASE..IO_ID_DO_BASE+MAX_DIGITAL_OUTPUTS). */
-    IoId ioId = IO_ID_INVALID;
-    PhysicalPortId bindingPort = IO_PORT_INVALID;
-    bool activeHigh = false;
-    bool initialOn = false;
-    IOOutputStartupPolicy startupPolicy = IOOutputStartupPolicy::ApplyInitial;
-    bool retainOnWarmReboot = false;
-    bool momentary = false;
-    uint16_t pulseMs = 500;
 };
 
 struct IODigitalOutputSlotConfig {
@@ -170,18 +162,3 @@ struct IODigitalInputSlotConfig {
     int32_t precision = 0;
 };
 
-struct IODigitalInputDefinition {
-    char id[24] = {0};
-    /** Required explicit DI id in [IO_ID_DI_BASE..IO_ID_DI_BASE+MAX_DIGITAL_INPUTS). */
-    IoId ioId = IO_ID_INVALID;
-    PhysicalPortId bindingPort = IO_PORT_INVALID;
-    bool activeHigh = true;
-    uint8_t pullMode = IO_PULL_NONE;
-    uint8_t mode = IO_DIGITAL_INPUT_STATE;
-    uint8_t edgeMode = IO_EDGE_RISING;
-    uint32_t counterDebounceUs = 0;
-    IODigitalValueCallback onValueChanged = nullptr;
-    void* onValueCtx = nullptr;
-    IODigitalCounterValueCallback onCounterChanged = nullptr;
-    void* onCounterCtx = nullptr;
-};

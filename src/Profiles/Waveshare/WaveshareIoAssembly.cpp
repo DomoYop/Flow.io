@@ -243,24 +243,24 @@ void requireSetup(bool ok, const char* step)
     while (true) delay(1000);
 }
 
-void applyAnalogDefaultsForDomainSlot(DomainSlotId domainSlot, IOAnalogDefinition& def)
+void applyAnalogDefaultsForDomainSlot(DomainSlotId domainSlot, IOAnalogSlotConfig& cfg)
 {
     const FlowIoLayout::AnalogRoleDefault* spec = FlowIoLayout::analogDefaultForDomainSlot(domainSlot);
     requireSetup(spec != nullptr, "unsupported analog domain role");
-    def.bindingPort = spec->bindingPort;
-    def.c0 = spec->c0;
-    def.c1 = spec->c1;
-    def.precision = spec->precision;
+    cfg.bindingPort = spec->bindingPort;
+    cfg.c0 = spec->c0;
+    cfg.c1 = spec->c1;
+    cfg.precision = spec->precision;
 }
 
-void applyDigitalDefaultsForDomainSlot(DomainSlotId domainSlot, IODigitalInputDefinition& def)
+void applyDigitalDefaultsForDomainSlot(DomainSlotId domainSlot, IODigitalInputSlotConfig& cfg)
 {
     const FlowIoLayout::DigitalInputRoleDefault* spec = FlowIoLayout::digitalInputDefaultForDomainSlot(domainSlot);
     requireSetup(spec != nullptr, "unsupported digital input domain role");
-    def.bindingPort = spec->bindingPort;
-    def.mode = spec->mode;
-    def.edgeMode = spec->edgeMode;
-    def.counterDebounceUs = spec->debounceUs;
+    cfg.bindingPort = spec->bindingPort;
+    cfg.mode = spec->mode;
+    cfg.edgeMode = spec->edgeMode;
+    cfg.counterDebounceUs = (int32_t)spec->debounceUs;
 }
 
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
@@ -511,10 +511,10 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
     );
 
     for (uint8_t i = 0; i < Limits::Io::MaxAnalogEndpoints; ++i) {
-        IOAnalogDefinition def{};
-        snprintf(def.id, sizeof(def.id), "a%02u", (unsigned)i);
-        def.ioId = (IoId)(IO_ID_AI_BASE + i);
-        requireSetup(modules.ioModule.defineAnalogInput(def), "define analog input slot");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "a%02u", (unsigned)i);
+        reg.ioId = (IoId)(IO_ID_AI_BASE + i);
+        requireSetup(modules.ioModule.defineAnalogInput(reg, IOAnalogSlotConfig{}), "define analog input slot");
     }
 
     for (uint8_t i = 0; i < ctx.domain->domainSlotCount; ++i) {
@@ -525,61 +525,65 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         requireSetup(ioId != IO_ID_INVALID, "invalid domain slot IO mapping");
 
         if (preset.slotKind == IO_SLOT_DIGITAL_INPUT) {
-            IODigitalInputDefinition def{};
-            snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "input");
-            def.ioId = ioId;
-            def.activeHigh = false;
-            def.pullMode = IO_PULL_UP;
-            applyDigitalDefaultsForDomainSlot(preset.id, def);
+            IOEndpointRegistration reg{};
+            snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "input");
+            reg.ioId = ioId;
+            IODigitalInputSlotConfig cfg{};
+            cfg.activeHigh = false;
+            cfg.pullMode = IO_PULL_UP;
+            applyDigitalDefaultsForDomainSlot(preset.id, cfg);
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
             if (const char* defaultName = waveshareDigitalInputNameForDomainSlot(preset.id)) {
-                snprintf(def.id, sizeof(def.id), "%s", defaultName);
+                snprintf(reg.id, sizeof(reg.id), "%s", defaultName);
             }
 #else
-            const uint8_t diOrdinal = digitalInputOrdinalFromPort(def.bindingPort);
+            const uint8_t diOrdinal = digitalInputOrdinalFromPort(cfg.bindingPort);
             if (diOrdinal != 0U) {
-                snprintf(def.id, sizeof(def.id), "DI Pin %u", (unsigned)diOrdinal);
+                snprintf(reg.id, sizeof(reg.id), "DI Pin %u", (unsigned)diOrdinal);
             }
 #endif
-            requireSetup(modules.ioModule.defineDigitalInput(def), "define digital input");
+            requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define digital input");
             continue;
         }
 
         if (preset.slotKind != IO_SLOT_ANALOG_INPUT) continue;
 
-        IOAnalogDefinition def{};
-        snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "analog");
-        def.ioId = ioId;
-        applyAnalogDefaultsForDomainSlot(preset.id, def);
-        requireSetup(modules.ioModule.applyAnalogInputDefaults(def), "apply analog input defaults");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "analog");
+        reg.ioId = ioId;
+        IOAnalogSlotConfig cfg{};
+        applyAnalogDefaultsForDomainSlot(preset.id, cfg);
+        requireSetup(modules.ioModule.applyAnalogInputDefaults(reg, cfg), "apply analog input defaults");
     }
 
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
     for (uint8_t i = 0; i < 8; ++i) {
         if (modules.ioModule.digitalInputSlotUsed(i)) continue;
-        IODigitalInputDefinition def{};
-        snprintf(def.id, sizeof(def.id), "%s", waveshareDigitalInputNameForLogical(i));
-        def.ioId = (IoId)(IO_ID_DI_BASE + i);
-        def.activeHigh = false;
-        def.pullMode = IO_PULL_UP;
-        def.mode = IO_DIGITAL_INPUT_STATE;
-        def.edgeMode = IO_EDGE_RISING;
-        def.counterDebounceUs = 0U;
-        def.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
-        requireSetup(modules.ioModule.defineDigitalInput(def), "define waveshare digital input");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "%s", waveshareDigitalInputNameForLogical(i));
+        reg.ioId = (IoId)(IO_ID_DI_BASE + i);
+        IODigitalInputSlotConfig cfg{};
+        cfg.activeHigh = false;
+        cfg.pullMode = IO_PULL_UP;
+        cfg.mode = IO_DIGITAL_INPUT_STATE;
+        cfg.edgeMode = IO_EDGE_RISING;
+        cfg.counterDebounceUs = 0;
+        cfg.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
+        requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define waveshare digital input");
     }
 #else
     for (uint8_t i = 4; i < 8; ++i) {
-        IODigitalInputDefinition def{};
-        snprintf(def.id, sizeof(def.id), "DI Pin %u", (unsigned)(i + 1));
-        def.ioId = (IoId)(IO_ID_DI_BASE + i);
-        def.activeHigh = false;
-        def.pullMode = IO_PULL_UP;
-        def.mode = IO_DIGITAL_INPUT_STATE;
-        def.edgeMode = IO_EDGE_RISING;
-        def.counterDebounceUs = 0U;
-        def.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
-        requireSetup(modules.ioModule.defineDigitalInput(def), "define extra digital input");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "DI Pin %u", (unsigned)(i + 1));
+        reg.ioId = (IoId)(IO_ID_DI_BASE + i);
+        IODigitalInputSlotConfig cfg{};
+        cfg.activeHigh = false;
+        cfg.pullMode = IO_PULL_UP;
+        cfg.mode = IO_DIGITAL_INPUT_STATE;
+        cfg.edgeMode = IO_EDGE_RISING;
+        cfg.counterDebounceUs = 0;
+        cfg.bindingPort = digitalInputPortFromOrdinal((uint8_t)(i + 1U));
+        requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define extra digital input");
     }
 #endif
 
@@ -593,39 +597,41 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         const FlowIoLayout::DigitalOutputRoleDefault* spec = FlowIoLayout::digitalOutputDefaultForDomainSlot(preset.id);
         requireSetup(spec != nullptr, "missing output layout binding");
 
-        IODigitalOutputDefinition def{};
+        IOEndpointRegistration reg{};
         const uint8_t exioOrdinal = exioOrdinalFromPort(spec->bindingPort);
         if (exioOrdinal != 0U) {
-            snprintf(def.id, sizeof(def.id), "EXIO%u", (unsigned)exioOrdinal);
+            snprintf(reg.id, sizeof(reg.id), "EXIO%u", (unsigned)exioOrdinal);
         } else {
-            snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "output");
+            snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "output");
         }
-        def.ioId = ioIdFromSlot(ioSlot);
-        def.bindingPort = spec->bindingPort;
-        def.activeHigh = spec->activeHigh;
-        def.initialOn = false;
-        def.startupPolicy = spec->retainOnWarmReboot
+        reg.ioId = ioIdFromSlot(ioSlot);
+        IODigitalOutputSlotConfig cfg{};
+        cfg.bindingPort = spec->bindingPort;
+        cfg.activeHigh = spec->activeHigh;
+        cfg.initialOn = false;
+        cfg.startupPolicy = spec->retainOnWarmReboot
             ? IOOutputStartupPolicy::PreserveHardwareState
             : IOOutputStartupPolicy::ApplyInitial;
-        def.retainOnWarmReboot = spec->retainOnWarmReboot;
-        def.momentary = spec->momentary;
-        def.pulseMs = spec->momentary ? spec->pulseMs : 0;
-        requireSetup(modules.ioModule.defineDigitalOutput(def), "define digital output");
+        cfg.retainOnWarmReboot = spec->retainOnWarmReboot;
+        cfg.momentary = spec->momentary;
+        cfg.pulseMs = spec->momentary ? (int32_t)spec->pulseMs : 0;
+        requireSetup(modules.ioModule.defineDigitalOutput(reg, cfg), "define digital output");
     }
 
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
     for (uint8_t i = 0; i < 8; ++i) {
-        IODigitalOutputDefinition def{};
-        snprintf(def.id, sizeof(def.id), "COMP%02u", (unsigned)(i + 1U));
-        def.ioId = (IoId)(IO_ID_DO_BASE + 8U + i);
-        def.bindingPort = waveshareCompOutputPort(i);
-        def.activeHigh = true;
-        def.initialOn = false;
-        def.startupPolicy = IOOutputStartupPolicy::ApplyInitial;
-        def.retainOnWarmReboot = false;
-        def.momentary = false;
-        def.pulseMs = 0;
-        requireSetup(modules.ioModule.defineDigitalOutput(def), "define comp digital output");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "COMP%02u", (unsigned)(i + 1U));
+        reg.ioId = (IoId)(IO_ID_DO_BASE + 8U + i);
+        IODigitalOutputSlotConfig cfg{};
+        cfg.bindingPort = waveshareCompOutputPort(i);
+        cfg.activeHigh = true;
+        cfg.initialOn = false;
+        cfg.startupPolicy = IOOutputStartupPolicy::ApplyInitial;
+        cfg.retainOnWarmReboot = false;
+        cfg.momentary = false;
+        cfg.pulseMs = 0;
+        requireSetup(modules.ioModule.defineDigitalOutput(reg, cfg), "define comp digital output");
     }
 #endif
 }

@@ -48,24 +48,26 @@ bool configureIoModule(const BoardSpec& board, ModuleInstances& modules)
     modules.ioModule.setBindingPorts(modules.ioBindingPorts, 2);
     modules.ioModule.setOneWireBuses(&modules.oneWireTemperature, nullptr);
 
-    IODigitalOutputDefinition out{};
-    if (!copyId_(out.id, sizeof(out.id), "aux_output")) return false;
-    out.ioId = (IoId)(IO_ID_DO_BASE + 0);
-    out.bindingPort = kMicronovaAuxOutputPort;
-    out.activeHigh = true;
-    out.initialOn = false;
-    out.momentary = false;
-    out.pulseMs = 0;
-    if (!modules.ioModule.defineDigitalOutput(out)) return false;
+    IOEndpointRegistration outReg{};
+    if (!copyId_(outReg.id, sizeof(outReg.id), "aux_output")) return false;
+    outReg.ioId = (IoId)(IO_ID_DO_BASE + 0);
+    IODigitalOutputSlotConfig outCfg{};
+    outCfg.bindingPort = kMicronovaAuxOutputPort;
+    outCfg.activeHigh = true;
+    outCfg.initialOn = false;
+    outCfg.momentary = false;
+    outCfg.pulseMs = 0;
+    if (!modules.ioModule.defineDigitalOutput(outReg, outCfg)) return false;
 
-    IOAnalogDefinition temperature{};
-    if (!copyId_(temperature.id, sizeof(temperature.id), "local_temperature")) return false;
-    temperature.ioId = (IoId)(IO_ID_AI_BASE + 0);
-    temperature.bindingPort = kMicronovaTemperaturePort;
-    temperature.c0 = 1.0f;
-    temperature.c1 = 0.0f;
-    temperature.precision = 1;
-    if (!modules.ioModule.defineAnalogInput(temperature)) return false;
+    IOEndpointRegistration tempReg{};
+    if (!copyId_(tempReg.id, sizeof(tempReg.id), "local_temperature")) return false;
+    tempReg.ioId = (IoId)(IO_ID_AI_BASE + 0);
+    IOAnalogSlotConfig tempCfg{};
+    tempCfg.bindingPort = kMicronovaTemperaturePort;
+    tempCfg.c0 = 1.0f;
+    tempCfg.c1 = 0.0f;
+    tempCfg.precision = 1;
+    if (!modules.ioModule.defineAnalogInput(tempReg, tempCfg)) return false;
 
     return true;
 }

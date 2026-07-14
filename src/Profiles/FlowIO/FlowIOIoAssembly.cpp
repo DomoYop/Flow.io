@@ -168,24 +168,24 @@ void requireSetup(bool ok, const char* step)
     while (true) delay(1000);
 }
 
-void applyAnalogDefaultsForDomainSlot(DomainSlotId domainSlot, IOAnalogDefinition& def)
+void applyAnalogDefaultsForDomainSlot(DomainSlotId domainSlot, IOAnalogSlotConfig& cfg)
 {
     const FlowIoLayout::AnalogRoleDefault* spec = FlowIoLayout::analogDefaultForDomainSlot(domainSlot);
     requireSetup(spec != nullptr, "unsupported analog domain slot");
-    def.bindingPort = spec->bindingPort;
-    def.c0 = spec->c0;
-    def.c1 = spec->c1;
-    def.precision = spec->precision;
+    cfg.bindingPort = spec->bindingPort;
+    cfg.c0 = spec->c0;
+    cfg.c1 = spec->c1;
+    cfg.precision = spec->precision;
 }
 
-void applyDigitalDefaultsForDomainSlot(DomainSlotId domainSlot, IODigitalInputDefinition& def)
+void applyDigitalDefaultsForDomainSlot(DomainSlotId domainSlot, IODigitalInputSlotConfig& cfg)
 {
     const FlowIoLayout::DigitalInputRoleDefault* spec = FlowIoLayout::digitalInputDefaultForDomainSlot(domainSlot);
     requireSetup(spec != nullptr, "unsupported digital input domain slot");
-    def.bindingPort = spec->bindingPort;
-    def.mode = spec->mode;
-    def.edgeMode = spec->edgeMode;
-    def.counterDebounceUs = spec->debounceUs;
+    cfg.bindingPort = spec->bindingPort;
+    cfg.mode = spec->mode;
+    cfg.edgeMode = spec->edgeMode;
+    cfg.counterDebounceUs = (int32_t)spec->debounceUs;
 }
 
 void buildAnalogValueTemplate(const IOModule& ioModule, uint8_t analogIdx, char* out, size_t outLen)
@@ -415,30 +415,32 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         requireSetup(ioId != IO_ID_INVALID, "invalid domain slot IO mapping");
 
         if (preset.slotKind == IO_SLOT_DIGITAL_INPUT) {
-            IODigitalInputDefinition def{};
-            snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "input");
-            def.ioId = ioId;
-            def.activeHigh = false;
-            def.pullMode = IO_PULL_UP;
-            applyDigitalDefaultsForDomainSlot(preset.id, def);
-            requireSetup(modules.ioModule.defineDigitalInput(def), "define digital input");
+            IOEndpointRegistration reg{};
+            snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "input");
+            reg.ioId = ioId;
+            IODigitalInputSlotConfig cfg{};
+            cfg.activeHigh = false;
+            cfg.pullMode = IO_PULL_UP;
+            applyDigitalDefaultsForDomainSlot(preset.id, cfg);
+            requireSetup(modules.ioModule.defineDigitalInput(reg, cfg), "define digital input");
             continue;
         }
 
         if (preset.slotKind != IO_SLOT_ANALOG_INPUT) continue;
 
-        IOAnalogDefinition def{};
-        snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "analog");
-        def.ioId = ioId;
-        applyAnalogDefaultsForDomainSlot(preset.id, def);
-        requireSetup(modules.ioModule.defineAnalogInput(def), "define analog input");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "analog");
+        reg.ioId = ioId;
+        IOAnalogSlotConfig cfg{};
+        applyAnalogDefaultsForDomainSlot(preset.id, cfg);
+        requireSetup(modules.ioModule.defineAnalogInput(reg, cfg), "define analog input");
     }
 
     for (uint8_t i = 6; i < 17; ++i) {
-        IOAnalogDefinition def{};
-        snprintf(def.id, sizeof(def.id), "a%02u", (unsigned)i);
-        def.ioId = (IoId)(IO_ID_AI_BASE + i);
-        requireSetup(modules.ioModule.defineAnalogInput(def), "define extra analog input");
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "a%02u", (unsigned)i);
+        reg.ioId = (IoId)(IO_ID_AI_BASE + i);
+        requireSetup(modules.ioModule.defineAnalogInput(reg, IOAnalogSlotConfig{}), "define extra analog input");
     }
 
     for (uint8_t i = 0; i < ctx.domain->domainSlotCount; ++i) {
@@ -451,19 +453,20 @@ void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
         const FlowIoLayout::DigitalOutputRoleDefault* spec = FlowIoLayout::digitalOutputDefaultForDomainSlot(preset.id);
         requireSetup(spec != nullptr, "missing output layout binding");
 
-        IODigitalOutputDefinition def{};
-        snprintf(def.id, sizeof(def.id), "%s", preset.endpointId ? preset.endpointId : "output");
-        def.ioId = ioIdFromSlot(ioSlot);
-        def.bindingPort = spec->bindingPort;
-        def.activeHigh = spec->activeHigh;
-        def.initialOn = false;
-        def.startupPolicy = spec->retainOnWarmReboot
+        IOEndpointRegistration reg{};
+        snprintf(reg.id, sizeof(reg.id), "%s", preset.endpointId ? preset.endpointId : "output");
+        reg.ioId = ioIdFromSlot(ioSlot);
+        IODigitalOutputSlotConfig cfg{};
+        cfg.bindingPort = spec->bindingPort;
+        cfg.activeHigh = spec->activeHigh;
+        cfg.initialOn = false;
+        cfg.startupPolicy = spec->retainOnWarmReboot
             ? IOOutputStartupPolicy::PreserveHardwareState
             : IOOutputStartupPolicy::ApplyInitial;
-        def.retainOnWarmReboot = spec->retainOnWarmReboot;
-        def.momentary = spec->momentary;
-        def.pulseMs = spec->momentary ? spec->pulseMs : 0;
-        requireSetup(modules.ioModule.defineDigitalOutput(def), "define digital output");
+        cfg.retainOnWarmReboot = spec->retainOnWarmReboot;
+        cfg.momentary = spec->momentary;
+        cfg.pulseMs = spec->momentary ? (int32_t)spec->pulseMs : 0;
+        requireSetup(modules.ioModule.defineDigitalOutput(reg, cfg), "define digital output");
     }
 }
 
