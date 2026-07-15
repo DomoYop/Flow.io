@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, List, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WEB_DIR = PROJECT_ROOT / "data" / "webinterface"
@@ -69,7 +69,7 @@ def _normalized_meta(payload: dict) -> dict:
     return legacy if isinstance(legacy, dict) else {}
 
 
-def _module_key_for_doc_key(key: str, all_keys: Iterable[str]) -> str:
+def _module_key_for_doc_key(key: str) -> str:
     clean = str(key or "").strip()
     if not clean:
         return "__root"
@@ -77,9 +77,10 @@ def _module_key_for_doc_key(key: str, all_keys: Iterable[str]) -> str:
         return "__wildcard"
     if "/" not in clean:
         return "__root"
-    has_children = any(other != clean and str(other).startswith(clean + "/") for other in all_keys)
-    if has_children:
-        return clean
+    # Every doc lives in its parent's chunk, including branch docs carrying
+    # tree metadata (hidden/visible_if): the tree renders a level with only
+    # that level's chunk loaded, so a branch doc stored in its own chunk
+    # would be invisible to the tree.
     return clean.rsplit("/", 1)[0]
 
 
@@ -182,10 +183,9 @@ def main() -> int:
 
     combined_meta = _merge_meta(_normalized_meta(cfgdocs), _normalized_meta(cfgmods))
 
-    keys = list(docs_map.keys())
     modules: Dict[str, Dict[str, dict]] = {}
-    for key in keys:
-        module_key = _module_key_for_doc_key(key, keys)
+    for key in docs_map.keys():
+        module_key = _module_key_for_doc_key(key)
         modules.setdefault(module_key, {})[key] = docs_map[key]
 
     CFGDOC_DIR.mkdir(parents=True, exist_ok=True)

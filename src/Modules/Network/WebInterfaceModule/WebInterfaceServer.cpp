@@ -1832,10 +1832,21 @@ void wavesharePrintUnavailableByManifestType_(Print& out, bool& firstValue, Runt
     printRuntimeUnavailable_(out, firstValue, id, item ? item->key : "", item ? item->type : "unknown");
 }
 
+bool waveshareReadIoBool_(const IOServiceV2* ioSvc, IoId ioId, bool& out)
+{
+    if (!ioSvc || !ioSvc->readValue) return false;
+    IoValue value{};
+    if (ioSvc->readValue(ioSvc->ctx, ioId, &value) != IO_OK) return false;
+    if (!value.valid || value.type != IO_VAL_BOOL) return false;
+    out = (value.v.b != 0);
+    return true;
+}
+
 bool appendWaveshareLocalRuntimeValue_(Print& out,
                                       DataStore* dataStore,
                                       ConfigStore* cfgStore,
                                       const AlarmService* alarmSvc,
+                                      const IOServiceV2* ioSvc,
                                       RuntimeUiId id,
                                       bool& firstValue,
                                       WaveshareRuntimeContext& ctx)
@@ -1893,7 +1904,11 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2301:
         case 2302:
         case 2303:
-        case 2304: {
+        case 2304:
+        case 2305:
+        case 2306:
+        case 2307:
+        case 2308: {
             uint8_t slot = PoolIds::DeviceFiltrationPump;
             const char* key = "pool.filtration_on";
             if (id == 2302) {
@@ -1905,6 +1920,18 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
             } else if (id == 2304) {
                 slot = PoolIds::DeviceRobot;
                 key = "pool.robot_on";
+            } else if (id == 2305) {
+                slot = PoolIds::DeviceFillPump;
+                key = "pool.fill_pump_on";
+            } else if (id == 2306) {
+                slot = PoolIds::DeviceChlorineGenerator;
+                key = "pool.chlorine_generator_on";
+            } else if (id == 2307) {
+                slot = PoolIds::DeviceLights;
+                key = "pool.lights_on";
+            } else if (id == 2308) {
+                slot = PoolIds::DeviceWaterHeater;
+                key = "pool.water_heater_on";
             }
 
             PoolDeviceRuntimeStateEntry state{};
@@ -1996,6 +2023,33 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2214:
             wavesharePrintUnavailableByManifestType_(out, firstValue, id);
             return true;
+        case 2221:
+        case 2222: {
+            // Entrees digitales flowswitch / volet, lues par IoId (robuste).
+            const IoId ioId = ioIdFromSlot(digitalInputSlot((id == 2221) ? 4U : 5U));
+            const char* key = (id == 2221) ? "io.flowswitch" : "io.cover_closed";
+            bool on = false;
+            if (waveshareReadIoBool_(ioSvc, ioId, on)) {
+                printRuntimeBool_(out, firstValue, id, key, on);
+            } else {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            }
+            return true;
+        }
+        case 2223:
+        case 2224: {
+            // Sorties indicatrices (recopie flowswitch temporisee / etat volet),
+            // lues par IoId sur les endpoints digitalOutputSlot(16/17).
+            const IoId ioId = ioIdFromSlot(digitalOutputSlot((id == 2223) ? 16U : 17U));
+            const char* key = (id == 2223) ? "io.flow_copy_out" : "io.cover_out";
+            bool on = false;
+            if (waveshareReadIoBool_(ioSvc, ioId, on)) {
+                printRuntimeBool_(out, firstValue, id, key, on);
+            } else {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            }
+            return true;
+        }
         case 1801:
             printRuntimeString_(out, firstValue, id, "system.firmware", FirmwareVersion::Full);
             return true;
@@ -2050,6 +2104,7 @@ void sendWaveshareLocalRuntimeValuesResponse_(AsyncWebServerRequest* request,
                                              DataStore* dataStore,
                                              ConfigStore* cfgStore,
                                              const AlarmService* alarmSvc,
+                                             const IOServiceV2* ioSvc,
                                              const RuntimeUiId* ids,
                                              size_t idCount)
 {
@@ -2068,7 +2123,7 @@ void sendWaveshareLocalRuntimeValuesResponse_(AsyncWebServerRequest* request,
     response->print("{\"ok\":true,\"values\":[");
     bool firstValue = true;
     for (size_t i = 0U; i < idCount; ++i) {
-        (void)appendWaveshareLocalRuntimeValue_(*response, dataStore, cfgStore, alarmSvc, ids[i], firstValue, ctx);
+        (void)appendWaveshareLocalRuntimeValue_(*response, dataStore, cfgStore, alarmSvc, ioSvc, ids[i], firstValue, ctx);
     }
     response->print("]}");
     request->send(response);
@@ -6447,7 +6502,7 @@ void WebInterfaceModule::startServer_()
 #elif defined(FLOW_PROFILE_WAVESHARE)
         {
             const AlarmService* alarmSvc = services_ ? services_->get<AlarmService>(ServiceId::Alarm) : nullptr;
-            sendWaveshareLocalRuntimeValuesResponse_(request, dataStore_, cfgStore_, alarmSvc, ids, idCount);
+            sendWaveshareLocalRuntimeValuesResponse_(request, dataStore_, cfgStore_, alarmSvc, ioSvc_, ids, idCount);
         }
 #else
         sendRuntimeUiValuesResponse_(request, flowCfgSvc_, ids, idCount);
@@ -6516,7 +6571,7 @@ void WebInterfaceModule::startServer_()
 #elif defined(FLOW_PROFILE_WAVESHARE)
             {
                 const AlarmService* alarmSvc = services_ ? services_->get<AlarmService>(ServiceId::Alarm) : nullptr;
-                sendWaveshareLocalRuntimeValuesResponse_(request, dataStore_, cfgStore_, alarmSvc, ids, idCount);
+                sendWaveshareLocalRuntimeValuesResponse_(request, dataStore_, cfgStore_, alarmSvc, ioSvc_, ids, idCount);
             }
 #else
             sendRuntimeUiValuesResponse_(request, flowCfgSvc_, ids, idCount);

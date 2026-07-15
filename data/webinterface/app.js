@@ -56,6 +56,7 @@
     let loadedWebAssetVersion = '';
     let supervisorFirmwareVersion = '-';
     let nextionDisplayVersion = '';
+    let spiffsContentVersion = '';
     let supervisorUptimeMs = 0;
     let supervisorHeap = {};
     let webProfileName = 'Supervisor';
@@ -1060,6 +1061,9 @@
             nextionDisplayVersion = rawNextionVersion;
           }
         }
+        if (Object.prototype.hasOwnProperty.call(data, 'spiffs_version')) {
+          spiffsContentVersion = String(data.spiffs_version || '').trim();
+        }
         supervisorUptimeMs = Number(data.upms) || 0;
         supervisorHeap = (data.heap && typeof data.heap === 'object') ? data.heap : {};
         renderUpgradeCatalog();
@@ -2062,6 +2066,8 @@
     let cfgTreeVirtualBranches = [];
     const cfgTreeNodeTextNames = { supervisor: {}, flow: {} };
     const cfgTreeNodeTextNamePending = { supervisor: new Set(), flow: new Set() };
+    const cfgCondBranchCache = { supervisor: {}, flow: {} };
+    const cfgCondBranchPending = { supervisor: new Map(), flow: new Map() };
     const poolLogicDeviceIoOutputNames = { supervisor: {}, flow: {} };
     let supCfgCurrentModule = '';
     let supCfgCurrentData = {};
@@ -3621,6 +3627,13 @@
       const key = String(componentKey || '').trim().toLowerCase();
       if (key === 'nextion') {
         return splitUpgradeVersionStamp(formatDetectedNextionVersion(nextionDisplayVersion), '');
+      }
+      if (key === 'spiffs') {
+        // Le SPIFFS n'a pas de version embarquée lisible sur l'appareil : on affiche la
+        // version réellement persistée lors du dernier flash SPIFFS (spiffs_version), pas
+        // la version du firmware (qui peut avoir été mise à jour indépendamment).
+        const spiffs = String(spiffsContentVersion || '').trim();
+        return splitUpgradeVersionStamp(spiffs && spiffs !== '-' ? spiffs : '-', '');
       }
       const supervisor = String(supervisorFirmwareVersion || '').trim();
       const flow = String(window.__flowIoFirmwareVersion || '').trim();
@@ -5661,6 +5674,8 @@
             available: !!(slot && slot.available)
           };
         })
+        // Ne garder que les sondes reellement presentes (BME680 absent => masque).
+        .filter((slot) => slot.enabled && slot.available)
         .sort((a, b) => a.slot - b.slot)
         .slice(0, 8);
     }
@@ -5723,22 +5738,17 @@
     }
 
     function buildPoolSondeSlotsGrid(slots) {
-      const cleanSlots = Array(8).fill(null);
-      if (Array.isArray(slots)) {
-        slots.forEach((slot) => {
-          const idx = Number(slot && slot.slot);
-          if (Number.isInteger(idx) && idx >= 0 && idx < 8) cleanSlots[idx] = slot;
-        });
-      }
+      // slots est deja filtre aux sondes presentes: on rend une tuile par sonde, sans
+      // emplacement vide (les sondes absentes sont masquees, pas affichees en "--").
+      const cleanSlots = (Array.isArray(slots) ? slots : [])
+        .filter((slot) => slot && slot.enabled !== false && slot.available)
+        .sort((a, b) => Number(a.slot) - Number(b.slot));
       const grid = document.createElement('div');
       grid.className = 'status-sonde-slot-grid';
 
-      for (let i = 0; i < 8; i += 1) {
-        const slot = cleanSlots[i] || null;
+      cleanSlots.forEach((slot) => {
         const tile = document.createElement('div');
         tile.className = 'status-sonde-slot';
-        const available = !!(slot && slot.enabled !== false && slot.available);
-        if (!available) tile.classList.add('is-empty');
 
         const bgColor = slot && isValidHexColor(slot.bgColor) ? slot.bgColor : '';
         if (bgColor) tile.style.background = bgColor;
@@ -5766,7 +5776,7 @@
 
         tile.appendChild(metric);
         grid.appendChild(tile);
-      }
+      });
 
       return grid;
     }
@@ -6190,6 +6200,27 @@
       return table;
     }
 
+    function runtimeValueIsUnavailable(runtimeValue) {
+      return !runtimeValue || runtimeValue.status === 'not_found' || runtimeValue.status === 'unavailable';
+    }
+
+    // Tableau de bord: ne montrer que ce qui est present/actif.
+    // - equipements: masquer ceux reellement absents (valeur indisponible).
+    // - mode: masquer une fonction desactivee (arret) ou indisponible; garder les fonctions actives.
+    // Le domaine sondes n'est pas filtre ici: ses entrees ne servent qu'a declencher la carte,
+    // l'affichage reel passe par les slots dashboard (filtres cote fetchPoolSondeSlots).
+    function poolMeasureEntryHiddenByFilter(entry, runtimeValue) {
+      const domainKey = String(entry && entry.domain ? entry.domain : '').trim().toLowerCase();
+      if (domainKey === 'equipements') {
+        return runtimeValueIsUnavailable(runtimeValue);
+      }
+      if (domainKey === 'mode') {
+        if (runtimeValueIsUnavailable(runtimeValue)) return true;
+        return runtimeValue.value === false;
+      }
+      return false;
+    }
+
     function buildPoolMeasureCards(entries, values, options) {
       const fragment = document.createDocumentFragment();
       const opts = options && typeof options === 'object' ? options : {};
@@ -6204,6 +6235,7 @@
       const groups = [];
       const groupsByName = new Map();
       (entries || []).forEach((entry) => {
+        if (poolMeasureEntryHiddenByFilter(entry, valueById.get(Number(entry.id)))) return;
         const domainKey = String(entry.domain || 'runtime');
         const groupKey = String(entry.group || '').trim();
         const cardKey = domainKey + '::' + groupKey;
@@ -6237,15 +6269,20 @@
             : null
         };
 
-        const heading = document.createElement('h3');
-        heading.textContent = group.name;
-        card.appendChild(heading);
-
         if (isPoolSondesGroup) {
+          // sondeSlots deja filtre aux sondes disponibles: si aucune, pas de carte vide.
+          if (!sondeSlots.length) return;
+          const heading = document.createElement('h3');
+          heading.textContent = group.name;
+          card.appendChild(heading);
           card.appendChild(buildPoolSondeSlotsGrid(sondeSlots));
           fragment.appendChild(card);
           return;
         }
+
+        const heading = document.createElement('h3');
+        heading.textContent = group.name;
+        card.appendChild(heading);
 
         const badgeNodes = [];
         const horizGaugeRows = [];
@@ -8131,6 +8168,7 @@
       if (source !== 'flow' && source !== 'supervisor') return;
       cfgTreeNodeTextNames[source] = {};
       cfgTreeNodeTextNamePending[source] = new Set();
+      clearCfgCondBranchCache(source);
     }
 
     function flowCfgTitreDepuisChemin(pathValue) {
@@ -8190,14 +8228,20 @@
         return cache[key];
       }
 
+      // Le chunk cfgdoc du prefixe porte les metadonnees d'arbre
+      // (hidden/visible_if) des branches enfantes.
+      try { await ensureCfgDocsForModule(p); } catch (err) {}
+
       const virtualChildren = cfgVirtualChildrenForDisplayPath(p);
       if (virtualChildren) {
         const node = {
           prefix: p,
           hasExact: false,
+          // Le masquage (hidden/visible_if) est applique a l'affichage par
+          // cfgFilteredChildren, jamais fige dans le cache children.
           children: virtualChildren.filter((name) => {
             const childPath = p ? (p + '/' + name) : name;
-            return !isConfigPathHidden(childPath) && !cfgIsAliasStoreShadowPath(childPath);
+            return !cfgIsAliasStoreShadowPath(childPath);
           })
         };
         cache[key] = node;
@@ -8231,13 +8275,24 @@
         .filter((name) => name.length > 0)
         .filter((name) => {
           const childPath = p ? (p + '/' + name) : name;
-          return !isConfigPathHidden(childPath) && !cfgIsAliasStoreShadowPath(childPath);
+          return !cfgIsAliasStoreShadowPath(childPath);
         });
+
+      // Injecte les branches virtuelles enfantes de ce prefixe (ex: la page
+      // "equipements" a la racine), si leur enfant reel requis existe.
+      const virtualTokens = cfgTreeVirtualBranches
+        .filter((branch) => {
+          if (!branch.requires) return true;
+          const requiredToken = cfgChildTokenForDisplayPath(p, branch.requires);
+          return requiredToken.length > 0 && children.indexOf(requiredToken) >= 0;
+        })
+        .map((branch) => cfgChildTokenForDisplayPath(p, branch.display))
+        .filter((name) => name.length > 0);
 
       const node = {
         prefix: p,
         hasExact: !!data.has_exact,
-        children: Array.from(new Set(children)).sort((a, b) => a.localeCompare(b))
+        children: Array.from(new Set(children.concat(virtualTokens))).sort((a, b) => a.localeCompare(b))
       };
       cache[key] = node;
       return node;
@@ -8522,6 +8577,15 @@
           resetPrimaryCfgEditor(cfgFilteredChildren(cfgTreeSelectedSource, '').length > 0
             ? 'Sélectionnez une branche dans l\'arborescence.'
             : 'Aucune branche disponible.');
+          return;
+        }
+
+        if (cleanPath === CFG_EQUIPMENT_VIRTUAL_PATH) {
+          if (cfgTreeSelectedSource === 'supervisor') {
+            await chargerPrimarySupervisorCfgModule(cleanPath);
+          } else {
+            await chargerFlowCfgModule(cleanPath);
+          }
           return;
         }
 
@@ -8850,6 +8914,7 @@
       }
       cfgDocSources = baseSources;
       chargerCfgTreeMetaDepuisDocs();
+      precacheCfgCondBranches();
     }
 
     async function chargerFlowCfgDocs() {
@@ -8905,7 +8970,13 @@
             ? entry.children.map((child) => nettoyerNomFlowCfg(child)).filter((child) => child.length > 0)
             : [];
           seenBranchKeys.add(display);
-          virtualBranches.push({ display: display, children: children });
+          virtualBranches.push({
+            display: display,
+            children: children,
+            // Nom d'un enfant reel du meme niveau requis pour afficher la
+            // branche virtuelle (ex: "poollogic" pour la page equipements).
+            requires: nettoyerNomFlowCfg(entry && entry.requires)
+          });
         });
       }
 
@@ -9000,8 +9071,25 @@
       return out;
     }
 
+    function bindingPortEnumSetForField(moduleName) {
+      const m = String(moduleName || '').trim().toLowerCase();
+      if (/^io\/output\/d\d{2}$/.test(m)) return 'flowio_binding_port_digital_output';
+      if (/^io\/input\/a\d{2}$/.test(m)) return 'flowio_binding_port_analog';
+      if (/^io\/input\/i\d{2}$/.test(m)) return 'flowio_binding_port_digital_input';
+      return '';
+    }
+
     function configEnumOptionsForField(source, moduleName, key, doc) {
-      const options = (doc && Array.isArray(doc._enumOptions)) ? doc._enumOptions : null;
+      let options = (doc && Array.isArray(doc._enumOptions)) ? doc._enumOptions : null;
+      // Repli pour les champs binding_port sans enum_set attache dans la cfgdoc
+      // (ex. sorties d16/d17 non documentees) : on reconstruit le menu deroulant
+      // de relais depuis l'enum_set de ports adapte au type d'endpoint.
+      if (!options && configIsBindingPortField(moduleName, key)) {
+        const rawOptions = resolveEnumOptions(bindingPortEnumSetForField(moduleName), cfgDocSources);
+        if (Array.isArray(rawOptions)) {
+          options = cfgDocApplyLocalizedEnumOptions(rawOptions);
+        }
+      }
       if (!options) return null;
       if (isWaveshareProfile() && isPoolLogicDeviceSlotField(moduleName, key, doc)) {
         return dynamicPoolLogicDeviceSlotOptions(source, options);
@@ -9414,9 +9502,158 @@
       return enrichResolvedDoc(merged, sources);
     }
 
+    // --- Visibilite conditionnelle generique (attribut visible_if des cfgdocs) ---
+    // Format : { "path": "poollogic/modes/disinfection_type", "eq": 1 }
+    //       ou { "path": "...", "in": [0, 2] }.
+    // `path` est un chemin store absolu, evalue contre la source affichee
+    // (flow/supervisor). Condition non resolue => visible (fail-open).
+
+    function cfgCondSourceKey(source) {
+      return source === 'supervisor' ? 'supervisor' : 'flow';
+    }
+
+    function cfgCondBranchOfPath(condPath) {
+      const idx = String(condPath || '').lastIndexOf('/');
+      return idx > 0 ? condPath.slice(0, idx) : '';
+    }
+
+    function fetchCfgCondBranch(source, branchPath) {
+      const src = cfgCondSourceKey(source);
+      const branch = nettoyerNomFlowCfg(branchPath);
+      if (!branch) return Promise.resolve();
+      if (Object.prototype.hasOwnProperty.call(cfgCondBranchCache[src], branch)) return Promise.resolve();
+      const pending = cfgCondBranchPending[src].get(branch);
+      if (pending) return pending;
+      const promise = (async () => {
+        try {
+          const url = (src === 'supervisor')
+            ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(branch))
+            : ('/api/flowcfg/module?name=' + encodeURIComponent(branch));
+          const fetchFn = (src === 'supervisor') ? fetch : fetchFlowRemoteQueued;
+          const res = await fetchFn(url, { cache: 'no-store' });
+          const data = await res.json().catch(() => null);
+          cfgCondBranchCache[src][branch] =
+            (res.ok && data && data.ok === true && data.data && typeof data.data === 'object')
+              ? data.data
+              : {};
+        } catch (err) {
+          cfgCondBranchCache[src][branch] = {};
+        } finally {
+          cfgCondBranchPending[src].delete(branch);
+          renderFlowCfgTree();
+        }
+      })();
+      cfgCondBranchPending[src].set(branch, promise);
+      return promise;
+    }
+
+    function cfgCondLookup(source, condPath) {
+      const src = cfgCondSourceKey(source);
+      const branch = cfgCondBranchOfPath(condPath);
+      if (!branch) return { resolved: false, value: undefined };
+      const branchData = cfgCondBranchCache[src][branch];
+      if (!branchData) {
+        fetchCfgCondBranch(src, branch).catch(() => {});
+        return { resolved: false, value: undefined };
+      }
+      const relativeKey = condPath.slice(branch.length + 1);
+      if (Object.prototype.hasOwnProperty.call(branchData, relativeKey)) {
+        return { resolved: true, value: branchData[relativeKey] };
+      }
+      if (Object.prototype.hasOwnProperty.call(branchData, condPath)) {
+        return { resolved: true, value: branchData[condPath] };
+      }
+      return { resolved: true, value: undefined };
+    }
+
+    function cfgCondValueMatches(actual, expected) {
+      if (typeof expected === 'boolean') {
+        const raw = String(actual ?? '').trim().toLowerCase();
+        const actualBool = actual === true || raw === 'true' || raw === '1' || raw === 'on';
+        return actualBool === expected;
+      }
+      if (typeof expected === 'number') {
+        const actualNum = Number(actual);
+        return Number.isFinite(actualNum) && actualNum === expected;
+      }
+      return String(actual ?? '') === String(expected ?? '');
+    }
+
+    function evalVisibleIfValue(actual, cond) {
+      if (typeof actual === 'undefined') return undefined;
+      if (Object.prototype.hasOwnProperty.call(cond, 'eq')) {
+        return cfgCondValueMatches(actual, cond.eq);
+      }
+      if (Array.isArray(cond.in)) {
+        return cond.in.some((expected) => cfgCondValueMatches(actual, expected));
+      }
+      return undefined;
+    }
+
+    function evalVisibleIf(source, cond) {
+      if (!cond || typeof cond !== 'object') return undefined;
+      const condPath = nettoyerNomFlowCfg(cond.path);
+      if (!condPath || condPath.indexOf('/') <= 0) return undefined;
+      const lookup = cfgCondLookup(source, condPath);
+      if (!lookup.resolved) return undefined;
+      return evalVisibleIfValue(lookup.value, cond);
+    }
+
+    function mergeCfgCondPatch(source, patchJson) {
+      // Reporte un patch applique dans le cache des conditions, sans re-fetch.
+      const src = cfgCondSourceKey(source);
+      let patch = patchJson;
+      if (typeof patch === 'string') {
+        try { patch = JSON.parse(patch); } catch (err) { return; }
+      }
+      if (!patch || typeof patch !== 'object') return;
+      let touched = false;
+      Object.keys(patch).forEach((moduleName) => {
+        const branch = nettoyerNomFlowCfg(moduleName);
+        const values = patch[moduleName];
+        if (!branch || !values || typeof values !== 'object') return;
+        const branchData = cfgCondBranchCache[src][branch];
+        if (!branchData) return;
+        Object.keys(values).forEach((key) => {
+          branchData[key] = values[key];
+          touched = true;
+        });
+      });
+      if (touched) renderFlowCfgTree();
+    }
+
+    function clearCfgCondBranchCache(source) {
+      const src = cfgCondSourceKey(source);
+      cfgCondBranchCache[src] = {};
+      cfgCondBranchPending[src] = new Map();
+    }
+
+    function precacheCfgCondBranches() {
+      // Precharge les branches referencees par des visible_if pour limiter le
+      // masquage differe (fail-open) au premier rendu de l'arbre.
+      const seen = new Set();
+      for (const src of cfgDocSources) {
+        const normalized = normalizeDocSource(src);
+        if (!normalized || !normalized.docs) continue;
+        Object.values(normalized.docs).forEach((doc) => {
+          const cond = (doc && typeof doc.visible_if === 'object') ? doc.visible_if : null;
+          const condPath = cond ? nettoyerNomFlowCfg(cond.path) : '';
+          const branch = condPath ? cfgCondBranchOfPath(condPath) : '';
+          if (!branch || seen.has(branch)) return;
+          seen.add(branch);
+          fetchCfgCondBranch(cfgTreeSelectedSource, branch).catch(() => {});
+        });
+      }
+    }
+
     function isConfigPathHidden(pathValue) {
       const meta = configPathMeta(pathValue);
-      return !!(meta && meta.hidden === true);
+      if (!meta) return false;
+      if (meta.hidden === true) return true;
+      if (meta.visible_if && typeof meta.visible_if === 'object') {
+        return evalVisibleIf(cfgTreeSelectedSource, meta.visible_if) === false;
+      }
+      return false;
     }
 
     function flowCfgApplyPerFieldEnabled(moduleName) {
@@ -9880,6 +10117,67 @@
         }
       }
 
+      // Visibilite generique par doc : hidden (champ) et visible_if.
+      const genericVisibilityEntries = visibilityEntries.filter((entry) =>
+        entry.doc && (entry.doc.hidden === true ||
+          (entry.doc.visible_if && typeof entry.doc.visible_if === 'object')));
+      if (genericVisibilityEntries.length > 0) {
+        const visibilitySource = cfgCondSourceKey(opts.source || cfgTreeSelectedSource);
+        const localFieldForCondPath = (condPath) => {
+          for (const entry of visibilityEntries) {
+            if (!entry.inputEl) continue;
+            const entryModule = nettoyerNomFlowCfg(entry.inputEl.dataset.module || '');
+            const entryKey = String(entry.inputEl.dataset.key || '');
+            if (!entryKey) continue;
+            const entryPath = entryModule ? (entryModule + '/' + entryKey) : entryKey;
+            if (entryPath === condPath) return entry.inputEl;
+          }
+          return null;
+        };
+        const applyGenericVisibility = () => {
+          genericVisibilityEntries.forEach((entry) => {
+            let shouldHide = entry.doc.hidden === true;
+            const cond = entry.doc.visible_if;
+            if (!shouldHide && cond && typeof cond === 'object') {
+              const condPath = nettoyerNomFlowCfg(cond.path);
+              const localField = condPath ? localFieldForCondPath(condPath) : null;
+              const visible = localField
+                ? evalVisibleIfValue(readConfigFieldValue(localField), cond)
+                : evalVisibleIf(visibilitySource, cond);
+              shouldHide = visible === false;
+            }
+            entry.row.hidden = shouldHide;
+            if (entry.inputEl) {
+              entry.inputEl.dataset.runtimeHidden = shouldHide ? '1' : '0';
+              entry.inputEl.disabled = shouldHide;
+            }
+          });
+          if (controlsPrimaryPane && !perFieldApply) {
+            updatePrimaryCfgApplyState();
+          }
+        };
+        const boundCondFields = new Set();
+        genericVisibilityEntries.forEach((entry) => {
+          const cond = entry.doc.visible_if;
+          if (!cond || typeof cond !== 'object') return;
+          const condPath = nettoyerNomFlowCfg(cond.path);
+          if (!condPath) return;
+          const localField = localFieldForCondPath(condPath);
+          if (localField) {
+            if (boundCondFields.has(localField)) return;
+            boundCondFields.add(localField);
+            localField.addEventListener('input', applyGenericVisibility);
+            localField.addEventListener('change', applyGenericVisibility);
+          } else {
+            const branch = cfgCondBranchOfPath(condPath);
+            if (branch) {
+              fetchCfgCondBranch(visibilitySource, branch).then(applyGenericVisibility).catch(() => {});
+            }
+          }
+        });
+        applyGenericVisibility();
+      }
+
       if (controlsPrimaryPane && !perFieldApply) {
         updatePrimaryCfgApplyState();
       }
@@ -10057,12 +10355,92 @@
       return buildPatchJsonFromFields(flowCfgFields, flowCfgCurrentModule);
     }
 
+    // Page composite "Equipements" : noeud virtuel de l'arbre regroupant le
+    // type de traitement (poollogic/modes/disinfection_type) et la presence de
+    // chaque equipement optionnel (pdm/pdN/enabled). L'apply standard groupe
+    // deja le patch multi-branches via dataset.module.
+    const CFG_EQUIPMENT_VIRTUAL_PATH = 'equipements';
+    const cfgEquipmentDeviceSlots = [1, 2, 3, 4, 5, 6, 7];
+
+    function cfgEquipmentSectionTitle(source, slot) {
+      const src = poolLogicDeviceSlotSource(source);
+      const cache = poolLogicDeviceIoOutputNames[src] || {};
+      const ioName = typeof cache[slot] === 'string' ? cache[slot].trim() : '';
+      const baseName = String(ioOutputPdmLabels[slot] || '').trim() || ('pd' + String(slot));
+      return ioName ? (baseName + ' [' + ioName + ']') : baseName;
+    }
+
+    async function chargerCfgEquipmentsPage(source) {
+      const src = cfgCondSourceKey(source);
+      const fetchBranchData = async (branch) => {
+        const url = (src === 'supervisor')
+          ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(branch))
+          : ('/api/flowcfg/module?name=' + encodeURIComponent(branch));
+        const fetchFn = (src === 'supervisor') ? fetchWithBusyRetry : fetchFlowRemoteQueued;
+        const res = await fetchFn(url, { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.ok !== true || typeof data.data !== 'object') return null;
+        return data.data;
+      };
+
+      await ensureCfgDocsForModule('poollogic/modes');
+      const modesData = await fetchBranchData('poollogic/modes');
+      const devices = [];
+      for (const slot of cfgEquipmentDeviceSlots) {
+        const branch = 'pdm/pd' + String(slot);
+        await ensureCfgDocsForModule(branch);
+        const branchData = await fetchBranchData(branch);
+        if (branchData && Object.prototype.hasOwnProperty.call(branchData, 'enabled')) {
+          devices.push({ slot: slot, branch: branch, enabled: branchData.enabled });
+        }
+      }
+      if (!modesData && devices.length === 0) {
+        throw new Error('branches équipements indisponibles');
+      }
+
+      if (src === 'supervisor') {
+        supCfgCurrentModule = CFG_EQUIPMENT_VIRTUAL_PATH;
+        supCfgCurrentData = {};
+        supCfgCurrentPdmExtension = null;
+      } else {
+        flowCfgCurrentModule = CFG_EQUIPMENT_VIRTUAL_PATH;
+        flowCfgCurrentData = {};
+        flowCfgCurrentPdmExtension = null;
+      }
+
+      closeColorPickerPopover();
+      flowCfgFields.innerHTML = '';
+      if (modesData && Object.prototype.hasOwnProperty.call(modesData, 'disinfection_type')) {
+        renderConfigFields(flowCfgFields, 'poollogic/modes', { disinfection_type: modesData.disinfection_type }, {
+          append: true,
+          source: src,
+          sectionTitle: tr('equip.disinfection', 'Type de traitement'),
+          controlsPrimaryPane: true
+        });
+      }
+      devices.forEach((device) => {
+        renderConfigFields(flowCfgFields, device.branch, { enabled: device.enabled }, {
+          append: true,
+          source: src,
+          sectionTitle: cfgEquipmentSectionTitle(src, device.slot),
+          controlsPrimaryPane: true
+        });
+      });
+      updatePrimaryCfgApplyState();
+      flowCfgStatus.textContent = tr('equip.hint',
+        'Équipements chargés. Après application, redémarrez l\'appareil pour mettre à jour les entités Home Assistant.');
+    }
+
     async function chargerFlowCfgModule(moduleName) {
       beginFlowCfgLoading('Chargement de la branche distante...', { tree: false, detail: true });
       const m = nettoyerNomFlowCfg(moduleName);
       try {
         if (!m) {
           resetFlowCfgEditor('Aucune branche sélectionnée.');
+          return;
+        }
+        if (m === CFG_EQUIPMENT_VIRTUAL_PATH) {
+          await chargerCfgEquipmentsPage('flow');
           return;
         }
         const res = await fetchFlowRemoteQueued(
@@ -10105,6 +10483,10 @@
           supCfgCurrentData = {};
           supCfgCurrentPdmExtension = null;
           resetPrimaryCfgEditor('Aucune branche locale sélectionnée.');
+          return;
+        }
+        if (m === CFG_EQUIPMENT_VIRTUAL_PATH) {
+          await chargerCfgEquipmentsPage('supervisor');
           return;
         }
         const res = await fetchWithBusyRetry('/api/supervisorcfg/module?name=' + encodeURIComponent(m), { cache: 'no-store' });
@@ -10378,6 +10760,7 @@
           throw new Error(formatFlowCfgApplyError(data));
         }
 
+        mergeCfgCondPatch('flow', patch);
         await chargerFlowCfgModule(flowCfgCurrentModule);
         await refreshWebUiLocale(true);
         flowCfgStatus.textContent = 'Champ "' + key + '" applique.';
@@ -10444,6 +10827,7 @@
           throw new Error(formatFlowCfgApplyError(data));
         }
         flowCfgStatus.textContent = 'Configuration appliquée sur flow.io.';
+        mergeCfgCondPatch('flow', patch);
         await chargerFlowCfgModule(flowCfgCurrentModule);
         await refreshWebUiLocale(true);
       } catch (err) {
