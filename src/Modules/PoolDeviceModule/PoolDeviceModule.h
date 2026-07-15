@@ -79,6 +79,10 @@ public:
 
     bool defineDevice(const PoolDeviceDefinition& def);
     const char* deviceLabel(uint8_t idx) const;
+    /** True when the slot is defined and enabled by config (profile HA wiring). */
+    bool deviceEnabled(uint8_t slot) const {
+        return slot < POOL_DEVICE_MAX && slots_[slot].used && slots_[slot].def.enabled;
+    }
     uint8_t runtimeSnapshotCount() const override;
     const char* runtimeSnapshotSuffix(uint8_t idx) const override;
     RuntimeRouteClass runtimeSnapshotClass(uint8_t idx) const override;

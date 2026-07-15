@@ -103,6 +103,25 @@ static bool formatChecked(char* out, size_t outLen, const char* fmt, ...)
     return (n >= 0) && ((size_t)n < outLen);
 }
 
+static bool jsonEscape(const char* in, char* out, size_t outLen)
+{
+    if (!in || !out || outLen == 0) return false;
+    size_t o = 0;
+    for (size_t i = 0; in[i] != '\0'; ++i) {
+        const unsigned char c = (unsigned char)in[i];
+        if (c == '"' || c == '\\') {
+            if ((o + 2U) >= outLen) return false;
+            out[o++] = '\\';
+            out[o++] = (char)c;
+        } else {
+            if ((o + 1U) >= outLen) return false;
+            out[o++] = (char)c;
+        }
+    }
+    out[o] = '\0';
+    return true;
+}
+
 void HAModule::makeDeviceId(char* out, size_t len)
 {
     if (!out || len == 0) return;
@@ -179,6 +198,25 @@ bool HAModule::requestRefreshSvc_()
 {
     requestAutoconfigRefresh();
     return true;
+}
+
+bool HAModule::setEntityAbsentSvc_(const char* ownerId, const char* objectSuffix, bool absent)
+{
+    if (oneShotCompleted_ || !ensureStorage_() || !ownerId || !objectSuffix) return false;
+    bool changed = false;
+    auto apply = [&](const char* eOwner, const char* eSuffix, bool& eAbsent) {
+        if (!eOwner || !eSuffix) return;
+        if (strcmp(eOwner, ownerId) != 0 || strcmp(eSuffix, objectSuffix) != 0) return;
+        if (eAbsent != absent) { eAbsent = absent; changed = true; }
+    };
+    for (uint8_t i = 0; i < sensorCount_; ++i) apply(sensors_[i].ownerId, sensors_[i].objectSuffix, sensors_[i].absent);
+    for (uint8_t i = 0; i < binarySensorCount_; ++i) apply(binarySensors_[i].ownerId, binarySensors_[i].objectSuffix, binarySensors_[i].absent);
+    for (uint8_t i = 0; i < switchCount_; ++i) apply(switches_[i].ownerId, switches_[i].objectSuffix, switches_[i].absent);
+    for (uint8_t i = 0; i < numberCount_; ++i) apply(numbers_[i].ownerId, numbers_[i].objectSuffix, numbers_[i].absent);
+    for (uint8_t i = 0; i < selectCount_; ++i) apply(selects_[i].ownerId, selects_[i].objectSuffix, selects_[i].absent);
+    for (uint8_t i = 0; i < buttonCount_; ++i) apply(buttons_[i].ownerId, buttons_[i].objectSuffix, buttons_[i].absent);
+    if (changed) requestAutoconfigRefresh();
+    return changed;
 }
 
 static bool isIntegralHaNumberValue(float value)
@@ -550,6 +588,18 @@ bool HAModule::publishDiscovery(const char* component, const char* objectId, Mqt
     return true;
 }
 
+bool HAModule::publishTombstone_(const char* component, const char* objectSuffix, MqttBuildContext& outCtx)
+{
+    // Publie un payload discovery vide retained : supprime l'entite cote HA et
+    // purge le message retained precedent.
+    if (!buildObjectId(objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) return false;
+    if (outCtx.payload && outCtx.payloadCapacity > 0) outCtx.payload[0] = '\0';
+    if (!publishDiscovery(component, objectIdBuf_, outCtx)) return false;
+    outCtx.payloadLen = 0;
+    outCtx.allowEmptyPayload = true;
+    return true;
+}
+
 bool HAModule::publishSensor(const char* objectId, const char* name,
                              const char* stateTopic, const char* valueTemplate,
                              const char* entityCategory, const char* icon, const char* unit,
@@ -844,6 +894,11 @@ bool HAModule::publishButton(const char* objectId, const char* name,
     if (entityCategory && entityCategory[0] != '\0') {
         snprintf(entityCategoryField, sizeof(entityCategoryField), ",\"ent_cat\":\"%s\"", entityCategory);
     }
+    char escapedPayloadPress[192] = {0};
+    if (!jsonEscape(payloadPress, escapedPayloadPress, sizeof(escapedPayloadPress))) {
+        LOGW("HA button payload_press escape overflow object=%s", objectId);
+        return false;
+    }
 
     if (icon && icon[0] != '\0') {
         if (!formatChecked(buildCtx.payload, buildCtx.payloadCapacity,
@@ -853,7 +908,7 @@ bool HAModule::publishButton(const char* objectId, const char* name,
                  "\"dev\":{\"ids\":[\"%s\"],\"name\":\"%s\","
                  "\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\",\"cu\":\"%s\"}}",
                  name, objectId, defaultEntityId, uniqueId,
-                 commandTopic, payloadPress, icon,
+                 commandTopic, escapedPayloadPress, icon,
                  entityCategoryField, availabilityField,
                  originName_, deviceIdent_, deviceName_, cfgData_.vendor, cfgData_.model, FirmwareVersion::Full, kHaDeviceConfigUrl)) {
             LOGW("HA button payload truncated object=%s", objectId);
@@ -867,7 +922,7 @@ bool HAModule::publishButton(const char* objectId, const char* name,
                  "\"dev\":{\"ids\":[\"%s\"],\"name\":\"%s\","
                  "\"mf\":\"%s\",\"mdl\":\"%s\",\"sw\":\"%s\",\"cu\":\"%s\"}}",
                  name, objectId, defaultEntityId, uniqueId,
-                 commandTopic, payloadPress,
+                 commandTopic, escapedPayloadPress,
                  entityCategoryField, availabilityField,
                  originName_, deviceIdent_, deviceName_, cfgData_.vendor, cfgData_.model, FirmwareVersion::Full, kHaDeviceConfigUrl)) {
             LOGW("HA button payload truncated object=%s", objectId);
@@ -1090,7 +1145,9 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
 
     if (messageId < (uint16_t)(cursor + sensorCount_)) {
         const HASensorEntry& e = sensors_[messageId - cursor];
-        if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
+        if (e.absent) {
+            ok = publishTombstone_("sensor", e.objectSuffix, buildCtx);
+        } else if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
             mqttSvc_->formatTopic(mqttSvc_->ctx, e.stateTopicSuffix, stateTopicBuf_, sizeof(stateTopicBuf_));
             ok = publishSensor(objectIdBuf_, e.name, stateTopicBuf_, e.valueTemplate,
                                e.entityCategory, e.icon, e.unit, e.hasEntityName, e.availabilityTemplate, e.isText, &buildCtx);
@@ -1099,7 +1156,9 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
         cursor = (uint16_t)(cursor + sensorCount_);
         if (messageId < (uint16_t)(cursor + binarySensorCount_)) {
             const HABinarySensorEntry& e = binarySensors_[messageId - cursor];
-            if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
+            if (e.absent) {
+                ok = publishTombstone_("binary_sensor", e.objectSuffix, buildCtx);
+            } else if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
                 mqttSvc_->formatTopic(mqttSvc_->ctx, e.stateTopicSuffix, stateTopicBuf_, sizeof(stateTopicBuf_));
                 ok = publishBinarySensor(objectIdBuf_, e.name, stateTopicBuf_, e.valueTemplate, e.deviceClass, e.entityCategory, e.icon, &buildCtx);
             }
@@ -1107,7 +1166,9 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
             cursor = (uint16_t)(cursor + binarySensorCount_);
             if (messageId < (uint16_t)(cursor + switchCount_)) {
                 const HASwitchEntry& e = switches_[messageId - cursor];
-                if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
+                if (e.absent) {
+                    ok = publishTombstone_("switch", e.objectSuffix, buildCtx);
+                } else if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
                     mqttSvc_->formatTopic(mqttSvc_->ctx, e.stateTopicSuffix, stateTopicBuf_, sizeof(stateTopicBuf_));
                     mqttSvc_->formatTopic(mqttSvc_->ctx, e.commandTopicSuffix, commandTopicBuf_, sizeof(commandTopicBuf_));
                     ok = publishSwitch(objectIdBuf_, e.name, stateTopicBuf_, e.valueTemplate,
@@ -1117,7 +1178,9 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
                 cursor = (uint16_t)(cursor + switchCount_);
                 if (messageId < (uint16_t)(cursor + numberCount_)) {
                     const HANumberEntry& e = numbers_[messageId - cursor];
-                    if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
+                    if (e.absent) {
+                        ok = publishTombstone_("number", e.objectSuffix, buildCtx);
+                    } else if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
                         mqttSvc_->formatTopic(mqttSvc_->ctx, e.stateTopicSuffix, stateTopicBuf_, sizeof(stateTopicBuf_));
                         mqttSvc_->formatTopic(mqttSvc_->ctx, e.commandTopicSuffix, commandTopicBuf_, sizeof(commandTopicBuf_));
                         ok = publishNumber(objectIdBuf_, e.name, stateTopicBuf_, e.valueTemplate,
@@ -1129,7 +1192,9 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
                     cursor = (uint16_t)(cursor + numberCount_);
                     if (messageId < (uint16_t)(cursor + selectCount_)) {
                         const HASelectEntry& e = selects_[messageId - cursor];
-                        if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
+                        if (e.absent) {
+                            ok = publishTombstone_("select", e.objectSuffix, buildCtx);
+                        } else if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
                             mqttSvc_->formatTopic(mqttSvc_->ctx, e.stateTopicSuffix, stateTopicBuf_, sizeof(stateTopicBuf_));
                             mqttSvc_->formatTopic(mqttSvc_->ctx, e.commandTopicSuffix, commandTopicBuf_, sizeof(commandTopicBuf_));
                             ok = publishSelect(objectIdBuf_, e.name, stateTopicBuf_, e.valueTemplate,
@@ -1140,7 +1205,9 @@ bool HAModule::buildEntityMessage_(uint16_t messageId, MqttBuildContext& buildCt
                         cursor = (uint16_t)(cursor + selectCount_);
                         if (messageId < (uint16_t)(cursor + buttonCount_)) {
                             const HAButtonEntry& e = buttons_[messageId - cursor];
-                            if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
+                            if (e.absent) {
+                                ok = publishTombstone_("button", e.objectSuffix, buildCtx);
+                            } else if (buildObjectId(e.objectSuffix, objectIdBuf_, sizeof(objectIdBuf_))) {
                                 mqttSvc_->formatTopic(mqttSvc_->ctx, e.commandTopicSuffix, commandTopicBuf_, sizeof(commandTopicBuf_));
                                 ok = publishButton(objectIdBuf_, e.name, commandTopicBuf_, e.payloadPress, e.entityCategory, e.icon, &buildCtx);
                             }

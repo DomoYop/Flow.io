@@ -179,6 +179,7 @@ private:
     bool addSelectSvc_(const HASelectEntry* entry);
     bool addButtonSvc_(const HAButtonEntry* entry);
     bool requestRefreshSvc_();
+    bool setEntityAbsentSvc_(const char* ownerId, const char* objectSuffix, bool absent);
     bool ensureStorage_();
     void releaseOneShotResources_();
     size_t entityTableUsedBytes_() const;
@@ -262,6 +263,7 @@ private:
                        const char* icon = nullptr,
                        MqttBuildContext* outCtx = nullptr);
     bool publishDiscovery(const char* component, const char* objectId, MqttBuildContext& outCtx);
+    bool publishTombstone_(const char* component, const char* objectSuffix, MqttBuildContext& outCtx);
 
     static void makeDeviceId(char* out, size_t len);
     static void makeHexNodeId(char* out, size_t len);
@@ -275,6 +277,7 @@ private:
         ServiceBinding::bind<&HAModule::addSelectSvc_>,
         ServiceBinding::bind<&HAModule::addButtonSvc_>,
         ServiceBinding::bind<&HAModule::requestRefreshSvc_>,
+        ServiceBinding::bind<&HAModule::setEntityAbsentSvc_>,
         this
     };
 };
