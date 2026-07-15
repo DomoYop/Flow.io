@@ -97,6 +97,7 @@ Fiches par module dans [docs/modules/](docs/modules/) ; le module métier princi
 - **Capacités compile-time** (tableaux statiques bornés) : nombre d'endpoints IO, équipements `PoolDevice`, entités Home Assistant, routes runtime MQTT, variables de config… sont fixés à la compilation. Valeurs courantes dans [docs/README.md](docs/README.md) (« Capacités statiques »). Dépasser une capacité = troncature silencieuse, pas une erreur de build.
 - **Deux ESP32 historiques** : `FlowIO` (métier/IO) et `Supervisor` (web/provisioning/OTA/TFT) communiquent en I2C — voir [docs/core/flow-supervisor-i2c-protocol.md](docs/core/flow-supervisor-i2c-protocol.md). Le profil Waveshare regroupe ces rôles sur une seule carte.
 - **Moniteur de puissance unifié `POWERMON`** : les anciens backends `INA226`/`INA228` sont fusionnés en un seul backend `IO_BACKEND_POWERMON` (=8), un seul jeu de ports (143-150) et une config `powermon*` (champ `model` = 226 ou 228 à l'exécution). **Ne plus utiliser les noms/enums `INA226`/`INA228`** côté IOModule. Détail : [docs/notes/refactor-powermon-ina226-ina228.md](docs/notes/refactor-powermon-ina226-ina228.md).
+- **Capteur « Pression » (ex-PSI)** : le capteur de pression est nommé `pressure` partout (identifiants, clés config JSON `pressure_*`, entité HA `io_pressure`, clé RuntimeUI `pool.pressure`, unité affichée **bar**). Les clés NVS binaires historiques (`pl_piid`, `pl_psil`, `pl_psih`, `pl_psdt`) et les valeurs d'AlarmId (1000/1001) sont conservées. Détail : [docs/notes/renommage-capteur-psi-pression.md](docs/notes/renommage-capteur-psi-pression.md).
 
 ## Notes de travail (`docs/notes/`)
 
@@ -105,3 +106,6 @@ Notes personnelles hors doc officielle — utiles pour l'état d'avancement et l
 - [io-mapping-capteur-mesure.md](docs/notes/io-mapping-capteur-mesure.md) — comment carte + domaine + E/S se combinent (les 4 couches, où se définit « quel capteur pour quelle mesure »).
 - [refactor-powermon-ina226-ina228.md](docs/notes/refactor-powermon-ina226-ina228.md) — unification INA226/INA228 → POWERMON (**implémenté et compilé**).
 - [wifi-ap-sta-reprobe.md](docs/notes/wifi-ap-sta-reprobe.md) — retour automatique AP→STA en signal faible (**analyse + proposition, non implémenté** : sur Waveshare le firmware ne retente jamais le STA une fois en AP).
+- [renommage-capteur-psi-pression.md](docs/notes/renommage-capteur-psi-pression.md) — renommage complet PSI → Pression (**implémenté**, clés NVS binaires et AlarmId inchangés).
+- [ota-spiffs-lenteur-plantage.md](docs/notes/ota-spiffs-lenteur-plantage.md) — plantage TWDT pendant l'OTA SPIFFS (**corrigé** : yield périodique) + traçage `spiffs_version`.
+- [audit-config-defaut-piscine-waveshare.md](docs/notes/audit-config-defaut-piscine-waveshare.md) — matrice des défauts métier injectés par `applyDomainDefaults` (DomainSpec).
