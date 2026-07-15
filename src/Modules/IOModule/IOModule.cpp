@@ -165,6 +165,7 @@ static constexpr uint8_t kCfgBranchIoDs2484 = 57;
 static constexpr uint8_t kCfgBranchIo1Wire1 = 58;
 static constexpr uint8_t kCfgBranchIo1Wire2 = 59;
 static constexpr uint8_t kCfgBranchIoPowermon = 60;
+static constexpr uint8_t kCfgBranchIoTca9554 = 73;
 static constexpr PhysicalPortId kLegacyDisconnectedBindingPort = 65535U;
 static constexpr char kLegacyCounterRuntimeKeyFmt[] = "ioi%02urt";
 
@@ -304,6 +305,7 @@ static constexpr MqttConfigRouteProducer::Route kIoCfgRoutes[] = {
     FLOW_IO_ANALOG_ROUTE_ENTRY(41, kCfgBranchIoA14, "14"),
     FLOW_IO_ANALOG_ROUTE_ENTRY(42, kCfgBranchIoA15, "15"),
     {48, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoMcp23017}, "io/drivers/mcp23017", "io/drivers/mcp23017", (uint8_t)MqttPublishPriority::Normal, nullptr},
+    {73, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoTca9554}, "io/drivers/tca9554", "io/drivers/tca9554", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {57, {(uint8_t)ConfigModuleId::Io, kCfgBranchIoDs2484}, "io/drivers/ds2484", "io/drivers/ds2484", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {58, {(uint8_t)ConfigModuleId::Io, kCfgBranchIo1Wire1}, "io/drivers/1wire_int1", "io/drivers/1wire_int1", (uint8_t)MqttPublishPriority::Normal, nullptr},
     {59, {(uint8_t)ConfigModuleId::Io, kCfgBranchIo1Wire2}, "io/drivers/1wire_int2", "io/drivers/1wire_int2", (uint8_t)MqttPublishPriority::Normal, nullptr},
@@ -2090,6 +2092,14 @@ IoStatus IOModule::ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t*
     bool enabled = true;
     switch (backend) {
         case IO_BACKEND_PCF8574:    enabled = cfgData_.pcfEnabled; break;
+        case IO_BACKEND_TCA9554:
+#if defined(FLOW_PROFILE_WAVESHARE)
+            // Mandatory on this board: the only path to drive digital outputs (EXIO1..8).
+            enabled = true;
+#else
+            enabled = cfgData_.tca9554Enabled;
+#endif
+            break;
         // DS18B20 are read through any enabled 1-Wire transport (DS2484 or GPIO buses).
         case IO_BACKEND_DS18B20:
             enabled = cfgData_.ds2484Enabled || cfgData_.oneWire1Enabled || cfgData_.oneWire2Enabled;
@@ -2114,7 +2124,6 @@ bool IOModule::getLedMaskSvc_(uint8_t* mask) const
 
 bool IOModule::setLedMask_(uint8_t mask, uint32_t tsMs)
 {
-    if (!cfgData_.pcfEnabled) return false;
     if (!ledMaskEp_) return false;
     uint8_t physical = pcfPhysicalFromLogical_(mask);
     bool ok = ledMaskEp_->setMask(physical, tsMs);
@@ -2127,7 +2136,6 @@ bool IOModule::setLedMask_(uint8_t mask, uint32_t tsMs)
 
 bool IOModule::turnLedOn_(uint8_t bit, uint32_t tsMs)
 {
-    if (!cfgData_.pcfEnabled) return false;
     if (bit > 7) return false;
     uint8_t mask = 0;
     if (!getLedMask_(mask)) mask = 0;
@@ -2137,7 +2145,6 @@ bool IOModule::turnLedOn_(uint8_t bit, uint32_t tsMs)
 
 bool IOModule::turnLedOff_(uint8_t bit, uint32_t tsMs)
 {
-    if (!cfgData_.pcfEnabled) return false;
     if (bit > 7) return false;
     uint8_t mask = 0;
     if (!getLedMask_(mask)) mask = 0;
@@ -2147,7 +2154,7 @@ bool IOModule::turnLedOff_(uint8_t bit, uint32_t tsMs)
 
 bool IOModule::getLedMask_(uint8_t& mask) const
 {
-    if (!cfgData_.pcfEnabled) return false;
+    if (!ledMaskEp_ && !pcfLogicalValid_) return false;
     if (pcfLogicalValid_) {
         mask = pcfLogicalMask_;
         return true;
@@ -2783,12 +2790,12 @@ bool IOModule::configureRuntime_()
                 LOGW("Digital output %s uses TCA9554 but PCF8574 outputs are also configured; mixed expanders not supported", s.endpointId);
                 continue;
             }
-            if (!cfgData_.pcfEnabled) {
+            if (!cfgData_.tca9554Enabled) {
                 LOGW("Digital output %s requires TCA9554 but expander module is disabled", s.endpointId);
                 continue;
             }
             if (!tcaDriver_) {
-                IMaskOutputDriver* tcaMaskDriver = allocTcaDriver_("tca9554", &i2cBus_, cfgData_.pcfAddress);
+                IMaskOutputDriver* tcaMaskDriver = allocTcaDriver_("tca9554", &i2cBus_, cfgData_.tca9554Address);
                 if (!tcaMaskDriver) {
                     LOGW("TCA9554 pool exhausted");
                     continue;
@@ -2798,7 +2805,7 @@ bool IOModule::configureRuntime_()
                     ? tcaDriver_->beginPreserveHardwareState()
                     : makeMaskProvider(tcaDriver_).begin();
                 if (!tcaBeginOk) {
-                    LOGW("TCA9554 not detected at 0x%02X", cfgData_.pcfAddress);
+                    LOGW("TCA9554 not detected at 0x%02X", cfgData_.tca9554Address);
                     tcaDriver_ = nullptr;
                     continue;
                 }
@@ -2904,9 +2911,9 @@ bool IOModule::configureRuntime_()
              cfgData_.powermonAddress, present ? "found" : "not found");
     }
 
-    if (needTcaOutput && !needPcfOutput && cfgData_.pcfEnabled) {
-        const bool present = i2cBus_.probe(cfgData_.pcfAddress);
-        LOGI("TCA9554 probe 0x%02X: %s", cfgData_.pcfAddress, present ? "found" : "not found");
+    if (needTcaOutput && !needPcfOutput && cfgData_.tca9554Enabled) {
+        const bool present = i2cBus_.probe(cfgData_.tca9554Address);
+        LOGI("TCA9554 probe 0x%02X: %s", cfgData_.tca9554Address, present ? "found" : "not found");
     }
 
     if (needAnalogSource[IO_SRC_ADS_INTERNAL_SINGLE]) {
@@ -3069,7 +3076,8 @@ bool IOModule::configureRuntime_()
         }
     }
 
-    if (cfgData_.pcfEnabled) {
+    const bool ledExpanderEnabled = (needTcaOutput && !needPcfOutput) ? cfgData_.tca9554Enabled : cfgData_.pcfEnabled;
+    if (ledExpanderEnabled) {
         // Do not expose/use the status LED mask endpoint when the expander lines
         // are already allocated to digital outputs (relays). Writing a global mask
         // would overwrite output startup states.
@@ -3080,11 +3088,11 @@ bool IOModule::configureRuntime_()
         IMaskOutputDriver* driver = nullptr;
         if (needTcaOutput && !needPcfOutput) {
             driver = tcaDriver_ ? static_cast<IMaskOutputDriver*>(tcaDriver_)
-                                : allocTcaDriver_("tca9554_led", &i2cBus_, cfgData_.pcfAddress);
+                                : allocTcaDriver_("tca9554_led", &i2cBus_, cfgData_.tca9554Address);
             if (driver && !tcaDriver_) {
                 tcaDriver_ = static_cast<Tca9554Driver*>(driver);
                 if (!makeMaskProvider(driver).begin()) {
-                    LOGW("TCA9554 not detected at 0x%02X", cfgData_.pcfAddress);
+                    LOGW("TCA9554 not detected at 0x%02X", cfgData_.tca9554Address);
                     tcaDriver_ = nullptr;
                     driver = nullptr;
                 }
@@ -3164,9 +3172,10 @@ bool IOModule::configureRuntime_()
     pcfLastEnabled_ = cfgData_.pcfEnabled;
 
     const char* expanderState = "off";
-    if (cfgData_.pcfEnabled) {
-        if (needTcaOutput && !needPcfOutput) expanderState = "tca9554";
-        else expanderState = "pcf8574";
+    if (needTcaOutput && !needPcfOutput) {
+        if (cfgData_.tca9554Enabled) expanderState = "tca9554";
+    } else if (cfgData_.pcfEnabled) {
+        expanderState = "pcf8574";
     }
 
     LOGI("I/O ready (ads=%ldms ds=%ldms i2c_ai=%s din=%ldms endpoints=%u expander=%s)",
@@ -3433,6 +3442,8 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(pcfActiveLowVar_, kCfgModuleId, kCfgBranchIoPcf857x);
     cfg.registerVar(mcp23017EnabledVar_, kCfgModuleId, kCfgBranchIoMcp23017);
     cfg.registerVar(mcp23017AddressVar_, kCfgModuleId, kCfgBranchIoMcp23017);
+    cfg.registerVar(tca9554EnabledVar_, kCfgModuleId, kCfgBranchIoTca9554);
+    cfg.registerVar(tca9554AddressVar_, kCfgModuleId, kCfgBranchIoTca9554);
     cfg.registerVar(ds2484EnabledVar_, kCfgModuleId, kCfgBranchIoDs2484);
     cfg.registerVar(ds2484AddressVar_, kCfgModuleId, kCfgBranchIoDs2484);
     cfg.registerVar(ds2484PollVar_, kCfgModuleId, kCfgBranchIoDs2484);
@@ -3481,6 +3492,11 @@ void IOModule::onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services)
     for (uint8_t i = 0; i < DIGITAL_CFG_SLOTS; ++i) {
         digitalCfg_[i].bindingPort = normalizeConfiguredBindingPort(digitalCfg_[i].bindingPort);
     }
+#if defined(FLOW_PROFILE_WAVESHARE)
+    // On Waveshare, TCA9554 is the only path to drive digital outputs (EXIO1-8);
+    // it cannot be an optional, user-disableable driver like PCF8574/MCP23017.
+    cfgData_.tca9554Enabled = true;
+#endif
     const bool sdaValid = (cfgData_.i2cSda >= 0) && digitalPinIsValid((uint8_t)cfgData_.i2cSda);
     const bool sclValid = (cfgData_.i2cScl >= 0) && digitalPinIsValid((uint8_t)cfgData_.i2cScl);
     if (!sdaValid || !sclValid) {

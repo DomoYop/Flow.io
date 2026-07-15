@@ -47,7 +47,12 @@ struct IOModuleConfig {
     uint8_t pcfAddress = FLOW_WIRDEF_IO_PCFAD;
     uint8_t pcfMaskDefault = FLOW_WIRDEF_IO_PCFMK;
     bool pcfActiveLow = FLOW_WIRDEF_IO_PCFAL;
-    bool mcp23017Enabled = true;
+    // TCA9554 est l'alternative a PCF8574 sur le connecteur d'extension de sorties ;
+    // champ dedie (independant de pcfEnabled/pcfAddress) pour ne pas coupler les deux puces.
+    bool tca9554Enabled = true;
+    uint8_t tca9554Address = 0x20;
+    // MCP23017 est une extension optionnelle non montee d'office (cf. sht40/bmp280/...).
+    bool mcp23017Enabled = false;
     uint8_t mcp23017Address = 0x21;
     // DS2484 I2C-to-1-Wire bridge.
     bool ds2484Enabled = false;

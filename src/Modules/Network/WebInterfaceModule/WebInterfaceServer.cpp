@@ -2923,6 +2923,18 @@ const IOBindingPortSpec* waveshareFindPortForMeta_(const IoEndpointMeta& meta)
     return nullptr;
 }
 
+// A port bound to a disabled backend (optional driver toggled off in config) never
+// produces a live reading; report it as "sleeping" rather than "error" so the
+// diagnostic page doesn't conflate an intentional disable with a real fault.
+bool waveshareIoBackendDisabled_(const IOServiceV2* ioSvc, uint8_t backend)
+{
+    if (!ioSvc || !ioSvc->backendInfo) return false;
+    uint8_t enabled = 1U;
+    uint8_t configurable = 0U;
+    if (ioSvc->backendInfo(ioSvc->ctx, backend, &enabled, &configurable) != IO_OK) return false;
+    return !enabled;
+}
+
 bool waveshareFindIoEndpointByPort_(const IOServiceV2* ioSvc,
                                     const IOBindingPortSpec& spec,
                                     IoId& ioIdOut,
@@ -3040,6 +3052,10 @@ WaveshareIoSummaryState waveshareIoSummaryStateForSlot_(const IOServiceV2* ioSvc
             out.error = "no_valid_value";
             return out;
         }
+    } else if (out.meta.kind == IO_KIND_DIGITAL_OUT && waveshareIoBackendDisabled_(ioSvc, out.meta.backend)) {
+        out.state = "sleeping";
+        out.error = "disabled";
+        return out;
     }
 
     if (out.hasPoolDevice) {
@@ -3165,7 +3181,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
             IoValue value{};
             const bool ok = ioSvc->readValue && ioSvc->readValue(ioSvc->ctx, ioId, &value) == IO_OK && value.valid;
             if (ok) ++driverActive[meta.backend];
-            else ++driverError[meta.backend];
+            else if (!waveshareIoBackendDisabled_(ioSvc, meta.backend)) ++driverError[meta.backend];
         }
     }
 
@@ -3177,7 +3193,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         if (!bound) continue;
         if (ioSvc && ioSvc->readValue && ioSvc->readValue(ioSvc->ctx, ioId, &value) == IO_OK && value.valid) {
             ++bindingActive;
-        } else {
+        } else if (!waveshareIoBackendDisabled_(ioSvc, meta.backend)) {
             ++bindingError;
         }
     }
@@ -3256,7 +3272,9 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         response.print(",\"io_id_label\":");
         printJsonEscaped_(response, bound ? "" : "Non affecte");
         response.print(",\"state\":");
-        printJsonEscaped_(response, bound ? (valueOk ? "active" : "error") : "sleeping");
+        printJsonEscaped_(response, bound
+            ? (valueOk ? "active" : (waveshareIoBackendDisabled_(ioSvc, backend) ? "sleeping" : "error"))
+            : "sleeping");
         response.print(",\"last_value\":");
         printJsonEscaped_(response, valueOk ? valueText : "-");
         response.print(",\"ts_ms\":");
@@ -3303,7 +3321,7 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
             response.print(",\"domain\":");
             printJsonEscaped_(response, domainName);
             response.print(",\"state\":");
-            printJsonEscaped_(response, valueOk ? "active" : "error");
+            printJsonEscaped_(response, valueOk ? "active" : (waveshareIoBackendDisabled_(ioSvc, meta.backend) ? "sleeping" : "error"));
             response.print(",\"last_value\":");
             printJsonEscaped_(response, valueOk ? valueText : "-");
             response.print(",\"ts_ms\":");

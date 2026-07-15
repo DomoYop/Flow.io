@@ -491,6 +491,8 @@ private:
     ConfigVariable<bool,0> pcfActiveLowVar_ { NVS_KEY(NvsKeys::Io::IO_PCFAL),"active_low","io/drivers/pcf857x",ConfigType::Bool,&cfgData_.pcfActiveLow,ConfigPersistence::Persistent,0 };
     ConfigVariable<bool,0> mcp23017EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_MCPEN),"enabled","io/drivers/mcp23017",ConfigType::Bool,&cfgData_.mcp23017Enabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<uint8_t,0> mcp23017AddressVar_ { NVS_KEY(NvsKeys::Io::IO_MCPAD),"address","io/drivers/mcp23017",ConfigType::UInt8,&cfgData_.mcp23017Address,ConfigPersistence::Persistent,0 };
+    ConfigVariable<bool,0> tca9554EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_TCAEN),"enabled","io/drivers/tca9554",ConfigType::Bool,&cfgData_.tca9554Enabled,ConfigPersistence::Persistent,0 };
+    ConfigVariable<uint8_t,0> tca9554AddressVar_ { NVS_KEY(NvsKeys::Io::IO_TCAAD),"address","io/drivers/tca9554",ConfigType::UInt8,&cfgData_.tca9554Address,ConfigPersistence::Persistent,0 };
     ConfigVariable<bool,0> ds2484EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_DS24EN),"enabled","io/drivers/ds2484",ConfigType::Bool,&cfgData_.ds2484Enabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<uint8_t,0> ds2484AddressVar_ { NVS_KEY(NvsKeys::Io::IO_DS24AD),"address","io/drivers/ds2484",ConfigType::UInt8,&cfgData_.ds2484Address,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> ds2484PollVar_ { NVS_KEY(NvsKeys::Io::IO_DS24PL),"poll_ms","io/drivers/ds2484",ConfigType::Int32,&cfgData_.ds2484PollMs,ConfigPersistence::Persistent,0 };
