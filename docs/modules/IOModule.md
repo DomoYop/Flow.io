@@ -18,6 +18,22 @@ Le service public exposé au reste du firmware est `IOServiceV2`.
 
 Type: module actif.
 
+## Organisation des sources
+
+La classe `IOModule` est implémentée dans quatre unités de compilation
+(`src/Modules/IOModule/`), découpées par domaine :
+
+- `IOModule.cpp` — cycle de vie du module, définition des slots, polling/ticks,
+  compteurs, sorties impulsionnelles, routes config MQTT
+- `IOModuleAssembly.cpp` — résolution des bindings, découverte DS18B20,
+  `configureRuntime_` (décomposé en étapes privées), allocateurs de pools
+- `IOModuleService.cpp` — implémentation `IOServiceV2` et masque LED de statut
+- `IOModuleSnapshots.cpp` — labels d'endpoints, snapshots input/output/runtime,
+  valeurs Runtime UI
+
+Les couches basses (bus, drivers, endpoints, registre, scheduler) sont dans les
+sous-dossiers `IOBus/`, `IODrivers/`, `IOEndpoints/`, `IORegistry/`, `IOScheduler/`.
+
 ## Dépendances
 
 En build `FlowIO`, les dépendances déclarées sont:
