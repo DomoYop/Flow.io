@@ -197,6 +197,7 @@ private:
     const WifiService* wifiSvc_ = nullptr;
     const CommandService* cmdSvc_ = nullptr;
     const HmiService* hmiSvc_ = nullptr;
+    const FirmwareUpdateService* firmwareUpdateSvc_ = nullptr;
     const FlowCfgRemoteService* flowCfgSvc_ = nullptr;
     const NetworkAccessService* netAccessSvc_ = nullptr;
     const IOServiceV2* ioSvc_ = nullptr;

@@ -3,6 +3,8 @@
     "cfgdocs.fwupdate.update_host.help": "Adresse du serveur HTTP hébergeant les firmwares.",
     "cfgdocs.fwupdate.update_host.label": "Hôte serveur MAJ",
     "cfgdocs.fwupdate.update_path.help": "Chemin de base du manifest des mises à jour sur le serveur HTTP.",
-    "cfgdocs.fwupdate.update_path.label": "Répertoire MAJ"
+    "cfgdocs.fwupdate.update_path.label": "Répertoire MAJ",
+    "cfgdocs.fwupdate.spiffs_version.help": "Version du contenu SPIFFS réellement flashée (mise à jour uniquement après un flash SPIFFS réussi).",
+    "cfgdocs.fwupdate.spiffs_version.label": "Version SPIFFS installée"
   }
 }

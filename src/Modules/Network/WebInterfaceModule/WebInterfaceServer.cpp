@@ -5464,6 +5464,15 @@ void WebInterfaceModule::startServer_()
             hmiSvc_->getDisplayVersion(hmiSvc_->ctx, nextionDisplayVersion, sizeof(nextionDisplayVersion))) {
             doc["nextion_display_version"] = nextionDisplayVersion;
         }
+        if (!firmwareUpdateSvc_ && services_) {
+            firmwareUpdateSvc_ = services_->get<FirmwareUpdateService>(ServiceId::FirmwareUpdate);
+        }
+        char spiffsVersion[24]{};
+        if (firmwareUpdateSvc_ && firmwareUpdateSvc_->getSpiffsVersion &&
+            firmwareUpdateSvc_->getSpiffsVersion(firmwareUpdateSvc_->ctx, spiffsVersion, sizeof(spiffsVersion)) &&
+            spiffsVersion[0] != '\0') {
+            doc["spiffs_version"] = spiffsVersion;
+        }
 #if defined(FLOW_PROFILE_MICRONOVA)
         doc["local_runtime"] = true;
         doc["local_config_label"] = "Config Store Micronova";

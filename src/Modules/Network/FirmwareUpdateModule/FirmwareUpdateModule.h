@@ -79,6 +79,7 @@ private:
     struct ConfigData {
         char updateHost[64] = "";
         char updatePath[64] = "/binary";
+        char spiffsVersion[24] = "";
     } cfgData_{};
 
     ConfigVariable<char, 2> updateHostVar_{
@@ -88,6 +89,12 @@ private:
     ConfigVariable<char, 2> updatePathVar_{
         NVS_KEY("up_base_path"), "update_path", "fwupdate",
         ConfigType::CharArray, cfgData_.updatePath, ConfigPersistence::Persistent, sizeof(cfgData_.updatePath)
+    };
+    // Version réellement flashée dans la partition SPIFFS (distincte de la version
+    // du firmware) : mise à jour uniquement quand runSpiffsUpdate_ termine avec succès.
+    ConfigVariable<char, 2> spiffsVersionVar_{
+        NVS_KEY("sp_version"), "spiffs_version", "fwupdate",
+        ConfigType::CharArray, cfgData_.spiffsVersion, ConfigPersistence::Persistent, sizeof(cfgData_.spiffsVersion)
     };
     ServiceRegistry* services_ = nullptr;
     ConfigStore* cfgStore_ = nullptr;
@@ -131,6 +138,7 @@ private:
                     const char* updatePath,
                     char* errOut,
                     size_t errOutLen);
+    bool getSpiffsVersion_(char* out, size_t outLen) const;
     bool runJob_(const UpdateJob& job);
     bool runWaveshareUpdate_(const char* url, char* errOut, size_t errOutLen);
     bool runNextionUpdate_(const char* url, char* errOut, size_t errOutLen);
@@ -166,6 +174,7 @@ private:
         ServiceBinding::bind<&FirmwareUpdateModule::checkManifestJsonStream_>,
         ServiceBinding::bind<&FirmwareUpdateModule::manifestUrl_>,
         ServiceBinding::bind<&FirmwareUpdateModule::setConfig_>,
+        ServiceBinding::bind<&FirmwareUpdateModule::getSpiffsVersion_>,
         this
     };
 };
