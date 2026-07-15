@@ -189,8 +189,8 @@ uint32_t SupervisorHMIModule::buildRenderKey_() const
     mix(&view_.flowAirTemp, sizeof(view_.flowAirTemp));
     mix(&view_.flowHasWaterCounter, sizeof(view_.flowHasWaterCounter));
     mix(&view_.flowWaterCounter, sizeof(view_.flowWaterCounter));
-    mix(&view_.flowHasPsi, sizeof(view_.flowHasPsi));
-    mix(&view_.flowPsi, sizeof(view_.flowPsi));
+    mix(&view_.flowHasPressure, sizeof(view_.flowHasPressure));
+    mix(&view_.flowPressure, sizeof(view_.flowPressure));
     mix(&view_.flowHasBmp280Temp, sizeof(view_.flowHasBmp280Temp));
     mix(&view_.flowBmp280Temp, sizeof(view_.flowBmp280Temp));
     mix(&view_.flowHasBme680Temp, sizeof(view_.flowHasBme680Temp));
@@ -435,8 +435,8 @@ void SupervisorHMIModule::refreshFlowStatusFromDataStore_()
     view_.flowAirTemp = flow.airTemp;
     view_.flowHasWaterCounter = flow.hasWaterCounter;
     view_.flowWaterCounter = flow.waterCounter;
-    view_.flowHasPsi = flow.hasPsi;
-    view_.flowPsi = flow.psi;
+    view_.flowHasPressure = flow.hasPressure;
+    view_.flowPressure = flow.pressure;
     view_.flowHasBmp280Temp = flow.hasBmp280Temp;
     view_.flowBmp280Temp = flow.bmp280Temp;
     view_.flowHasBme680Temp = flow.hasBme680Temp;

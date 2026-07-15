@@ -14,7 +14,7 @@ inline constexpr PoolRoleSpec kPoolRoles[] = {
     // {role, ioSlot, endpointId, displayName, haObjectSuffix, haName, haIcon, haUnit}
     {PoolIds::SensorOrp, analogInputSlot(0), "ORP", "ORP", "io_orp", nullptr, "mdi:flash", "mV"},
     {PoolIds::SensorPh, analogInputSlot(1), "pH", "pH", "io_ph", nullptr, "mdi:ph", ""},
-    {PoolIds::SensorPsi, analogInputSlot(2), "PSI", "PSI", "io_psi", nullptr, "mdi:gauge", "PSI"},
+    {PoolIds::SensorPressure, analogInputSlot(2), "Pressure", "Pressure", "io_pressure", nullptr, "mdi:gauge", "bar"},
     {PoolIds::SensorSpareAnalog, analogInputSlot(3), "Spare", "Spare", "io_spare", nullptr, "mdi:sine-wave", nullptr},
     {PoolIds::SensorWaterTemp, analogInputSlot(4), "Water Temperature", "Water Temperature", "io_wat_tmp", nullptr, "mdi:water-thermometer", "\xC2\xB0""C"},
     {PoolIds::SensorAirTemp, analogInputSlot(5), "Air Temperature", "Air Temperature", "io_air_tmp", nullptr, "mdi:thermometer", "\xC2\xB0""C"},

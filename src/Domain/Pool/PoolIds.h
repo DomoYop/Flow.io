@@ -7,7 +7,7 @@ namespace PoolIds {
 enum DomainSlot : DomainSlotId {
     SensorOrp = 1,
     SensorPh = 2,
-    SensorPsi = 3,
+    SensorPressure = 3,
     SensorSpareAnalog = 4,
     SensorWaterTemp = 5,
     SensorAirTemp = 6,

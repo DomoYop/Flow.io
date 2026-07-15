@@ -206,7 +206,7 @@ constexpr uint8_t JitterPct = 15;
 constexpr uint8_t MaxRuntimeRoutes = 112;
 /** @brief Default momentary digital output pulse duration in ms (`IOModule`). */
 constexpr uint16_t MomentaryPulseMs = 500;
-/** @brief Default periodic trace interval for ORP/pH/PSI calc logs (`IOModule`, `trace_period_ms`). */
+/** @brief Default periodic trace interval for ORP/pH/Pressure calc logs (`IOModule`, `trace_period_ms`). */
 constexpr uint32_t IoTracePeriodMs = 10000;
 /** @brief HA command payload buffer length for IO output switches (`IOModule::haSwitchPayloadOn_/Off_`). */
 constexpr size_t IoHaSwitchPayloadBuf = 128;

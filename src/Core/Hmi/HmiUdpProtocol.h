@@ -94,12 +94,12 @@ struct HmiUdpHomeV2NeedlesPayload {
     uint8_t flags;
     int8_t phNeedle;
     int8_t orpNeedle;
-    uint8_t psiNeedle;
+    uint8_t pressureNeedle;
 };
 
 static constexpr uint8_t HMI_UDP_V2_NEEDLE_PH = 0x01;
 static constexpr uint8_t HMI_UDP_V2_NEEDLE_ORP = 0x02;
-static constexpr uint8_t HMI_UDP_V2_NEEDLE_PSI = 0x04;
+static constexpr uint8_t HMI_UDP_V2_NEEDLE_PRESSURE = 0x04;
 
 struct HmiUdpStateBitsPayload {
     uint32_t stateBits;

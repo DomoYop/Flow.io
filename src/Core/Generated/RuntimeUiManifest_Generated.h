@@ -43,7 +43,7 @@ inline constexpr RuntimeUiManifestItem kRuntimeUiManifestItems[] = {
     {2203, "pool.ph", "float", nullptr},
     {2204, "pool.orp", "float", "mV"},
     {2205, "pool.water_counter", "float", "L"},
-    {2206, "pool.psi", "float", "PSI"},
+    {2206, "pool.pressure", "float", "bar"},
     {2207, "io.bmp280_temp", "float", "\302\260C"},
     {2208, "io.bme680_temp", "float", "\302\260C"},
     {2209, "bmp280.pressure", "float", "hPa"},

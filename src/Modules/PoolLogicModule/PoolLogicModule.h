@@ -92,7 +92,7 @@ private:
         O2BlockNone = 0,
         O2BlockInactive = 1,
         O2BlockTimeUnsynced = 2,
-        O2BlockPsi = 3,
+        O2BlockPressure = 3,
         O2BlockTankLow = 4,
         O2BlockFlowInvalid = 5,
         O2BlockFiltrationWait = 6,
@@ -129,7 +129,7 @@ private:
     enum class HeatAssistReason : uint8_t {
         Disabled = 0,
         ManualMode,
-        PsiBlocked,
+        PressureBlocked,
         SetpointInvalid,
         TempUnavailable,
         ProbeWait30m,
@@ -145,7 +145,7 @@ private:
 
     static constexpr IoId IO_ID_PH_DEFAULT = ioIdFromSlot(analogInputSlot(1));
     static constexpr IoId IO_ID_ORP_DEFAULT = ioIdFromSlot(analogInputSlot(0));
-    static constexpr IoId IO_ID_PSI_DEFAULT = ioIdFromSlot(analogInputSlot(2));
+    static constexpr IoId IO_ID_PRESSURE_DEFAULT = ioIdFromSlot(analogInputSlot(2));
     static constexpr IoId IO_ID_WATER_TEMP_DEFAULT = ioIdFromSlot(analogInputSlot(4));
     static constexpr IoId IO_ID_AIR_TEMP_DEFAULT = ioIdFromSlot(analogInputSlot(5));
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
@@ -182,7 +182,7 @@ private:
     // Sensor IO ids for IOServiceV2 reads.
     IoId phIoId_ = IO_ID_PH_DEFAULT;
     IoId orpIoId_ = IO_ID_ORP_DEFAULT;
-    IoId psiIoId_ = IO_ID_PSI_DEFAULT;
+    IoId pressureIoId_ = IO_ID_PRESSURE_DEFAULT;
     IoId waterTempIoId_ = IO_ID_WATER_TEMP_DEFAULT;
     IoId airTempIoId_ = IO_ID_AIR_TEMP_DEFAULT;
     IoId levelIoId_ = IO_ID_LEVEL_DEFAULT;
@@ -190,8 +190,8 @@ private:
     IoId chlorineLevelIoId_ = IO_ID_CHLORINE_LEVEL_DEFAULT;
 
     // Thresholds / delays
-    float psiLowThreshold_ = 0.15f;
-    float psiHighThreshold_ = 1.80f;
+    float pressureLowThreshold_ = 0.15f;
+    float pressureHighThreshold_ = 1.80f;
     float winterStartTempC_ = -2.0f;
     float freezeHoldTempC_ = 2.0f;
     float secureElectroTempC_ = 15.0f;
@@ -208,7 +208,7 @@ private:
     int32_t orpWindowMs_ = PoolDefaults::PidWindowMs;
     int32_t pidMinOnMs_ = PoolDefaults::PidMinOnMs;
     int32_t pidSampleMs_ = PoolDefaults::PidSampleMs;
-    uint8_t psiStartupDelaySec_ = 60;
+    uint8_t pressureStartupDelaySec_ = 60;
     uint8_t delayPidsMin_ = 5;
     uint8_t delayElectroMin_ = 10;
     uint8_t robotDelayMin_ = 30;
@@ -265,7 +265,7 @@ private:
     bool startupActivityPending_ = false;
     uint32_t startupActivitySinceMs_ = 0;
 
-    bool psiError_ = false;
+    bool pressureError_ = false;
     bool phTankLowError_ = false;
     bool chlorineTankLowError_ = false;
     bool cleaningDone_ = false;
@@ -313,8 +313,8 @@ private:
                                        &phIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> orpIdVar_{NVS_KEY(NvsKeys::PoolLogic::OrpIoId), "dis_io_id", "poollogic/sensors", ConfigType::UInt16,
                                         &orpIoId_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<IoId,0> psiIdVar_{NVS_KEY(NvsKeys::PoolLogic::PsiIoId), "psi_io_id", "poollogic/sensors", ConfigType::UInt16,
-                                        &psiIoId_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<IoId,0> pressureIdVar_{NVS_KEY(NvsKeys::PoolLogic::PressureIoId), "pressure_io_id", "poollogic/sensors", ConfigType::UInt16,
+                                        &pressureIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> waterTempIdVar_{NVS_KEY(NvsKeys::PoolLogic::WaterTempIoId), "wat_temp_io_id", "poollogic/sensors", ConfigType::UInt16,
                                               &waterTempIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> airTempIdVar_{NVS_KEY(NvsKeys::PoolLogic::AirTempIoId), "air_temp_io_id", "poollogic/sensors", ConfigType::UInt16,
@@ -326,10 +326,10 @@ private:
     ConfigVariable<IoId,0> chlorineLevelIdVar_{NVS_KEY(NvsKeys::PoolLogic::ChlorineLevelIoId), "chl_lvl_io_id", "poollogic/sensors", ConfigType::UInt16,
                                                   &chlorineLevelIoId_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<float,0> psiLowVar_{NVS_KEY(NvsKeys::PoolLogic::PsiLow), "psi_low_th", "poollogic/safety", ConfigType::Float,
-                                       &psiLowThreshold_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> psiHighVar_{NVS_KEY(NvsKeys::PoolLogic::PsiHigh), "psi_high_th", "poollogic/safety", ConfigType::Float,
-                                        &psiHighThreshold_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> pressureLowVar_{NVS_KEY(NvsKeys::PoolLogic::PressureLow), "pressure_low_th", "poollogic/safety", ConfigType::Float,
+                                       &pressureLowThreshold_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> pressureHighVar_{NVS_KEY(NvsKeys::PoolLogic::PressureHigh), "pressure_high_th", "poollogic/safety", ConfigType::Float,
+                                        &pressureHighThreshold_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> winterStartVar_{NVS_KEY(NvsKeys::PoolLogic::WinterStart), "winter_start_t", "poollogic/safety", ConfigType::Float,
                                             &winterStartTempC_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> freezeHoldVar_{NVS_KEY(NvsKeys::PoolLogic::FreezeHold), "freeze_hold_t", "poollogic/safety", ConfigType::Float,
@@ -363,8 +363,8 @@ private:
     ConfigVariable<int32_t,0> pidSampleMsVar_{NVS_KEY(NvsKeys::PoolLogic::PidSampleMs), "pid_sample_ms", "poollogic/regulation", ConfigType::Int32,
                                               &pidSampleMs_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<uint8_t,0> psiDelayVar_{NVS_KEY(NvsKeys::PoolLogic::PsiDelay), "psi_start_dly_s", "poollogic/safety", ConfigType::UInt8,
-                                           &psiStartupDelaySec_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint8_t,0> pressureDelayVar_{NVS_KEY(NvsKeys::PoolLogic::PressureDelay), "pressure_start_dly_s", "poollogic/safety", ConfigType::UInt8,
+                                           &pressureStartupDelaySec_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> delayPidsVar_{NVS_KEY(NvsKeys::PoolLogic::DelayPids), "dly_pid_min", "poollogic/regulation", ConfigType::UInt8,
                                             &delayPidsMin_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> delayElectroVar_{NVS_KEY(NvsKeys::PoolLogic::DelayElectro), "dly_electro_min", "poollogic/swg", ConfigType::UInt8,
@@ -445,8 +445,8 @@ private:
                                          uint8_t* durationOut = nullptr);
 
     // Control
-    static AlarmCondState condPsiLowStatic_(void* ctx, uint32_t nowMs);
-    static AlarmCondState condPsiHighStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condPressureLowStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condPressureHighStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhTankLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorineTankLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condWaterLevelLowStatic_(void* ctx, uint32_t nowMs);
@@ -510,7 +510,7 @@ private:
                          uint32_t filtrationRunMin,
                          bool haveWaterTemp,
                          float waterTemp,
-                         bool psiError,
+                         bool pressureError,
                          bool tankLow,
                          uint32_t nowMs,
                          bool& requestFiltrationOut,

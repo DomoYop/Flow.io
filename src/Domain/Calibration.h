@@ -16,7 +16,7 @@ struct Orp {
     static constexpr float ExternalC1 = 0.0f;
 };
 
-struct Psi {
+struct Pressure {
     static constexpr float DefaultC0 = 0.377923399f;
     static constexpr float DefaultC1 = -0.17634473f;
 };

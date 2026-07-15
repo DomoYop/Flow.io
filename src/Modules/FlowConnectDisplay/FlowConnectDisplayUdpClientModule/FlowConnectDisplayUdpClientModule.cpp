@@ -315,10 +315,10 @@ void FlowConnectDisplayUdpClientModule::handlePacket_(const HmiUdpHeader& header
             NextionV2NeedlePublish publish{};
             publish.ph = (p->flags & HMI_UDP_V2_NEEDLE_PH) != 0U;
             publish.orp = (p->flags & HMI_UDP_V2_NEEDLE_ORP) != 0U;
-            publish.psi = (p->flags & HMI_UDP_V2_NEEDLE_PSI) != 0U;
+            publish.pressure = (p->flags & HMI_UDP_V2_NEEDLE_PRESSURE) != 0U;
             publish.phNeedle = p->phNeedle;
             publish.orpNeedle = p->orpNeedle;
-            publish.psiNeedle = p->psiNeedle;
+            publish.pressureNeedle = p->pressureNeedle;
             (void)nextion_.publishV2Needles(publish);
             break;
         }

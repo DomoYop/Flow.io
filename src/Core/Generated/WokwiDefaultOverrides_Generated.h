@@ -301,17 +301,17 @@
 
 #ifndef FLOW_WIRDEF_IO_A20
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A20 Calib::Psi::DefaultC0
+#define FLOW_WIRDEF_IO_A20 Calib::Pressure::DefaultC0
 #else
-#define FLOW_WIRDEF_IO_A20 Calib::Psi::DefaultC0
+#define FLOW_WIRDEF_IO_A20 Calib::Pressure::DefaultC0
 #endif
 #endif
 
 #ifndef FLOW_WIRDEF_IO_A21
 #if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
-#define FLOW_WIRDEF_IO_A21 Calib::Psi::DefaultC1
+#define FLOW_WIRDEF_IO_A21 Calib::Pressure::DefaultC1
 #else
-#define FLOW_WIRDEF_IO_A21 Calib::Psi::DefaultC1
+#define FLOW_WIRDEF_IO_A21 Calib::Pressure::DefaultC1
 #endif
 #endif
 

@@ -47,15 +47,15 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
 
     self.phIdVar_.moduleName = kCfgModuleSensors;
     self.orpIdVar_.moduleName = kCfgModuleSensors;
-    self.psiIdVar_.moduleName = kCfgModuleSensors;
+    self.pressureIdVar_.moduleName = kCfgModuleSensors;
     self.waterTempIdVar_.moduleName = kCfgModuleSensors;
     self.airTempIdVar_.moduleName = kCfgModuleSensors;
     self.levelIdVar_.moduleName = kCfgModuleSensors;
     self.phLevelIdVar_.moduleName = kCfgModuleSensors;
     self.chlorineLevelIdVar_.moduleName = kCfgModuleSensors;
 
-    self.psiLowVar_.moduleName = kCfgModuleSafety;
-    self.psiHighVar_.moduleName = kCfgModuleSafety;
+    self.pressureLowVar_.moduleName = kCfgModuleSafety;
+    self.pressureHighVar_.moduleName = kCfgModuleSafety;
     self.winterStartVar_.moduleName = kCfgModuleSafety;
     self.freezeHoldVar_.moduleName = kCfgModuleSafety;
     self.secureElectroVar_.moduleName = kCfgModuleSwg;
@@ -73,7 +73,7 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.pidMinOnMsVar_.moduleName = kCfgModuleRegulation;
     self.pidSampleMsVar_.moduleName = kCfgModuleRegulation;
 
-    self.psiDelayVar_.moduleName = kCfgModuleSafety;
+    self.pressureDelayVar_.moduleName = kCfgModuleSafety;
     self.delayPidsVar_.moduleName = kCfgModuleRegulation;
     self.delayElectroVar_.moduleName = kCfgModuleSwg;
     self.robotDelayVar_.moduleName = kCfgModuleRobot;

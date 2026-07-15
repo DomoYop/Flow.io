@@ -281,22 +281,22 @@
       "help_t": "cfgdocs.poollogic.safety.freeze_hold_t.help",
       "unit": "C"
     },
-    "poollogic/safety/psi_high_th": {
+    "poollogic/safety/pressure_high_th": {
       "type": "Float",
-      "label_t": "cfgdocs.poollogic.safety.psi_high_th.label",
-      "help_t": "cfgdocs.poollogic.safety.psi_high_th.help",
+      "label_t": "cfgdocs.poollogic.safety.pressure_high_th.label",
+      "help_t": "cfgdocs.poollogic.safety.pressure_high_th.help",
       "unit": "bar"
     },
-    "poollogic/safety/psi_low_th": {
+    "poollogic/safety/pressure_low_th": {
       "type": "Float",
-      "label_t": "cfgdocs.poollogic.safety.psi_low_th.label",
-      "help_t": "cfgdocs.poollogic.safety.psi_low_th.help",
+      "label_t": "cfgdocs.poollogic.safety.pressure_low_th.label",
+      "help_t": "cfgdocs.poollogic.safety.pressure_low_th.help",
       "unit": "bar"
     },
-    "poollogic/safety/psi_start_dly_s": {
+    "poollogic/safety/pressure_start_dly_s": {
       "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.safety.psi_start_dly_s.label",
-      "help_t": "cfgdocs.poollogic.safety.psi_start_dly_s.help",
+      "label_t": "cfgdocs.poollogic.safety.pressure_start_dly_s.label",
+      "help_t": "cfgdocs.poollogic.safety.pressure_start_dly_s.help",
       "unit": "s"
     },
     "poollogic/safety/winter_start_t": {
@@ -341,10 +341,10 @@
       "help_t": "cfgdocs.poollogic.sensors.pool_lvl_io_id.help",
       "enum_set": "flowio_logical_input_digital"
     },
-    "poollogic/sensors/psi_io_id": {
+    "poollogic/sensors/pressure_io_id": {
       "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.sensors.psi_io_id.label",
-      "help_t": "cfgdocs.poollogic.sensors.psi_io_id.help",
+      "label_t": "cfgdocs.poollogic.sensors.pressure_io_id.label",
+      "help_t": "cfgdocs.poollogic.sensors.pressure_io_id.help",
       "enum_set": "flowio_logical_input_analog"
     },
     "poollogic/sensors/wat_temp_io_id": {

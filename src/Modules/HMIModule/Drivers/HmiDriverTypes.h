@@ -66,10 +66,10 @@ struct HmiEvent {
 struct NextionV2NeedlePublish {
     bool ph = false;
     bool orp = false;
-    bool psi = false;
+    bool pressure = false;
     int8_t phNeedle = 0;
     int8_t orpNeedle = 0;
-    uint8_t psiNeedle = 0;
+    uint8_t pressureNeedle = 0;
 };
 
 static constexpr size_t HMI_DISPLAY_VERSION_TEXT_MAX = 9U; // "99.99.99" + NUL.
@@ -113,7 +113,7 @@ enum : uint8_t {
     HMI_HOME_ALARM_CHLORINE_TANK_LOW = 2,
     HMI_HOME_ALARM_PH_PUMP_RUNTIME = 3,
     HMI_HOME_ALARM_ORP_PUMP_RUNTIME = 4,
-    HMI_HOME_ALARM_PSI = 5,
+    HMI_HOME_ALARM_PRESSURE = 5,
 };
 
 class IHmiDriver {

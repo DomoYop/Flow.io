@@ -92,10 +92,10 @@ bool HmiUdpServerModule::sendHomeV2Needles(const NextionV2NeedlePublish& publish
     HmiUdpHomeV2NeedlesPayload payload{};
     if (publish.ph) payload.flags |= HMI_UDP_V2_NEEDLE_PH;
     if (publish.orp) payload.flags |= HMI_UDP_V2_NEEDLE_ORP;
-    if (publish.psi) payload.flags |= HMI_UDP_V2_NEEDLE_PSI;
+    if (publish.pressure) payload.flags |= HMI_UDP_V2_NEEDLE_PRESSURE;
     payload.phNeedle = publish.phNeedle;
     payload.orpNeedle = publish.orpNeedle;
-    payload.psiNeedle = publish.psiNeedle;
+    payload.pressureNeedle = publish.pressureNeedle;
     return sendPacket_(HmiUdpMsgType::HomeV2Needles, &payload, sizeof(payload));
 }
 

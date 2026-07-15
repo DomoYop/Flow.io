@@ -45,8 +45,8 @@ constexpr DataKey DATAKEY_FLOW_REMOTE_HAS_AIR_TEMP = DataKeys::FlowRemoteHasAirT
 constexpr DataKey DATAKEY_FLOW_REMOTE_AIR_TEMP = DataKeys::FlowRemoteAirTemp;
 constexpr DataKey DATAKEY_FLOW_REMOTE_HAS_WATER_COUNTER = DataKeys::FlowRemoteHasWaterCounter;
 constexpr DataKey DATAKEY_FLOW_REMOTE_WATER_COUNTER = DataKeys::FlowRemoteWaterCounter;
-constexpr DataKey DATAKEY_FLOW_REMOTE_HAS_PSI = DataKeys::FlowRemoteHasPsi;
-constexpr DataKey DATAKEY_FLOW_REMOTE_PSI = DataKeys::FlowRemotePsi;
+constexpr DataKey DATAKEY_FLOW_REMOTE_HAS_PRESSURE = DataKeys::FlowRemoteHasPressure;
+constexpr DataKey DATAKEY_FLOW_REMOTE_PRESSURE = DataKeys::FlowRemotePressure;
 constexpr DataKey DATAKEY_FLOW_REMOTE_HAS_BMP280_TEMP = DataKeys::FlowRemoteHasBmp280Temp;
 constexpr DataKey DATAKEY_FLOW_REMOTE_BMP280_TEMP = DataKeys::FlowRemoteBmp280Temp;
 constexpr DataKey DATAKEY_FLOW_REMOTE_HAS_BME680_TEMP = DataKeys::FlowRemoteHasBme680Temp;
@@ -355,21 +355,21 @@ static inline bool setFlowRemoteWaterCounter(DataStore& ds, float v)
     return true;
 }
 
-static inline bool setFlowRemoteHasPsi(DataStore& ds, bool v)
+static inline bool setFlowRemoteHasPressure(DataStore& ds, bool v)
 {
     RuntimeData& rt = ds.dataMutable();
-    if (rt.flowRemote.hasPsi == v) return false;
-    rt.flowRemote.hasPsi = v;
-    ds.notifyChanged(DATAKEY_FLOW_REMOTE_HAS_PSI);
+    if (rt.flowRemote.hasPressure == v) return false;
+    rt.flowRemote.hasPressure = v;
+    ds.notifyChanged(DATAKEY_FLOW_REMOTE_HAS_PRESSURE);
     return true;
 }
 
-static inline bool setFlowRemotePsi(DataStore& ds, float v)
+static inline bool setFlowRemotePressure(DataStore& ds, float v)
 {
     RuntimeData& rt = ds.dataMutable();
-    if (fabsf(rt.flowRemote.psi - v) <= 0.01f) return false;
-    rt.flowRemote.psi = v;
-    ds.notifyChanged(DATAKEY_FLOW_REMOTE_PSI);
+    if (fabsf(rt.flowRemote.pressure - v) <= 0.01f) return false;
+    rt.flowRemote.pressure = v;
+    ds.notifyChanged(DATAKEY_FLOW_REMOTE_PRESSURE);
     return true;
 }
 
@@ -497,8 +497,8 @@ static inline void applyFlowRemoteRuntimeSnapshot(DataStore& ds, const FlowRemot
     setFlowRemoteAirTemp(ds, in.airTemp);
     setFlowRemoteHasWaterCounter(ds, in.hasWaterCounter);
     setFlowRemoteWaterCounter(ds, in.waterCounter);
-    setFlowRemoteHasPsi(ds, in.hasPsi);
-    setFlowRemotePsi(ds, in.psi);
+    setFlowRemoteHasPressure(ds, in.hasPressure);
+    setFlowRemotePressure(ds, in.pressure);
     setFlowRemoteHasBmp280Temp(ds, in.hasBmp280Temp);
     setFlowRemoteBmp280Temp(ds, in.bmp280Temp);
     setFlowRemoteHasBme680Temp(ds, in.hasBme680Temp);

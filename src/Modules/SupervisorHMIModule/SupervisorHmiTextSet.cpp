@@ -21,8 +21,8 @@ bool isLangCode_(const char* value, char c0, char c1)
 
 static const SupervisorHmiTextSet kTextFr{
     {
-        "PSI bas",
-        "PSI haut",
+        "Pression basse",
+        "Pression haute",
         "pH vide",
         "Chlore vide",
         "pH uptime",
@@ -44,8 +44,8 @@ static const SupervisorHmiTextSet kTextFr{
 
 static const SupervisorHmiTextSet kTextEn{
     {
-        "Low PSI",
-        "High PSI",
+        "Low pressure",
+        "High pressure",
         "pH empty",
         "Chlorine empty",
         "pH uptime",

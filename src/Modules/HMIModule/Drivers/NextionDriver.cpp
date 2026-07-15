@@ -390,7 +390,7 @@ bool NextionDriver::publishV2Needles(const NextionV2NeedlePublish& publish)
     bool ok = true;
     if (publish.ph) ok = sendInt_("vaPHNiddle", publish.phNeedle) && ok;
     if (publish.orp) ok = sendInt_("vaOrpNiddle", publish.orpNeedle) && ok;
-    if (publish.psi) ok = sendNum_("vaPSINiddle", publish.psiNeedle) && ok;
+    if (publish.pressure) ok = sendNum_("vaPSINiddle", publish.pressureNeedle) && ok;
     return ok;
 }
 

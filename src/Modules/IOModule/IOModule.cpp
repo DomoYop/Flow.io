@@ -848,7 +848,7 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
             if (value.type == IO_VAL_INT32) return writer.writeI32(runtimeId, value.v.i32);
             return writer.writeUnavailable(runtimeId);
         }
-        case RuntimeUiPsi:
+        case RuntimeUiPressure:
             runtimeIndex = 2;
             break;
         case RuntimeUiBmp280Temp:
@@ -1360,7 +1360,7 @@ bool IOModule::processAnalogDefinition_(uint8_t idx, uint32_t nowMs)
     float calibrated = (slot.cfg.c0 * filtered) + slot.cfg.c1;
     float rounded = ioRoundToPrecision(calibrated, slot.cfg.precision);
 
-    // Trace pH/ORP/PSI calculation chain with configurable periodic ticker.
+    // Trace pH/ORP/Pressure calculation chain with configurable periodic ticker.
     bool isAdsSource = (slot.source == IO_SRC_ADS_INTERNAL_SINGLE) ||
                        (slot.source == IO_SRC_ADS_EXTERNAL_DIFF);
     if (cfgData_.traceEnabled && isAdsSource && idx < 3) {
@@ -1368,7 +1368,7 @@ bool IOModule::processAnalogDefinition_(uint8_t idx, uint32_t nowMs)
             (cfgData_.tracePeriodMs > 0) ? (uint32_t)cfgData_.tracePeriodMs : Limits::IoTracePeriodMs;
         uint32_t& lastMs = analogCalcLogLastMs_[idx];
         if (lastMs == 0U || (uint32_t)(nowMs - lastMs) >= periodMs) {
-            const char* sensor = (idx == 0) ? "ORP" : ((idx == 1) ? "pH" : "PSI");
+            const char* sensor = (idx == 0) ? "ORP" : ((idx == 1) ? "pH" : "Pressure");
             const char sourceMark = (slot.source == IO_SRC_ADS_INTERNAL_SINGLE) ? 'I' : 'E';
             LOGD("Calc %c %-3s raw_bin=%7d raw_V=%10.6f median_V=%10.6f coeff=%9.3f rounded=%9.3f",
                  sourceMark,

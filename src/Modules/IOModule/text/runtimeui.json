@@ -102,11 +102,11 @@
     },
     {
       "valueId": 6,
-      "key": "pool.psi",
+      "key": "pool.pressure",
       "type": "float",
       "domain": "sondes",
       "display": "value",
-      "unit": "PSI",
+      "unit": "bar",
       "decimals": 2,
       "order": 60,
       "label_t": "runtimeui.io.v06.label",

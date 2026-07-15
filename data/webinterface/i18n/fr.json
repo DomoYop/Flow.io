@@ -334,7 +334,7 @@
     "calibration.sensorLabel": "Sonde",
     "calibration.sensor.ph": "pH (2 points)",
     "calibration.sensor.orp": "ORP (2 points)",
-    "calibration.sensor.psi": "Pression PSI (2 points)",
+    "calibration.sensor.pressure": "Pression (2 points)",
     "calibration.sensor.waterTemp": "Température eau (1 point)",
     "calibration.sensor.airTemp": "Température air (1 point)",
     "calibration.loadSensor": "Charger la sonde",

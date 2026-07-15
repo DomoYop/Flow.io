@@ -71,7 +71,7 @@ static constexpr uint32_t kHomePublishTime = 1UL << 7;
 static constexpr uint32_t kHomePublishDate = 1UL << 8;
 static constexpr uint32_t kHomePublishAlarmBits = 1UL << 9;
 static constexpr uint32_t kHomePublishErrorMessage = 1UL << 10;
-static constexpr uint32_t kHomePublishPsi = 1UL << 11;
+static constexpr uint32_t kHomePublishPressure = 1UL << 11;
 static constexpr uint32_t kHomePublishAll = kHomePublishWaterTemp |
                                             kHomePublishAirTemp |
                                             kHomePublishPh |
@@ -83,7 +83,7 @@ static constexpr uint32_t kHomePublishAll = kHomePublishWaterTemp |
                                             kHomePublishDate |
                                             kHomePublishAlarmBits |
                                             kHomePublishErrorMessage |
-                                            kHomePublishPsi;
+                                            kHomePublishPressure;
 static constexpr uint32_t kClockPublishCheckMs = 1000U;
 static constexpr uint32_t kHomePeriodicRefreshPeriodMs = 10000U;
 static constexpr uint32_t kNextionPageProbeInitialPeriodMs = 1000U;
@@ -236,8 +236,8 @@ static bool isConfigPageCode_(uint8_t pageId)
 static uint32_t alarmMaskFromId_(AlarmId id)
 {
     switch (id) {
-        case AlarmId::PoolPsiLow: return 1UL;
-        case AlarmId::PoolPsiHigh: return 2UL;
+        case AlarmId::PoolPressureLow: return 1UL;
+        case AlarmId::PoolPressureHigh: return 2UL;
         case AlarmId::PoolPhTankLow: return 4UL;
         case AlarmId::PoolChlorineTankLow: return 8UL;
         case AlarmId::PoolPhPumpMaxUptime: return 16UL;
@@ -752,9 +752,9 @@ void HMIModule::init(ConfigStore& cfg, ServiceRegistry& services)
     refreshLocale_();
     phIoId_ = ioIdFromSlot(analogInputSlot(1));
     orpIoId_ = ioIdFromSlot(analogInputSlot(0));
-    psiIoId_ = ioIdFromSlot(analogInputSlot(2));
+    pressureIoId_ = ioIdFromSlot(analogInputSlot(2));
     airTempIoId_ = ioIdFromSlot(analogInputSlot(5));
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+#if defined(FLOW_PROFILE_WAVESHARE)
     poolLevelIoId_ = ioIdFromSlot(digitalInputSlot(2));
     phLevelIoId_ = ioIdFromSlot(digitalInputSlot(0));
     chlorineLevelIoId_ = ioIdFromSlot(digitalInputSlot(1));
@@ -767,7 +767,7 @@ void HMIModule::init(ConfigStore& cfg, ServiceRegistry& services)
     waterCounterIoId_ = ioIdFromSlot(digitalInputSlot(3));
     phRuntimeIndex_ = kInvalidRuntimeIndex;
     orpRuntimeIndex_ = kInvalidRuntimeIndex;
-    psiRuntimeIndex_ = kInvalidRuntimeIndex;
+    pressureRuntimeIndex_ = kInvalidRuntimeIndex;
     waterTempRuntimeIndex_ = kInvalidRuntimeIndex;
     airTempRuntimeIndex_ = kInvalidRuntimeIndex;
     poolLevelRuntimeIndex_ = kInvalidRuntimeIndex;
@@ -868,7 +868,7 @@ void HMIModule::refreshHomeBindings_()
         bool foundPoolLevel = false;
         bool foundPh = false;
         bool foundOrp = false;
-        bool foundPsi = false;
+        bool foundPressure = false;
         bool foundWaterTemp = false;
         bool foundAirTemp = false;
         bool foundPhLevel = false;
@@ -901,10 +901,10 @@ void HMIModule::refreshHomeBindings_()
             if (foundOrp) {
                 orpIoId_ = (IoId)ioId;
             }
-            ioId = (uint16_t)psiIoId_;
-            foundPsi = findJsonUInt16_(jsonBuf, "psi_io_id", ioId);
-            if (foundPsi) {
-                psiIoId_ = (IoId)ioId;
+            ioId = (uint16_t)pressureIoId_;
+            foundPressure = findJsonUInt16_(jsonBuf, "pressure_io_id", ioId);
+            if (foundPressure) {
+                pressureIoId_ = (IoId)ioId;
             }
             ioId = (uint16_t)waterTempIoId_;
             foundWaterTemp = findJsonUInt16_(jsonBuf, "wat_temp_io_id", ioId);
@@ -968,13 +968,13 @@ void HMIModule::refreshHomeBindings_()
                 fillingDeviceSlot_ = (uint8_t)slot;
             }
 
-            LOGD("HMI poollogic cfg sensors_trunc=%u device_trunc=%u keys lvl=%u ph=%u orp=%u psi=%u wat=%u air=%u phlvl=%u chllvl=%u wc=%u filtr=%u php=%u orpp=%u robot=%u fill=%u",
+            LOGD("HMI poollogic cfg sensors_trunc=%u device_trunc=%u keys lvl=%u ph=%u orp=%u pressure=%u wat=%u air=%u phlvl=%u chllvl=%u wc=%u filtr=%u php=%u orpp=%u robot=%u fill=%u",
                  sensorsTruncated ? 1U : 0U,
                  truncated ? 1U : 0U,
                  foundPoolLevel ? 1U : 0U,
                  foundPh ? 1U : 0U,
                  foundOrp ? 1U : 0U,
-                 foundPsi ? 1U : 0U,
+                 foundPressure ? 1U : 0U,
                  foundWaterTemp ? 1U : 0U,
                  foundAirTemp ? 1U : 0U,
                  foundPhLevel ? 1U : 0U,
@@ -992,7 +992,7 @@ void HMIModule::refreshHomeBindings_()
 
     (void)resolveIoRuntimeIndex_(phIoId_, phRuntimeIndex_);
     (void)resolveIoRuntimeIndex_(orpIoId_, orpRuntimeIndex_);
-    (void)resolveIoRuntimeIndex_(psiIoId_, psiRuntimeIndex_);
+    (void)resolveIoRuntimeIndex_(pressureIoId_, pressureRuntimeIndex_);
     (void)resolveIoRuntimeIndex_(waterTempIoId_, waterTempRuntimeIndex_);
     (void)resolveIoRuntimeIndex_(airTempIoId_, airTempRuntimeIndex_);
     (void)resolveIoRuntimeIndex_(poolLevelIoId_, poolLevelRuntimeIndex_);
@@ -1000,13 +1000,13 @@ void HMIModule::refreshHomeBindings_()
     (void)resolveIoRuntimeIndex_(chlorineLevelIoId_, chlorineLevelRuntimeIndex_);
     (void)resolveIoRuntimeIndex_(waterCounterIoId_, waterCounterRuntimeIndex_);
 
-    LOGD("HMI home bindings ph=%u(rt=%u) orp=%u(rt=%u) psi=%u(rt=%u) wat=%u(rt=%u) air=%u(rt=%u) lvl=%u(rt=%u)",
+    LOGD("HMI home bindings ph=%u(rt=%u) orp=%u(rt=%u) pressure=%u(rt=%u) wat=%u(rt=%u) air=%u(rt=%u) lvl=%u(rt=%u)",
          (unsigned)phIoId_,
          (unsigned)phRuntimeIndex_,
          (unsigned)orpIoId_,
          (unsigned)orpRuntimeIndex_,
-         (unsigned)psiIoId_,
-         (unsigned)psiRuntimeIndex_,
+         (unsigned)pressureIoId_,
+         (unsigned)pressureRuntimeIndex_,
          (unsigned)waterTempIoId_,
          (unsigned)waterTempRuntimeIndex_,
          (unsigned)airTempIoId_,
@@ -1173,8 +1173,8 @@ uint32_t HMIModule::buildHomeAlarmBits_() const
     if (isAlarmActive_(AlarmId::PoolChlorineTankLow)) bits |= (1UL << HMI_HOME_ALARM_CHLORINE_TANK_LOW);
     if (isAlarmActive_(AlarmId::PoolPhPumpMaxUptime)) bits |= (1UL << HMI_HOME_ALARM_PH_PUMP_RUNTIME);
     if (isAlarmActive_(AlarmId::PoolChlorinePumpMaxUptime)) bits |= (1UL << HMI_HOME_ALARM_ORP_PUMP_RUNTIME);
-    if (isAlarmActive_(AlarmId::PoolPsiLow) || isAlarmActive_(AlarmId::PoolPsiHigh)) {
-        bits |= (1UL << HMI_HOME_ALARM_PSI);
+    if (isAlarmActive_(AlarmId::PoolPressureLow) || isAlarmActive_(AlarmId::PoolPressureHigh)) {
+        bits |= (1UL << HMI_HOME_ALARM_PRESSURE);
     }
     return bits;
 }
@@ -1587,8 +1587,8 @@ void HMIModule::flushHomePublish_()
     if ((pending & kHomePublishErrorMessage) != 0U && publishHomeText_(HmiHomeTextField::ErrorMessage)) {
         sent |= kHomePublishErrorMessage;
     }
-    if ((pending & kHomePublishPsi) != 0U) {
-        sent |= kHomePublishPsi;
+    if ((pending & kHomePublishPressure) != 0U) {
+        sent |= kHomePublishPressure;
     }
 
     if (sent == 0U) {
@@ -1638,7 +1638,7 @@ bool HMIModule::hasSensorFault_() const
 {
     return configuredSensorUnknown_(phIoId_, phRuntimeIndex_) ||
            configuredSensorUnknown_(orpIoId_, orpRuntimeIndex_) ||
-           configuredSensorUnknown_(psiIoId_, psiRuntimeIndex_) ||
+           configuredSensorUnknown_(pressureIoId_, pressureRuntimeIndex_) ||
            configuredSensorUnknown_(waterTempIoId_, waterTempRuntimeIndex_) ||
            configuredSensorUnknown_(airTempIoId_, airTempRuntimeIndex_) ||
            configuredSensorUnknown_(poolLevelIoId_, poolLevelRuntimeIndex_) ||
@@ -1666,7 +1666,7 @@ bool HMIModule::firstSensorFaultRef_(char* out, size_t outLen) const
     IoId faultIoId = IO_ID_INVALID;
     if (configuredSensorUnknown_(phIoId_, phRuntimeIndex_)) faultIoId = phIoId_;
     else if (configuredSensorUnknown_(orpIoId_, orpRuntimeIndex_)) faultIoId = orpIoId_;
-    else if (configuredSensorUnknown_(psiIoId_, psiRuntimeIndex_)) faultIoId = psiIoId_;
+    else if (configuredSensorUnknown_(pressureIoId_, pressureRuntimeIndex_)) faultIoId = pressureIoId_;
     else if (configuredSensorUnknown_(waterTempIoId_, waterTempRuntimeIndex_)) faultIoId = waterTempIoId_;
     else if (configuredSensorUnknown_(airTempIoId_, airTempRuntimeIndex_)) faultIoId = airTempIoId_;
     else if (configuredSensorUnknown_(poolLevelIoId_, poolLevelRuntimeIndex_)) faultIoId = poolLevelIoId_;
@@ -1723,7 +1723,7 @@ void HMIModule::applyLedMask_(bool force)
     if (dsSvc_ && dsSvc_->store) mqttConnected = mqttReady(*dsSvc_->store);
     (void)readPoolLogicModeFlags_(modes.autoMode, modes.winterMode, modes.phAutoMode, modes.orpAutoMode);
     const bool waterLevelLow = isWaterLevelLow_();
-    const bool psiAlarm = isAlarmActive_(AlarmId::PoolPsiLow) || isAlarmActive_(AlarmId::PoolPsiHigh);
+    const bool pressureAlarm = isAlarmActive_(AlarmId::PoolPressureLow) || isAlarmActive_(AlarmId::PoolPressureHigh);
     const bool phTankLowAlarm = isAlarmActive_(AlarmId::PoolPhTankLow);
     const bool chlorineTankLowAlarm = isAlarmActive_(AlarmId::PoolChlorineTankLow);
     const bool phPumpRuntimeAlarm = isAlarmActive_(AlarmId::PoolPhPumpMaxUptime);
@@ -1740,11 +1740,11 @@ void HMIModule::applyLedMask_(bool force)
 
     if (!page2) {
         // Page 1:
-        // p2=mode auto, p3=winter, p4/p5 unused, p6=niveau eau bas, p7=PSI error.
+        // p2=mode auto, p3=winter, p4/p5 unused, p6=niveau eau bas, p7=pression error.
         if (modes.autoMode) mask |= (uint8_t)(1U << kLedBitModeA);
         if (modes.winterMode) mask |= (uint8_t)(1U << kLedBitModeB);
         if (waterLevelLow) mask |= (uint8_t)(1U << kLedBitAlarmC);
-        if (psiAlarm) mask |= (uint8_t)(1U << kLedBitAlarmD);
+        if (pressureAlarm) mask |= (uint8_t)(1U << kLedBitAlarmD);
     } else {
         // Page 2:
         // p2=mode pH auto, p3=mode ORP auto, p4=bidon pH bas, p5=bidon chlore bas,
@@ -1875,7 +1875,7 @@ void HMIModule::onEvent_(const Event& e)
                                kHomePublishOrp |
                                kHomePublishPhGauge |
                                kHomePublishOrpGauge |
-                               kHomePublishPsi |
+                               kHomePublishPressure |
                                kHomePublishAlarmBits;
         } else if (p->id == (DataKey)(DATAKEY_POOL_DEVICE_STATE_BASE + filtrationDeviceSlot_) ||
                    p->id == (DataKey)(DATAKEY_POOL_DEVICE_STATE_BASE + phPumpDeviceSlot_) ||
@@ -1897,8 +1897,8 @@ void HMIModule::onEvent_(const Event& e)
             id == AlarmId::PoolPhPumpMaxUptime ||
             id == AlarmId::PoolChlorinePumpMaxUptime ||
             id == AlarmId::PoolWaterLevelLow ||
-            id == AlarmId::PoolPsiLow ||
-            id == AlarmId::PoolPsiHigh) {
+            id == AlarmId::PoolPressureLow ||
+            id == AlarmId::PoolPressureHigh) {
             ledDirty = true;
             homePublishMask |= kHomePublishAlarmBits;
         }
@@ -2556,8 +2556,8 @@ const char* HMIModule::alarmLabelShortForId_(AlarmId id) const
 {
     const bool en = runtimeUiIsEnglishLang(localeLang_);
     switch (id) {
-        case AlarmId::PoolPsiLow: return en ? "Low PSI" : "PSI bas";
-        case AlarmId::PoolPsiHigh: return en ? "High PSI" : "PSI haut";
+        case AlarmId::PoolPressureLow: return en ? "Low pressure" : "Pression basse";
+        case AlarmId::PoolPressureHigh: return en ? "High pressure" : "Pression haute";
         case AlarmId::PoolPhTankLow: return en ? "pH empty" : "pH vide";
         case AlarmId::PoolChlorineTankLow: return en ? "Chlorine empty" : "Chlore vide";
         case AlarmId::PoolPhPumpMaxUptime: return en ? "pH uptime" : "pH uptime";

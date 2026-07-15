@@ -149,7 +149,7 @@ private:
         RuntimeUiPh = 3,
         RuntimeUiOrp = 4,
         RuntimeUiWaterCounter = 5,
-        RuntimeUiPsi = 6,
+        RuntimeUiPressure = 6,
         RuntimeUiBmp280Temp = 7,
         RuntimeUiBme680Temp = 8,
         RuntimeUiBmp280Pressure = 9,

@@ -19,8 +19,8 @@ constexpr float FactorHigh = 1.0f / 2.0f;
 constexpr uint8_t FiltrationStartMinHour = 8;
 constexpr uint8_t FiltrationStopMaxHour = 23;
 
-constexpr float PsiLow = 0.15f;
-constexpr float PsiHigh = 1.80f;
+constexpr float PressureLow = 0.15f;
+constexpr float PressureHigh = 1.80f;
 constexpr float WinterStartTempC = -2.0f;
 constexpr float FreezeHoldTempC = 2.0f;
 constexpr float SecureElectroTempC = 15.0f;
@@ -40,7 +40,7 @@ constexpr int32_t PidWindowMs = 3600000;
 constexpr int32_t PidMinOnMs = 30000;
 constexpr int32_t PidSampleMs = 30000;
 
-constexpr uint8_t PsiStartupDelaySec = 60;
+constexpr uint8_t PressureStartupDelaySec = 60;
 constexpr uint8_t DelayPidsMin = 5;
 constexpr uint8_t DelayElectroMin = 10;
 constexpr uint8_t RobotDelayMin = 30;
@@ -59,8 +59,8 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     TempHigh,
     FiltrationStartMinHour,
     FiltrationStopMaxHour,
-    PsiLow,
-    PsiHigh,
+    PressureLow,
+    PressureHigh,
     WinterStartTempC,
     FreezeHoldTempC,
     SecureElectroTempC,
@@ -75,7 +75,7 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     PidWindowMs,
     PidMinOnMs,
     PidSampleMs,
-    PsiStartupDelaySec,
+    PressureStartupDelaySec,
     DelayPidsMin,
     DelayElectroMin,
     RobotDelayMin,

@@ -77,7 +77,7 @@ constexpr const char* kDashboardDefaultLabels[kFlowRemoteDashboardSlotCount] = {
     "Compteur",
     "BME680",
     "BMP280",
-    "PSI",
+    "Pression",
 };
 constexpr DashboardColorPreset kDashboardColorPresets[] = {
     {0U, "Bleu eau", "#E6EFFF", rgb565_(230, 239, 255)},

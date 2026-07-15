@@ -11,8 +11,8 @@ enum class AlarmId : uint16_t {
     None = 0,
 
     // PoolLogic domain
-    PoolPsiLow = 1000,
-    PoolPsiHigh = 1001,
+    PoolPressureLow = 1000,
+    PoolPressureHigh = 1001,
     PoolPhTankLow = 1002,
     PoolChlorineTankLow = 1003,
     PoolPhPumpMaxUptime = 1004,

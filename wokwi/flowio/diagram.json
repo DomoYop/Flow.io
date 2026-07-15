@@ -53,7 +53,7 @@
       "id": "text6",
       "top": -192,
       "left": 652.8,
-      "attrs": { "text": "PSI" }
+      "attrs": { "text": "Pressure" }
     },
     {
       "type": "wokwi-resistor",
@@ -161,7 +161,7 @@
       "id": "led7",
       "top": -99.6,
       "left": -187.8,
-      "attrs": { "color": "red", "label": "Chl Up / PSI Err", "flip": "1" }
+      "attrs": { "color": "red", "label": "Chl Up / Pressure Err", "flip": "1" }
     },
     {
       "type": "wokwi-led",
@@ -373,7 +373,7 @@
       "left": 950.4,
       "attrs": { "text": "pH" }
     },
-    { "type": "wokwi-text", "id": "text11", "top": 0, "left": 950.4, "attrs": { "text": "PSI" } },
+    { "type": "wokwi-text", "id": "text11", "top": 0, "left": 950.4, "attrs": { "text": "Pressure" } },
     { "type": "wokwi-gnd", "id": "gnd10", "top": 297.6, "left": 921, "attrs": {} },
     { "type": "wokwi-vcc", "id": "vcc8", "top": -28.04, "left": 681.6, "attrs": {} },
     {

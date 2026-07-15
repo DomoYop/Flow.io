@@ -80,8 +80,8 @@ SPECS: List[Tuple[str, str, str, str, str]] = [
     ("io_a1x", "FLOW_WIRDEF_IO_A1X", "profile", "float", "32767.0f"),
 
     ("io_a2port", "FLOW_WIRDEF_IO_A2PORT", "profile", "uint16", "102u"),
-    ("io_a20", "FLOW_WIRDEF_IO_A20", "profile", "float", "Calib::Psi::DefaultC0"),
-    ("io_a21", "FLOW_WIRDEF_IO_A21", "profile", "float", "Calib::Psi::DefaultC1"),
+    ("io_a20", "FLOW_WIRDEF_IO_A20", "profile", "float", "Calib::Pressure::DefaultC0"),
+    ("io_a21", "FLOW_WIRDEF_IO_A21", "profile", "float", "Calib::Pressure::DefaultC1"),
     ("io_a2p", "FLOW_WIRDEF_IO_A2P", "profile", "int32", "1"),
     ("io_a2n", "FLOW_WIRDEF_IO_A2N", "profile", "float", "-32768.0f"),
     ("io_a2x", "FLOW_WIRDEF_IO_A2X", "profile", "float", "32767.0f"),

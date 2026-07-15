@@ -196,15 +196,15 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     phIdVar_.moduleName = kCfgModuleSensors;
     orpIdVar_.moduleName = kCfgModuleSensors;
-    psiIdVar_.moduleName = kCfgModuleSensors;
+    pressureIdVar_.moduleName = kCfgModuleSensors;
     waterTempIdVar_.moduleName = kCfgModuleSensors;
     airTempIdVar_.moduleName = kCfgModuleSensors;
     levelIdVar_.moduleName = kCfgModuleSensors;
     phLevelIdVar_.moduleName = kCfgModuleSensors;
     chlorineLevelIdVar_.moduleName = kCfgModuleSensors;
 
-    psiLowVar_.moduleName = kCfgModuleSafety;
-    psiHighVar_.moduleName = kCfgModuleSafety;
+    pressureLowVar_.moduleName = kCfgModuleSafety;
+    pressureHighVar_.moduleName = kCfgModuleSafety;
     winterStartVar_.moduleName = kCfgModuleSafety;
     freezeHoldVar_.moduleName = kCfgModuleSafety;
     secureElectroVar_.moduleName = kCfgModuleSwg;
@@ -222,7 +222,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     pidMinOnMsVar_.moduleName = kCfgModuleRegulation;
     pidSampleMsVar_.moduleName = kCfgModuleRegulation;
 
-    psiDelayVar_.moduleName = kCfgModuleSafety;
+    pressureDelayVar_.moduleName = kCfgModuleSafety;
     delayPidsVar_.moduleName = kCfgModuleRegulation;
     delayElectroVar_.moduleName = kCfgModuleSwg;
     robotDelayVar_.moduleName = kCfgModuleRobot;
@@ -271,15 +271,15 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     cfg.registerVar(phIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(orpIdVar_, kCfgModuleId, kCfgBranchSensors);
-    cfg.registerVar(psiIdVar_, kCfgModuleId, kCfgBranchSensors);
+    cfg.registerVar(pressureIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(waterTempIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(airTempIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(levelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(phLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(chlorineLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
 
-    cfg.registerVar(psiLowVar_, kCfgModuleId, kCfgBranchSafety);
-    cfg.registerVar(psiHighVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(pressureLowVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(pressureHighVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(winterStartVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchSwg);
@@ -297,7 +297,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(pidMinOnMsVar_, kCfgModuleId, kCfgBranchRegulation);
     cfg.registerVar(pidSampleMsVar_, kCfgModuleId, kCfgBranchRegulation);
 
-    cfg.registerVar(psiDelayVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(pressureDelayVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(delayPidsVar_, kCfgModuleId, kCfgBranchRegulation);
     cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchSwg);
     cfg.registerVar(robotDelayVar_, kCfgModuleId, kCfgBranchRobot);
@@ -510,7 +510,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "h"
         };
         static const char* kHeatAssistStatusFrTemplate =
-            R"({% set st = value_json.ri | default('UNKNOWN', true) %}{% if st == 'DISABLED' %}Désactivé{% elif st == 'MANUAL_MODE' %}Mode manuel{% elif st == 'PSI_BLOCKED' %}Pression bloquée{% elif st == 'SETPOINT_INVALID' %}Consigne invalide{% elif st == 'TEMP_UNAVAILABLE' %}Température indisponible{% elif st == 'PROBE_WAIT_30M' %}Attente sonde 30 min{% elif st == 'PROBE_WAIT_20M' %}Attente sonde 20 min{% elif st == 'PROBE_RUNNING' %}Sondage en cours{% elif st == 'HEATING' %}Chauffe active{% elif st == 'IDLE_PUMP_ON' %}Pompe active sans chauffe{% elif st == 'SETPOINT_REACHED' %}Consigne atteinte{% else %}Inconnu{% endif %})";
+            R"({% set st = value_json.ri | default('UNKNOWN', true) %}{% if st == 'DISABLED' %}Désactivé{% elif st == 'MANUAL_MODE' %}Mode manuel{% elif st == 'PRESSURE_BLOCKED' %}Pression bloquée{% elif st == 'SETPOINT_INVALID' %}Consigne invalide{% elif st == 'TEMP_UNAVAILABLE' %}Température indisponible{% elif st == 'PROBE_WAIT_30M' %}Attente sonde 30 min{% elif st == 'PROBE_WAIT_20M' %}Attente sonde 20 min{% elif st == 'PROBE_RUNNING' %}Sondage en cours{% elif st == 'HEATING' %}Chauffe active{% elif st == 'IDLE_PUMP_ON' %}Pompe active sans chauffe{% elif st == 'SETPOINT_REACHED' %}Consigne atteinte{% else %}Inconnu{% endif %})";
         const HASensorEntry heatAssistStatus{
             "poollogic",
             "pl_has_rsn",
@@ -806,14 +806,14 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:timeline-clock-outline",
             "min"
         };
-        const HANumberEntry psiLowThreshold{
+        const HANumberEntry pressureLowThreshold{
             "poollogic",
-            "pl_safe_psi_low",
-            "PSI Low Threshold",
+            "pl_safe_pressure_low",
+            "Pressure Low Threshold",
             "cfg/poollogic/safety",
-            "{{ value_json.psi_low_th | float(0) }}",
+            "{{ value_json.pressure_low_th | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/safety\\\":{\\\"psi_low_th\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/safety\\\":{\\\"pressure_low_th\\\":{{ value | float(0) }}}}",
             0.0f,
             5.0f,
             0.01f,
@@ -822,14 +822,14 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:gauge-low",
             "bar"
         };
-        const HANumberEntry psiHighThreshold{
+        const HANumberEntry pressureHighThreshold{
             "poollogic",
-            "pl_safe_psi_high",
-            "PSI High Threshold",
+            "pl_safe_pressure_high",
+            "Pressure High Threshold",
             "cfg/poollogic/safety",
-            "{{ value_json.psi_high_th | float(0) }}",
+            "{{ value_json.pressure_high_th | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/safety\\\":{\\\"psi_high_th\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/safety\\\":{\\\"pressure_high_th\\\":{{ value | float(0) }}}}",
             0.0f,
             5.0f,
             0.01f,
@@ -930,8 +930,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addNumber(haSvc->ctx, &chlorineGeneratorMinTemp);
         (void)haSvc->addNumber(haSvc->ctx, &phWindowMin);
         (void)haSvc->addNumber(haSvc->ctx, &orpWindowMin);
-        (void)haSvc->addNumber(haSvc->ctx, &psiLowThreshold);
-        (void)haSvc->addNumber(haSvc->ctx, &psiHighThreshold);
+        (void)haSvc->addNumber(haSvc->ctx, &pressureLowThreshold);
+        (void)haSvc->addNumber(haSvc->ctx, &pressureHighThreshold);
         (void)haSvc->addNumber(haSvc->ctx, &o2PoolVolume);
         (void)haSvc->addNumber(haSvc->ctx, &o2WeeklyDose);
         (void)haSvc->addNumber(haSvc->ctx, &o2SplitCount);
@@ -989,34 +989,34 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     // PoolLogic owns the alarm definitions but delegates evaluation to the
     // shared alarm module through static condition callbacks.
     if (alarmSvc_ && alarmSvc_->registerAlarm) {
-        const AlarmRegistration psiLowAlarm{
-            AlarmId::PoolPsiLow,
+        const AlarmRegistration pressureLowAlarm{
+            AlarmId::PoolPressureLow,
             AlarmSeverity::Alarm,
             true,
             2000,
             1000,
             60000,
-            "psi_low",
+            "pressure_low",
             "Low pressure",
             "poollogic"
         };
-        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &psiLowAlarm, &PoolLogicModule::condPsiLowStatic_, this)) {
-            LOGW("PoolLogic failed to register AlarmId::PoolPsiLow");
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &pressureLowAlarm, &PoolLogicModule::condPressureLowStatic_, this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolPressureLow");
         }
 
-        const AlarmRegistration psiHighAlarm{
-            AlarmId::PoolPsiHigh,
+        const AlarmRegistration pressureHighAlarm{
+            AlarmId::PoolPressureHigh,
             AlarmSeverity::Critical,
             true,
             0,
             1000,
             60000,
-            "psi_high",
+            "pressure_high",
             "High pressure",
             "poollogic"
         };
-        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &psiHighAlarm, &PoolLogicModule::condPsiHighStatic_, this)) {
-            LOGW("PoolLogic failed to register AlarmId::PoolPsiHigh");
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &pressureHighAlarm, &PoolLogicModule::condPressureHighStatic_, this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolPressureHigh");
         }
 
         const AlarmRegistration phTankLowAlarm{

@@ -88,8 +88,8 @@ struct SupervisorHmiViewModel {
     float flowAirTemp = 0.0f;
     bool flowHasWaterCounter = false;
     float flowWaterCounter = 0.0f;
-    bool flowHasPsi = false;
-    float flowPsi = 0.0f;
+    bool flowHasPressure = false;
+    float flowPressure = 0.0f;
     bool flowHasBmp280Temp = false;
     float flowBmp280Temp = 0.0f;
     bool flowHasBme680Temp = false;

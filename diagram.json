@@ -71,7 +71,7 @@
       "id": "text6",
       "top": -172.8,
       "left": 422.4,
-      "attrs": { "text": "PSI" }
+      "attrs": { "text": "Pressure" }
     },
     {
       "type": "wokwi-vcc",
@@ -125,7 +125,7 @@
     },
     { "type": "wokwi-text", "id": "text9", "top": 211.2, "left": 720, "attrs": { "text": "ORP" } },
     { "type": "wokwi-text", "id": "text10", "top": 124.8, "left": 720, "attrs": { "text": "pH" } },
-    { "type": "wokwi-text", "id": "text11", "top": 19.2, "left": 720, "attrs": { "text": "PSI" } },
+    { "type": "wokwi-text", "id": "text11", "top": 19.2, "left": 720, "attrs": { "text": "Pressure" } },
     { "type": "wokwi-gnd", "id": "gnd10", "top": 316.8, "left": 690.6, "attrs": {} },
     { "type": "wokwi-vcc", "id": "vcc8", "top": -8.84, "left": 451.2, "attrs": {} },
     {

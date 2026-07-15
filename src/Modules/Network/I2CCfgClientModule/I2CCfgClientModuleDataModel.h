@@ -56,8 +56,8 @@ struct FlowRemoteRuntimeData {
     float airTemp = 0.0f;
     bool hasWaterCounter = false;
     float waterCounter = 0.0f;
-    bool hasPsi = false;
-    float psi = 0.0f;
+    bool hasPressure = false;
+    float pressure = 0.0f;
     bool hasBmp280Temp = false;
     float bmp280Temp = 0.0f;
     bool hasBme680Temp = false;

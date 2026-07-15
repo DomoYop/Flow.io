@@ -334,7 +334,7 @@
     "calibration.sensorLabel": "Sensor",
     "calibration.sensor.ph": "pH (2 points)",
     "calibration.sensor.orp": "ORP (2 points)",
-    "calibration.sensor.psi": "PSI Pressure (2 points)",
+    "calibration.sensor.pressure": "Pressure (2 points)",
     "calibration.sensor.waterTemp": "Water temperature (1 point)",
     "calibration.sensor.airTemp": "Air temperature (1 point)",
     "calibration.loadSensor": "Load sensor",

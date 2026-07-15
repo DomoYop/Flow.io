@@ -56,7 +56,7 @@ static constexpr uint16_t kColorWater = rgb565_(67, 131, 238);
 static constexpr uint16_t kColorAir = rgb565_(27, 184, 219);
 static constexpr uint16_t kColorPh = rgb565_(34, 197, 94);
 static constexpr uint16_t kColorOrp = rgb565_(132, 82, 236);
-static constexpr uint16_t kColorPsi = rgb565_(234, 88, 12);
+static constexpr uint16_t kColorPressure = rgb565_(234, 88, 12);
 static constexpr uint16_t kColorCounter = rgb565_(8, 145, 178);
 static constexpr uint16_t kColorAlarmIdle = rgb565_(207, 218, 232);
 

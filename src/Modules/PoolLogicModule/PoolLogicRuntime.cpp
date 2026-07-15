@@ -234,7 +234,7 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             switch (heatAssistReason_) {
                 case HeatAssistReason::Disabled: return "DISABLED";
                 case HeatAssistReason::ManualMode: return "MANUAL_MODE";
-                case HeatAssistReason::PsiBlocked: return "PSI_BLOCKED";
+                case HeatAssistReason::PressureBlocked: return "PRESSURE_BLOCKED";
                 case HeatAssistReason::SetpointInvalid: return "SETPOINT_INVALID";
                 case HeatAssistReason::TempUnavailable: return "TEMP_UNAVAILABLE";
                 case HeatAssistReason::ProbeWait30m: return "PROBE_WAIT_30M";

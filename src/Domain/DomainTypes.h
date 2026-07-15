@@ -95,8 +95,8 @@ struct PoolLogicDefaultsSpec {
     float tempHigh;
     uint8_t filtrationStartMinHour;
     uint8_t filtrationStopMaxHour;
-    float psiLow;
-    float psiHigh;
+    float pressureLow;
+    float pressureHigh;
     float winterStartTempC;
     float freezeHoldTempC;
     float secureElectroTempC;
@@ -111,7 +111,7 @@ struct PoolLogicDefaultsSpec {
     int32_t pidWindowMs;
     int32_t pidMinOnMs;
     int32_t pidSampleMs;
-    uint8_t psiStartupDelaySec;
+    uint8_t pressureStartupDelaySec;
     uint8_t delayPidsMin;
     uint8_t delayElectroMin;
     uint8_t robotDelayMin;

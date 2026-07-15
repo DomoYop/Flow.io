@@ -160,7 +160,7 @@ constexpr const char* kDashboardDefaultLabels[TFTModuleS3::DashboardSlotCount] =
     "Compteur",
     "BME680",
     "BMP280",
-    "PSI",
+    "Pression",
 };
 
 constexpr DashboardColorPreset kDashboardColorPresets[] = {
@@ -199,8 +199,8 @@ constexpr uint8_t kDashboardDefaultColorIds[TFTModuleS3::DashboardSlotCount] = {
 };
 
 constexpr uint16_t kAlarmDefaultIds[TFTModuleS3::AlarmDashboardSlotCount] = {
-    (uint16_t)AlarmId::PoolPsiLow,
-    (uint16_t)AlarmId::PoolPsiHigh,
+    (uint16_t)AlarmId::PoolPressureLow,
+    (uint16_t)AlarmId::PoolPressureHigh,
     (uint16_t)AlarmId::PoolPhTankLow,
     (uint16_t)AlarmId::PoolChlorineTankLow,
     (uint16_t)AlarmId::PoolPhPumpMaxUptime,
@@ -221,8 +221,8 @@ constexpr bool kAlarmDefaultEnabled[TFTModuleS3::AlarmDashboardSlotCount] = {
 };
 
 constexpr const char* kAlarmDefaultLabels[TFTModuleS3::AlarmDashboardSlotCount] = {
-    "PSI bas",
-    "PSI haut",
+    "Pression basse",
+    "Pression haute",
     "pH vide",
     "Chlore vide",
     "pH uptime",
@@ -1646,8 +1646,8 @@ uint16_t TFTModuleS3::dashboardColor_(uint8_t colorId, uint8_t slot) const
 const char* TFTModuleS3::alarmIdLabel_(uint16_t alarmId) const
 {
     switch ((AlarmId)alarmId) {
-        case AlarmId::PoolPsiLow: return "PSI bas";
-        case AlarmId::PoolPsiHigh: return "PSI haut";
+        case AlarmId::PoolPressureLow: return "Pression basse";
+        case AlarmId::PoolPressureHigh: return "Pression haute";
         case AlarmId::PoolPhTankLow: return "pH vide";
         case AlarmId::PoolChlorineTankLow: return "Chlore vide";
         case AlarmId::PoolPhPumpMaxUptime: return "pH uptime";

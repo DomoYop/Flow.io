@@ -2124,11 +2124,11 @@
         recommendedSpan: 120,
         warningOffset: 120
       },
-      psi: {
-        key: 'psi',
-        label: 'Pression PSI',
+      pressure: {
+        key: 'pressure',
+        label: 'Pression',
         mode: 'two',
-        poollogicKey: 'psi_io_id',
+        poollogicKey: 'pressure_io_id',
         ioSlot: 2,
         runtimeUiId: 2206,
         recommendedSpan: 0.4,

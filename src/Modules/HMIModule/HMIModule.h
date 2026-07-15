@@ -160,9 +160,11 @@ private:
     portMUX_TYPE homePublishMux_ = portMUX_INITIALIZER_UNLOCKED;
     IoId phIoId_ = ioIdFromSlot(analogInputSlot(1));
     IoId orpIoId_ = ioIdFromSlot(analogInputSlot(0));
-    IoId psiIoId_ = ioIdFromSlot(analogInputSlot(2));
+    IoId pressureIoId_ = ioIdFromSlot(analogInputSlot(2));
     IoId airTempIoId_ = ioIdFromSlot(analogInputSlot(5));
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    // Réplique le mapping domainIoSlotBindings du profil compilé ; à terme ces
+    // defaults devraient être injectés depuis le DomainSpec plutôt que par macro.
+#if defined(FLOW_PROFILE_WAVESHARE)
     IoId poolLevelIoId_ = ioIdFromSlot(digitalInputSlot(2));
     IoId phLevelIoId_ = ioIdFromSlot(digitalInputSlot(0));
     IoId chlorineLevelIoId_ = ioIdFromSlot(digitalInputSlot(1));
@@ -182,7 +184,7 @@ private:
     uint8_t fillingDeviceSlot_ = PoolIds::DeviceFillPump;
     uint8_t phRuntimeIndex_ = 0xFFU;
     uint8_t orpRuntimeIndex_ = 0xFFU;
-    uint8_t psiRuntimeIndex_ = 0xFFU;
+    uint8_t pressureRuntimeIndex_ = 0xFFU;
     uint8_t waterTempRuntimeIndex_ = 0xFFU;
     uint8_t airTempRuntimeIndex_ = 0xFFU;
     uint8_t poolLevelRuntimeIndex_ = 0xFFU;

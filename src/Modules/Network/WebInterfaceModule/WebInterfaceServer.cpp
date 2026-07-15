@@ -1959,8 +1959,8 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
                 unit = "mV";
             } else if (id == 2206) {
                 runtimeIndex = 2;
-                key = "pool.psi";
-                unit = "PSI";
+                key = "pool.pressure";
+                unit = "bar";
             }
 
             float value = 0.0f;
@@ -2351,7 +2351,7 @@ constexpr const char* kWaveshareDashboardDefaultLabels[kWaveshareDashboardSlotCo
     "Compteur",
     "BME680",
     "BMP280",
-    "PSI",
+    "Pression",
 };
 constexpr uint8_t kWaveshareDashboardDefaultColorIds[kWaveshareDashboardSlotCount] = {
     0U,
@@ -2364,8 +2364,8 @@ constexpr uint8_t kWaveshareDashboardDefaultColorIds[kWaveshareDashboardSlotCoun
     7U,
 };
 constexpr uint16_t kWaveshareAlarmDashboardDefaultIds[kWaveshareDashboardSlotCount] = {
-    (uint16_t)AlarmId::PoolPsiLow,
-    (uint16_t)AlarmId::PoolPsiHigh,
+    (uint16_t)AlarmId::PoolPressureLow,
+    (uint16_t)AlarmId::PoolPressureHigh,
     (uint16_t)AlarmId::PoolPhTankLow,
     (uint16_t)AlarmId::PoolChlorineTankLow,
     (uint16_t)AlarmId::PoolPhPumpMaxUptime,
@@ -2384,8 +2384,8 @@ constexpr bool kWaveshareAlarmDashboardDefaultEnabled[kWaveshareDashboardSlotCou
     false,
 };
 constexpr const char* kWaveshareAlarmDashboardDefaultLabels[kWaveshareDashboardSlotCount] = {
-    "PSI bas",
-    "PSI haut",
+    "Pression basse",
+    "Pression haute",
     "pH vide",
     "Chlore vide",
     "pH uptime",
@@ -2423,8 +2423,8 @@ const char* waveshareDashboardColorHex_(uint8_t colorId, uint8_t slot)
 const char* waveshareAlarmDashboardLabel_(uint16_t alarmId)
 {
     switch ((AlarmId)alarmId) {
-        case AlarmId::PoolPsiLow: return "PSI bas";
-        case AlarmId::PoolPsiHigh: return "PSI haut";
+        case AlarmId::PoolPressureLow: return "Pression basse";
+        case AlarmId::PoolPressureHigh: return "Pression haute";
         case AlarmId::PoolPhTankLow: return "pH vide";
         case AlarmId::PoolChlorineTankLow: return "Chlore vide";
         case AlarmId::PoolPhPumpMaxUptime: return "pH uptime";
