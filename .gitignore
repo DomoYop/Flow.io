@@ -9,3 +9,4 @@
 .pio-core
 .pio-core-local
 data/**/*.gz
+binary/

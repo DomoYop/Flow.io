@@ -51,7 +51,7 @@ inline constexpr IoPointSpec kFlowIODINv1IoPoints[] = {
     {"relay8", IoCapability::DigitalOut, BoardSignal::Relay8, 4, false, 0},  // Water heater relay on GPIO4.
     {"digital_in1", IoCapability::DigitalIn, BoardSignal::DigitalIn1, 34, false, 0}, // Pool level sensor input on GPIO34.
     {"digital_in2", IoCapability::DigitalIn, BoardSignal::DigitalIn2, 36, false, 0}, // pH tank level sensor input on GPIO36.
-    {"digital_in3", IoCapability::DigitalIn, BoardSignal::DigitalIn3, 36, false, 0}, // Chlorine tank level sensor input on GPIO39.
+    {"digital_in3", IoCapability::DigitalIn, BoardSignal::DigitalIn3, 39, false, 0}, // Chlorine tank level sensor input on GPIO39.
     {"digital_in4", IoCapability::DigitalIn, BoardSignal::DigitalIn4, 35, false, 0}, // Water counter pulse input on GPIO35.
     {"analog_in1", IoCapability::AnalogIn, BoardSignal::AnalogIn1, 0, false, 0}, // ADS1115 internal channel 0.
     {"analog_in2", IoCapability::AnalogIn, BoardSignal::AnalogIn2, 1, false, 0}, // ADS1115 internal channel 1.
