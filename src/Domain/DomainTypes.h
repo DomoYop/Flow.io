@@ -102,6 +102,7 @@ struct PoolLogicDefaultsSpec {
     float secureElectroTempC;
     float phSetpoint;
     float orpSetpoint;
+    float heaterSetpoint;
     float phKp;
     float phKi;
     float phKd;
@@ -117,4 +118,11 @@ struct PoolLogicDefaultsSpec {
     uint8_t robotDelayMin;
     uint8_t robotDurationMin;
     uint8_t fillingMinOnSec;
+    float o2PoolVolumeM3;
+    float o2DoseMlPer10M3Week;
+    uint8_t o2MainHour;
+    uint8_t o2SplitCount;
+    bool o2TempComp;
+    float o2LoadFactor;
+    uint8_t o2MinFilterRunMin;
 };

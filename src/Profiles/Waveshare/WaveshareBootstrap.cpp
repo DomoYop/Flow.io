@@ -250,6 +250,7 @@ void setupProfile(AppContext& ctx)
     modules.hmiModule.setRemoteUdpServer(&modules.hmiUdpServerModule);
     configureIoModule(ctx, modules);
     configurePoolDevices(ctx, modules);
+    modules.poolLogicModule.applyDomainDefaults(*ctx.domain);
 
     // Keep PoolLogic runtime snapshots first so HA-critical state (including
     // heat_assist reason) stays available even when runtime route capacity is reached.

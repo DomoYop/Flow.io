@@ -47,6 +47,14 @@ constexpr uint8_t RobotDelayMin = 30;
 constexpr uint8_t RobotDurationMin = 120;
 constexpr uint8_t FillingMinOnSec = 30;
 
+constexpr float O2PoolVolumeM3 = 50.0f;
+constexpr float O2DoseMlPer10M3Week = 500.0f;
+constexpr uint8_t O2MainHour = 20;
+constexpr uint8_t O2SplitCount = 2;
+constexpr bool O2TempComp = true;
+constexpr float O2LoadFactor = 1.0f;
+constexpr uint8_t O2MinFilterRunMin = 10;
+
 constexpr float PeristalticFlowLPerHour = 1.2f;
 constexpr float PeristalticTankCapacityMl = 20000.0f;
 constexpr float PeristalticTankInitialMl = 20000.0f;
@@ -66,6 +74,7 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     SecureElectroTempC,
     PhSetpoint,
     OrpSetpoint,
+    HeaterSetpoint,
     PhKp,
     PhKi,
     PhKd,
@@ -80,7 +89,14 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     DelayElectroMin,
     RobotDelayMin,
     RobotDurationMin,
-    FillingMinOnSec
+    FillingMinOnSec,
+    O2PoolVolumeM3,
+    O2DoseMlPer10M3Week,
+    O2MainHour,
+    O2SplitCount,
+    O2TempComp,
+    O2LoadFactor,
+    O2MinFilterRunMin
 };
 
 }  // namespace PoolDefaults

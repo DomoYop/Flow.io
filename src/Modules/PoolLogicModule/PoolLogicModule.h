@@ -21,6 +21,8 @@
 constexpr uint16_t POOLLOGIC_EVENT_DAILY_RECALC = 0x2101;
 constexpr uint16_t POOLLOGIC_EVENT_FILTRATION_WINDOW = 0x2102;
 
+struct DomainSpec;
+
 class PoolLogicModule : public Module, public IRuntimeSnapshotProvider, public IRuntimeUiValueProvider {
 public:
     ModuleId moduleId() const override { return ModuleId::PoolLogic; }
@@ -43,6 +45,8 @@ public:
     }
 
     void init(ConfigStore& cfg, ServiceRegistry& services) override;
+    /** @brief Injecte les défauts métier du profil (avant initAll ; la NVS garde la priorité). */
+    void applyDomainDefaults(const DomainSpec& domain);
     void onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services) override;
     void loop() override;
     uint16_t taskStackSize() const override { return 4096; }

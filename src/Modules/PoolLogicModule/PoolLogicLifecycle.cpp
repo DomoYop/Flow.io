@@ -5,6 +5,7 @@
 
 #include "PoolLogicModule.h"
 #include "Core/MqttTopics.h"
+#include "Domain/DomainSpec.h"
 #include "Modules/IOModule/IORuntime.h"
 #include "Modules/PoolDeviceModule/PoolDeviceRuntime.h"
 
@@ -1109,6 +1110,68 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     LOGI("PoolLogic ready");
     (void)cfgStore_;
+}
+
+void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
+{
+    if (const PoolLogicDefaultsSpec* d = domain.poolLogicDefaults) {
+        waterTempLowThreshold_ = d->tempLow;
+        waterTempSetpoint_ = d->tempHigh;
+        filtrationStartMin_ = d->filtrationStartMinHour;
+        filtrationStopMax_ = d->filtrationStopMaxHour;
+        filtrationCalcStart_ = d->filtrationStartMinHour;
+        filtrationCalcStop_ = d->filtrationStopMaxHour;
+        pressureLowThreshold_ = d->pressureLow;
+        pressureHighThreshold_ = d->pressureHigh;
+        winterStartTempC_ = d->winterStartTempC;
+        freezeHoldTempC_ = d->freezeHoldTempC;
+        secureElectroTempC_ = d->secureElectroTempC;
+        phSetpoint_ = d->phSetpoint;
+        orpSetpoint_ = d->orpSetpoint;
+        heaterSetpoint_ = d->heaterSetpoint;
+        phKp_ = d->phKp;
+        phKi_ = d->phKi;
+        phKd_ = d->phKd;
+        orpKp_ = d->orpKp;
+        orpKi_ = d->orpKi;
+        orpKd_ = d->orpKd;
+        phWindowMs_ = d->pidWindowMs;
+        orpWindowMs_ = d->pidWindowMs;
+        pidMinOnMs_ = d->pidMinOnMs;
+        pidSampleMs_ = d->pidSampleMs;
+        pressureStartupDelaySec_ = d->pressureStartupDelaySec;
+        delayPidsMin_ = d->delayPidsMin;
+        delayElectroMin_ = d->delayElectroMin;
+        robotDelayMin_ = d->robotDelayMin;
+        robotDurationMin_ = d->robotDurationMin;
+        fillingMinOnSec_ = d->fillingMinOnSec;
+        o2PoolVolumeM3_ = d->o2PoolVolumeM3;
+        o2DoseMlPer10M3Week_ = d->o2DoseMlPer10M3Week;
+        o2MainHour_ = d->o2MainHour;
+        o2SplitCount_ = d->o2SplitCount;
+        o2TempComp_ = d->o2TempComp;
+        o2LoadFactor_ = d->o2LoadFactor;
+        o2MinFilterRunMin_ = d->o2MinFilterRunMin;
+    }
+
+    // IoIds capteurs dérivés des bindings du domaine (remplace l'ancien #if par profil).
+    const struct {
+        DomainSlotId slot;
+        IoId* target;
+    } sensorSlots[] = {
+        {PoolIds::SensorPh, &phIoId_},
+        {PoolIds::SensorOrp, &orpIoId_},
+        {PoolIds::SensorPressure, &pressureIoId_},
+        {PoolIds::SensorWaterTemp, &waterTempIoId_},
+        {PoolIds::SensorAirTemp, &airTempIoId_},
+        {PoolIds::SensorPoolLevel, &levelIoId_},
+        {PoolIds::SensorPhLevel, &phLevelIoId_},
+        {PoolIds::SensorChlorineLevel, &chlorineLevelIoId_},
+    };
+    for (const auto& s : sensorSlots) {
+        const IoSlotId ioSlot = domainIoSlotForRole(domain, s.slot);
+        if (ioSlot != IO_SLOT_INVALID) *s.target = ioIdFromSlot(ioSlot);
+    }
 }
 
 void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
