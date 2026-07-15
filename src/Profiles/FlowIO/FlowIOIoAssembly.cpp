@@ -51,6 +51,7 @@ PoolIoHaContext haContext(ModuleInstances& modules, const AppContext* ctx)
     haCtx.ha = modules.haService;
     haCtx.dataStore = modules.ioDataStore;
     haCtx.domain = ctx ? ctx->domain : &PoolDomain::kPoolDomain;
+    haCtx.poolDevice = &modules.poolDeviceModule;
     return haCtx;
 }
 

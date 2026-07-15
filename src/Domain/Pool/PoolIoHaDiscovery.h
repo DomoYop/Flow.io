@@ -13,6 +13,7 @@
 
 class IOModule;
 class DataStore;
+class PoolDeviceModule;
 struct HAService;
 
 struct PoolIoHaContext {
@@ -20,6 +21,9 @@ struct PoolIoHaContext {
     const HAService* ha = nullptr;
     DataStore* dataStore = nullptr;
     const DomainSpec* domain = nullptr;
+    // Equipements : sert au tombstone HA des switches desactives (page
+    // Equipements). Optionnel : sans lui, aucun switch n'est marque absent.
+    const PoolDeviceModule* poolDevice = nullptr;
 };
 
 namespace PoolIoHa {

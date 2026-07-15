@@ -17,6 +17,7 @@
 #include "Domain/Pool/PoolIds.h"
 #include "Modules/IOModule/IOModule.h"
 #include "Modules/Network/HAModule/HARuntime.h"
+#include "Modules/PoolDeviceModule/PoolDeviceModule.h"
 
 #ifndef FLOW_HA_BOOT_TRACE
 #define FLOW_HA_BOOT_TRACE 0
@@ -264,6 +265,11 @@ void syncSwitches(const PoolIoHaContext& ctx)
             continue;
         }
 
+        // Equipement desactive par l'utilisateur (page Equipements) => tombstone
+        // du switch cote Home Assistant. La discovery s'execute apres le
+        // chargement NVS, donc deviceEnabled reflete la config persistee.
+        const bool switchAbsent =
+            ctx.poolDevice ? !ctx.poolDevice->deviceEnabled(device.id) : false;
         const HASwitchEntry entry{
             "io",
             device.objectSuffix,
@@ -274,7 +280,8 @@ void syncSwitches(const PoolIoHaContext& ctx)
             gDiscoveryHeap->switchPayloadOn[i],
             gDiscoveryHeap->switchPayloadOff[i],
             device.haIcon,
-            nullptr
+            nullptr,
+            switchAbsent
         };
         (void)ctx.ha->addSwitch(ctx.ha->ctx, &entry);
     }

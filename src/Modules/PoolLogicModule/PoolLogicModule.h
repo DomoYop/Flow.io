@@ -45,9 +45,15 @@ public:
     }
 
     void init(ConfigStore& cfg, ServiceRegistry& services) override;
-    /** @brief Injecte les défauts métier du profil (avant initAll ; la NVS garde la priorité). */
-    void applyDomainDefaults(const DomainSpec& domain);
     void onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services) override;
+    /**
+     * @brief Injecte les défauts métier du profil (spec + IoIds capteurs du domaine).
+     *
+     * À appeler depuis le bootstrap de profil AVANT ModuleManager::initAll() :
+     * les valeurs injectées deviennent les défauts que ConfigStore::loadPersistent()
+     * conserve tant que la clé NVS correspondante n'existe pas.
+     */
+    void applyDomainDefaults(const DomainSpec& domain);
     void loop() override;
     uint16_t taskStackSize() const override { return 4096; }
     uint32_t startDelayMs() const override {
@@ -147,20 +153,16 @@ private:
     static constexpr uint8_t SLOT_DAILY_RECALC = 3;
     static constexpr uint8_t SLOT_FILTR_WINDOW = 4;
 
+    // Filet générique si applyDomainDefaults() n'est pas appelé ; les vrais défauts
+    // sont injectés par le bootstrap depuis DomainSpec::domainIoSlotBindings.
     static constexpr IoId IO_ID_PH_DEFAULT = ioIdFromSlot(analogInputSlot(1));
     static constexpr IoId IO_ID_ORP_DEFAULT = ioIdFromSlot(analogInputSlot(0));
     static constexpr IoId IO_ID_PRESSURE_DEFAULT = ioIdFromSlot(analogInputSlot(2));
     static constexpr IoId IO_ID_WATER_TEMP_DEFAULT = ioIdFromSlot(analogInputSlot(4));
     static constexpr IoId IO_ID_AIR_TEMP_DEFAULT = ioIdFromSlot(analogInputSlot(5));
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    static constexpr IoId IO_ID_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(2));
-    static constexpr IoId IO_ID_PH_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(0));
-    static constexpr IoId IO_ID_CHLORINE_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(1));
-#else
     static constexpr IoId IO_ID_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(0));
     static constexpr IoId IO_ID_PH_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(1));
     static constexpr IoId IO_ID_CHLORINE_LEVEL_DEFAULT = ioIdFromSlot(digitalInputSlot(2));
-#endif
 
     // State and configuration storage
     bool enabled_ = false;
@@ -192,13 +194,20 @@ private:
     IoId levelIoId_ = IO_ID_LEVEL_DEFAULT;
     IoId phLevelIoId_ = IO_ID_PH_LEVEL_DEFAULT;
     IoId chlorineLevelIoId_ = IO_ID_CHLORINE_LEVEL_DEFAULT;
+    // Flowswitch/volet (entrees) et sorties indicatrices (recopie temporisee,
+    // etat volet). IoId derives du domaine dans applyDomainDefaults ; le port
+    // physique des sorties reste reconfigurable via la page E/S (bindingPort).
+    IoId flowSwitchIoId_ = IO_ID_INVALID;
+    IoId coverClosedIoId_ = IO_ID_INVALID;
+    IoId outFlowCopyIoId_ = IO_ID_INVALID;
+    IoId outCoverIoId_ = IO_ID_INVALID;
 
     // Thresholds / delays
-    float pressureLowThreshold_ = 0.15f;
-    float pressureHighThreshold_ = 1.80f;
-    float winterStartTempC_ = -2.0f;
-    float freezeHoldTempC_ = 2.0f;
-    float secureElectroTempC_ = 15.0f;
+    float pressureLowThreshold_ = PoolDefaults::PressureLow;
+    float pressureHighThreshold_ = PoolDefaults::PressureHigh;
+    float winterStartTempC_ = PoolDefaults::WinterStartTempC;
+    float freezeHoldTempC_ = PoolDefaults::FreezeHoldTempC;
+    float secureElectroTempC_ = PoolDefaults::SecureElectroTempC;
     float phSetpoint_ = PoolDefaults::PhSetpoint;
     float orpSetpoint_ = PoolDefaults::OrpSetpoint;
     float heaterSetpoint_ = PoolDefaults::HeaterSetpoint;
@@ -212,21 +221,27 @@ private:
     int32_t orpWindowMs_ = PoolDefaults::PidWindowMs;
     int32_t pidMinOnMs_ = PoolDefaults::PidMinOnMs;
     int32_t pidSampleMs_ = PoolDefaults::PidSampleMs;
-    uint8_t pressureStartupDelaySec_ = 60;
-    uint8_t delayPidsMin_ = 5;
-    uint8_t delayElectroMin_ = 10;
-    uint8_t robotDelayMin_ = 30;
-    uint8_t robotDurationMin_ = 120;
-    uint8_t fillingMinOnSec_ = 30;
+    uint8_t pressureStartupDelaySec_ = PoolDefaults::PressureStartupDelaySec;
+    uint8_t delayPidsMin_ = PoolDefaults::DelayPidsMin;
+    uint8_t delayElectroMin_ = PoolDefaults::DelayElectroMin;
+    uint8_t robotDelayMin_ = PoolDefaults::RobotDelayMin;
+    uint8_t robotDurationMin_ = PoolDefaults::RobotDurationMin;
+    uint8_t fillingMinOnSec_ = PoolDefaults::FillingMinOnSec;
+    // Delai d'activation (s) de la recopie flowswitch ; interlock securite debit.
+    // Interlock desactive par defaut (opt-in) : sans flowswitch cable, DIN4 en
+    // pull-up lit "pas de debit" et bloquerait le dosage. A activer une fois le
+    // capteur installe (switch HA / config poollogic/safety flow_interlock).
+    uint8_t flowCopyDelaySec_ = 30;
+    bool flowInterlockEnabled_ = false;
 
     // Active oxygen phase-2 configuration and persisted protocol cursor.
-    float o2PoolVolumeM3_ = 50.0f;
-    float o2DoseMlPer10M3Week_ = 500.0f;
-    uint8_t o2MainHour_ = 20;
-    uint8_t o2SplitCount_ = 2;
-    bool o2TempComp_ = true;
-    float o2LoadFactor_ = 1.0f;
-    uint8_t o2MinFilterRunMin_ = 10;
+    float o2PoolVolumeM3_ = PoolDefaults::O2PoolVolumeM3;
+    float o2DoseMlPer10M3Week_ = PoolDefaults::O2DoseMlPer10M3Week;
+    uint8_t o2MainHour_ = PoolDefaults::O2MainHour;
+    uint8_t o2SplitCount_ = PoolDefaults::O2SplitCount;
+    bool o2TempComp_ = PoolDefaults::O2TempComp;
+    float o2LoadFactor_ = PoolDefaults::O2LoadFactor;
+    uint8_t o2MinFilterRunMin_ = PoolDefaults::O2MinFilterRunMin;
     uint8_t o2ProtocolState_ = O2ProtocolIdle;
     uint16_t o2LastDoseDay_ = 0;
     float o2WeeklyDoneMl_ = 0.0f;
@@ -277,6 +292,13 @@ private:
     bool robotManualDesired_ = false;
     bool phPidEnabled_ = false;
     bool orpPidEnabled_ = false;
+
+    // Etat runtime flowswitch / sorties indicatrices.
+    uint32_t flowSwitchOnSinceMs_ = 0;
+    bool flowSwitchLast_ = false;
+    bool flowCopyOutState_ = false;
+    bool coverClosedState_ = false;
+    bool noFlowError_ = false;
 
     portMUX_TYPE pendingMux_ = portMUX_INITIALIZER_UNLOCKED;
 
@@ -417,6 +439,11 @@ private:
                                                 &orpPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> heaterDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSlot), "heater_slot", "poollogic/devices", ConfigType::UInt8,
                                                &heaterDeviceSlot_, ConfigPersistence::Persistent, 0};
+
+    ConfigVariable<uint8_t,0> flowCopyDelayVar_{NVS_KEY(NvsKeys::PoolLogic::FlowCopyDelay), "flow_copy_delay_s", "poollogic/safety", ConfigType::UInt8,
+                                                &flowCopyDelaySec_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> flowInterlockVar_{NVS_KEY(NvsKeys::PoolLogic::FlowInterlock), "flow_interlock", "poollogic/safety", ConfigType::Bool,
+                                             &flowInterlockEnabled_, ConfigPersistence::Persistent, 0};
 
     // Services and adapters
     ConfigStore* cfgStore_ = nullptr;

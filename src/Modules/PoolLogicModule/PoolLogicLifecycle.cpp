@@ -170,6 +170,72 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
 };
 }
 
+void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
+{
+    if (const PoolLogicDefaultsSpec* d = domain.poolLogicDefaults) {
+        waterTempLowThreshold_ = d->tempLow;
+        waterTempSetpoint_ = d->tempHigh;
+        filtrationStartMin_ = d->filtrationStartMinHour;
+        filtrationStopMax_ = d->filtrationStopMaxHour;
+        filtrationCalcStart_ = d->filtrationStartMinHour;
+        filtrationCalcStop_ = d->filtrationStopMaxHour;
+        pressureLowThreshold_ = d->pressureLow;
+        pressureHighThreshold_ = d->pressureHigh;
+        winterStartTempC_ = d->winterStartTempC;
+        freezeHoldTempC_ = d->freezeHoldTempC;
+        secureElectroTempC_ = d->secureElectroTempC;
+        phSetpoint_ = d->phSetpoint;
+        orpSetpoint_ = d->orpSetpoint;
+        heaterSetpoint_ = d->heaterSetpoint;
+        phKp_ = d->phKp;
+        phKi_ = d->phKi;
+        phKd_ = d->phKd;
+        orpKp_ = d->orpKp;
+        orpKi_ = d->orpKi;
+        orpKd_ = d->orpKd;
+        phWindowMs_ = d->pidWindowMs;
+        orpWindowMs_ = d->pidWindowMs;
+        pidMinOnMs_ = d->pidMinOnMs;
+        pidSampleMs_ = d->pidSampleMs;
+        pressureStartupDelaySec_ = d->pressureStartupDelaySec;
+        delayPidsMin_ = d->delayPidsMin;
+        delayElectroMin_ = d->delayElectroMin;
+        robotDelayMin_ = d->robotDelayMin;
+        robotDurationMin_ = d->robotDurationMin;
+        fillingMinOnSec_ = d->fillingMinOnSec;
+        o2PoolVolumeM3_ = d->o2PoolVolumeM3;
+        o2DoseMlPer10M3Week_ = d->o2DoseMlPer10M3Week;
+        o2MainHour_ = d->o2MainHour;
+        o2SplitCount_ = d->o2SplitCount;
+        o2TempComp_ = d->o2TempComp;
+        o2LoadFactor_ = d->o2LoadFactor;
+        o2MinFilterRunMin_ = d->o2MinFilterRunMin;
+    }
+
+    // IoIds capteurs dérivés des bindings du domaine (remplace l'ancien #if par profil).
+    const struct {
+        DomainSlotId slot;
+        IoId* target;
+    } sensorSlots[] = {
+        {PoolIds::SensorPh, &phIoId_},
+        {PoolIds::SensorOrp, &orpIoId_},
+        {PoolIds::SensorPressure, &pressureIoId_},
+        {PoolIds::SensorWaterTemp, &waterTempIoId_},
+        {PoolIds::SensorAirTemp, &airTempIoId_},
+        {PoolIds::SensorPoolLevel, &levelIoId_},
+        {PoolIds::SensorPhLevel, &phLevelIoId_},
+        {PoolIds::SensorChlorineLevel, &chlorineLevelIoId_},
+        {PoolIds::SensorFlowSwitch, &flowSwitchIoId_},
+        {PoolIds::SensorCoverClosed, &coverClosedIoId_},
+        {PoolIds::ActuatorFlowCopy, &outFlowCopyIoId_},
+        {PoolIds::ActuatorCoverClosed, &outCoverIoId_},
+    };
+    for (const auto& s : sensorSlots) {
+        const IoSlotId ioSlot = domainIoSlotForRole(domain, s.slot);
+        if (ioSlot != IO_SLOT_INVALID) *s.target = ioIdFromSlot(ioSlot);
+    }
+}
+
 void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 {
     constexpr uint8_t kCfgModuleId = (uint8_t)ConfigModuleId::PoolLogic;
@@ -325,6 +391,9 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchDevices);
     cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchDevices);
 
+    cfg.registerVar(flowCopyDelayVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(flowInterlockVar_, kCfgModuleId, kCfgBranchSafety);
+
     const EventBusService* ebSvc = services.get<EventBusService>(ServiceId::EventBus);
     eventBus_ = ebSvc ? ebSvc->bus : nullptr;
     timeSvc_ = services.get<TimeService>(ServiceId::Time);
@@ -428,6 +497,18 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:thermometer-lines",
             "config"
         };
+        const HASwitchEntry flowInterlockSwitch{
+            "poollogic",
+            "pl_flow_interlock",
+            "Flow Safety Interlock",
+            "cfg/poollogic/safety",
+            "{% if value_json.flow_interlock %}ON{% else %}OFF{% endif %}",
+            MqttTopics::SuffixCfgSet,
+            "{\\\"poollogic/safety\\\":{\\\"flow_interlock\\\":true}}",
+            "{\\\"poollogic/safety\\\":{\\\"flow_interlock\\\":false}}",
+            "mdi:water-alert",
+            "config"
+        };
         (void)haSvc->addSwitch(haSvc->ctx, &autoModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &winterModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &phAutoModeSwitch);
@@ -435,6 +516,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addSwitch(haSvc->ctx, &heaterAutoModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &phDosePlusSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &o2TempCompSwitch);
+        (void)haSvc->addSwitch(haSvc->ctx, &flowInterlockSwitch);
     }
     if (haSvc && haSvc->addSelect) {
         static const char* kDisinfectionTypeStateTpl =
@@ -934,10 +1016,27 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addNumber(haSvc->ctx, &pressureLowThreshold);
         (void)haSvc->addNumber(haSvc->ctx, &pressureHighThreshold);
         (void)haSvc->addNumber(haSvc->ctx, &o2PoolVolume);
+        const HANumberEntry flowCopyDelay{
+            "poollogic",
+            "pl_flow_copy_delay",
+            "Flow Copy Output Delay",
+            "cfg/poollogic/safety",
+            "{{ value_json.flow_copy_delay_s | int(0) }}",
+            MqttTopics::SuffixCfgSet,
+            "{\\\"poollogic/safety\\\":{\\\"flow_copy_delay_s\\\":{{ value | int(0) }}}}",
+            0.0f,
+            255.0f,
+            1.0f,
+            "box",
+            "config",
+            "mdi:timer-sand",
+            "s"
+        };
         (void)haSvc->addNumber(haSvc->ctx, &o2WeeklyDose);
         (void)haSvc->addNumber(haSvc->ctx, &o2SplitCount);
         (void)haSvc->addNumber(haSvc->ctx, &o2LoadFactor);
         (void)haSvc->addNumber(haSvc->ctx, &o2MinFilterRun);
+        (void)haSvc->addNumber(haSvc->ctx, &flowCopyDelay);
     }
     if (haSvc && haSvc->addButton) {
         const HAButtonEntry filtrationRecalc{
@@ -950,6 +1049,31 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:refresh"
         };
         (void)haSvc->addButton(haSvc->ctx, &filtrationRecalc);
+    }
+    if (haSvc && haSvc->addBinarySensor) {
+        // Etat logique des 2 sorties indicatrices + interlock, publie sur le
+        // snapshot runtime rt/poollogic/flow.
+        const HABinarySensorEntry flowCopyOut{
+            "poollogic", "pl_flow_copy_out", "Flow Copy Output",
+            "rt/poollogic/flow",
+            "{{ 'True' if value_json.flow_copy else 'False' }}",
+            nullptr, nullptr, "mdi:waves-arrow-right", false
+        };
+        const HABinarySensorEntry coverOut{
+            "poollogic", "pl_cover_out", "Cover Closed Output",
+            "rt/poollogic/flow",
+            "{{ 'True' if value_json.cover else 'False' }}",
+            nullptr, nullptr, "mdi:window-shutter", false
+        };
+        const HABinarySensorEntry noFlow{
+            "poollogic", "pl_no_flow", "No Flow (interlock)",
+            "rt/poollogic/flow",
+            "{{ 'True' if value_json.no_flow else 'False' }}",
+            "problem", nullptr, "mdi:water-alert", false
+        };
+        (void)haSvc->addBinarySensor(haSvc->ctx, &flowCopyOut);
+        (void)haSvc->addBinarySensor(haSvc->ctx, &coverOut);
+        (void)haSvc->addBinarySensor(haSvc->ctx, &noFlow);
     }
     if (cmdSvc && cmdSvc->registerHandler) {
         cmdSvc->registerHandler(cmdSvc->ctx, "poollogic.filtration.write", &PoolLogicModule::cmdFiltrationWriteStatic_, this);
@@ -1112,68 +1236,6 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     (void)cfgStore_;
 }
 
-void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
-{
-    if (const PoolLogicDefaultsSpec* d = domain.poolLogicDefaults) {
-        waterTempLowThreshold_ = d->tempLow;
-        waterTempSetpoint_ = d->tempHigh;
-        filtrationStartMin_ = d->filtrationStartMinHour;
-        filtrationStopMax_ = d->filtrationStopMaxHour;
-        filtrationCalcStart_ = d->filtrationStartMinHour;
-        filtrationCalcStop_ = d->filtrationStopMaxHour;
-        pressureLowThreshold_ = d->pressureLow;
-        pressureHighThreshold_ = d->pressureHigh;
-        winterStartTempC_ = d->winterStartTempC;
-        freezeHoldTempC_ = d->freezeHoldTempC;
-        secureElectroTempC_ = d->secureElectroTempC;
-        phSetpoint_ = d->phSetpoint;
-        orpSetpoint_ = d->orpSetpoint;
-        heaterSetpoint_ = d->heaterSetpoint;
-        phKp_ = d->phKp;
-        phKi_ = d->phKi;
-        phKd_ = d->phKd;
-        orpKp_ = d->orpKp;
-        orpKi_ = d->orpKi;
-        orpKd_ = d->orpKd;
-        phWindowMs_ = d->pidWindowMs;
-        orpWindowMs_ = d->pidWindowMs;
-        pidMinOnMs_ = d->pidMinOnMs;
-        pidSampleMs_ = d->pidSampleMs;
-        pressureStartupDelaySec_ = d->pressureStartupDelaySec;
-        delayPidsMin_ = d->delayPidsMin;
-        delayElectroMin_ = d->delayElectroMin;
-        robotDelayMin_ = d->robotDelayMin;
-        robotDurationMin_ = d->robotDurationMin;
-        fillingMinOnSec_ = d->fillingMinOnSec;
-        o2PoolVolumeM3_ = d->o2PoolVolumeM3;
-        o2DoseMlPer10M3Week_ = d->o2DoseMlPer10M3Week;
-        o2MainHour_ = d->o2MainHour;
-        o2SplitCount_ = d->o2SplitCount;
-        o2TempComp_ = d->o2TempComp;
-        o2LoadFactor_ = d->o2LoadFactor;
-        o2MinFilterRunMin_ = d->o2MinFilterRunMin;
-    }
-
-    // IoIds capteurs dérivés des bindings du domaine (remplace l'ancien #if par profil).
-    const struct {
-        DomainSlotId slot;
-        IoId* target;
-    } sensorSlots[] = {
-        {PoolIds::SensorPh, &phIoId_},
-        {PoolIds::SensorOrp, &orpIoId_},
-        {PoolIds::SensorPressure, &pressureIoId_},
-        {PoolIds::SensorWaterTemp, &waterTempIoId_},
-        {PoolIds::SensorAirTemp, &airTempIoId_},
-        {PoolIds::SensorPoolLevel, &levelIoId_},
-        {PoolIds::SensorPhLevel, &phLevelIoId_},
-        {PoolIds::SensorChlorineLevel, &chlorineLevelIoId_},
-    };
-    for (const auto& s : sensorSlots) {
-        const IoSlotId ioSlot = domainIoSlotForRole(domain, s.slot);
-        if (ioSlot != IO_SLOT_INVALID) *s.target = ioIdFromSlot(ioSlot);
-    }
-}
-
 void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
 {
     mqttSvc_ = services.get<MqttService>(ServiceId::Mqtt);
@@ -1240,6 +1302,53 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
          swgControlModeStr_(swgControlMode_));
     normalizeDeviceSlots_();
     logDeviceSlotConfig_();
+
+    // Masquage Home Assistant selon le type de desinfection et la presence des
+    // equipements optionnels : les entites non pertinentes sont marquees absentes
+    // (tombstone au boot). Cote arbre web, l'attribut visible_if des cfgdocs fait
+    // le meme filtrage. Reconfiguration prise en compte au prochain redemarrage
+    // (discovery one-shot).
+    const HAService* haCfgSvc = services.get<HAService>(ServiceId::Ha);
+    if (haCfgSvc && haCfgSvc->setEntityAbsent) {
+        auto setAbs = [&](const char* suffix, bool absent) {
+            (void)haCfgSvc->setEntityAbsent(haCfgSvc->ctx, "poollogic", suffix, absent);
+        };
+        const bool notChlorine = (disinfectionType_ != DisinfectionChlorineBromine);
+        const bool notSwg = (disinfectionType_ != DisinfectionSwg);
+        const bool notO2 = (disinfectionType_ != DisinfectionActiveOxygen);
+
+        auto deviceEnabled = [&](uint8_t slot) -> bool {
+            if (!poolSvc_ || !poolSvc_->meta) return true;
+            PoolDeviceSvcMeta m{};
+            if (poolSvc_->meta(poolSvc_->ctx, slot, &m) != POOLDEV_SVC_OK) return true;
+            return m.used && m.enabled;
+        };
+        const bool heaterOff = !deviceEnabled(heaterDeviceSlot_);
+        const bool fillOff = !deviceEnabled(fillingDeviceSlot_);
+
+        // Chlore liquide (type 0) : PID ORP + fenetre.
+        setAbs("pl_dis_auto", notChlorine);
+        setAbs("pl_dis_window", notChlorine);
+        // Consigne ORP partagee chlore liquide (0) et electrolyse-ORP (1).
+        setAbs("pl_dis_setpoint", notChlorine && notSwg);
+        // Electrolyse (type 1).
+        setAbs("pl_swg_ctrl", notSwg);
+        setAbs("pl_swg_dly_elec", notSwg);
+        setAbs("pl_swg_min_temp", notSwg);
+        // Oxygene actif (type 2).
+        static const char* const kO2Suffixes[] = {
+            "pl_o2_temp_comp", "pl_o2_hour", "pl_o2_state", "pl_o2_done",
+            "pl_o2_pending", "pl_o2_last_day", "pl_o2_block", "pl_o2_plan",
+            "pl_o2_flow", "pl_o2_vol", "pl_o2_dose", "pl_o2_split",
+            "pl_o2_load", "pl_o2_min_flt"
+        };
+        for (const char* suffix : kO2Suffixes) setAbs(suffix, notO2);
+        // Equipements optionnels.
+        setAbs("pl_heat_auto", heaterOff);
+        setAbs("pl_heat_setpoint", heaterOff);
+        setAbs("pl_has_rsn", heaterOff);
+        setAbs("pl_refill_min_on", fillOff);
+    }
 
     ensureDailySlot_();
 

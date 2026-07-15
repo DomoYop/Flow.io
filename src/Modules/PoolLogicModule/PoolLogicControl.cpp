@@ -25,7 +25,7 @@ constexpr uint8_t kHeatAssistFlagProbeRunning = (1U << 0);
 constexpr uint8_t kHeatAssistFlagHeatingActive = (1U << 1);
 constexpr uint8_t kHeatAssistFlagFastCycle = (1U << 2);
 constexpr uint32_t kO2PersistPeriodMs = 30000UL;
-constexpr float kO2DoseEpressurelonMl = 0.5f;
+constexpr float kO2DoseEpsilonMl = 0.5f;
 
 const char* poolDeviceSvcStatusStr_(PoolDeviceSvcStatus st)
 {
@@ -420,7 +420,7 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
 
     if (!isDisinfectionType_(DisinfectionActiveOxygen) || !autoMode_) {
         o2LastProgressMs_ = 0;
-        if (o2PendingMl_ <= kO2DoseEpressurelonMl) {
+        if (o2PendingMl_ <= kO2DoseEpsilonMl) {
             o2PendingMl_ = 0.0f;
             setO2ProtocolState_(O2ProtocolIdle, O2BlockInactive, nowMs);
         } else {
@@ -435,8 +435,8 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
     uint8_t hour = 0;
     if (!currentO2LocalTime_(dayKey, weekKey, weekDayMon0, hour)) {
         o2LastProgressMs_ = 0;
-        if (o2PendingMl_ > kO2DoseEpressurelonMl) requestFiltrationOut = true;
-        setO2ProtocolState_(o2PendingMl_ > kO2DoseEpressurelonMl ? O2ProtocolBlocked : O2ProtocolIdle,
+        if (o2PendingMl_ > kO2DoseEpsilonMl) requestFiltrationOut = true;
+        setO2ProtocolState_(o2PendingMl_ > kO2DoseEpsilonMl ? O2ProtocolBlocked : O2ProtocolIdle,
                             O2BlockTimeUnsynced,
                             nowMs);
         return false;
@@ -452,9 +452,9 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
     const float doseMl = (split > 0U) ? (weeklyDoseMl / (float)split) : weeklyDoseMl;
     o2LastPlannedDoseMl_ = doseMl;
 
-    if (o2PendingMl_ <= kO2DoseEpressurelonMl) {
+    if (o2PendingMl_ <= kO2DoseEpsilonMl) {
         o2PendingMl_ = 0.0f;
-        if (weeklyDoseMl <= kO2DoseEpressurelonMl || doseMl <= kO2DoseEpressurelonMl) {
+        if (weeklyDoseMl <= kO2DoseEpsilonMl || doseMl <= kO2DoseEpsilonMl) {
             setO2ProtocolState_(O2ProtocolBlocked, O2BlockConfig, nowMs);
             return false;
         }
@@ -462,7 +462,7 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
             isO2DoseDay_(weekDayMon0) &&
             hour >= o2MainHour_ &&
             o2LastDoseDay_ != dayKey &&
-            o2WeeklyDoneMl_ < (weeklyDoseMl - kO2DoseEpressurelonMl);
+            o2WeeklyDoneMl_ < (weeklyDoseMl - kO2DoseEpsilonMl);
         if (dueToday) {
             const float remainingWeekMl = weeklyDoseMl - o2WeeklyDoneMl_;
             o2PendingMl_ = (remainingWeekMl < doseMl) ? remainingWeekMl : doseMl;
@@ -473,7 +473,7 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
         }
     }
 
-    if (o2PendingMl_ <= kO2DoseEpressurelonMl) {
+    if (o2PendingMl_ <= kO2DoseEpsilonMl) {
         o2PendingMl_ = 0.0f;
         setO2ProtocolState_(O2ProtocolIdle, O2BlockNone, nowMs);
         return false;
@@ -531,7 +531,7 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
             if (std::isfinite(injectedMl) && injectedMl > 0.0f) {
                 o2PendingMl_ -= injectedMl;
                 o2WeeklyDoneMl_ += injectedMl;
-                if (o2PendingMl_ <= kO2DoseEpressurelonMl) {
+                if (o2PendingMl_ <= kO2DoseEpsilonMl) {
                     if (o2PendingMl_ < 0.0f) {
                         o2WeeklyDoneMl_ += o2PendingMl_;
                     }
@@ -1138,7 +1138,7 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     // then automatic scheduling/winter logic in that order.
     bool filtrationDesiredBase = filtrationFsm_.on;
     if (pressureError_) {
-        // Safety first: Pressure alarms must stop filtration even in manual mode.
+        // Safety first: pressure alarms must stop filtration even in manual mode.
         filtrationDesiredBase = false;
     } else if (!autoMode_) {
         // Legacy-like manual mode: when auto_mode is off, keep filtration fully manual.
@@ -1446,6 +1446,51 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         filtrationFsm_.lastDesired = !filtrationDesired;
         filtrationFsm_.lastCmdMs = 0U;
     }
+
+    // --- Flowswitch : recopie temporisee, etat volet, et interlock securite ---
+    bool flowOn = false;
+    const bool haveFlow = loadDigitalSensor_(flowSwitchIoId_, flowOn);
+    if (flowOn && !flowSwitchLast_) {
+        // Front montant du debit : demarre le compte a rebours d'activation.
+        flowSwitchOnSinceMs_ = nowMs;
+    }
+    flowSwitchLast_ = flowOn;
+    // Recopie a l'activation temporisee (delai configurable), retombee immediate.
+    bool flowCopyOut = false;
+    if (flowOn) {
+        const uint32_t elapsedMs = (uint32_t)(nowMs - flowSwitchOnSinceMs_);
+        flowCopyOut = elapsedMs >= ((uint32_t)flowCopyDelaySec_ * 1000UL);
+    }
+    flowCopyOutState_ = flowCopyOut;
+
+    bool coverClosed = false;
+    const bool haveCover = loadDigitalSensor_(coverClosedIoId_, coverClosed);
+    coverClosedState_ = haveCover && coverClosed;
+
+    // Ecriture des 2 sorties indicatrices (no-op si non liees a un port).
+    if (ioSvc_ && ioSvc_->writeDigital) {
+        if (outFlowCopyIoId_ != IO_ID_INVALID) {
+            (void)ioSvc_->writeDigital(ioSvc_->ctx, outFlowCopyIoId_, flowCopyOutState_ ? 1U : 0U, nowMs);
+        }
+        if (outCoverIoId_ != IO_ID_INVALID) {
+            (void)ioSvc_->writeDigital(ioSvc_->ctx, outCoverIoId_, coverClosedState_ ? 1U : 0U, nowMs);
+        }
+    }
+
+    // Interlock securite : plus de debit => coupe dosage pH/chlore et electrolyse.
+    // N'agit que si un flowswitch est present (haveFlow) et l'interlock active.
+    const bool noFlow = haveFlow && !flowOn;
+    const bool interlockActive = flowInterlockEnabled_ && noFlow;
+    if (interlockActive && !noFlowError_) {
+        LOGW("Flow interlock: no flow detected, blocking pH/chlorine/electrolysis");
+    }
+    noFlowError_ = interlockActive;
+    if (interlockActive) {
+        phPumpDesired = false;
+        orpPumpDesired = false;
+        swgDesired = false;
+    }
+
     applyDeviceControl_(filtrationDeviceSlot_, "Filtration Pump", filtrationFsm_, filtrationDesired, nowMs);
     applyDeviceControl_(phPumpDeviceSlot_, "pH Pump", phPumpFsm_, phPumpDesired, nowMs);
     applyDeviceControl_(orpPumpDeviceSlot_,

@@ -1,6 +1,8 @@
 {
   "locale": "en",
   "translations": {
+    "cfgmods.poollogic.equipements.label": "Équipements",
+    "cfgmods.poollogic.equipements.help": "Sélection of type de traitement et of équipements installés.",
     "cfgdocs.poollogic.chlorine.dis_auto_mode.help": "Enable automatic ORP/chlore.",
     "cfgdocs.poollogic.chlorine.dis_auto_mode.label": "Auto mode ORP",
     "cfgdocs.poollogic.chlorine.dis_kd.help": "Gain dérivé of régulateur ORP.",
