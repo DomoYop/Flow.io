@@ -197,6 +197,23 @@ private:
     uint8_t pcfLogicalFromPhysical_(uint8_t physicalMask) const;
 
     bool configureRuntime_();
+    /** Expander output needs collected from the digital output slot bindings. */
+    struct ExpanderNeeds {
+        bool pcf = false;
+        bool tca = false;
+        bool mcp = false;
+        bool tcaPreserveStartup = false;
+    };
+    void configureAnalogSlots_(bool (&needAnalogSource)[IO_SRC_COUNT]);
+    ExpanderNeeds scanExpanderNeeds_() const;
+    void beginI2cIfNeeded_(const bool (&needAnalogSource)[IO_SRC_COUNT], const ExpanderNeeds& needs);
+    void configureDigitalInputSlot_(DigitalSlot& s, uint8_t slotIdx);
+    void configureDigitalOutputSlot_(DigitalSlot& s, const ExpanderNeeds& needs, bool& mcpProbeFailed);
+    void probeConfiguredI2cDevices_(const bool (&needAnalogSource)[IO_SRC_COUNT], const ExpanderNeeds& needs);
+    void configureAnalogProviders_(const bool (&needAnalogSource)[IO_SRC_COUNT]);
+    void configureLedMaskEndpoint_(const ExpanderNeeds& needs);
+    /** Adds the polling jobs then finishes runtime bring-up (runtimeReady_ + ready log). */
+    void registerSchedulerJobs_(bool needI2cAnalogJob, const ExpanderNeeds& needs);
     const IOBindingPortSpec* bindingPortSpec_(PhysicalPortId portId) const;
     bool resolveAnalogBinding_(PhysicalPortId portId, uint8_t& sourceOut, uint8_t& channelOut, uint8_t& backendOut) const;
     bool resolveDigitalInputBinding_(PhysicalPortId portId, uint8_t& pinOut, uint8_t& backendOut, uint8_t& channelOut) const;

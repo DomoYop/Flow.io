@@ -309,13 +309,8 @@ void IOModule::resolveDs18Sensors_()
                                             &oneWireAir_, oneWireAirAddr_);
 }
 
-bool IOModule::configureRuntime_()
+void IOModule::configureAnalogSlots_(bool (&needAnalogSource)[IO_SRC_COUNT])
 {
-    if (runtimeReady_) return true;
-    if (!cfgData_.enabled) return false;
-
-    bool needAnalogSource[IO_SRC_COUNT] = {false};
-
     for (uint8_t i = 0; i < MAX_ANALOG_ENDPOINTS; ++i) {
         if (!analogSlots_[i].used) continue;
         analogSlots_[i].ioId = (IoId)(IO_ID_AI_BASE + i);
@@ -366,11 +361,13 @@ bool IOModule::configureRuntime_()
         if (!analogSlots_[i].endpoint) continue;
         registry_.add(analogSlots_[i].endpoint);
     }
+}
 
+IOModule::ExpanderNeeds IOModule::scanExpanderNeeds_() const
+{
     bool needPcfOutput = false;
     bool needTcaOutput = false;
     bool needMcpOutput = false;
-    bool mcpProbeFailed = false;
     bool needTcaPreserveStartup = false;
     for (uint8_t i = 0; i < MAX_DIGITAL_SLOTS; ++i) {
         const DigitalSlot& s = digitalSlots_[i];
@@ -395,6 +392,20 @@ bool IOModule::configureRuntime_()
             needMcpOutput = true;
         }
     }
+
+    ExpanderNeeds needs{};
+    needs.pcf = needPcfOutput;
+    needs.tca = needTcaOutput;
+    needs.mcp = needMcpOutput;
+    needs.tcaPreserveStartup = needTcaPreserveStartup;
+    return needs;
+}
+
+void IOModule::beginI2cIfNeeded_(const bool (&needAnalogSource)[IO_SRC_COUNT], const ExpanderNeeds& needs)
+{
+    const bool needPcfOutput = needs.pcf;
+    const bool needTcaOutput = needs.tca;
+    const bool needMcpOutput = needs.mcp;
 
     const bool needI2c =
         needAnalogSource[IO_SRC_ADS_INTERNAL_SINGLE] ||
@@ -425,279 +436,272 @@ bool IOModule::configureRuntime_()
         LOGI("ADS1115 probe 0x48: %s", ads48Present ? "found" : "not found");
         LOGI("ADS1115 probe 0x49: %s", ads49Present ? "found" : "not found");
     }
+}
 
-    for (uint8_t i = 0; i < MAX_DIGITAL_SLOTS; ++i) {
-        if (!digitalSlots_[i].used) continue;
-        DigitalSlot& s = digitalSlots_[i];
-        s.owner = this;
-        s.ioId = (s.kind == DIGITAL_SLOT_OUTPUT)
-                   ? (IoId)(IO_ID_DO_BASE + s.logicalIdx)
-                   : (IoId)(IO_ID_DI_BASE + s.logicalIdx);
-
-        if (s.kind == DIGITAL_SLOT_INPUT) {
-            const uint8_t cfgIdx = s.logicalIdx;
-            if (cfgIdx < MAX_DIGITAL_INPUTS) {
-                if (digitalInCfg_[cfgIdx].name[0] != '\0') {
-                    strncpy(s.id, digitalInCfg_[cfgIdx].name, sizeof(s.id) - 1);
-                    s.id[sizeof(s.id) - 1] = '\0';
-                }
-                s.inCfg.bindingPort = digitalInCfg_[cfgIdx].bindingPort;
-                s.inCfg.activeHigh = digitalInCfg_[cfgIdx].activeHigh;
-                uint8_t pull = digitalInCfg_[cfgIdx].pullMode;
-                if (pull > IO_PULL_DOWN) pull = IO_PULL_NONE;
-                s.inCfg.pullMode = pull;
-                s.inCfg.mode = digitalInCfg_[cfgIdx].mode;
-                s.inCfg.edgeMode = digitalInCfg_[cfgIdx].edgeMode;
-                s.inCfg.counterDebounceUs = (int32_t)counterDebounceUsFromConfigLocal(digitalInCfg_[cfgIdx].counterDebounceUs);
-            }
-
-            snprintf(s.endpointId, sizeof(s.endpointId), "i%02u", (unsigned)s.logicalIdx);
-            uint8_t pin = 0U;
-            uint8_t backend = IO_BACKEND_GPIO;
-            uint8_t channel = 0U;
-            if (!resolveDigitalInputBinding_(s.inCfg.bindingPort, pin, backend, channel)) {
-                if (s.inCfg.bindingPort != IO_PORT_INVALID) {
-                    LOGW("Digital input %s unresolved binding_port=%u",
-                         s.endpointId,
-                         (unsigned)s.inCfg.bindingPort);
-                }
-                continue;
-            }
-            s.backend = backend;
-            s.channel = channel;
-            IDigitalCounterDriver* driver = allocGpioDriver_(
-                s.endpointId,
-                pin,
-                false,
-                s.inCfg.activeHigh,
-                s.inCfg.pullMode,
-                s.inCfg.mode == IO_DIGITAL_INPUT_COUNTER,
-                s.inCfg.edgeMode,
-                s.inCfg.counterDebounceUs
-            );
-            if (!driver) {
-                LOGW("Digital input %s driver alloc failed pin=%u binding_port=%u mode=%u debounce_us=%lu",
-                     s.endpointId,
-                     (unsigned)pin,
-                     (unsigned)s.inCfg.bindingPort,
-                     (unsigned)s.inCfg.mode,
-                     (unsigned long)s.inCfg.counterDebounceUs);
-                continue;
-            }
-
-            s.provider = makeDigitalProvider(driver);
-            if (!s.provider.begin()) {
-                LOGW("Digital input %s driver begin failed id=%s pin=%u binding_port=%u mode=%u debounce_us=%lu",
-                     s.endpointId,
-                     driver->id() ? driver->id() : "?",
-                     (unsigned)pin,
-                     (unsigned)s.inCfg.bindingPort,
-                     (unsigned)s.inCfg.mode,
-                     (unsigned long)s.inCfg.counterDebounceUs);
-                continue;
-            }
-
-            const uint8_t valueType = (s.inCfg.mode == IO_DIGITAL_INPUT_COUNTER) ? IO_EP_VALUE_FLOAT : IO_EP_VALUE_BOOL;
-            s.endpoint = allocDigitalSensorEndpoint_(s.endpointId, valueType);
-            if (!s.endpoint) continue;
-            if (s.inCfg.mode == IO_DIGITAL_INPUT_COUNTER) {
-                eraseLegacyCounterPersistedTotal_(s.logicalIdx);
-                int32_t initialRawCount = 0;
-                if (driver) {
-                    (void)driver->readCount(initialRawCount);
-                }
-
-                const IODigitalInputSlotConfig* cfg = (s.logicalIdx < MAX_DIGITAL_INPUTS) ? &digitalInCfg_[s.logicalIdx] : nullptr;
-                const float c0 = cfg ? cfg->c0 : 1.0f;
-                const int32_t precision = sanitizeAnalogPrecision_(cfg ? cfg->precision : 0);
-                const float configTotal = cfg ? cfg->counterTotal : 0.0f;
-
-                if (float* lastConfigTotal = counterConfigTotalState_(s.logicalIdx)) {
-                    *lastConfigTotal = configTotal;
-                }
-                s.counterScaledTotal = configTotal;
-                s.counterScaledTotal += ((float)initialRawCount * c0);
-                s.counterLastPersistedTotal = configTotal;
-                s.counterLastRawCount = initialRawCount;
-                s.counterLastFlushedRawCount = initialRawCount;
-                s.counterLastPersistMs = millis();
-                s.lastValid = false;
-                const float scaledValue = ioRoundToPrecision(s.counterScaledTotal, precision);
-                static_cast<DigitalSensorEndpoint*>(s.endpoint)->updateFloat(scaledValue, true, millis());
-            }
-            registry_.add(s.endpoint);
-            (void)processDigitalInputDefinition_(i, millis());
-            continue;
+void IOModule::configureDigitalInputSlot_(DigitalSlot& s, uint8_t slotIdx)
+{
+    const uint8_t cfgIdx = s.logicalIdx;
+    if (cfgIdx < MAX_DIGITAL_INPUTS) {
+        if (digitalInCfg_[cfgIdx].name[0] != '\0') {
+            strncpy(s.id, digitalInCfg_[cfgIdx].name, sizeof(s.id) - 1);
+            s.id[sizeof(s.id) - 1] = '\0';
         }
-
-        const uint8_t cfgIdx = s.logicalIdx;
-        if (cfgIdx < DIGITAL_CFG_SLOTS) {
-            snprintf(s.id, sizeof(s.id), "d%02u", (unsigned)cfgIdx);
-            s.outCfg.bindingPort = digitalCfg_[cfgIdx].bindingPort;
-            s.outCfg.activeHigh = digitalCfg_[cfgIdx].activeHigh;
-            s.outCfg.initialOn = digitalCfg_[cfgIdx].initialOn;
-            s.outCfg.startupPolicy = digitalCfg_[cfgIdx].startupPolicy;
-            s.outCfg.retainOnWarmReboot = digitalCfg_[cfgIdx].retainOnWarmReboot;
-            s.outCfg.momentary = digitalCfg_[cfgIdx].momentary;
-            int32_t p = digitalCfg_[cfgIdx].pulseMs;
-            if (p <= 0) p = 500;
-            if (p > 60000) p = 60000;
-            s.outCfg.pulseMs = (uint16_t)p;
-        } else {
-            snprintf(s.id, sizeof(s.id), "d%02u", (unsigned)s.logicalIdx);
-        }
-
-        strncpy(s.endpointId, s.id, sizeof(s.endpointId) - 1);
-        s.endpointId[sizeof(s.endpointId) - 1] = '\0';
-
-        uint8_t pin = 0U;
-        uint8_t backend = IO_BACKEND_GPIO;
-        uint8_t channel = 0U;
-        bool usesPcfOut = false;
-        bool usesTcaOut = false;
-        bool usesMcpOut = false;
-        if (!resolveDigitalOutputBinding_(s.outCfg.bindingPort, pin, backend, channel, usesPcfOut, usesTcaOut, usesMcpOut)) {
-            if (s.outCfg.bindingPort != IO_PORT_INVALID) {
-                LOGW("Digital output %s unresolved binding_port=%u",
-                     s.endpointId,
-                     (unsigned)s.outCfg.bindingPort);
-            }
-            continue;
-        }
-        s.backend = backend;
-        s.channel = channel;
-        if (s.outCfg.retainOnWarmReboot && !usesTcaOut) {
-            LOGW("Digital output %s retain_on_warm_reboot ignored: backend is not TCA9554", s.endpointId);
-        }
-
-        IDigitalPinDriver* driver = nullptr;
-        if (usesPcfOut) {
-            if (needTcaOutput) {
-                LOGW("Digital output %s uses PCF8574 but TCA9554 outputs are also configured; mixed expanders not supported", s.endpointId);
-                continue;
-            }
-            if (!cfgData_.pcfEnabled) {
-                LOGW("Digital output %s requires PCF8574 but module is disabled", s.endpointId);
-                continue;
-            }
-            if (!pcfDriver_) {
-                IMaskOutputDriver* pcfMaskDriver = allocPcfDriver_("pcf8574", &i2cBus_, cfgData_.pcfAddress);
-                if (!pcfMaskDriver) {
-                    LOGW("PCF8574 pool exhausted");
-                    continue;
-                }
-                pcfDriver_ = static_cast<Pcf8574Driver*>(pcfMaskDriver);
-                if (!makeMaskProvider(pcfDriver_).begin()) {
-                    LOGW("PCF8574 not detected at 0x%02X", cfgData_.pcfAddress);
-                    pcfDriver_ = nullptr;
-                    continue;
-                }
-            }
-            driver = allocPcfBitDriver_(s.id, pcfDriver_, channel, s.outCfg.activeHigh);
-        } else if (usesTcaOut) {
-            if (needPcfOutput) {
-                LOGW("Digital output %s uses TCA9554 but PCF8574 outputs are also configured; mixed expanders not supported", s.endpointId);
-                continue;
-            }
-            if (!cfgData_.tca9554Enabled) {
-                LOGW("Digital output %s requires TCA9554 but expander module is disabled", s.endpointId);
-                continue;
-            }
-            if (!tcaDriver_) {
-                IMaskOutputDriver* tcaMaskDriver = allocTcaDriver_("tca9554", &i2cBus_, cfgData_.tca9554Address);
-                if (!tcaMaskDriver) {
-                    LOGW("TCA9554 pool exhausted");
-                    continue;
-                }
-                tcaDriver_ = static_cast<Tca9554Driver*>(tcaMaskDriver);
-                const bool tcaBeginOk = needTcaPreserveStartup
-                    ? tcaDriver_->beginPreserveHardwareState()
-                    : makeMaskProvider(tcaDriver_).begin();
-                if (!tcaBeginOk) {
-                    LOGW("TCA9554 not detected at 0x%02X", cfgData_.tca9554Address);
-                    tcaDriver_ = nullptr;
-                    continue;
-                }
-            }
-            driver = allocTcaBitDriver_(s.id, tcaDriver_, channel, s.outCfg.activeHigh);
-        } else if (usesMcpOut) {
-            if (needPcfOutput) {
-                LOGW("Digital output %s uses MCP23017 but PCF8574 outputs are also configured; mixed expanders not supported", s.endpointId);
-                continue;
-            }
-            if (mcpProbeFailed) {
-                LOGW("Digital output %s requires MCP23017 but expander is unavailable", s.endpointId);
-                continue;
-            }
-            if (!cfgData_.mcp23017Enabled) {
-                LOGW("Digital output %s requires MCP23017 but module is disabled", s.endpointId);
-                continue;
-            }
-            if (!mcpDriver_) {
-                mcpDriver_ = allocMcpDriver_("mcp23017", &i2cBus_, cfgData_.mcp23017Address);
-                if (!mcpDriver_) {
-                    LOGW("MCP23017 pool exhausted");
-                    continue;
-                }
-                if (!mcpDriver_->begin()) {
-                    LOGW("MCP23017 not detected at 0x%02X", cfgData_.mcp23017Address);
-                    mcpDriver_ = nullptr;
-                    mcpProbeFailed = true;
-                    continue;
-                }
-            }
-            driver = allocMcpBitDriver_(s.id, mcpDriver_, channel, s.outCfg.activeHigh);
-        } else {
-            driver = allocGpioDriver_(s.id, pin, true, s.outCfg.activeHigh);
-        }
-        if (!driver) continue;
-
-        s.provider = makeDigitalProvider(driver);
-        if (!s.provider.begin()) continue;
-        s.pulseArmed = false;
-        s.pulseDeadlineMs = 0;
-
-        s.endpoint = static_cast<IOEndpoint*>(allocDigitalActuatorEndpoint_(
-            s.id,
-            &IOModule::writeDigitalOut_,
-            &s
-        ));
-        if (!s.endpoint) continue;
-        registry_.add(s.endpoint);
-
-        bool actualOn = s.outCfg.initialOn;
-        const bool preserveStartup =
-            s.outCfg.startupPolicy == IOOutputStartupPolicy::PreserveHardwareState;
-        if (preserveStartup) {
-            if (!s.provider.read(actualOn)) {
-                LOGW("Digital output %s startup state adoption failed", s.endpointId);
-            }
-        } else {
-            (void)s.provider.write(s.outCfg.initialOn);
-            actualOn = s.outCfg.initialOn;
-        }
-
-        const uint32_t nowMs = millis();
-        static_cast<DigitalActuatorEndpoint*>(s.endpoint)->adoptValue(actualOn, nowMs);
-        if (dataStore_) {
-            uint8_t rtIdx = 0;
-            if (endpointIndexFromId_(s.endpointId, rtIdx)) {
-                (void)setIoEndpointBool(*dataStore_, rtIdx, actualOn, nowMs);
-            }
-        }
-        markIoCycleChanged_(s.ioId);
+        s.inCfg.bindingPort = digitalInCfg_[cfgIdx].bindingPort;
+        s.inCfg.activeHigh = digitalInCfg_[cfgIdx].activeHigh;
+        uint8_t pull = digitalInCfg_[cfgIdx].pullMode;
+        if (pull > IO_PULL_DOWN) pull = IO_PULL_NONE;
+        s.inCfg.pullMode = pull;
+        s.inCfg.mode = digitalInCfg_[cfgIdx].mode;
+        s.inCfg.edgeMode = digitalInCfg_[cfgIdx].edgeMode;
+        s.inCfg.counterDebounceUs = (int32_t)counterDebounceUsFromConfigLocal(digitalInCfg_[cfgIdx].counterDebounceUs);
     }
 
-    Ads1115DriverConfig adsInternalCfg{};
-    adsInternalCfg.address = cfgData_.adsInternalAddr;
-    adsInternalCfg.gain = (uint8_t)cfgData_.adsGain;
-    adsInternalCfg.dataRate = (uint8_t)cfgData_.adsRate;
-    adsInternalCfg.pollMs = (cfgData_.adsPollMs < 20) ? 20 : (uint32_t)cfgData_.adsPollMs;
-    adsInternalCfg.differentialPairs = false;
+    snprintf(s.endpointId, sizeof(s.endpointId), "i%02u", (unsigned)s.logicalIdx);
+    uint8_t pin = 0U;
+    uint8_t backend = IO_BACKEND_GPIO;
+    uint8_t channel = 0U;
+    if (!resolveDigitalInputBinding_(s.inCfg.bindingPort, pin, backend, channel)) {
+        if (s.inCfg.bindingPort != IO_PORT_INVALID) {
+            LOGW("Digital input %s unresolved binding_port=%u",
+                 s.endpointId,
+                 (unsigned)s.inCfg.bindingPort);
+        }
+        return;
+    }
+    s.backend = backend;
+    s.channel = channel;
+    IDigitalCounterDriver* driver = allocGpioDriver_(
+        s.endpointId,
+        pin,
+        false,
+        s.inCfg.activeHigh,
+        s.inCfg.pullMode,
+        s.inCfg.mode == IO_DIGITAL_INPUT_COUNTER,
+        s.inCfg.edgeMode,
+        s.inCfg.counterDebounceUs
+    );
+    if (!driver) {
+        LOGW("Digital input %s driver alloc failed pin=%u binding_port=%u mode=%u debounce_us=%lu",
+             s.endpointId,
+             (unsigned)pin,
+             (unsigned)s.inCfg.bindingPort,
+             (unsigned)s.inCfg.mode,
+             (unsigned long)s.inCfg.counterDebounceUs);
+        return;
+    }
 
-    Ads1115DriverConfig adsExternalCfg = adsInternalCfg;
-    adsExternalCfg.address = cfgData_.adsExternalAddr;
-    adsExternalCfg.differentialPairs = true;
+    s.provider = makeDigitalProvider(driver);
+    if (!s.provider.begin()) {
+        LOGW("Digital input %s driver begin failed id=%s pin=%u binding_port=%u mode=%u debounce_us=%lu",
+             s.endpointId,
+             driver->id() ? driver->id() : "?",
+             (unsigned)pin,
+             (unsigned)s.inCfg.bindingPort,
+             (unsigned)s.inCfg.mode,
+             (unsigned long)s.inCfg.counterDebounceUs);
+        return;
+    }
+
+    const uint8_t valueType = (s.inCfg.mode == IO_DIGITAL_INPUT_COUNTER) ? IO_EP_VALUE_FLOAT : IO_EP_VALUE_BOOL;
+    s.endpoint = allocDigitalSensorEndpoint_(s.endpointId, valueType);
+    if (!s.endpoint) return;
+    if (s.inCfg.mode == IO_DIGITAL_INPUT_COUNTER) {
+        eraseLegacyCounterPersistedTotal_(s.logicalIdx);
+        int32_t initialRawCount = 0;
+        if (driver) {
+            (void)driver->readCount(initialRawCount);
+        }
+
+        const IODigitalInputSlotConfig* cfg = (s.logicalIdx < MAX_DIGITAL_INPUTS) ? &digitalInCfg_[s.logicalIdx] : nullptr;
+        const float c0 = cfg ? cfg->c0 : 1.0f;
+        const int32_t precision = sanitizeAnalogPrecision_(cfg ? cfg->precision : 0);
+        const float configTotal = cfg ? cfg->counterTotal : 0.0f;
+
+        if (float* lastConfigTotal = counterConfigTotalState_(s.logicalIdx)) {
+            *lastConfigTotal = configTotal;
+        }
+        s.counterScaledTotal = configTotal;
+        s.counterScaledTotal += ((float)initialRawCount * c0);
+        s.counterLastPersistedTotal = configTotal;
+        s.counterLastRawCount = initialRawCount;
+        s.counterLastFlushedRawCount = initialRawCount;
+        s.counterLastPersistMs = millis();
+        s.lastValid = false;
+        const float scaledValue = ioRoundToPrecision(s.counterScaledTotal, precision);
+        static_cast<DigitalSensorEndpoint*>(s.endpoint)->updateFloat(scaledValue, true, millis());
+    }
+    registry_.add(s.endpoint);
+    (void)processDigitalInputDefinition_(slotIdx, millis());
+}
+
+void IOModule::configureDigitalOutputSlot_(DigitalSlot& s, const ExpanderNeeds& needs, bool& mcpProbeFailed)
+{
+    const bool needPcfOutput = needs.pcf;
+    const bool needTcaOutput = needs.tca;
+    const bool needTcaPreserveStartup = needs.tcaPreserveStartup;
+
+    const uint8_t cfgIdx = s.logicalIdx;
+    if (cfgIdx < DIGITAL_CFG_SLOTS) {
+        snprintf(s.id, sizeof(s.id), "d%02u", (unsigned)cfgIdx);
+        s.outCfg.bindingPort = digitalCfg_[cfgIdx].bindingPort;
+        s.outCfg.activeHigh = digitalCfg_[cfgIdx].activeHigh;
+        s.outCfg.initialOn = digitalCfg_[cfgIdx].initialOn;
+        s.outCfg.startupPolicy = digitalCfg_[cfgIdx].startupPolicy;
+        s.outCfg.retainOnWarmReboot = digitalCfg_[cfgIdx].retainOnWarmReboot;
+        s.outCfg.momentary = digitalCfg_[cfgIdx].momentary;
+        int32_t p = digitalCfg_[cfgIdx].pulseMs;
+        if (p <= 0) p = 500;
+        if (p > 60000) p = 60000;
+        s.outCfg.pulseMs = (uint16_t)p;
+    } else {
+        snprintf(s.id, sizeof(s.id), "d%02u", (unsigned)s.logicalIdx);
+    }
+
+    strncpy(s.endpointId, s.id, sizeof(s.endpointId) - 1);
+    s.endpointId[sizeof(s.endpointId) - 1] = '\0';
+
+    uint8_t pin = 0U;
+    uint8_t backend = IO_BACKEND_GPIO;
+    uint8_t channel = 0U;
+    bool usesPcfOut = false;
+    bool usesTcaOut = false;
+    bool usesMcpOut = false;
+    if (!resolveDigitalOutputBinding_(s.outCfg.bindingPort, pin, backend, channel, usesPcfOut, usesTcaOut, usesMcpOut)) {
+        if (s.outCfg.bindingPort != IO_PORT_INVALID) {
+            LOGW("Digital output %s unresolved binding_port=%u",
+                 s.endpointId,
+                 (unsigned)s.outCfg.bindingPort);
+        }
+        return;
+    }
+    s.backend = backend;
+    s.channel = channel;
+    if (s.outCfg.retainOnWarmReboot && !usesTcaOut) {
+        LOGW("Digital output %s retain_on_warm_reboot ignored: backend is not TCA9554", s.endpointId);
+    }
+
+    IDigitalPinDriver* driver = nullptr;
+    if (usesPcfOut) {
+        if (needTcaOutput) {
+            LOGW("Digital output %s uses PCF8574 but TCA9554 outputs are also configured; mixed expanders not supported", s.endpointId);
+            return;
+        }
+        if (!cfgData_.pcfEnabled) {
+            LOGW("Digital output %s requires PCF8574 but module is disabled", s.endpointId);
+            return;
+        }
+        if (!pcfDriver_) {
+            IMaskOutputDriver* pcfMaskDriver = allocPcfDriver_("pcf8574", &i2cBus_, cfgData_.pcfAddress);
+            if (!pcfMaskDriver) {
+                LOGW("PCF8574 pool exhausted");
+                return;
+            }
+            pcfDriver_ = static_cast<Pcf8574Driver*>(pcfMaskDriver);
+            if (!makeMaskProvider(pcfDriver_).begin()) {
+                LOGW("PCF8574 not detected at 0x%02X", cfgData_.pcfAddress);
+                pcfDriver_ = nullptr;
+                return;
+            }
+        }
+        driver = allocPcfBitDriver_(s.id, pcfDriver_, channel, s.outCfg.activeHigh);
+    } else if (usesTcaOut) {
+        if (needPcfOutput) {
+            LOGW("Digital output %s uses TCA9554 but PCF8574 outputs are also configured; mixed expanders not supported", s.endpointId);
+            return;
+        }
+        if (!cfgData_.tca9554Enabled) {
+            LOGW("Digital output %s requires TCA9554 but expander module is disabled", s.endpointId);
+            return;
+        }
+        if (!tcaDriver_) {
+            IMaskOutputDriver* tcaMaskDriver = allocTcaDriver_("tca9554", &i2cBus_, cfgData_.tca9554Address);
+            if (!tcaMaskDriver) {
+                LOGW("TCA9554 pool exhausted");
+                return;
+            }
+            tcaDriver_ = static_cast<Tca9554Driver*>(tcaMaskDriver);
+            const bool tcaBeginOk = needTcaPreserveStartup
+                ? tcaDriver_->beginPreserveHardwareState()
+                : makeMaskProvider(tcaDriver_).begin();
+            if (!tcaBeginOk) {
+                LOGW("TCA9554 not detected at 0x%02X", cfgData_.tca9554Address);
+                tcaDriver_ = nullptr;
+                return;
+            }
+        }
+        driver = allocTcaBitDriver_(s.id, tcaDriver_, channel, s.outCfg.activeHigh);
+    } else if (usesMcpOut) {
+        if (needPcfOutput) {
+            LOGW("Digital output %s uses MCP23017 but PCF8574 outputs are also configured; mixed expanders not supported", s.endpointId);
+            return;
+        }
+        if (mcpProbeFailed) {
+            LOGW("Digital output %s requires MCP23017 but expander is unavailable", s.endpointId);
+            return;
+        }
+        if (!cfgData_.mcp23017Enabled) {
+            LOGW("Digital output %s requires MCP23017 but module is disabled", s.endpointId);
+            return;
+        }
+        if (!mcpDriver_) {
+            mcpDriver_ = allocMcpDriver_("mcp23017", &i2cBus_, cfgData_.mcp23017Address);
+            if (!mcpDriver_) {
+                LOGW("MCP23017 pool exhausted");
+                return;
+            }
+            if (!mcpDriver_->begin()) {
+                LOGW("MCP23017 not detected at 0x%02X", cfgData_.mcp23017Address);
+                mcpDriver_ = nullptr;
+                mcpProbeFailed = true;
+                return;
+            }
+        }
+        driver = allocMcpBitDriver_(s.id, mcpDriver_, channel, s.outCfg.activeHigh);
+    } else {
+        driver = allocGpioDriver_(s.id, pin, true, s.outCfg.activeHigh);
+    }
+    if (!driver) return;
+
+    s.provider = makeDigitalProvider(driver);
+    if (!s.provider.begin()) return;
+    s.pulseArmed = false;
+    s.pulseDeadlineMs = 0;
+
+    s.endpoint = static_cast<IOEndpoint*>(allocDigitalActuatorEndpoint_(
+        s.id,
+        &IOModule::writeDigitalOut_,
+        &s
+    ));
+    if (!s.endpoint) return;
+    registry_.add(s.endpoint);
+
+    bool actualOn = s.outCfg.initialOn;
+    const bool preserveStartup =
+        s.outCfg.startupPolicy == IOOutputStartupPolicy::PreserveHardwareState;
+    if (preserveStartup) {
+        if (!s.provider.read(actualOn)) {
+            LOGW("Digital output %s startup state adoption failed", s.endpointId);
+        }
+    } else {
+        (void)s.provider.write(s.outCfg.initialOn);
+        actualOn = s.outCfg.initialOn;
+    }
+
+    const uint32_t nowMs = millis();
+    static_cast<DigitalActuatorEndpoint*>(s.endpoint)->adoptValue(actualOn, nowMs);
+    if (dataStore_) {
+        uint8_t rtIdx = 0;
+        if (endpointIndexFromId_(s.endpointId, rtIdx)) {
+            (void)setIoEndpointBool(*dataStore_, rtIdx, actualOn, nowMs);
+        }
+    }
+    markIoCycleChanged_(s.ioId);
+}
+
+void IOModule::probeConfiguredI2cDevices_(const bool (&needAnalogSource)[IO_SRC_COUNT], const ExpanderNeeds& needs)
+{
+    const bool needPcfOutput = needs.pcf;
+    const bool needTcaOutput = needs.tca;
 
     if (needAnalogSource[IO_SRC_SHT40] || cfgData_.sht40Enabled) {
         const bool present = i2cBus_.probe(cfgData_.sht40Address);
@@ -724,6 +728,20 @@ bool IOModule::configureRuntime_()
         const bool present = i2cBus_.probe(cfgData_.tca9554Address);
         LOGI("TCA9554 probe 0x%02X: %s", cfgData_.tca9554Address, present ? "found" : "not found");
     }
+}
+
+void IOModule::configureAnalogProviders_(const bool (&needAnalogSource)[IO_SRC_COUNT])
+{
+    Ads1115DriverConfig adsInternalCfg{};
+    adsInternalCfg.address = cfgData_.adsInternalAddr;
+    adsInternalCfg.gain = (uint8_t)cfgData_.adsGain;
+    adsInternalCfg.dataRate = (uint8_t)cfgData_.adsRate;
+    adsInternalCfg.pollMs = (cfgData_.adsPollMs < 20) ? 20 : (uint32_t)cfgData_.adsPollMs;
+    adsInternalCfg.differentialPairs = false;
+
+    Ads1115DriverConfig adsExternalCfg = adsInternalCfg;
+    adsExternalCfg.address = cfgData_.adsExternalAddr;
+    adsExternalCfg.differentialPairs = true;
 
     if (needAnalogSource[IO_SRC_ADS_INTERNAL_SINGLE]) {
         IAnalogSourceDriver* driver = allocAdsDriver_("ads_internal", &i2cBus_, adsInternalCfg);
@@ -884,6 +902,12 @@ bool IOModule::configureRuntime_()
             }
         }
     }
+}
+
+void IOModule::configureLedMaskEndpoint_(const ExpanderNeeds& needs)
+{
+    const bool needPcfOutput = needs.pcf;
+    const bool needTcaOutput = needs.tca;
 
     const bool ledExpanderEnabled = (needTcaOutput && !needPcfOutput) ? cfgData_.tca9554Enabled : cfgData_.pcfEnabled;
     if (ledExpanderEnabled) {
@@ -942,6 +966,12 @@ bool IOModule::configureRuntime_()
         }
         }
     }
+}
+
+void IOModule::registerSchedulerJobs_(bool needI2cAnalogJob, const ExpanderNeeds& needs)
+{
+    const bool needPcfOutput = needs.pcf;
+    const bool needTcaOutput = needs.tca;
 
     IOScheduledJob adsJob{};
     adsJob.id = "ads_fast";
@@ -957,10 +987,6 @@ bool IOModule::configureRuntime_()
     dsJob.ctx = this;
     scheduler_.add(dsJob);
 
-    const bool needI2cAnalogJob = needAnalogSource[IO_SRC_SHT40]
-        || needAnalogSource[IO_SRC_BMP280]
-        || needAnalogSource[IO_SRC_BME680]
-        || needAnalogSource[IO_SRC_POWERMON];
     IOScheduledJob i2cAnalogJob{};
     if (needI2cAnalogJob) {
         i2cAnalogJob.id = "i2c_analog";
@@ -994,7 +1020,44 @@ bool IOModule::configureRuntime_()
          (long)dinJob.periodMs,
          (unsigned)registry_.count(),
          expanderState);
+}
 
+bool IOModule::configureRuntime_()
+{
+    if (runtimeReady_) return true;
+    if (!cfgData_.enabled) return false;
+
+    bool needAnalogSource[IO_SRC_COUNT] = {false};
+    configureAnalogSlots_(needAnalogSource);
+
+    const ExpanderNeeds expanders = scanExpanderNeeds_();
+    beginI2cIfNeeded_(needAnalogSource, expanders);
+
+    bool mcpProbeFailed = false;
+    for (uint8_t i = 0; i < MAX_DIGITAL_SLOTS; ++i) {
+        if (!digitalSlots_[i].used) continue;
+        DigitalSlot& s = digitalSlots_[i];
+        s.owner = this;
+        s.ioId = (s.kind == DIGITAL_SLOT_OUTPUT)
+                   ? (IoId)(IO_ID_DO_BASE + s.logicalIdx)
+                   : (IoId)(IO_ID_DI_BASE + s.logicalIdx);
+
+        if (s.kind == DIGITAL_SLOT_INPUT) {
+            configureDigitalInputSlot_(s, i);
+        } else {
+            configureDigitalOutputSlot_(s, expanders, mcpProbeFailed);
+        }
+    }
+
+    probeConfiguredI2cDevices_(needAnalogSource, expanders);
+    configureAnalogProviders_(needAnalogSource);
+    configureLedMaskEndpoint_(expanders);
+
+    const bool needI2cAnalogJob = needAnalogSource[IO_SRC_SHT40]
+        || needAnalogSource[IO_SRC_BMP280]
+        || needAnalogSource[IO_SRC_BME680]
+        || needAnalogSource[IO_SRC_POWERMON];
+    registerSchedulerJobs_(needI2cAnalogJob, expanders);
     return true;
 }
 
