@@ -37,6 +37,15 @@ inline constexpr PoolRoleSpec kPoolRoles[] = {
     {PoolIds::ActuatorChlorineGenerator, digitalOutputSlot(5), "io_chl_gen", "Chlorine Generator", nullptr, nullptr, nullptr, nullptr},
     {PoolIds::ActuatorLights, digitalOutputSlot(6), "io_lights", "Lights", nullptr, nullptr, nullptr, nullptr},
     {PoolIds::ActuatorWaterHeater, digitalOutputSlot(7), "io_wat_htr", "Water Heater", nullptr, nullptr, nullptr, nullptr},
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    // Flowswitch (debit) + contact volet, et 2 sorties indicatrices pilotees
+    // par PoolLogic (recopie temporisee, etat volet). Waveshare seulement :
+    // FlowIO n'a ni les DIN ni les slots de sortie correspondants.
+    {PoolIds::SensorFlowSwitch, digitalInputSlot(4), "Flow Switch", "Flow Switch", "io_flowsw", nullptr, "mdi:waves-arrow-right", nullptr},
+    {PoolIds::SensorCoverClosed, digitalInputSlot(5), "Cover Closed", "Cover Closed", "io_cover", nullptr, "mdi:window-shutter", nullptr},
+    {PoolIds::ActuatorFlowCopy, digitalOutputSlot(16), "io_flow_cpy", "Flow Copy Output", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorCoverClosed, digitalOutputSlot(17), "io_cover_out", "Cover Output", nullptr, nullptr, nullptr, nullptr},
+#endif
 };
 
 inline constexpr PoolDevicePreset kPoolDevices[] = {

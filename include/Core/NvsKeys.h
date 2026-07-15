@@ -209,6 +209,8 @@ constexpr char OrpPumpSlot[] = "pl_sorp"; // Pool logic module persisted key for
 constexpr char HeaterSlot[] = "pl_shea"; // Pool logic module persisted key for field `pl_shea`.
 constexpr char FiltrationCalcStart[] = "pl_fcst"; // Pool logic runtime key for calculated filtration start hour.
 constexpr char FiltrationCalcStop[] = "pl_fcen"; // Pool logic runtime key for calculated filtration stop hour.
+constexpr char FlowCopyDelay[] = "pl_fscdl"; // Flowswitch copy output activation delay (s).
+constexpr char FlowInterlock[] = "pl_flilk"; // Flowswitch safety interlock enable (block dosing/electrolysis when no flow).
 }  // namespace PoolLogic
 
 namespace PoolDevice {

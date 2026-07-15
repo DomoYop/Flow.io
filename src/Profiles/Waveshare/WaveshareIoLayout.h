@@ -144,6 +144,8 @@ inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {
     {PoolIds::SensorPhLevel,        PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH (GPIO4).
     {PoolIds::SensorChlorineLevel,  PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau desinfectant (GPIO5).
     {PoolIds::SensorWaterCounter,   PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (GPIO7, 100 ms debounce).
+    {PoolIds::SensorFlowSwitch,     PortDin4, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 50000U}, // Flowswitch (debit present), 50 ms debounce.
+    {PoolIds::SensorCoverClosed,    PortDin5, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 50000U}, // Contact volet ferme, 50 ms debounce.
 #else
     {PoolIds::SensorPoolLevel,      PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
     {PoolIds::SensorPhLevel,        PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
@@ -162,6 +164,10 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     {PoolIds::ActuatorChlorineGenerator,PortExio6, true, false, false, 0U}, // Electrolyseur.
     {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
     {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
+#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
+    {PoolIds::ActuatorFlowCopy,         IO_PORT_INVALID, true, false, false, 0U}, // Recopie flowswitch (temporisee), non liee par defaut.
+    {PoolIds::ActuatorCoverClosed,      IO_PORT_INVALID, true, false, false, 0U}, // Etat volet ferme, non lie par defaut.
+#endif
 };
 
 

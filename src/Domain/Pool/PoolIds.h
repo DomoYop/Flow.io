@@ -22,7 +22,13 @@ enum DomainSlot : DomainSlotId {
     ActuatorFillPump = 15,
     ActuatorChlorineGenerator = 16,
     ActuatorLights = 17,
-    ActuatorWaterHeater = 18
+    ActuatorWaterHeater = 18,
+    // Ajouts : entrees flowswitch (debit) + contact volet, et 2 sorties
+    // indicatrices pilotees par PoolLogic (recopie temporisee, etat volet).
+    SensorFlowSwitch = 19,
+    SensorCoverClosed = 20,
+    ActuatorFlowCopy = 21,
+    ActuatorCoverClosed = 22
 };
 
 enum Device : PoolDeviceId {
@@ -37,7 +43,7 @@ enum Device : PoolDeviceId {
 };
 
 constexpr uint8_t DeviceCount = 8;
-constexpr uint8_t SensorCount = 10;
-constexpr uint8_t DomainSlotCount = 18;
+constexpr uint8_t SensorCount = 12;
+constexpr uint8_t DomainSlotCount = 22;
 
 }  // namespace PoolIds
