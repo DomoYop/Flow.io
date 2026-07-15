@@ -164,6 +164,10 @@ private:
         RuntimeUiPowermonTemperature = 18,
         RuntimeUiPowermonEnergy = 19,
         RuntimeUiPowermonCharge = 20,
+        RuntimeUiFlowSwitch = 21,
+        RuntimeUiCoverClosed = 22,
+        RuntimeUiFlowCopyOut = 23,
+        RuntimeUiCoverOut = 24,
     };
 
     static bool tickFastAds_(void* ctx, uint32_t nowMs);

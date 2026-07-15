@@ -320,6 +320,50 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "displayConfig": null
     },
     {
+      "id": 2223,
+      "runtimeId": 2223,
+      "moduleId": 22,
+      "module": "io",
+      "valueId": 23,
+      "key": "io.flow_copy_out",
+      "label": "Sortie recopie flowswitch",
+      "type": "bool",
+      "domain": "equipements",
+      "group": "\u00c9quipements",
+      "unit": null,
+      "decimals": null,
+      "order": 230,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "Marche",
+        "inactiveText": "Arr\u00eat"
+      }
+    },
+    {
+      "id": 2224,
+      "runtimeId": 2224,
+      "moduleId": 22,
+      "module": "io",
+      "valueId": 24,
+      "key": "io.cover_out",
+      "label": "Sortie \u00e9tat volet",
+      "type": "bool",
+      "domain": "equipements",
+      "group": "\u00c9quipements",
+      "unit": null,
+      "decimals": null,
+      "order": 240,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "Ferm\u00e9",
+        "inactiveText": "Ouvert"
+      }
+    },
+    {
       "id": 2401,
       "runtimeId": 2401,
       "moduleId": 24,
@@ -939,6 +983,50 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "flags": null,
       "display": "value",
       "displayConfig": null
+    },
+    {
+      "id": 2221,
+      "runtimeId": 2221,
+      "moduleId": 22,
+      "module": "io",
+      "valueId": 21,
+      "key": "io.flowswitch",
+      "label": "D\u00e9bit pr\u00e9sent (flowswitch)",
+      "type": "bool",
+      "domain": "sondes",
+      "group": "Sondes",
+      "unit": null,
+      "decimals": null,
+      "order": 210,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "D\u00e9bit",
+        "inactiveText": "Pas de d\u00e9bit"
+      }
+    },
+    {
+      "id": 2222,
+      "runtimeId": 2222,
+      "moduleId": 22,
+      "module": "io",
+      "valueId": 22,
+      "key": "io.cover_closed",
+      "label": "Volet ferm\u00e9",
+      "type": "bool",
+      "domain": "sondes",
+      "group": "Sondes",
+      "unit": null,
+      "decimals": null,
+      "order": 220,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "Ferm\u00e9",
+        "inactiveText": "Ouvert"
+      }
     },
     {
       "id": 1801,

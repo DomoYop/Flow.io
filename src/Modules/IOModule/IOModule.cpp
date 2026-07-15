@@ -848,6 +848,34 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
             if (value.type == IO_VAL_INT32) return writer.writeI32(runtimeId, value.v.i32);
             return writer.writeUnavailable(runtimeId);
         }
+        case RuntimeUiFlowSwitch: {
+            IoValue value{};
+            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalInputSlot(4)), &value);
+            if (st != IO_OK || !value.valid) return writer.writeUnavailable(runtimeId);
+            if (value.type == IO_VAL_BOOL) return writer.writeBool(runtimeId, value.v.b != 0);
+            return writer.writeUnavailable(runtimeId);
+        }
+        case RuntimeUiCoverClosed: {
+            IoValue value{};
+            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalInputSlot(5)), &value);
+            if (st != IO_OK || !value.valid) return writer.writeUnavailable(runtimeId);
+            if (value.type == IO_VAL_BOOL) return writer.writeBool(runtimeId, value.v.b != 0);
+            return writer.writeUnavailable(runtimeId);
+        }
+        case RuntimeUiFlowCopyOut: {
+            IoValue value{};
+            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalOutputSlot(16)), &value);
+            if (st != IO_OK || !value.valid) return writer.writeUnavailable(runtimeId);
+            if (value.type == IO_VAL_BOOL) return writer.writeBool(runtimeId, value.v.b != 0);
+            return writer.writeUnavailable(runtimeId);
+        }
+        case RuntimeUiCoverOut: {
+            IoValue value{};
+            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalOutputSlot(17)), &value);
+            if (st != IO_OK || !value.valid) return writer.writeUnavailable(runtimeId);
+            if (value.type == IO_VAL_BOOL) return writer.writeBool(runtimeId, value.v.b != 0);
+            return writer.writeUnavailable(runtimeId);
+        }
         case RuntimeUiPressure:
             runtimeIndex = 2;
             break;

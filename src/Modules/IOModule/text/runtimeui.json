@@ -279,6 +279,62 @@
       "order": 200,
       "label_t": "runtimeui.io.v20.label",
       "group_t": "runtimeui.io.v20.group"
+    },
+    {
+      "valueId": 21,
+      "key": "io.flowswitch",
+      "type": "bool",
+      "domain": "sondes",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.io.v21.display.activeText",
+        "inactiveText_t": "runtimeui.io.v21.display.inactiveText"
+      },
+      "order": 210,
+      "label_t": "runtimeui.io.v21.label",
+      "group_t": "runtimeui.io.v21.group"
+    },
+    {
+      "valueId": 22,
+      "key": "io.cover_closed",
+      "type": "bool",
+      "domain": "sondes",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.io.v22.display.activeText",
+        "inactiveText_t": "runtimeui.io.v22.display.inactiveText"
+      },
+      "order": 220,
+      "label_t": "runtimeui.io.v22.label",
+      "group_t": "runtimeui.io.v22.group"
+    },
+    {
+      "valueId": 23,
+      "key": "io.flow_copy_out",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.io.v23.display.activeText",
+        "inactiveText_t": "runtimeui.io.v23.display.inactiveText"
+      },
+      "order": 230,
+      "label_t": "runtimeui.io.v23.label",
+      "group_t": "runtimeui.io.v23.group"
+    },
+    {
+      "valueId": 24,
+      "key": "io.cover_out",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.io.v24.display.activeText",
+        "inactiveText_t": "runtimeui.io.v24.display.inactiveText"
+      },
+      "order": 240,
+      "label_t": "runtimeui.io.v24.label",
+      "group_t": "runtimeui.io.v24.group"
     }
   ]
 }
