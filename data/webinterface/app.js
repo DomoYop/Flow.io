@@ -8591,6 +8591,12 @@
           return;
         }
 
+        // Noeud sans branche store : une meta "compose" en fait une page a
+        // part entiere (ex. la synthese d'activation des equipements).
+        if (await chargerCfgComposeOnlyPage(cfgTreeSelectedSource, cleanPath)) {
+          return;
+        }
+
         const childCount = cfgFilteredChildren(cfgTreeSelectedSource, cleanPath).length;
         if (childCount > 0) {
           resetPrimaryCfgEditor('Branche ouverte. Sélectionnez une sous-branche ou un noeud configurable.');
@@ -9498,9 +9504,17 @@
 
     // --- Visibilite conditionnelle generique (attribut visible_if des cfgdocs) ---
     // Format : { "path": "poollogic/modes/disinfection_type", "eq": 1 }
-    //       ou { "path": "...", "in": [0, 2] }.
+    //       ou { "path": "...", "in": [0, 2] }
+    //       ou un tableau de conditions toutes requises (ET logique).
     // `path` est un chemin store absolu, evalue contre la source affichee
     // (flow/supervisor). Condition non resolue => visible (fail-open).
+
+    function visibleIfConds(cond) {
+      if (Array.isArray(cond)) {
+        return cond.filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry));
+      }
+      return (cond && typeof cond === 'object') ? [cond] : [];
+    }
 
     function cfgCondSourceKey(source) {
       return source === 'supervisor' ? 'supervisor' : 'flow';
@@ -9584,13 +9598,25 @@
       return undefined;
     }
 
-    function evalVisibleIf(source, cond) {
+    function evalVisibleIfOne(source, cond) {
       if (!cond || typeof cond !== 'object') return undefined;
       const condPath = nettoyerNomFlowCfg(cond.path);
       if (!condPath || condPath.indexOf('/') <= 0) return undefined;
       const lookup = cfgCondLookup(source, condPath);
       if (!lookup.resolved) return undefined;
       return evalVisibleIfValue(lookup.value, cond);
+    }
+
+    function evalVisibleIf(source, cond) {
+      const conds = visibleIfConds(cond);
+      if (conds.length === 0) return undefined;
+      let result;
+      for (const entry of conds) {
+        const value = evalVisibleIfOne(source, entry);
+        if (value === false) return false;
+        if (value === true) result = true;
+      }
+      return result;
     }
 
     function mergeCfgCondPatch(source, patchJson) {
@@ -9630,12 +9656,13 @@
         const normalized = normalizeDocSource(src);
         if (!normalized || !normalized.docs) continue;
         Object.values(normalized.docs).forEach((doc) => {
-          const cond = (doc && typeof doc.visible_if === 'object') ? doc.visible_if : null;
-          const condPath = cond ? nettoyerNomFlowCfg(cond.path) : '';
-          const branch = condPath ? cfgCondBranchOfPath(condPath) : '';
-          if (!branch || seen.has(branch)) return;
-          seen.add(branch);
-          fetchCfgCondBranch(cfgTreeSelectedSource, branch).catch(() => {});
+          visibleIfConds(doc && doc.visible_if).forEach((cond) => {
+            const condPath = nettoyerNomFlowCfg(cond.path);
+            const branch = condPath ? cfgCondBranchOfPath(condPath) : '';
+            if (!branch || seen.has(branch)) return;
+            seen.add(branch);
+            fetchCfgCondBranch(cfgTreeSelectedSource, branch).catch(() => {});
+          });
         });
       }
     }
@@ -10122,27 +10149,37 @@
       if (genericVisibilityEntries.length > 0) {
         const visibilitySource = cfgCondSourceKey(opts.source || cfgTreeSelectedSource);
         const localFieldForCondPath = (condPath) => {
-          for (const entry of visibilityEntries) {
-            if (!entry.inputEl) continue;
-            const entryModule = nettoyerNomFlowCfg(entry.inputEl.dataset.module || '');
-            const entryKey = String(entry.inputEl.dataset.key || '');
+          // Cherche dans tout le conteneur (pas seulement les champs de ce
+          // rendu) : une section composee rendue avant (ex. le switch
+          // pdm/pdN/enabled) doit piloter en direct les champs de la branche.
+          for (const inputEl of containerEl.querySelectorAll('[data-key]')) {
+            const entryModule = nettoyerNomFlowCfg(inputEl.dataset.module || '');
+            const entryKey = String(inputEl.dataset.key || '');
             if (!entryKey) continue;
             const entryPath = entryModule ? (entryModule + '/' + entryKey) : entryKey;
-            if (entryPath === condPath) return entry.inputEl;
+            if (entryPath === condPath) return inputEl;
           }
           return null;
+        };
+        // Une condition dont le champ pilote est rendu sur la page est lue en
+        // direct (live) ; sinon elle passe par le cache de branche distant.
+        const evalCondForPage = (cond) => {
+          const condPath = nettoyerNomFlowCfg(cond.path);
+          const localField = condPath ? localFieldForCondPath(condPath) : null;
+          return localField
+            ? evalVisibleIfValue(readConfigFieldValue(localField), cond)
+            : evalVisibleIfOne(visibilitySource, cond);
         };
         const applyGenericVisibility = () => {
           genericVisibilityEntries.forEach((entry) => {
             let shouldHide = entry.doc.hidden === true;
-            const cond = entry.doc.visible_if;
-            if (!shouldHide && cond && typeof cond === 'object') {
-              const condPath = nettoyerNomFlowCfg(cond.path);
-              const localField = condPath ? localFieldForCondPath(condPath) : null;
-              const visible = localField
-                ? evalVisibleIfValue(readConfigFieldValue(localField), cond)
-                : evalVisibleIf(visibilitySource, cond);
-              shouldHide = visible === false;
+            if (!shouldHide) {
+              for (const cond of visibleIfConds(entry.doc.visible_if)) {
+                if (evalCondForPage(cond) === false) {
+                  shouldHide = true;
+                  break;
+                }
+              }
             }
             entry.row.hidden = shouldHide;
             if (entry.inputEl) {
@@ -10156,22 +10193,22 @@
         };
         const boundCondFields = new Set();
         genericVisibilityEntries.forEach((entry) => {
-          const cond = entry.doc.visible_if;
-          if (!cond || typeof cond !== 'object') return;
-          const condPath = nettoyerNomFlowCfg(cond.path);
-          if (!condPath) return;
-          const localField = localFieldForCondPath(condPath);
-          if (localField) {
-            if (boundCondFields.has(localField)) return;
-            boundCondFields.add(localField);
-            localField.addEventListener('input', applyGenericVisibility);
-            localField.addEventListener('change', applyGenericVisibility);
-          } else {
-            const branch = cfgCondBranchOfPath(condPath);
-            if (branch) {
-              fetchCfgCondBranch(visibilitySource, branch).then(applyGenericVisibility).catch(() => {});
+          visibleIfConds(entry.doc.visible_if).forEach((cond) => {
+            const condPath = nettoyerNomFlowCfg(cond.path);
+            if (!condPath) return;
+            const localField = localFieldForCondPath(condPath);
+            if (localField) {
+              if (boundCondFields.has(localField)) return;
+              boundCondFields.add(localField);
+              localField.addEventListener('input', applyGenericVisibility);
+              localField.addEventListener('change', applyGenericVisibility);
+            } else {
+              const branch = cfgCondBranchOfPath(condPath);
+              if (branch) {
+                fetchCfgCondBranch(visibilitySource, branch).then(applyGenericVisibility).catch(() => {});
+              }
             }
-          }
+          });
         });
         applyGenericVisibility();
       }
@@ -10443,6 +10480,47 @@
           onApplyField: onApplyField
         });
       });
+    }
+
+    // Page composee seule : un noeud d'arbre sans branche store propre (ex. le
+    // noeud virtuel poollogic/devices) peut declarer une meta "compose" ; ses
+    // sections sont alors rendues comme page a part entiere. L'apply standard
+    // route deja chaque champ vers sa branche store via dataset.module.
+    async function chargerCfgComposeOnlyPage(source, displayPath) {
+      const m = nettoyerNomFlowCfg(displayPath);
+      if (!m) return false;
+      try { await ensureCfgDocsForModule(m); } catch (err) {}
+      const meta = configPathMeta(m);
+      if (!meta || !Array.isArray(meta.compose) || meta.compose.length === 0) return false;
+      beginFlowCfgLoading('Chargement de la page composée...', { tree: false, detail: true });
+      try {
+        const sections = await loadCfgComposeSections(source, m);
+        if (sections.length === 0) {
+          resetPrimaryCfgEditor('Aucune variable configurable dans cette branche.');
+          return true;
+        }
+        closeColorPickerPopover();
+        flowCfgFields.innerHTML = '';
+        const perFieldApply = flowCfgApplyPerFieldEnabled(m);
+        if (source === 'supervisor') {
+          supCfgCurrentModule = m;
+          supCfgCurrentData = {};
+          supCfgCurrentComposeSections = sections;
+          supCfgCurrentPdmExtension = null;
+          renderCfgComposeSections(sections, 'supervisor', perFieldApply, appliquerPrimaryCfgField);
+        } else {
+          flowCfgCurrentModule = m;
+          flowCfgCurrentData = {};
+          flowCfgCurrentComposeSections = sections;
+          flowCfgCurrentPdmExtension = null;
+          renderCfgComposeSections(sections, 'flow', perFieldApply, appliquerFlowCfgField);
+        }
+        updatePrimaryCfgApplyState();
+        flowCfgStatus.textContent = tr('config.branchLoaded', 'Branche chargée.');
+        return true;
+      } finally {
+        endFlowCfgLoading({ tree: false, detail: true });
+      }
     }
 
     // Detection generique des selects "slot PDM" (enum_set poollogic_device_slot)

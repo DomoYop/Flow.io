@@ -109,3 +109,4 @@ Notes personnelles hors doc officielle — utiles pour l'état d'avancement et l
 - [renommage-capteur-psi-pression.md](docs/notes/renommage-capteur-psi-pression.md) — renommage complet PSI → Pression (**implémenté**, clés NVS binaires et AlarmId inchangés).
 - [ota-spiffs-lenteur-plantage.md](docs/notes/ota-spiffs-lenteur-plantage.md) — plantage TWDT pendant l'OTA SPIFFS (**corrigé** : yield périodique) + traçage `spiffs_version`.
 - [audit-config-defaut-piscine-waveshare.md](docs/notes/audit-config-defaut-piscine-waveshare.md) — matrice des défauts métier injectés par `applyDomainDefaults` (DomainSpec).
+- [audit-configstore-ui-poollogic.md](docs/notes/audit-configstore-ui-poollogic.md) — audit ConfigStore + chaîne cfgdocs/UI, refonte UX « équipements actifs » (**implémentée**) et backlog des chantiers de fond.
