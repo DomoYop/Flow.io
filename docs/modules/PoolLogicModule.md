@@ -325,6 +325,7 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 - `ph_setpoint`
 - `ph_kp`, `ph_ki`, `ph_kd`
 - `ph_window_ms`
+- `ph_pump_slot` (slot PoolDevice de la pompe pH)
 
 ### Désinfection chlore/brome liquide (`poollogic/chlorine`)
 
@@ -332,6 +333,7 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 - `dis_setpoint`
 - `dis_kp`, `dis_ki`, `dis_kd`
 - `dis_window_ms`
+- `dis_pump_slot` (slot PoolDevice de la pompe chlore liquide)
 
 ### Régulation commune (`poollogic/regulation`)
 
@@ -344,6 +346,7 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 - `swg_control_mode`
 - `secure_elec_t`
 - `dly_electro_min`
+- `swg_slot` (slot PoolDevice de l'électrolyseur)
 
 ### Paramètres oxygène actif (`poollogic/o2`)
 
@@ -382,17 +385,20 @@ Les curseurs `protocol_state`, `last_dose_day`, `weekly_done_ml` et `pending_ml`
 - `filtr_stop_max`
 - `filtr_start_clc` (calculé)
 - `filtr_stop_clc` (calculé)
+- `filtr_slot` (slot PoolDevice de la pompe de filtration)
 
-### Bindings capteurs IO
+### Bindings capteurs IO (`poollogic/sensors`)
 
 - `ph_io_id`
 - `dis_io_id`
-- `psi_io_id`
+- `pressure_io_id`
 - `wat_temp_io_id`
 - `air_temp_io_id`
 - `pool_lvl_io_id`
 - `ph_lvl_io_id`
 - `chl_lvl_io_id`
+- `flow_io_id` (entrée digitale flowswitch ; défaut = rôle domaine `SensorFlowSwitch`)
+- `cover_io_id` (entrée digitale contact volet fermé ; défaut = rôle domaine `SensorCoverClosed`)
 
 ### Sécurités (`poollogic/safety`)
 
@@ -406,25 +412,24 @@ Les curseurs `protocol_state`, `last_dose_day`, `weekly_done_ml` et `pending_ml`
 
 - `robot_delay_min`
 - `robot_dur_min`
+- `robot_slot` (slot PoolDevice du robot)
 
 ### Remplissage (`poollogic/refill`)
 
 - `fill_min_on_s`
+- `fill_slot` (slot PoolDevice de la pompe de remplissage)
 
 ### Chauffage (`poollogic/heater`)
 
 - `heater_auto_mode`
 - `heater_setpoint`
+- `heater_slot` (slot PoolDevice du chauffage)
 
-### Slots équipements (PoolDevice) (`poollogic/devices`)
-
-- `filtration_slot`
-- `swg_slot`
-- `robot_slot`
-- `filling_slot`
-- `ph_pump_slot`
-- `dis_pump_slot`
-- `heater_slot`
+> Note : l'ancienne branche `poollogic/devices` (7 variables d'aiguillage rôle → slot)
+> a été supprimée ; chaque `*_slot` vit désormais dans sa branche métier (clés NVS
+> `pl_s*` inchangées). Dans l'arbre de config web, `poollogic/devices` est un nœud
+> virtuel qui liste les 16 PDM (`pdm/pd0..pd15`) via alias d'affichage. L'éclairage
+> (pd6) n'a pas de branche métier PoolLogic : son activation passe par cette liste.
 
 ## Commandes
 
@@ -746,7 +751,6 @@ Publication autoportée via `MqttConfigRouteProducer` local:
 - `cfg/poollogic/chlorine`
 - `cfg/poollogic/swg`
 - `cfg/poollogic/o2`
-- `cfg/poollogic/devices`
 - `cfg/poollogic/heater`
 - `cfg/poollogic/robot`
 - `cfg/poollogic/refill`

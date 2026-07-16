@@ -28,7 +28,6 @@ static constexpr const char* kCfgModulePh = "poollogic/ph";
 static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
 static constexpr const char* kCfgModuleSwg = "poollogic/swg";
 static constexpr const char* kCfgModuleO2 = "poollogic/o2";
-static constexpr const char* kCfgModuleDevices = "poollogic/devices";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
 static constexpr const char* kCfgModuleRobot = "poollogic/robot";
 static constexpr const char* kCfgModuleRefill = "poollogic/refill";
@@ -75,7 +74,6 @@ MqttBuildResult PoolLogicModule::buildCfgBase_(MqttBuildContext& buildCtx)
         {"chlorine", kCfgModuleChlorine},
         {"swg", kCfgModuleSwg},
         {"o2", kCfgModuleO2},
-        {"devices", kCfgModuleDevices},
         {"heater", kCfgModuleHeater},
         {"robot", kCfgModuleRobot},
         {"refill", kCfgModuleRefill},

@@ -42,12 +42,13 @@ namespace {
 static constexpr bool kConfigMenuEnabled = (FLOW_HMI_CONFIG_MENU_ENABLED != 0);
 static constexpr const char* kHmiModulePrefix = "hmi/";
 static constexpr const char* kPoolLogicSensorsModule = "poollogic/sensors";
-static constexpr const char* kPoolLogicDeviceModule = "poollogic/devices";
 static constexpr const char* kPoolLogicModesModule = "poollogic/modes";
 static constexpr const char* kPoolLogicPhModule = "poollogic/ph";
 static constexpr const char* kPoolLogicChlorineModule = "poollogic/chlorine";
+static constexpr const char* kPoolLogicFiltrationModule = "poollogic/filtration";
+static constexpr const char* kPoolLogicRobotModule = "poollogic/robot";
+static constexpr const char* kPoolLogicRefillModule = "poollogic/refill";
 static constexpr size_t kPoolLogicSensorsJsonBufSize = 480U;
-static constexpr size_t kPoolLogicDeviceJsonBufSize = 192U;
 static constexpr size_t kPoolLogicModeJsonBufSize = 256U;
 static constexpr uint8_t kLedBitMqttConnected = 0;
 static constexpr uint8_t kLedBitPageSelect = 1;
@@ -935,59 +936,52 @@ void HMIModule::refreshHomeBindings_()
             LOGW("HMI poollogic sensors export failed");
         }
 
-        truncated = false;
-        memset(jsonBuf, 0, sizeof(jsonBuf));
-        if (cfgSvc_->toJsonModule(cfgSvc_->ctx,
-                                  kPoolLogicDeviceModule,
-                                  jsonBuf,
-                                  kPoolLogicDeviceJsonBufSize,
-                                  &truncated)) {
-            uint16_t slot = filtrationDeviceSlot_;
-            foundFiltrationSlot = findJsonUInt16_(jsonBuf, "filtr_slot", slot);
-            if (foundFiltrationSlot) {
-                filtrationDeviceSlot_ = (uint8_t)slot;
+        // Les slots role->PDM vivent dans leur branche metier respective.
+        const struct {
+            const char* module;
+            const char* key;
+            uint8_t* target;
+            bool* found;
+        } slotReads[] = {
+            {kPoolLogicFiltrationModule, "filtr_slot", &filtrationDeviceSlot_, &foundFiltrationSlot},
+            {kPoolLogicPhModule, "ph_pump_slot", &phPumpDeviceSlot_, &foundPhPumpSlot},
+            {kPoolLogicChlorineModule, "dis_pump_slot", &orpPumpDeviceSlot_, &foundOrpPumpSlot},
+            {kPoolLogicRobotModule, "robot_slot", &robotDeviceSlot_, &foundRobotSlot},
+            {kPoolLogicRefillModule, "fill_slot", &fillingDeviceSlot_, &foundFillingSlot},
+        };
+        bool slotTruncated = false;
+        for (const auto& r : slotReads) {
+            truncated = false;
+            memset(jsonBuf, 0, sizeof(jsonBuf));
+            if (!cfgSvc_->toJsonModule(cfgSvc_->ctx, r.module, jsonBuf, sizeof(jsonBuf), &truncated)) {
+                LOGW("HMI poollogic %s export failed", r.module);
+                continue;
             }
-            slot = phPumpDeviceSlot_;
-            foundPhPumpSlot = findJsonUInt16_(jsonBuf, "ph_pump_slot", slot);
-            if (foundPhPumpSlot) {
-                phPumpDeviceSlot_ = (uint8_t)slot;
+            if (truncated) slotTruncated = true;
+            uint16_t slot = *r.target;
+            *r.found = findJsonUInt16_(jsonBuf, r.key, slot);
+            if (*r.found) {
+                *r.target = (uint8_t)slot;
             }
-            slot = orpPumpDeviceSlot_;
-            foundOrpPumpSlot = findJsonUInt16_(jsonBuf, "dis_pump_slot", slot);
-            if (foundOrpPumpSlot) {
-                orpPumpDeviceSlot_ = (uint8_t)slot;
-            }
-            slot = robotDeviceSlot_;
-            foundRobotSlot = findJsonUInt16_(jsonBuf, "robot_slot", slot);
-            if (foundRobotSlot) {
-                robotDeviceSlot_ = (uint8_t)slot;
-            }
-            slot = fillingDeviceSlot_;
-            foundFillingSlot = findJsonUInt16_(jsonBuf, "fill_slot", slot);
-            if (foundFillingSlot) {
-                fillingDeviceSlot_ = (uint8_t)slot;
-            }
-
-            LOGD("HMI poollogic cfg sensors_trunc=%u device_trunc=%u keys lvl=%u ph=%u orp=%u pressure=%u wat=%u air=%u phlvl=%u chllvl=%u wc=%u filtr=%u php=%u orpp=%u robot=%u fill=%u",
-                 sensorsTruncated ? 1U : 0U,
-                 truncated ? 1U : 0U,
-                 foundPoolLevel ? 1U : 0U,
-                 foundPh ? 1U : 0U,
-                 foundOrp ? 1U : 0U,
-                 foundPressure ? 1U : 0U,
-                 foundWaterTemp ? 1U : 0U,
-                 foundAirTemp ? 1U : 0U,
-                 foundPhLevel ? 1U : 0U,
-                 foundChlorineLevel ? 1U : 0U,
-                 foundWaterCounter ? 1U : 0U,
-                 foundFiltrationSlot ? 1U : 0U,
-                 foundPhPumpSlot ? 1U : 0U,
-                 foundOrpPumpSlot ? 1U : 0U,
-                 foundRobotSlot ? 1U : 0U,
-                 foundFillingSlot ? 1U : 0U);
-        } else {
-            LOGW("HMI poollogic device export failed");
         }
+
+        LOGD("HMI poollogic cfg sensors_trunc=%u slot_trunc=%u keys lvl=%u ph=%u orp=%u pressure=%u wat=%u air=%u phlvl=%u chllvl=%u wc=%u filtr=%u php=%u orpp=%u robot=%u fill=%u",
+             sensorsTruncated ? 1U : 0U,
+             slotTruncated ? 1U : 0U,
+             foundPoolLevel ? 1U : 0U,
+             foundPh ? 1U : 0U,
+             foundOrp ? 1U : 0U,
+             foundPressure ? 1U : 0U,
+             foundWaterTemp ? 1U : 0U,
+             foundAirTemp ? 1U : 0U,
+             foundPhLevel ? 1U : 0U,
+             foundChlorineLevel ? 1U : 0U,
+             foundWaterCounter ? 1U : 0U,
+             foundFiltrationSlot ? 1U : 0U,
+             foundPhPumpSlot ? 1U : 0U,
+             foundOrpPumpSlot ? 1U : 0U,
+             foundRobotSlot ? 1U : 0U,
+             foundFillingSlot ? 1U : 0U);
     }
 
     (void)resolveIoRuntimeIndex_(phIoId_, phRuntimeIndex_);
@@ -1821,7 +1815,11 @@ void HMIModule::onEvent_(const Event& e)
             p->module[0] && strncmp(p->module, "poollogic/", 10) == 0;
         const bool poolLogicBindingsChanged =
             strcmp(p->module, kPoolLogicSensorsModule) == 0 ||
-            strcmp(p->module, kPoolLogicDeviceModule) == 0;
+            strcmp(p->module, kPoolLogicFiltrationModule) == 0 ||
+            strcmp(p->module, kPoolLogicPhModule) == 0 ||
+            strcmp(p->module, kPoolLogicChlorineModule) == 0 ||
+            strcmp(p->module, kPoolLogicRobotModule) == 0 ||
+            strcmp(p->module, kPoolLogicRefillModule) == 0;
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic && !poolLogicChangedByName) {
             LOGW("HMI ignored non-branched PoolLogic config module=%s key=%s",
                  p->module[0] ? p->module : "<empty>",

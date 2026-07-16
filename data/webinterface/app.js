@@ -2034,6 +2034,7 @@
     let flowCfgCurrentModule = '';
     let flowCfgCurrentData = {};
     let flowCfgCurrentPdmExtension = null;
+    let flowCfgCurrentComposeSections = [];
     let flowCfgChildrenCache = {};
     let flowCfgPath = [];
     let flowCfgExpandedNodes = new Set();
@@ -2072,6 +2073,7 @@
     let supCfgCurrentModule = '';
     let supCfgCurrentData = {};
     let supCfgCurrentPdmExtension = null;
+    let supCfgCurrentComposeSections = [];
     let supCfgTreePath = '';
     let supCfgChildrenCache = {};
     let supCfgExpandedNodes = new Set();
@@ -8580,15 +8582,6 @@
           return;
         }
 
-        if (cleanPath === CFG_EQUIPMENT_VIRTUAL_PATH) {
-          if (cfgTreeSelectedSource === 'supervisor') {
-            await chargerPrimarySupervisorCfgModule(cleanPath);
-          } else {
-            await chargerFlowCfgModule(cleanPath);
-          }
-          return;
-        }
-
         if (node && node.hasExact) {
           if (cfgTreeSelectedSource === 'supervisor') {
             await chargerPrimarySupervisorCfgModule(storePath || cleanPath);
@@ -9033,11 +9026,12 @@
     }
 
     function isPoolLogicDeviceSlotField(moduleName, key, doc) {
-      const cleanModule = nettoyerNomFlowCfg(moduleName).toLowerCase();
+      // Detection par enum_set : les selects "slot PDM" vivent dans les
+      // branches metier poollogic (heater, ph, chlorine, ...), plus dans une
+      // branche devices dediee.
       const cleanKey = String(key || '').trim().toLowerCase();
-      if (cleanModule !== 'poollogic/devices') return false;
       if (!cleanKey.endsWith('_slot')) return false;
-      return !doc || String(doc.enum_set || '').trim() === 'poollogic_device_slot';
+      return !!doc && String(doc.enum_set || '').trim() === 'poollogic_device_slot';
     }
 
     function poolLogicDeviceSlotLabel(source, slot, fallback) {
@@ -9701,6 +9695,7 @@
 
     function resetPrimaryCfgEditor(message) {
       supCfgCurrentPdmExtension = null;
+      supCfgCurrentComposeSections = [];
       flowCfgFields.innerHTML = '';
       flowCfgApplyBtn.hidden = false;
       flowCfgApplyBtn.disabled = true;
@@ -9713,6 +9708,7 @@
       flowCfgCurrentModule = '';
       flowCfgCurrentData = {};
       flowCfgCurrentPdmExtension = null;
+      flowCfgCurrentComposeSections = [];
       resetPrimaryCfgEditor(message);
     }
 
@@ -9868,7 +9864,9 @@
       if (controlsPrimaryPane) {
         flowCfgApplyBtn.hidden = perFieldApply;
       }
-      const keys = Object.keys(data).sort();
+      // Ordre des champs = ordre d'emission du firmware (ordre d'enregistrement
+      // des ConfigVariable), pas de tri alphabetique.
+      const keys = Object.keys(data);
       if (sectionTitle && keys.length > 0) {
         const sectionEl = document.createElement('div');
         sectionEl.className = 'control-section-title';
@@ -10193,7 +10191,24 @@
     }
 
     function renderFlowCfgFieldsWithExtensions(dataObj) {
-      renderFlowCfgFields(dataObj);
+      const composeSections = Array.isArray(flowCfgCurrentComposeSections) ? flowCfgCurrentComposeSections : [];
+      if (composeSections.length > 0) {
+        // Sections composees en tete de page (ex: activation appareil), puis
+        // les champs de la branche en mode append.
+        closeColorPickerPopover();
+        flowCfgFields.innerHTML = '';
+        const perFieldApply = flowCfgApplyPerFieldEnabled(flowCfgCurrentModule);
+        renderCfgComposeSections(composeSections, 'flow', perFieldApply, appliquerFlowCfgField);
+        renderConfigFields(flowCfgFields, flowCfgCurrentModule, dataObj, {
+          append: true,
+          source: 'flow',
+          controlsPrimaryPane: true,
+          perFieldApply: perFieldApply,
+          onApplyField: appliquerFlowCfgField
+        });
+      } else {
+        renderFlowCfgFields(dataObj);
+      }
       if (flowCfgCurrentPdmExtension &&
           flowCfgCurrentPdmExtension.data &&
           Object.keys(flowCfgCurrentPdmExtension.data).length > 0) {
@@ -10295,7 +10310,22 @@
     }
 
     function renderPrimarySupervisorCfgFieldsWithExtensions(dataObj) {
-      renderPrimarySupervisorCfgFields(dataObj);
+      const composeSections = Array.isArray(supCfgCurrentComposeSections) ? supCfgCurrentComposeSections : [];
+      if (composeSections.length > 0) {
+        closeColorPickerPopover();
+        flowCfgFields.innerHTML = '';
+        const perFieldApply = flowCfgApplyPerFieldEnabled(supCfgCurrentModule);
+        renderCfgComposeSections(composeSections, 'supervisor', perFieldApply, appliquerPrimaryCfgField);
+        renderConfigFields(flowCfgFields, supCfgCurrentModule, dataObj, {
+          append: true,
+          source: 'supervisor',
+          controlsPrimaryPane: true,
+          perFieldApply: perFieldApply,
+          onApplyField: appliquerPrimaryCfgField
+        });
+      } else {
+        renderPrimarySupervisorCfgFields(dataObj);
+      }
       if (supCfgCurrentPdmExtension &&
           supCfgCurrentPdmExtension.data &&
           Object.keys(supCfgCurrentPdmExtension.data).length > 0) {
@@ -10355,80 +10385,73 @@
       return buildPatchJsonFromFields(flowCfgFields, flowCfgCurrentModule);
     }
 
-    // Page composite "Equipements" : noeud virtuel de l'arbre regroupant le
-    // type de traitement (poollogic/modes/disinfection_type) et la presence de
-    // chaque equipement optionnel (pdm/pdN/enabled). L'apply standard groupe
-    // deja le patch multi-branches via dataset.module.
-    const CFG_EQUIPMENT_VIRTUAL_PATH = 'equipements';
-    const cfgEquipmentDeviceSlots = [1, 2, 3, 4, 5, 6, 7];
-
-    function cfgEquipmentSectionTitle(source, slot) {
-      const src = poolLogicDeviceSlotSource(source);
-      const cache = poolLogicDeviceIoOutputNames[src] || {};
-      const ioName = typeof cache[slot] === 'string' ? cache[slot].trim() : '';
-      const baseName = String(ioOutputPdmLabels[slot] || '').trim() || ('pd' + String(slot));
-      return ioName ? (baseName + ' [' + ioName + ']') : baseName;
+    // Sections composees : la meta cfgmods "compose" d'une branche declare des
+    // champs d'autres branches store a afficher sur sa page (ex: le switch
+    // pdm/pdN/enabled dans poollogic/heater). L'apply standard groupe deja le
+    // patch multi-branches via dataset.module.
+    async function loadCfgComposeSections(source, moduleName) {
+      const meta = configPathMeta(moduleName);
+      const entries = (meta && Array.isArray(meta.compose)) ? meta.compose : [];
+      if (entries.length === 0) return [];
+      const src = cfgCondSourceKey(source);
+      const sections = [];
+      for (const rawEntry of entries) {
+        if (!rawEntry || typeof rawEntry !== 'object') continue;
+        const entryModule = nettoyerNomFlowCfg(rawEntry.module);
+        const fields = Array.isArray(rawEntry.fields) ? rawEntry.fields : [];
+        if (!entryModule || fields.length === 0) continue;
+        try { await ensureCfgDocsForModule(entryModule); } catch (err) {}
+        let data = null;
+        try {
+          const url = (src === 'supervisor')
+            ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(entryModule))
+            : ('/api/flowcfg/module?name=' + encodeURIComponent(entryModule));
+          const fetchFn = (src === 'supervisor') ? fetchWithBusyRetry : fetchFlowRemoteQueued;
+          const res = await fetchFn(url, { cache: 'no-store' });
+          const payload = await res.json().catch(() => null);
+          if (res.ok && payload && payload.ok === true && typeof payload.data === 'object') {
+            data = payload.data;
+          }
+        } catch (err) {}
+        if (!data) continue;
+        const filtered = {};
+        fields.forEach((field) => {
+          const key = String(field || '').trim();
+          if (key && Object.prototype.hasOwnProperty.call(data, key)) {
+            filtered[key] = data[key];
+          }
+        });
+        if (Object.keys(filtered).length === 0) continue;
+        const localized = cfgDocApplyLocalizedText(rawEntry);
+        sections.push({
+          module: entryModule,
+          data: filtered,
+          title: (localized && typeof localized.label === 'string') ? localized.label : ''
+        });
+      }
+      return sections;
     }
 
-    async function chargerCfgEquipmentsPage(source) {
-      const src = cfgCondSourceKey(source);
-      const fetchBranchData = async (branch) => {
-        const url = (src === 'supervisor')
-          ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(branch))
-          : ('/api/flowcfg/module?name=' + encodeURIComponent(branch));
-        const fetchFn = (src === 'supervisor') ? fetchWithBusyRetry : fetchFlowRemoteQueued;
-        const res = await fetchFn(url, { cache: 'no-store' });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data || data.ok !== true || typeof data.data !== 'object') return null;
-        return data.data;
-      };
-
-      await ensureCfgDocsForModule('poollogic/modes');
-      const modesData = await fetchBranchData('poollogic/modes');
-      const devices = [];
-      for (const slot of cfgEquipmentDeviceSlots) {
-        const branch = 'pdm/pd' + String(slot);
-        await ensureCfgDocsForModule(branch);
-        const branchData = await fetchBranchData(branch);
-        if (branchData && Object.prototype.hasOwnProperty.call(branchData, 'enabled')) {
-          devices.push({ slot: slot, branch: branch, enabled: branchData.enabled });
-        }
-      }
-      if (!modesData && devices.length === 0) {
-        throw new Error('branches équipements indisponibles');
-      }
-
-      if (src === 'supervisor') {
-        supCfgCurrentModule = CFG_EQUIPMENT_VIRTUAL_PATH;
-        supCfgCurrentData = {};
-        supCfgCurrentPdmExtension = null;
-      } else {
-        flowCfgCurrentModule = CFG_EQUIPMENT_VIRTUAL_PATH;
-        flowCfgCurrentData = {};
-        flowCfgCurrentPdmExtension = null;
-      }
-
-      closeColorPickerPopover();
-      flowCfgFields.innerHTML = '';
-      if (modesData && Object.prototype.hasOwnProperty.call(modesData, 'disinfection_type')) {
-        renderConfigFields(flowCfgFields, 'poollogic/modes', { disinfection_type: modesData.disinfection_type }, {
+    function renderCfgComposeSections(sections, source, perFieldApply, onApplyField) {
+      (Array.isArray(sections) ? sections : []).forEach((section) => {
+        renderConfigFields(flowCfgFields, section.module, section.data, {
           append: true,
-          source: src,
-          sectionTitle: tr('equip.disinfection', 'Type de traitement'),
-          controlsPrimaryPane: true
-        });
-      }
-      devices.forEach((device) => {
-        renderConfigFields(flowCfgFields, device.branch, { enabled: device.enabled }, {
-          append: true,
-          source: src,
-          sectionTitle: cfgEquipmentSectionTitle(src, device.slot),
-          controlsPrimaryPane: true
+          source: source,
+          sectionTitle: section.title,
+          controlsPrimaryPane: true,
+          perFieldApply: perFieldApply,
+          onApplyField: onApplyField
         });
       });
-      updatePrimaryCfgApplyState();
-      flowCfgStatus.textContent = tr('equip.hint',
-        'Équipements chargés. Après application, redémarrez l\'appareil pour mettre à jour les entités Home Assistant.');
+    }
+
+    // Detection generique des selects "slot PDM" (enum_set poollogic_device_slot)
+    // pour charger les libelles dynamiques quel que soit le module porteur.
+    function moduleHasDeviceSlotField(moduleName, dataObj) {
+      if (!isWaveshareProfile()) return false;
+      const data = (dataObj && typeof dataObj === 'object') ? dataObj : {};
+      return Object.keys(data).some((key) =>
+        isPoolLogicDeviceSlotField(moduleName, key, configDocFor(moduleName, key, [])));
     }
 
     async function chargerFlowCfgModule(moduleName) {
@@ -10437,10 +10460,6 @@
       try {
         if (!m) {
           resetFlowCfgEditor('Aucune branche sélectionnée.');
-          return;
-        }
-        if (m === CFG_EQUIPMENT_VIRTUAL_PATH) {
-          await chargerCfgEquipmentsPage('flow');
           return;
         }
         const res = await fetchFlowRemoteQueued(
@@ -10456,11 +10475,12 @@
         if (pdmModule) {
           await ensureCfgDocsForModule(pdmModule);
         }
-        if (isWaveshareProfile() && m === 'poollogic/devices') {
+        if (moduleHasDeviceSlotField(m, data.data)) {
           await loadPoolLogicDeviceSlotLabels('flow', true);
         }
         flowCfgCurrentModule = m;
         flowCfgCurrentData = data.data;
+        flowCfgCurrentComposeSections = await loadCfgComposeSections('flow', m);
         flowCfgCurrentPdmExtension = await loadFlowCfgPdmExtensionData(m, flowCfgCurrentData);
         renderFlowCfgFieldsWithExtensions(flowCfgCurrentData);
         flowCfgStatus.textContent = data.truncated
@@ -10485,10 +10505,6 @@
           resetPrimaryCfgEditor('Aucune branche locale sélectionnée.');
           return;
         }
-        if (m === CFG_EQUIPMENT_VIRTUAL_PATH) {
-          await chargerCfgEquipmentsPage('supervisor');
-          return;
-        }
         const res = await fetchWithBusyRetry('/api/supervisorcfg/module?name=' + encodeURIComponent(m), { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok || !data || data.ok !== true || typeof data.data !== 'object') {
@@ -10499,11 +10515,12 @@
         if (pdmModule) {
           await ensureCfgDocsForModule(pdmModule);
         }
-        if (isWaveshareProfile() && m === 'poollogic/devices') {
+        if (moduleHasDeviceSlotField(m, data.data)) {
           await loadPoolLogicDeviceSlotLabels('supervisor', true);
         }
         supCfgCurrentModule = m;
         supCfgCurrentData = data.data;
+        supCfgCurrentComposeSections = await loadCfgComposeSections('supervisor', m);
         supCfgCurrentPdmExtension = await loadPrimarySupervisorPdmExtensionData(m, supCfgCurrentData);
         renderPrimarySupervisorCfgFieldsWithExtensions(supCfgCurrentData);
         flowCfgStatus.textContent = data.truncated

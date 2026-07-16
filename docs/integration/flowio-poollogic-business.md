@@ -313,14 +313,18 @@ Si le service alarme n’est pas disponible, `PoolLogic` utilise un fallback loc
 
 - `fill_min_on_s`
 
-### `poollogic/devices`
+### Slots rôle → PoolDevice (répartis par branche métier)
 
-- `filtr_slot`
-- `swg_slot`
-- `robot_slot`
-- `fill_slot`
-- `ph_pump_slot`
-- `dis_pump_slot`
+La branche `poollogic/devices` (et son topic `cfg/poollogic/devices`) a été supprimée ;
+chaque variable d'aiguillage vit dans sa branche métier (clés NVS `pl_s*` inchangées) :
+
+- `filtr_slot` → `poollogic/filtration`
+- `swg_slot` → `poollogic/swg`
+- `robot_slot` → `poollogic/robot`
+- `fill_slot` → `poollogic/refill`
+- `ph_pump_slot` → `poollogic/ph`
+- `dis_pump_slot` → `poollogic/chlorine`
+- `heater_slot` → `poollogic/heater`
 
 ## 7.2 `pdm/*` (device manager)
 

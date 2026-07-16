@@ -30,7 +30,8 @@ static constexpr uint8_t kCfgBranchPh = 6;
 static constexpr uint8_t kCfgBranchChlorine = 7;
 static constexpr uint8_t kCfgBranchSwg = 8;
 static constexpr uint8_t kCfgBranchO2 = 9;
-static constexpr uint8_t kCfgBranchDevices = 10;
+// kCfgBranch 10 (ex-devices) libere : les slots role->PDM vivent desormais
+// dans leur branche metier (filtration/swg/robot/refill/ph/chlorine/heater).
 static constexpr uint8_t kCfgBranchHeater = 11;
 static constexpr uint8_t kCfgBranchRobot = 12;
 static constexpr uint8_t kCfgBranchRefill = 13;
@@ -46,7 +47,6 @@ static constexpr const char* kCfgModulePh = "poollogic/ph";
 static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
 static constexpr const char* kCfgModuleSwg = "poollogic/swg";
 static constexpr const char* kCfgModuleO2 = "poollogic/o2";
-static constexpr const char* kCfgModuleDevices = "poollogic/devices";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
 static constexpr const char* kCfgModuleRobot = "poollogic/robot";
 static constexpr const char* kCfgModuleRefill = "poollogic/refill";
@@ -62,7 +62,6 @@ enum : uint16_t {
     kCfgMsgChlorine = 8,
     kCfgMsgSwg = 9,
     kCfgMsgO2 = 10,
-    kCfgMsgDevices = 11,
     kCfgMsgHeater = 12,
     kCfgMsgRobot = 13,
     kCfgMsgRefill = 14,
@@ -136,13 +135,6 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchO2},
      kCfgModuleO2,
      "o2",
-     (uint8_t)MqttPublishPriority::Normal,
-     nullptr,
-     kPoolLogicCfgTopicBase},
-    {kCfgMsgDevices,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchDevices},
-     kCfgModuleDevices,
-     "devices",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
@@ -269,6 +261,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     levelIdVar_.moduleName = kCfgModuleSensors;
     phLevelIdVar_.moduleName = kCfgModuleSensors;
     chlorineLevelIdVar_.moduleName = kCfgModuleSensors;
+    flowSwitchIdVar_.moduleName = kCfgModuleSensors;
+    coverClosedIdVar_.moduleName = kCfgModuleSensors;
 
     pressureLowVar_.moduleName = kCfgModuleSafety;
     pressureHighVar_.moduleName = kCfgModuleSafety;
@@ -308,13 +302,13 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     o2WeeklyDoneVar_.moduleName = kCfgModuleO2;
     o2PendingVar_.moduleName = kCfgModuleO2;
 
-    filtrationDeviceVar_.moduleName = kCfgModuleDevices;
-    swgDeviceVar_.moduleName = kCfgModuleDevices;
-    robotDeviceVar_.moduleName = kCfgModuleDevices;
-    fillingDeviceVar_.moduleName = kCfgModuleDevices;
-    phPumpDeviceVar_.moduleName = kCfgModuleDevices;
-    orpPumpDeviceVar_.moduleName = kCfgModuleDevices;
-    heaterDeviceVar_.moduleName = kCfgModuleDevices;
+    filtrationDeviceVar_.moduleName = kCfgModuleFiltration;
+    swgDeviceVar_.moduleName = kCfgModuleSwg;
+    robotDeviceVar_.moduleName = kCfgModuleRobot;
+    fillingDeviceVar_.moduleName = kCfgModuleRefill;
+    phPumpDeviceVar_.moduleName = kCfgModulePh;
+    orpPumpDeviceVar_.moduleName = kCfgModuleChlorine;
+    heaterDeviceVar_.moduleName = kCfgModuleHeater;
 
     // Registration order mirrors the published config branches so init remains
     // easy to diff against the generated cfgdocs and MQTT routes.
@@ -344,6 +338,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(levelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(phLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(chlorineLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
+    cfg.registerVar(flowSwitchIdVar_, kCfgModuleId, kCfgBranchSensors);
+    cfg.registerVar(coverClosedIdVar_, kCfgModuleId, kCfgBranchSensors);
 
     cfg.registerVar(pressureLowVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(pressureHighVar_, kCfgModuleId, kCfgBranchSafety);
@@ -383,13 +379,15 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchO2);
     cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchO2);
 
-    cfg.registerVar(filtrationDeviceVar_, kCfgModuleId, kCfgBranchDevices);
-    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchDevices);
-    cfg.registerVar(robotDeviceVar_, kCfgModuleId, kCfgBranchDevices);
-    cfg.registerVar(fillingDeviceVar_, kCfgModuleId, kCfgBranchDevices);
-    cfg.registerVar(phPumpDeviceVar_, kCfgModuleId, kCfgBranchDevices);
-    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchDevices);
-    cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchDevices);
+    // Slots role -> PDM enregistres apres les reglages de leur branche pour
+    // apparaitre en dernier dans chaque page (l'ordre UI suit l'enregistrement).
+    cfg.registerVar(filtrationDeviceVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(robotDeviceVar_, kCfgModuleId, kCfgBranchRobot);
+    cfg.registerVar(fillingDeviceVar_, kCfgModuleId, kCfgBranchRefill);
+    cfg.registerVar(phPumpDeviceVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchHeater);
 
     cfg.registerVar(flowCopyDelayVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(flowInterlockVar_, kCfgModuleId, kCfgBranchSafety);

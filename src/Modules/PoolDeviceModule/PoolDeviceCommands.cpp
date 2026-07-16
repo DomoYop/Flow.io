@@ -60,11 +60,13 @@ void writeCmdErrorSlot_(char* reply, size_t replyLen, const char* where, ErrorCo
 bool readConfigBool_(ConfigStore* cfgStore, const char* moduleName, const char* key, bool& out)
 {
     if (!cfgStore || !moduleName || !key) return false;
-    char json[192]{};
+    // 384 : les branches metier poollogic (ph, chlorine) depassent 192 octets
+    // depuis qu'elles portent aussi leur slot role->PDM.
+    char json[384]{};
     bool truncated = false;
     if (!cfgStore->toJsonModule(moduleName, json, sizeof(json), &truncated) || truncated) return false;
 
-    StaticJsonDocument<192> doc;
+    StaticJsonDocument<384> doc;
     const DeserializationError err = deserializeJson(doc, json);
     if (err || !doc.is<JsonObjectConst>()) return false;
     JsonVariantConst value = doc.as<JsonObjectConst>()[key];
@@ -76,11 +78,11 @@ bool readConfigBool_(ConfigStore* cfgStore, const char* moduleName, const char* 
 bool readConfigUInt8_(ConfigStore* cfgStore, const char* moduleName, const char* key, uint8_t& out)
 {
     if (!cfgStore || !moduleName || !key) return false;
-    char json[192]{};
+    char json[384]{};
     bool truncated = false;
     if (!cfgStore->toJsonModule(moduleName, json, sizeof(json), &truncated) || truncated) return false;
 
-    StaticJsonDocument<192> doc;
+    StaticJsonDocument<384> doc;
     const DeserializationError err = deserializeJson(doc, json);
     if (err || !doc.is<JsonObjectConst>()) return false;
     JsonVariantConst value = doc.as<JsonObjectConst>()[key];
@@ -257,22 +259,13 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
         uint8_t phPumpSlot = PoolIds::DevicePhPump;
         uint8_t orpPumpSlot = PoolIds::DeviceChlorinePump;
 
-        char modeJson[160]{};
-        bool truncated = false;
-        if (cfgStore_->toJsonModule("poollogic/devices", modeJson, sizeof(modeJson), &truncated) && !truncated) {
-            StaticJsonDocument<192> modeDoc;
-            const DeserializationError modeErr = deserializeJson(modeDoc, modeJson);
-            if (!modeErr && modeDoc.is<JsonObjectConst>()) {
-                const JsonObjectConst obj = modeDoc.as<JsonObjectConst>();
-                if (obj["ph_pump_slot"].is<uint16_t>()) {
-                    const uint16_t v = obj["ph_pump_slot"].as<uint16_t>();
-                    if (v < POOL_DEVICE_MAX) phPumpSlot = (uint8_t)v;
-                }
-                if (obj["dis_pump_slot"].is<uint16_t>()) {
-                    const uint16_t v = obj["dis_pump_slot"].as<uint16_t>();
-                    if (v < POOL_DEVICE_MAX) orpPumpSlot = (uint8_t)v;
-                }
-            }
+        // Slots role->PDM lus depuis leur branche metier respective.
+        uint8_t slotVal = 0;
+        if (readConfigUInt8_(cfgStore_, "poollogic/ph", "ph_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
+            phPumpSlot = slotVal;
+        }
+        if (readConfigUInt8_(cfgStore_, "poollogic/chlorine", "dis_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
+            orpPumpSlot = slotVal;
         }
 
         const char* modeKey = nullptr;

@@ -144,7 +144,10 @@ Curseurs de protocole persistés (4 — **état runtime, PAS des défauts à pro
 `protocol_state` (pl_o2st), `last_dose_day` (pl_o2day), `weekly_done_ml` (pl_o2done),
 `pending_ml` (pl_o2pend).
 
-### poollogic/devices
+### Slots rôle → PoolDevice (répartis dans les branches métier)
+
+Ex-branche `poollogic/devices`, supprimée : chaque `*_slot` vit dans sa branche
+métier (filtration/swg/robot/refill/ph/chlorine/heater), clés NVS inchangées.
 
 | JSON | Clé NVS | Défaut | Source |
 |---|---|---|---|

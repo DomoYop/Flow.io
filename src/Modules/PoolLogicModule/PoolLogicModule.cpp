@@ -22,7 +22,6 @@ static constexpr const char* kCfgModulePh = "poollogic/ph";
 static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
 static constexpr const char* kCfgModuleSwg = "poollogic/swg";
 static constexpr const char* kCfgModuleO2 = "poollogic/o2";
-static constexpr const char* kCfgModuleDevices = "poollogic/devices";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
 static constexpr const char* kCfgModuleRobot = "poollogic/robot";
 static constexpr const char* kCfgModuleRefill = "poollogic/refill";
@@ -53,6 +52,8 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.levelIdVar_.moduleName = kCfgModuleSensors;
     self.phLevelIdVar_.moduleName = kCfgModuleSensors;
     self.chlorineLevelIdVar_.moduleName = kCfgModuleSensors;
+    self.flowSwitchIdVar_.moduleName = kCfgModuleSensors;
+    self.coverClosedIdVar_.moduleName = kCfgModuleSensors;
 
     self.pressureLowVar_.moduleName = kCfgModuleSafety;
     self.pressureHighVar_.moduleName = kCfgModuleSafety;
@@ -80,12 +81,12 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.robotDurationVar_.moduleName = kCfgModuleRobot;
     self.fillingMinOnVar_.moduleName = kCfgModuleRefill;
 
-    self.filtrationDeviceVar_.moduleName = kCfgModuleDevices;
-    self.swgDeviceVar_.moduleName = kCfgModuleDevices;
-    self.robotDeviceVar_.moduleName = kCfgModuleDevices;
-    self.fillingDeviceVar_.moduleName = kCfgModuleDevices;
-    self.phPumpDeviceVar_.moduleName = kCfgModuleDevices;
-    self.orpPumpDeviceVar_.moduleName = kCfgModuleDevices;
-    self.heaterDeviceVar_.moduleName = kCfgModuleDevices;
+    self.filtrationDeviceVar_.moduleName = kCfgModuleFiltration;
+    self.swgDeviceVar_.moduleName = kCfgModuleSwg;
+    self.robotDeviceVar_.moduleName = kCfgModuleRobot;
+    self.fillingDeviceVar_.moduleName = kCfgModuleRefill;
+    self.phPumpDeviceVar_.moduleName = kCfgModulePh;
+    self.orpPumpDeviceVar_.moduleName = kCfgModuleChlorine;
+    self.heaterDeviceVar_.moduleName = kCfgModuleHeater;
 }
 #endif

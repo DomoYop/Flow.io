@@ -194,9 +194,10 @@ private:
     IoId levelIoId_ = IO_ID_LEVEL_DEFAULT;
     IoId phLevelIoId_ = IO_ID_PH_LEVEL_DEFAULT;
     IoId chlorineLevelIoId_ = IO_ID_CHLORINE_LEVEL_DEFAULT;
-    // Flowswitch/volet (entrees) et sorties indicatrices (recopie temporisee,
-    // etat volet). IoId derives du domaine dans applyDomainDefaults ; le port
-    // physique des sorties reste reconfigurable via la page E/S (bindingPort).
+    // Flowswitch/volet : entrees exposees en config (poollogic/sensors) avec
+    // defaut domaine pose par applyDomainDefaults avant loadPersistent ; les
+    // sorties indicatrices (recopie temporisee, etat volet) restent runtime,
+    // leur port physique est reconfigurable via la page E/S (bindingPort).
     IoId flowSwitchIoId_ = IO_ID_INVALID;
     IoId coverClosedIoId_ = IO_ID_INVALID;
     IoId outFlowCopyIoId_ = IO_ID_INVALID;
@@ -351,6 +352,10 @@ private:
                                             &phLevelIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> chlorineLevelIdVar_{NVS_KEY(NvsKeys::PoolLogic::ChlorineLevelIoId), "chl_lvl_io_id", "poollogic/sensors", ConfigType::UInt16,
                                                   &chlorineLevelIoId_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<IoId,0> flowSwitchIdVar_{NVS_KEY(NvsKeys::PoolLogic::FlowSwitchIoId), "flow_io_id", "poollogic/sensors", ConfigType::UInt16,
+                                               &flowSwitchIoId_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<IoId,0> coverClosedIdVar_{NVS_KEY(NvsKeys::PoolLogic::CoverClosedIoId), "cover_io_id", "poollogic/sensors", ConfigType::UInt16,
+                                                &coverClosedIoId_, ConfigPersistence::Persistent, 0};
 
     ConfigVariable<float,0> pressureLowVar_{NVS_KEY(NvsKeys::PoolLogic::PressureLow), "pressure_low_th", "poollogic/safety", ConfigType::Float,
                                        &pressureLowThreshold_, ConfigPersistence::Persistent, 0};
@@ -425,19 +430,21 @@ private:
     ConfigVariable<float,0> o2PendingVar_{NVS_KEY(NvsKeys::PoolLogic::O2PendingMl), "pending_ml", "poollogic/o2", ConfigType::Float,
                                           &o2PendingMl_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<uint8_t,0> filtrationDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationSlot), "filtr_slot", "poollogic/devices", ConfigType::UInt8,
+    // Aiguillage role -> slot PoolDevice : chaque variable vit dans la branche
+    // metier correspondante (les cles NVS pl_s* restent inchangees).
+    ConfigVariable<uint8_t,0> filtrationDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationSlot), "filtr_slot", "poollogic/filtration", ConfigType::UInt8,
                                                    &filtrationDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> swgDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::SwgSlot), "swg_slot", "poollogic/devices", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> swgDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::SwgSlot), "swg_slot", "poollogic/swg", ConfigType::UInt8,
                                             &swgDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> robotDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::RobotSlot), "robot_slot", "poollogic/devices", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> robotDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::RobotSlot), "robot_slot", "poollogic/robot", ConfigType::UInt8,
                                               &robotDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> fillingDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FillingSlot), "fill_slot", "poollogic/devices", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> fillingDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FillingSlot), "fill_slot", "poollogic/refill", ConfigType::UInt8,
                                                 &fillingDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> phPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::PhPumpSlot), "ph_pump_slot", "poollogic/devices", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> phPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::PhPumpSlot), "ph_pump_slot", "poollogic/ph", ConfigType::UInt8,
                                                &phPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> orpPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::OrpPumpSlot), "dis_pump_slot", "poollogic/devices", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> orpPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::OrpPumpSlot), "dis_pump_slot", "poollogic/chlorine", ConfigType::UInt8,
                                                 &orpPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> heaterDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSlot), "heater_slot", "poollogic/devices", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> heaterDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSlot), "heater_slot", "poollogic/heater", ConfigType::UInt8,
                                                &heaterDeviceSlot_, ConfigPersistence::Persistent, 0};
 
     ConfigVariable<uint8_t,0> flowCopyDelayVar_{NVS_KEY(NvsKeys::PoolLogic::FlowCopyDelay), "flow_copy_delay_s", "poollogic/safety", ConfigType::UInt8,
