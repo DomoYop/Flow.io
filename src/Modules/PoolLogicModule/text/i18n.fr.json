@@ -1,7 +1,7 @@
 {
   "translations": {
     "cfgmods.poollogic.compose.device.label": "Équipement associé",
-    "cfgmods.poollogic.compose.disinfection.label": "Type de désinfection",
+    "cfgmods.poollogic.compose.disinfection.label": "Désinfection",
     "cfgdocs.poollogic.chlorine.dis_auto_mode.help": "Active la régulation automatique ORP/chlore.",
     "cfgdocs.poollogic.chlorine.dis_auto_mode.label": "Mode auto ORP",
     "cfgdocs.poollogic.chlorine.dis_kd.help": "Gain dérivé du régulateur ORP.",
@@ -10,7 +10,7 @@
     "cfgdocs.poollogic.chlorine.dis_ki.label": "ORP Ki",
     "cfgdocs.poollogic.chlorine.dis_kp.help": "Gain proportionnel du régulateur ORP.",
     "cfgdocs.poollogic.chlorine.dis_kp.label": "ORP Kp",
-    "cfgdocs.poollogic.chlorine.dis_setpoint.help": "Valeur cible ORP pour la régulation chlore.",
+    "cfgdocs.poollogic.chlorine.dis_setpoint.help": "Valeur cible ORP (redox) mesurant le niveau de désinfectant dans l'eau, commune à tous les modes de désinfection.",
     "cfgdocs.poollogic.chlorine.dis_setpoint.label": "Consigne ORP",
     "cfgdocs.poollogic.chlorine.dis_window_ms.help": "Fenêtre temporelle PWM appliquée a la pompe ORP.",
     "cfgdocs.poollogic.chlorine.dis_window_ms.label": "Fenêtre ORP (ms)",

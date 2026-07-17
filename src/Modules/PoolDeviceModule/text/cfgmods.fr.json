@@ -8,7 +8,9 @@
     "poollogic/devices": {
       "label_t": "cfgmods.pdm.devices.label",
       "help_t": "cfgmods.pdm.devices.help",
+      "order": 0,
       "compose": [
+        { "module": "poollogic/modes", "fields": ["disinfection_type"], "label_t": "cfgmods.poollogic.compose.disinfection.label" },
         { "module": "pdm/pd0", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd0.label" },
         { "module": "pdm/pd1", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd1.label" },
         { "module": "pdm/pd2", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd2.label" },

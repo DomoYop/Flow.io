@@ -8193,6 +8193,14 @@
       return source === 'supervisor' ? supCfgChildrenCache : flowCfgChildrenCache;
     }
 
+    function cfgChildTreeOrder(childPath) {
+      // Ordre optionnel declare par la meta "order" du doc de branche
+      // (ex: poollogic/devices en tete). Defaut 1000, puis tri alphabetique.
+      const meta = configPathMeta(childPath);
+      const order = meta ? Number(meta.order) : NaN;
+      return Number.isFinite(order) ? order : 1000;
+    }
+
     function cfgFilteredChildren(source, prefix) {
       const p = nettoyerNomFlowCfg(prefix);
       const node = cfgChildrenCacheForSource(source)[cfgCacheKey(p)];
@@ -8202,7 +8210,12 @@
           const childPath = p ? (p + '/' + name) : name;
           return !isConfigPathHidden(childPath) && !cfgIsAliasStoreShadowPath(childPath);
         })
-        .slice();
+        .sort((a, b) => {
+          const pathA = p ? (p + '/' + a) : a;
+          const pathB = p ? (p + '/' + b) : b;
+          const orderDiff = cfgChildTreeOrder(pathA) - cfgChildTreeOrder(pathB);
+          return orderDiff !== 0 ? orderDiff : a.localeCompare(b);
+        });
     }
 
     function cfgExpandAncestors(source, pathValue) {
