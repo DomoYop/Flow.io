@@ -2,6 +2,7 @@
   "locale": "en",
   "translations": {
     "cfgmods.poollogic.compose.device.label": "Équipement associé",
+    "cfgmods.poollogic.compose.disinfection.label": "Type de désinfection",
     "cfgdocs.poollogic.chlorine.dis_auto_mode.help": "Enable automatic ORP/chlore.",
     "cfgdocs.poollogic.chlorine.dis_auto_mode.label": "Auto mode ORP",
     "cfgdocs.poollogic.chlorine.dis_kd.help": "Gain dérivé of régulateur ORP.",
