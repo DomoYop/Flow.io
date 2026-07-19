@@ -1,90 +1,150 @@
 /**
  * @file FiltrationWindow.cpp
- * @brief Deterministic filtration window computation helper implementation.
+ * @brief Deterministic turnover-based filtration plan computation helper implementation.
  */
 
 #include "Modules/PoolLogicModule/FiltrationWindow.h"
 #include "Domain/Pool/PoolDefaults.h"
 #include <math.h>
 
-static int clampClockHour_(int hour)
+static constexpr uint16_t kMinutesPerDay = 1440;
+
+static bool isValidWindow_(const FiltrationPlanWindow& w)
 {
-    if (hour < 0) return 0;
-    if (hour > PoolDefaults::MaxClockHour) return PoolDefaults::MaxClockHour;
-    return hour;
+    if (!w.enabled) return false;
+    if (w.startMinute >= kMinutesPerDay || w.stopMinute >= kMinutesPerDay) return false;
+    return w.startMinute != w.stopMinute;
 }
 
-static void setWidestAvailableWindow_(const FiltrationWindowInput& in, FiltrationWindowOutput& out)
+// Longueur en minutes, fenetres traversant minuit incluses.
+static uint16_t windowLength_(const FiltrationPlanWindow& w)
 {
-    int start = clampClockHour_((int)in.startMinHour);
-    int stop = clampClockHour_((int)in.stopMaxHour);
+    return (uint16_t)((w.stopMinute + kMinutesPerDay - w.startMinute) % kMinutesPerDay);
+}
 
-    if (stop <= start) {
-        if (start < PoolDefaults::MaxClockHour) {
-            stop = start + PoolDefaults::MinEmergencyDurationHours;
-        } else {
-            start = PoolDefaults::FallbackStartHour;
-            stop = PoolDefaults::MaxClockHour;
+// Test [start, stop) avec passage de minuit quand stop < start.
+static bool minuteInSegment_(uint16_t startMinute, uint16_t stopMinute, uint16_t minuteOfDay)
+{
+    if (startMinute == stopMinute) return false;
+    return (stopMinute < startMinute)
+        ? (minuteOfDay >= startMinute || minuteOfDay < stopMinute)
+        : (minuteOfDay >= startMinute && minuteOfDay < stopMinute);
+}
+
+float filtrationCyclesForTemp(float tempC)
+{
+    const auto* curve = PoolDefaults::kFiltrationCyclesCurve;
+    const uint8_t n = PoolDefaults::FiltrationCyclesCurveCount;
+
+    if (tempC <= curve[0].tempC) return curve[0].cyclesPerDay;
+    if (tempC >= curve[n - 1].tempC) return curve[n - 1].cyclesPerDay;
+
+    for (uint8_t i = 1; i < n; ++i) {
+        if (tempC < curve[i].tempC) {
+            const float span = curve[i].tempC - curve[i - 1].tempC;
+            const float t = (tempC - curve[i - 1].tempC) / span;
+            return curve[i - 1].cyclesPerDay + t * (curve[i].cyclesPerDay - curve[i - 1].cyclesPerDay);
         }
     }
-
-    out.durationHours = (uint8_t)(stop - start);
-    out.startHour = (uint8_t)start;
-    out.stopHour = (uint8_t)stop;
+    return curve[n - 1].cyclesPerDay;
 }
 
-bool computeFiltrationWindowDeterministic(const FiltrationWindowInput& in, FiltrationWindowOutput& out)
+bool computeFiltrationPlan(const FiltrationPlanInput& in, FiltrationPlanOutput& out)
 {
-    if (!isfinite(in.waterTemp)) {
-        setWidestAvailableWindow_(in, out);
+    out = FiltrationPlanOutput{};
+
+    // Tri des fenetres valides par priorite croissante (indice comme egalite).
+    uint8_t order[FILTRATION_PLAN_MAX_WINDOWS];
+    uint8_t validCount = 0;
+    uint16_t totalCapacity = 0;
+    for (uint8_t i = 0; i < FILTRATION_PLAN_MAX_WINDOWS; ++i) {
+        if (!isValidWindow_(in.windows[i])) continue;
+        order[validCount++] = i;
+        totalCapacity = (uint16_t)(totalCapacity + windowLength_(in.windows[i]));
+    }
+    for (uint8_t a = 1; a < validCount; ++a) {
+        const uint8_t idx = order[a];
+        uint8_t b = a;
+        while (b > 0 && in.windows[order[b - 1]].priority > in.windows[idx].priority) {
+            order[b] = order[b - 1];
+            --b;
+        }
+        order[b] = idx;
+    }
+
+    const bool inputValid = isfinite(in.waterTemp) && in.poolVolumeM3 > 0.0f && in.pumpFlowM3h > 0.0f;
+    out.fallback = !inputValid;
+
+    // Aucune fenetre exploitable : segment de secours de duree minimale
+    // centre sur le pivot solaire, pour ne jamais laisser l'eau sans brassage.
+    if (validCount == 0) {
+        const uint16_t take = PoolDefaults::FiltrationMinTotalMinutes;
+        const uint16_t pivot = (uint16_t)PoolDefaults::FiltrationPivotHour * 60u;
+        const uint16_t segStart = (uint16_t)((pivot + kMinutesPerDay - take / 2u) % kMinutesPerDay);
+        out.segments[0].startMinute = segStart;
+        out.segments[0].stopMinute = (uint16_t)((segStart + take) % kMinutesPerDay);
+        out.segmentCount = 1;
+        out.requiredMinutes = take;
+        out.plannedMinutes = take;
+        out.fallback = true;
         return true;
     }
 
-    int duration = PoolDefaults::MinDurationHours;
-    if (in.waterTemp < in.lowThreshold) {
-        duration = PoolDefaults::MinDurationHours;
-    } else if (in.waterTemp < in.setpoint) {
-        duration = (int)lroundf(in.waterTemp * PoolDefaults::FactorLow);
-    } else {
-        duration = (int)lroundf(in.waterTemp * PoolDefaults::FactorHigh);
-    }
-
-    if (duration < PoolDefaults::MinDurationHours) duration = PoolDefaults::MinDurationHours;
-    if (duration > PoolDefaults::MaxDurationHours) duration = PoolDefaults::MaxDurationHours;
-
-    int startMin = clampClockHour_((int)in.startMinHour);
-    int stopMax = clampClockHour_((int)in.stopMaxHour);
-
-    int start = PoolDefaults::FiltrationPivotHour - (int)lroundf((float)duration * PoolDefaults::FactorHigh);
-    if (start < startMin) start = startMin;
-
-    int stop = start + duration;
-    if (stop > stopMax) stop = stopMax;
-
-    if (stop <= start) {
-        if (start < PoolDefaults::MaxClockHour) {
-            stop = start + PoolDefaults::MinEmergencyDurationHours;
-        } else {
-            start = PoolDefaults::FallbackStartHour;
-            stop = PoolDefaults::MaxClockHour;
+    uint16_t required = totalCapacity;
+    if (inputValid) {
+        const float cycles = filtrationCyclesForTemp(in.waterTemp);
+        const float hours = (in.poolVolumeM3 * cycles) / in.pumpFlowM3h;
+        long minutes = lroundf(hours * 60.0f);
+        if (minutes < (long)PoolDefaults::FiltrationMinTotalMinutes) {
+            minutes = (long)PoolDefaults::FiltrationMinTotalMinutes;
         }
+        if (minutes > (long)totalCapacity) minutes = (long)totalCapacity;
+        required = (uint16_t)minutes;
+    }
+    out.requiredMinutes = required;
+
+    // Allocation par priorite : chaque fenetre recoit ce qu'il reste, segment
+    // centre dans la fenetre. Les reliquats sous la duree minimale de segment
+    // sont arrondis vers le haut (jamais de cycle pompe trop court).
+    uint16_t remaining = required;
+    for (uint8_t a = 0; a < validCount && remaining > 0; ++a) {
+        const FiltrationPlanWindow& w = in.windows[order[a]];
+        const uint16_t len = windowLength_(w);
+        uint16_t take = (remaining < len) ? remaining : len;
+        if (take < PoolDefaults::FiltrationMinSegmentMinutes) {
+            if (len < PoolDefaults::FiltrationMinSegmentMinutes) continue;
+            take = PoolDefaults::FiltrationMinSegmentMinutes;
+        }
+        const uint16_t offset = (uint16_t)((len - take) / 2u);
+        const uint16_t segStart = (uint16_t)((w.startMinute + offset) % kMinutesPerDay);
+        FiltrationPlanSegment& seg = out.segments[out.segmentCount++];
+        seg.startMinute = segStart;
+        seg.stopMinute = (uint16_t)((segStart + take) % kMinutesPerDay);
+        out.plannedMinutes = (uint16_t)(out.plannedMinutes + take);
+        remaining = (remaining > take) ? (uint16_t)(remaining - take) : 0;
     }
 
-    out.durationHours = (uint8_t)(stop - start);
-    out.startHour = (uint8_t)start;
-    out.stopHour = (uint8_t)stop;
+    // Besoin entierement sous la duree minimale de segment : forcer au moins
+    // un segment dans la fenetre la plus prioritaire.
+    if (out.segmentCount == 0) {
+        const FiltrationPlanWindow& w = in.windows[order[0]];
+        const uint16_t len = windowLength_(w);
+        const uint16_t take = (required < len) ? required : len;
+        const uint16_t offset = (uint16_t)((len - take) / 2u);
+        const uint16_t segStart = (uint16_t)((w.startMinute + offset) % kMinutesPerDay);
+        out.segments[0].startMinute = segStart;
+        out.segments[0].stopMinute = (uint16_t)((segStart + take) % kMinutesPerDay);
+        out.segmentCount = 1;
+        out.plannedMinutes = take;
+    }
     return true;
 }
 
-bool isFiltrationWindowActiveAtMinute(uint8_t startHour, uint8_t stopHour, uint16_t minuteOfDay)
+bool isFiltrationPlanActiveAtMinute(const FiltrationPlanOutput& plan, uint16_t minuteOfDay)
 {
-    const uint16_t clampedMinute = (minuteOfDay < 1440U) ? minuteOfDay : 1439U;
-    const uint16_t startMinute = (uint16_t)(((startHour < 24U) ? startHour : 23U) * 60U);
-    const uint16_t stopMinute = (uint16_t)(((stopHour < 24U) ? stopHour : 23U) * 60U);
-
-    if (startMinute == stopMinute) return false;
-
-    return (stopMinute <= startMinute)
-        ? (clampedMinute >= startMinute || clampedMinute < stopMinute)
-        : (clampedMinute >= startMinute && clampedMinute < stopMinute);
+    const uint16_t m = (minuteOfDay < kMinutesPerDay) ? minuteOfDay : (uint16_t)(kMinutesPerDay - 1);
+    for (uint8_t i = 0; i < plan.segmentCount && i < FILTRATION_PLAN_MAX_WINDOWS; ++i) {
+        if (minuteInSegment_(plan.segments[i].startMinute, plan.segments[i].stopMinute, m)) return true;
+    }
+    return false;
 }

@@ -95,17 +95,10 @@
         { "path": "pdm/pd5/enabled", "eq": true }
       ]
     },
-    "poollogic/filtration/wat_temp_lo_th": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/wat_temp_setpt": {
+    "poollogic/filtration/pump_flow_m3h": {
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
     },
     "poollogic/filtration/filtr_start_clc": {
-      "enum_set": "hours_of_day",
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/filtr_start_min": {
       "enum_set": "hours_of_day",
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
     },
@@ -113,9 +106,59 @@
       "enum_set": "hours_of_day",
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
     },
-    "poollogic/filtration/filtr_stop_max": {
-      "enum_set": "hours_of_day",
+    "poollogic/filtration/filtr_w1_en": {
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+    },
+    "poollogic/filtration/filtr_w1_start": {
+      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+    },
+    "poollogic/filtration/filtr_w1_stop": {
+      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+    },
+    "poollogic/filtration/filtr_w1_prio": {
+      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+    },
+    "poollogic/filtration/filtr_w2_en": {
+      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+    },
+    "poollogic/filtration/filtr_w2_start": {
+      "visible_if": [
+        { "path": "pdm/pd0/enabled", "eq": true },
+        { "path": "poollogic/filtration/filtr_w2_en", "eq": true }
+      ]
+    },
+    "poollogic/filtration/filtr_w2_stop": {
+      "visible_if": [
+        { "path": "pdm/pd0/enabled", "eq": true },
+        { "path": "poollogic/filtration/filtr_w2_en", "eq": true }
+      ]
+    },
+    "poollogic/filtration/filtr_w2_prio": {
+      "visible_if": [
+        { "path": "pdm/pd0/enabled", "eq": true },
+        { "path": "poollogic/filtration/filtr_w2_en", "eq": true }
+      ]
+    },
+    "poollogic/filtration/filtr_w3_en": {
+      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+    },
+    "poollogic/filtration/filtr_w3_start": {
+      "visible_if": [
+        { "path": "pdm/pd0/enabled", "eq": true },
+        { "path": "poollogic/filtration/filtr_w3_en", "eq": true }
+      ]
+    },
+    "poollogic/filtration/filtr_w3_stop": {
+      "visible_if": [
+        { "path": "pdm/pd0/enabled", "eq": true },
+        { "path": "poollogic/filtration/filtr_w3_en", "eq": true }
+      ]
+    },
+    "poollogic/filtration/filtr_w3_prio": {
+      "visible_if": [
+        { "path": "pdm/pd0/enabled", "eq": true },
+        { "path": "poollogic/filtration/filtr_w3_en", "eq": true }
+      ]
     },
     "poollogic/filtration/filtr_slot": {
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }

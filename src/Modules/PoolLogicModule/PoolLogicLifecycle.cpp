@@ -165,10 +165,9 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
 void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
 {
     if (const PoolLogicDefaultsSpec* d = domain.poolLogicDefaults) {
-        waterTempLowThreshold_ = d->tempLow;
-        waterTempSetpoint_ = d->tempHigh;
-        filtrationStartMin_ = d->filtrationStartMinHour;
-        filtrationStopMax_ = d->filtrationStopMaxHour;
+        // La plage historique du domaine devient la fenetre 1 du plan.
+        filtrWinStart_[0] = (uint16_t)d->filtrationStartMinHour * 60u;
+        filtrWinStop_[0] = (uint16_t)d->filtrationStopMaxHour * 60u;
         filtrationCalcStart_ = d->filtrationStartMinHour;
         filtrationCalcStop_ = d->filtrationStopMaxHour;
         pressureLowThreshold_ = d->pressureLow;
@@ -246,10 +245,19 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     disinfectionTypeVar_.moduleName = kCfgModuleModes;
     swgControlModeVar_.moduleName = kCfgModuleSwg;
 
-    tempLowVar_.moduleName = kCfgModuleFiltration;
-    tempSetpointVar_.moduleName = kCfgModuleFiltration;
-    startMinVar_.moduleName = kCfgModuleFiltration;
-    stopMaxVar_.moduleName = kCfgModuleFiltration;
+    pumpFlowVar_.moduleName = kCfgModuleFiltration;
+    filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
+    filtrWin1StartVar_.moduleName = kCfgModuleFiltration;
+    filtrWin1StopVar_.moduleName = kCfgModuleFiltration;
+    filtrWin1PrioVar_.moduleName = kCfgModuleFiltration;
+    filtrWin2EnVar_.moduleName = kCfgModuleFiltration;
+    filtrWin2StartVar_.moduleName = kCfgModuleFiltration;
+    filtrWin2StopVar_.moduleName = kCfgModuleFiltration;
+    filtrWin2PrioVar_.moduleName = kCfgModuleFiltration;
+    filtrWin3EnVar_.moduleName = kCfgModuleFiltration;
+    filtrWin3StartVar_.moduleName = kCfgModuleFiltration;
+    filtrWin3StopVar_.moduleName = kCfgModuleFiltration;
+    filtrWin3PrioVar_.moduleName = kCfgModuleFiltration;
     calcStartVar_.moduleName = kCfgModuleFiltration;
     calcStopVar_.moduleName = kCfgModuleFiltration;
 
@@ -323,10 +331,19 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(disinfectionTypeVar_, kCfgModuleId, kCfgBranchModes);
     cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchSwg);
 
-    cfg.registerVar(tempLowVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(tempSetpointVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(startMinVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(stopMaxVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(pumpFlowVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin1EnVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin1StartVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin1StopVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin1PrioVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin2EnVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin2StartVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin2StopVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin2PrioVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin3EnVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin3StartVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin3StopVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin3PrioVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(calcStartVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(calcStopVar_, kCfgModuleId, kCfgBranchFiltration);
 
@@ -695,53 +712,21 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addSensor(haSvc->ctx, &o2PumpFlow);
     }
     if (haSvc && haSvc->addNumber) {
-        const HANumberEntry waterTempSetpoint{
+        const HANumberEntry pumpFlow{
             "poollogic",
-            "pl_wat_temp_sp",
-            "Water Temperature Setpoint",
+            "pl_pump_flow",
+            "Filtration Pump Flow",
             "cfg/poollogic/filtration",
-            "{{ value_json.wat_temp_setpt | float(0) }}",
+            "{{ value_json.pump_flow_m3h | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/filtration\\\":{\\\"wat_temp_setpt\\\":{{ value | float(0) }}}}",
-            5.0f,
-            35.0f,
-            0.1f,
-            "slider",
-            "config",
-            "mdi:thermometer-water",
-            "C"
-        };
-        const HANumberEntry filtrationStartMin{
-            "poollogic",
-            "pl_flt_start_min",
-            "Min Start Filtration Pump",
-            "cfg/poollogic/filtration",
-            "{{ value_json.filtr_start_min | int(0) }}",
-            MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/filtration\\\":{\\\"filtr_start_min\\\":{{ value | int(0) }}}}",
-            0.0f,
-            23.0f,
+            "{\\\"poollogic/filtration\\\":{\\\"pump_flow_m3h\\\":{{ value | float(0) }}}}",
             1.0f,
+            40.0f,
+            0.5f,
             "box",
             "config",
-            "mdi:clock-start",
-            "h"
-        };
-        const HANumberEntry filtrationStopMax{
-            "poollogic",
-            "pl_flt_stop_max",
-            "Max End Filtration Pump",
-            "cfg/poollogic/filtration",
-            "{{ value_json.filtr_stop_max | int(0) }}",
-            MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/filtration\\\":{\\\"filtr_stop_max\\\":{{ value | int(0) }}}}",
-            0.0f,
-            23.0f,
-            1.0f,
-            "box",
-            "config",
-            "mdi:clock-end",
-            "h"
+            "mdi:pump",
+            "m3/h"
         };
         const HANumberEntry delayPidsMin{
             "poollogic",
@@ -999,10 +984,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:timer-check-outline",
             "min"
         };
-        (void)haSvc->addNumber(haSvc->ctx, &waterTempSetpoint);
         (void)haSvc->addNumber(haSvc->ctx, &heaterSetpoint);
-        (void)haSvc->addNumber(haSvc->ctx, &filtrationStartMin);
-        (void)haSvc->addNumber(haSvc->ctx, &filtrationStopMax);
+        (void)haSvc->addNumber(haSvc->ctx, &pumpFlow);
         (void)haSvc->addNumber(haSvc->ctx, &delayPidsMin);
         (void)haSvc->addNumber(haSvc->ctx, &delayElectroMin);
         (void)haSvc->addNumber(haSvc->ctx, &fillMinUptime);
@@ -1351,7 +1334,14 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
     ensureDailySlot_();
 
     if (schedSvc_ && schedSvc_->isActive) {
-        filtrationWindowActive_ = schedSvc_->isActive(schedSvc_->ctx, SLOT_FILTR_WINDOW);
+        bool active = false;
+        for (uint8_t i = 0; i < FILTRATION_PLAN_MAX_WINDOWS; ++i) {
+            if (schedSvc_->isActive(schedSvc_->ctx, (uint8_t)(SLOT_FILTR_WINDOW_BASE + i))) {
+                active = true;
+                break;
+            }
+        }
+        filtrationWindowActive_ = active;
     }
 
     // Trigger one recompute on startup, after persisted config and scheduler
@@ -1470,14 +1460,25 @@ void PoolLogicModule::onEvent_(const Event& e)
         const ConfigChangedPayload* p = (const ConfigChangedPayload*)e.payload;
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
             p->localBranchId == kCfgBranchFiltration) {
-            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStart) == 0 ||
-                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStop) == 0) {
-                (void)applyFiltrationWindowSlot_(filtrationCalcStart_, filtrationCalcStop_);
-            } else {
+            // Les cles calculees sont des sorties pures du plan : les re-appliquer
+            // ici ecraserait les segments multi-fenetres (et bouclerait avec le
+            // recalcul qui les ecrit).
+            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStart) != 0 &&
+                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStop) != 0) {
                 portENTER_CRITICAL(&pendingMux_);
                 pendingDailyRecalc_ = true;
                 portEXIT_CRITICAL(&pendingMux_);
             }
+            return;
+        }
+        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
+            p->localBranchId == kCfgBranchO2 &&
+            p->nvsKey &&
+            strcmp(p->nvsKey, NvsKeys::PoolLogic::O2PoolVolumeM3) == 0) {
+            // Le volume du bassin sert aussi au besoin de filtration (turnover).
+            portENTER_CRITICAL(&pendingMux_);
+            pendingDailyRecalc_ = true;
+            portEXIT_CRITICAL(&pendingMux_);
             return;
         }
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
@@ -1573,16 +1574,22 @@ void PoolLogicModule::onEvent_(const Event& e)
     }
 
     // Scheduler edges only latch intent/state; the loop owns the control work.
+    // Avec plusieurs segments, un front Stop peut coincider avec le Start du
+    // suivant : on reevalue le plan complet plutot que de suivre le dernier front.
     if (p->eventId == POOLLOGIC_EVENT_FILTRATION_WINDOW) {
-        if (edge == SchedulerEdge::Start) {
-            portENTER_CRITICAL(&pendingMux_);
-            filtrationWindowActive_ = true;
-            portEXIT_CRITICAL(&pendingMux_);
-        } else if (edge == SchedulerEdge::Stop) {
-            portENTER_CRITICAL(&pendingMux_);
-            filtrationWindowActive_ = false;
-            portEXIT_CRITICAL(&pendingMux_);
+        FiltrationPlanOutput planCopy{};
+        portENTER_CRITICAL(&pendingMux_);
+        planCopy = filtrationPlan_;
+        portEXIT_CRITICAL(&pendingMux_);
+
+        bool active = (edge == SchedulerEdge::Start);
+        if (planCopy.segmentCount > 0) {
+            bool planActive = false;
+            if (currentFiltrationPlanActive_(planCopy, planActive)) active = planActive;
         }
+        portENTER_CRITICAL(&pendingMux_);
+        filtrationWindowActive_ = active;
+        portEXIT_CRITICAL(&pendingMux_);
     }
 }
 

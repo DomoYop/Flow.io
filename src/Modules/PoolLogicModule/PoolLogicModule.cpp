@@ -37,10 +37,19 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.heaterAutoModeVar_.moduleName = kCfgModuleHeater;
     self.phDosePlusVar_.moduleName = kCfgModulePh;
     self.disinfectionTypeVar_.moduleName = kCfgModuleModes;
-    self.tempLowVar_.moduleName = kCfgModuleFiltration;
-    self.tempSetpointVar_.moduleName = kCfgModuleFiltration;
-    self.startMinVar_.moduleName = kCfgModuleFiltration;
-    self.stopMaxVar_.moduleName = kCfgModuleFiltration;
+    self.pumpFlowVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin1StartVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin1StopVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin1PrioVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin2EnVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin2StartVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin2StopVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin2PrioVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin3EnVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin3StartVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin3StopVar_.moduleName = kCfgModuleFiltration;
+    self.filtrWin3PrioVar_.moduleName = kCfgModuleFiltration;
     self.calcStartVar_.moduleName = kCfgModuleFiltration;
     self.calcStopVar_.moduleName = kCfgModuleFiltration;
 

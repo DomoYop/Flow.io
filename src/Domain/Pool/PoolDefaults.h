@@ -6,18 +6,43 @@ namespace PoolDefaults {
 
 constexpr uint8_t FiltrationPivotHour = 15;
 constexpr uint8_t MinDurationHours = 2;
-constexpr uint8_t MaxDurationHours = 24;
-constexpr uint8_t MaxClockHour = 23;
-constexpr uint8_t FallbackStartHour = 22;
-constexpr uint8_t MinEmergencyDurationHours = 1;
 
 constexpr float TempLow = 12.0f;
 constexpr float TempHigh = 24.0f;
-constexpr float FactorLow = 1.0f / 3.0f;
-constexpr float FactorHigh = 1.0f / 2.0f;
 
 constexpr uint8_t FiltrationStartMinHour = 8;
 constexpr uint8_t FiltrationStopMaxHour = 23;
+
+// Filtration par renouvellement volumique : besoin = volume * cycles(T) / debit.
+constexpr float PumpFlowM3h = 10.0f;
+constexpr uint16_t FiltrationMinTotalMinutes = (uint16_t)MinDurationHours * 60u;
+constexpr uint16_t FiltrationMinSegmentMinutes = 30;
+
+// Courbe cycles de renouvellement par jour en fonction de la temperature de
+// l'eau (interpolation lineaire entre points, plateau aux extremes).
+struct FiltrationCyclesPoint {
+    float tempC;
+    float cyclesPerDay;
+};
+inline constexpr FiltrationCyclesPoint kFiltrationCyclesCurve[] = {
+    {10.0f, 0.25f},
+    {14.0f, 0.40f},
+    {18.0f, 0.60f},
+    {22.0f, 1.00f},
+    {25.0f, 1.40f},
+    {28.0f, 2.00f},
+    {31.0f, 3.00f},
+};
+constexpr uint8_t FiltrationCyclesCurveCount =
+    (uint8_t)(sizeof(kFiltrationCyclesCurve) / sizeof(kFiltrationCyclesCurve[0]));
+
+// Fenetres de filtration par defaut (minutes depuis minuit). La fenetre 1
+// reprend la plage historique 08:00-23:00 ; la fenetre 2 est un gabarit
+// heures creuses 23:30-07:30 livre desactive.
+constexpr uint16_t FiltrWin1StartMinute = (uint16_t)FiltrationStartMinHour * 60u;
+constexpr uint16_t FiltrWin1StopMinute = (uint16_t)FiltrationStopMaxHour * 60u;
+constexpr uint16_t FiltrWin2StartMinute = 23u * 60u + 30u;
+constexpr uint16_t FiltrWin2StopMinute = 7u * 60u + 30u;
 
 constexpr float PressureLow = 0.15f;
 constexpr float PressureHigh = 1.80f;

@@ -1077,14 +1077,16 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
 
     bool windowActive = false;
     bool forceFiltrationReconcile = false;
+    FiltrationPlanOutput planCopy{};
     portENTER_CRITICAL(&pendingMux_);
     windowActive = filtrationWindowActive_;
     forceFiltrationReconcile = pendingFiltrationReconcile_;
     pendingFiltrationReconcile_ = false;
+    planCopy = filtrationPlan_;
     portEXIT_CRITICAL(&pendingMux_);
 
     bool clockWindowActive = false;
-    if (currentFiltrationWindowActive_(filtrationCalcStart_, filtrationCalcStop_, clockWindowActive)) {
+    if (planCopy.segmentCount > 0 && currentFiltrationPlanActive_(planCopy, clockWindowActive)) {
         if (clockWindowActive != windowActive || forceFiltrationReconcile) {
             windowActive = clockWindowActive;
             portENTER_CRITICAL(&pendingMux_);
@@ -1092,7 +1094,13 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
             portEXIT_CRITICAL(&pendingMux_);
         }
     } else if (forceFiltrationReconcile && schedSvc_ && schedSvc_->isActive) {
-        windowActive = schedSvc_->isActive(schedSvc_->ctx, SLOT_FILTR_WINDOW);
+        windowActive = false;
+        for (uint8_t i = 0; i < planCopy.segmentCount; ++i) {
+            if (schedSvc_->isActive(schedSvc_->ctx, (uint8_t)(SLOT_FILTR_WINDOW_BASE + i))) {
+                windowActive = true;
+                break;
+            }
+        }
         portENTER_CRITICAL(&pendingMux_);
         filtrationWindowActive_ = windowActive;
         portEXIT_CRITICAL(&pendingMux_);

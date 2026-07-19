@@ -16,6 +16,7 @@
 #include "Core/Services/Services.h"
 #include "Domain/Pool/PoolDefaults.h"
 #include "Domain/Pool/PoolIds.h"
+#include "Modules/PoolLogicModule/FiltrationWindow.h"
 
 /** @brief Event ids owned by PoolLogicModule. */
 constexpr uint16_t POOLLOGIC_EVENT_DAILY_RECALC = 0x2101;
@@ -151,7 +152,7 @@ private:
     };
 
     static constexpr uint8_t SLOT_DAILY_RECALC = 3;
-    static constexpr uint8_t SLOT_FILTR_WINDOW = 4;
+    static constexpr uint8_t SLOT_FILTR_WINDOW_BASE = 4;  // slots 4..6, un par segment planifie
 
     // Filet générique si applyDomainDefaults() n'est pas appelé ; les vrais défauts
     // sont injectés par le bootstrap depuis DomainSpec::domainIoSlotBindings.
@@ -177,13 +178,17 @@ private:
     uint8_t disinfectionType_ = DisinfectionChlorineBromine;
     uint8_t swgControlMode_ = SwgControlContinuous;
 
-    // Schedule / filtration window from water temperature
-    float waterTempLowThreshold_ = PoolDefaults::TempLow;
-    float waterTempSetpoint_ = PoolDefaults::TempHigh;
-    uint8_t filtrationStartMin_ = PoolDefaults::FiltrationStartMinHour;
-    uint8_t filtrationStopMax_ = PoolDefaults::FiltrationStopMaxHour;
+    // Schedule / filtration plan (turnover volumique + fenetres priorisees)
+    float pumpFlowM3h_ = PoolDefaults::PumpFlowM3h;
+    bool filtrWinEnabled_[FILTRATION_PLAN_MAX_WINDOWS] = {true, false, false};
+    uint16_t filtrWinStart_[FILTRATION_PLAN_MAX_WINDOWS] = {
+        PoolDefaults::FiltrWin1StartMinute, PoolDefaults::FiltrWin2StartMinute, 0};
+    uint16_t filtrWinStop_[FILTRATION_PLAN_MAX_WINDOWS] = {
+        PoolDefaults::FiltrWin1StopMinute, PoolDefaults::FiltrWin2StopMinute, 0};
+    uint8_t filtrWinPriority_[FILTRATION_PLAN_MAX_WINDOWS] = {1, 2, 3};
     uint8_t filtrationCalcStart_ = PoolDefaults::FiltrationStartMinHour;
     uint8_t filtrationCalcStop_ = PoolDefaults::FiltrationStopMaxHour;
+    FiltrationPlanOutput filtrationPlan_{};  // dernier plan applique (garde par pendingMux_)
 
     // Sensor IO ids for IOServiceV2 reads.
     IoId phIoId_ = IO_ID_PH_DEFAULT;
@@ -323,14 +328,32 @@ private:
     ConfigVariable<uint8_t,0> swgControlModeVar_{NVS_KEY(NvsKeys::PoolLogic::SwgControlMode), "swg_control_mode", "poollogic/swg", ConfigType::UInt8,
                                                  &swgControlMode_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<float,0> tempLowVar_{NVS_KEY(NvsKeys::PoolLogic::TempLow), "wat_temp_lo_th", "poollogic/filtration", ConfigType::Float,
-                                        &waterTempLowThreshold_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> tempSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::TempSetpoint), "wat_temp_setpt", "poollogic/filtration", ConfigType::Float,
-                                             &waterTempSetpoint_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> startMinVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationStartMin), "filtr_start_min", "poollogic/filtration", ConfigType::UInt8,
-                                           &filtrationStartMin_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> stopMaxVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationStopMax), "filtr_stop_max", "poollogic/filtration", ConfigType::UInt8,
-                                          &filtrationStopMax_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> pumpFlowVar_{NVS_KEY(NvsKeys::PoolLogic::PumpFlowM3h), "pump_flow_m3h", "poollogic/filtration", ConfigType::Float,
+                                         &pumpFlowM3h_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> filtrWin1EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Enabled), "filtr_w1_en", "poollogic/filtration", ConfigType::Bool,
+                                           &filtrWinEnabled_[0], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> filtrWin1StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Start), "filtr_w1_start", "poollogic/filtration", ConfigType::UInt16,
+                                                  &filtrWinStart_[0], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> filtrWin1StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Stop), "filtr_w1_stop", "poollogic/filtration", ConfigType::UInt16,
+                                                 &filtrWinStop_[0], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint8_t,0> filtrWin1PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Priority), "filtr_w1_prio", "poollogic/filtration", ConfigType::UInt8,
+                                                &filtrWinPriority_[0], ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> filtrWin2EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Enabled), "filtr_w2_en", "poollogic/filtration", ConfigType::Bool,
+                                           &filtrWinEnabled_[1], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> filtrWin2StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Start), "filtr_w2_start", "poollogic/filtration", ConfigType::UInt16,
+                                                  &filtrWinStart_[1], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> filtrWin2StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Stop), "filtr_w2_stop", "poollogic/filtration", ConfigType::UInt16,
+                                                 &filtrWinStop_[1], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint8_t,0> filtrWin2PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Priority), "filtr_w2_prio", "poollogic/filtration", ConfigType::UInt8,
+                                                &filtrWinPriority_[1], ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> filtrWin3EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Enabled), "filtr_w3_en", "poollogic/filtration", ConfigType::Bool,
+                                           &filtrWinEnabled_[2], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> filtrWin3StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Start), "filtr_w3_start", "poollogic/filtration", ConfigType::UInt16,
+                                                  &filtrWinStart_[2], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> filtrWin3StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Stop), "filtr_w3_stop", "poollogic/filtration", ConfigType::UInt16,
+                                                 &filtrWinStop_[2], ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint8_t,0> filtrWin3PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Priority), "filtr_w3_prio", "poollogic/filtration", ConfigType::UInt8,
+                                                &filtrWinPriority_[2], ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> calcStartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationCalcStart), "filtr_start_clc", "poollogic/filtration", ConfigType::UInt8,
                                             &filtrationCalcStart_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> calcStopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationCalcStop), "filtr_stop_clc", "poollogic/filtration", ConfigType::UInt8,
@@ -475,9 +498,9 @@ private:
 
     // Scheduler
     void ensureDailySlot_();
-    bool applyFiltrationWindowSlot_(uint8_t startHour, uint8_t stopHour);
-    bool currentFiltrationWindowActive_(uint8_t startHour, uint8_t stopHour, bool& activeOut) const;
-    bool computeFiltrationWindow_(float waterTemp, uint8_t& startHourOut, uint8_t& stopHourOut, uint8_t& durationOut);
+    bool applyFiltrationPlanSlots_(const FiltrationPlanOutput& plan);
+    bool currentFiltrationPlanActive_(const FiltrationPlanOutput& plan, bool& activeOut) const;
+    bool computeFiltrationPlan_(float waterTemp, FiltrationPlanOutput& out) const;
     bool recalcAndApplyFiltrationWindow_(uint8_t* startHourOut = nullptr,
                                          uint8_t* stopHourOut = nullptr,
                                          uint8_t* durationOut = nullptr);
