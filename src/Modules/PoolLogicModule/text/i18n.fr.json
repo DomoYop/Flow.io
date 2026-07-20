@@ -82,7 +82,7 @@
     "cfgdocs.poollogic.o2.min_filter_run_min.label": "Filtration mini O2",
     "cfgdocs.poollogic.o2.pending_ml.help": "Volume O2 restant à injecter après interruption ou reboot.",
     "cfgdocs.poollogic.o2.pending_ml.label": "O2 en attente",
-    "cfgdocs.poollogic.o2.pool_volume_m3.help": "Volume du bassin utilisé pour calculer les doses O2.",
+    "cfgdocs.poollogic.o2.pool_volume_m3.help": "Volume du bassin utilisé pour le besoin de filtration (renouvellement volumique) et les doses O2.",
     "cfgdocs.poollogic.o2.pool_volume_m3.label": "Volume bassin",
     "cfgdocs.poollogic.o2.protocol_state.help": "Etat persistant du protocole de dosage O2.",
     "cfgdocs.poollogic.o2.protocol_state.label": "Etat protocole O2",

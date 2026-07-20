@@ -20,9 +20,31 @@ besoin (min) = volume bassin (m³) × cycles(T) / débit pompe (m³/h) × 60
 
 Chaque fenêtre (`filtr_w{1..3}_en/start/stop/prio`, NVS `pl_fw{i}e/s/p/r`) est en **minutes depuis minuit** ; `stop < start` = fenêtre traversant minuit. Le besoin est versé dans les fenêtres par ordre de `prio` (1 = remplie en premier), chaque segment **centré** dans sa fenêtre. Reliquat < 30 min arrondi à 30 min (pas de cycle pompe court) ; reliquat non plaçable tronqué.
 
-**Heures creuses** : créer une fenêtre sur la plage HC (gabarit livré : fenêtre 2 = 23:30–07:30, désactivée) et lui donner `prio` 1 — elle est remplie en premier, le reste déborde sur les fenêtres suivantes.
+**Heures creuses** : créer une fenêtre sur la plage HC et lui donner `prio` 1 — elle est remplie en premier, le reste déborde sur les fenêtres suivantes.
 
-Défauts d'usine : F1 = 08:00–23:00 prio 1 active (reprend `DomainSpec::filtrationStartMinHour/StopMaxHour`) ; F2 = gabarit HC prio 2 inactive ; F3 inactive.
+Défauts d'usine : F1 = 08:00–23:00 prio 1 active (reprend `DomainSpec::filtrationStartMinHour/StopMaxHour`) ; F2 = gabarit HC 23:30–07:30 prio 2 inactive ; F3 inactive.
+
+### Préréglage recommandé : optimisation heures creuses (contrat à double plage HC)
+
+Exemple pour un contrat à 8 h d'HC (nuit 01:00–07:00 + après-midi 14:00–16:00). Les 3 fenêtres priorisées reproduisent la stratégie saisonnière **automatiquement** grâce au besoin turnover, sans logique dédiée :
+
+| Fenêtre | Plage | Priorité | Rôle |
+|---|---|---:|---|
+| F1 | 01:00 → 07:00 | 1 | HC nuit (remplie en premier) |
+| F2 | 14:00 → 16:00 | 2 | HC après-midi |
+| F3 | 16:00 → 19:00 | 3 | Extension HP après-midi (débordement, brassage diurne aux UV) |
+
+Comportement obtenu selon le besoin calculé (donc selon la température) :
+
+- **Été** (besoin ≈ 11–12 h) : 6 h nuit + 2 h HC + extension HP → maximum d'HC tout en gardant du brassage l'après-midi quand les algues se développent.
+- **Intersaison** (besoin ≈ 8 h) : 6 h nuit + 2 h HC = **100 % en HC**, F3 vide, et 2 h de circulation diurne (14–16) conservées.
+- **Hiver** (besoin < 6 h) : tout tombe dans F1 (nuit HC), pas de risque algues à cette température.
+
+Points d'attention :
+
+- La capacité totale des fenêtres actives **plafonne** le besoin ; dimensionner F1+F2+F3 ≥ pic de filtration estival (sinon on filtre moins que le besoin théorique).
+- Séparer HC après-midi (F2) et extension HP (F3) plutôt qu'une seule fenêtre 14:00–19:00 : la priorité remplit alors l'HC avant l'HP, ce que le centrage d'un segment unique ne garantirait pas.
+- **Électrolyse non pilotée par les fenêtres** (choix assumé) : en régulation ORP, l'électrolyseur ne produit que si la pompe tourne *et* l'ORP est sous consigne, donc il s'auto-limite la nuit. Ce préréglage suppose la désinfection en mode **ORP** (en mode « Continu sur filtration », l'électrolyse suivrait la pompe, y compris la nuit).
 
 ## Implémentation
 

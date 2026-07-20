@@ -1987,6 +1987,7 @@
     const poolFiltrationFill = document.getElementById('poolFiltrationFill');
     const poolModeBadges = document.getElementById('poolModeBadges');
     const poolDisinfectionModes = document.getElementById('poolDisinfectionModes');
+    const poolFiltrationPanel = document.getElementById('poolFiltrationPanel');
     const poolAlarmCard = document.getElementById('poolAlarmCard');
     const poolConfigGrid = document.getElementById('poolConfigGrid');
     const calibrationSensorSelect = document.getElementById('calibrationSensorSelect');
@@ -2223,7 +2224,7 @@
     let poolConfigReqSeq = 0;
     const poolConfigModuleDefs = Object.freeze([
       Object.freeze({ module: 'poollogic/modes', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
-      Object.freeze({ module: 'poollogic/filtration', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'La plage de filtration combine contraintes horaires et température d’eau pour protéger le bassin.' }),
+      Object.freeze({ module: 'poollogic/filtration', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
       Object.freeze({ module: 'poollogic/heater', titleKey: 'pool.card.heater.title', title: 'Chauffage', icon: 'thermostat', noteKey: 'pool.card.heater.note', note: 'Le chauffage suit sa consigne seulement quand le mode automatique le permet.' }),
       Object.freeze({ module: 'poollogic/refill', titleKey: 'pool.card.refill.title', title: 'Remplissage', icon: 'water_drop', noteKey: 'pool.card.refill.note', note: 'Le remplissage garde une durée minimale pour éviter les cycles trop courts.' }),
       Object.freeze({ module: 'poollogic/safety', titleKey: 'pool.card.safety.title', title: 'Protections', icon: 'health_and_safety', noteKey: 'pool.card.safety.note', note: 'Seuils de pression, hors gel et bascule hiver utilisés par les automatismes.' }),
@@ -7126,7 +7127,67 @@
       poolAlarmCard.appendChild(list);
     }
 
-    function poolConfigRenderFiltrationCard(def, data) {
+    function poolFiltrationMinutesToTime(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 0 || n > 1439) return '';
+      const m = Math.trunc(n);
+      return String(Math.trunc(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    }
+
+    function poolFiltrationTimeToMinutes(text) {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(String(text || '').trim());
+      if (!m) return null;
+      const v = (Number(m[1]) * 60) + Number(m[2]);
+      return (v >= 0 && v < 1440) ? v : null;
+    }
+
+    async function poolFiltrationApplyPatch(fields, statusEl, applyBtn) {
+      const patch = {};
+      let changes = 0;
+      for (const field of fields) {
+        const value = field.read();
+        if (value === null) {
+          statusEl.textContent = tr('pool.filtration.invalid', 'Valeur invalide : {label}').replace('{label}', field.label);
+          statusEl.className = 'pool-filtration-status is-error';
+          return;
+        }
+        if (value !== field.initial) {
+          const branch = field.branch || 'poollogic/filtration';
+          if (!patch[branch]) patch[branch] = {};
+          patch[branch][field.key] = value;
+          changes += 1;
+        }
+      }
+      if (!changes) {
+        statusEl.textContent = tr('pool.filtration.noChange', 'Aucun changement à appliquer.');
+        statusEl.className = 'pool-filtration-status';
+        return;
+      }
+      applyBtn.disabled = true;
+      statusEl.textContent = tr('pool.filtration.applyBusy', 'Application des fenêtres...');
+      statusEl.className = 'pool-filtration-status';
+      try {
+        await fetchOkJson(
+          '/api/flowcfg/apply',
+          createFormPostOptions({ patch: JSON.stringify(patch) }),
+          tr('pool.filtration.applyError', 'application des fenêtres impossible'),
+          fetchFlowRemoteQueued
+        );
+        statusEl.textContent = tr('pool.filtration.applied', 'Fenêtres appliquées, plan recalculé.');
+        statusEl.className = 'pool-filtration-status is-ok';
+        await loadPoolConfig(true);
+      } catch (err) {
+        statusEl.textContent = String(err || tr('pool.filtration.applyError', 'application des fenêtres impossible'));
+        statusEl.className = 'pool-filtration-status is-error';
+        applyBtn.disabled = false;
+      }
+    }
+
+    function poolConfigRenderFiltrationPanel(modules) {
+      if (!poolFiltrationPanel) return;
+      poolFiltrationPanel.innerHTML = '';
+      const data = modules['poollogic/filtration'] || {};
+
       const card = document.createElement('article');
       card.className = 'pool-config-card pool-filtration-card';
 
@@ -7135,33 +7196,203 @@
       const icon = document.createElement('span');
       icon.className = 'ui-msr pool-card-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = def.icon;
+      icon.textContent = 'waves';
       const copy = document.createElement('div');
       copy.className = 'pool-card-title-wrap';
       const title = document.createElement('h3');
-      title.textContent = tr(def.titleKey, def.title);
+      title.textContent = tr('pool.card.filtration.title', 'Filtration');
+      const note = document.createElement('p');
+      note.textContent = tr('pool.card.filtration.note', 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.');
       copy.appendChild(title);
+      copy.appendChild(note);
+      const plan = document.createElement('div');
+      plan.className = 'pool-filtration-times pool-filtration-plan';
+      const planStart = document.createElement('b');
+      planStart.textContent = poolConfigFormatHour(data.filtr_start_clc);
+      const planArrow = document.createElement('span');
+      planArrow.className = 'ui-msr pool-filtration-arrow';
+      planArrow.setAttribute('aria-hidden', 'true');
+      planArrow.textContent = 'arrow_forward';
+      const planStop = document.createElement('b');
+      planStop.textContent = poolConfigFormatHour(data.filtr_stop_clc);
+      plan.appendChild(planStart);
+      plan.appendChild(planArrow);
+      plan.appendChild(planStop);
       head.appendChild(icon);
       head.appendChild(copy);
+      head.appendChild(plan);
       card.appendChild(head);
 
-      const start = poolConfigFormatHour(data.filtr_start_clc ?? data.filtr_start_min);
-      const stop = poolConfigFormatHour(data.filtr_stop_clc ?? data.filtr_stop_max);
-      const times = document.createElement('div');
-      times.className = 'pool-filtration-times';
-      const startEl = document.createElement('b');
-      startEl.textContent = start;
-      const arrow = document.createElement('span');
-      arrow.className = 'ui-msr pool-filtration-arrow';
-      arrow.setAttribute('aria-hidden', 'true');
-      arrow.textContent = 'arrow_forward';
-      const stopEl = document.createElement('b');
-      stopEl.textContent = stop;
-      times.appendChild(startEl);
-      times.appendChild(arrow);
-      times.appendChild(stopEl);
-      card.appendChild(times);
-      return card;
+      const fields = [];
+      const table = document.createElement('div');
+      table.className = 'pool-fwin-table';
+
+      const headerRow = document.createElement('div');
+      headerRow.className = 'pool-fwin-row pool-fwin-head';
+      [
+        tr('pool.filtration.col.window', 'Fenêtre'),
+        tr('pool.filtration.col.enabled', 'Active'),
+        tr('pool.filtration.col.start', 'Début'),
+        tr('pool.filtration.col.stop', 'Fin'),
+        tr('pool.filtration.col.priority', 'Priorité')
+      ].forEach((text) => {
+        const cell = document.createElement('span');
+        cell.textContent = text;
+        headerRow.appendChild(cell);
+      });
+      table.appendChild(headerRow);
+
+      for (let i = 1; i <= 3; i += 1) {
+        const row = document.createElement('div');
+        row.className = 'pool-fwin-row';
+        const windowLabel = tr('pool.filtration.window', 'Fenêtre {n}').replace('{n}', String(i));
+
+        const name = document.createElement('span');
+        name.className = 'pool-fwin-name';
+        name.textContent = windowLabel;
+        row.appendChild(name);
+
+        const enKey = 'filtr_w' + i + '_en';
+        const enWrap = document.createElement('label');
+        enWrap.className = 'pool-fwin-toggle';
+        const enInput = document.createElement('input');
+        enInput.type = 'checkbox';
+        enInput.checked = toBool(data[enKey]);
+        enWrap.appendChild(enInput);
+        row.appendChild(enWrap);
+        fields.push({
+          key: enKey,
+          label: windowLabel,
+          initial: toBool(data[enKey]),
+          read: () => enInput.checked
+        });
+
+        const syncRowState = () => { row.classList.toggle('is-disabled', !enInput.checked); };
+        enInput.addEventListener('change', syncRowState);
+
+        [['start', 'filtr_w' + i + '_start'], ['stop', 'filtr_w' + i + '_stop']].forEach(([role, key]) => {
+          const input = document.createElement('input');
+          input.type = 'time';
+          input.step = 60;
+          input.className = 'control-input pool-fwin-time';
+          input.value = poolFiltrationMinutesToTime(data[key]);
+          row.appendChild(input);
+          const initial = Number(data[key]);
+          fields.push({
+            key,
+            label: windowLabel + ' — ' + (role === 'start' ? tr('pool.filtration.col.start', 'Début') : tr('pool.filtration.col.stop', 'Fin')),
+            initial: Number.isFinite(initial) ? Math.trunc(initial) : null,
+            read: () => poolFiltrationTimeToMinutes(input.value)
+          });
+        });
+
+        const prioKey = 'filtr_w' + i + '_prio';
+        const prioSelect = document.createElement('select');
+        prioSelect.className = 'control-input pool-fwin-prio';
+        for (let p = 1; p <= 3; p += 1) {
+          const opt = document.createElement('option');
+          opt.value = String(p);
+          opt.textContent = String(p);
+          prioSelect.appendChild(opt);
+        }
+        const prioValue = Number(data[prioKey]);
+        prioSelect.value = String(Number.isFinite(prioValue) && prioValue >= 1 && prioValue <= 3 ? Math.trunc(prioValue) : i);
+        row.appendChild(prioSelect);
+        fields.push({
+          key: prioKey,
+          label: windowLabel + ' — ' + tr('pool.filtration.col.priority', 'Priorité'),
+          initial: Number.isFinite(prioValue) ? Math.trunc(prioValue) : null,
+          read: () => Number(prioSelect.value)
+        });
+
+        syncRowState();
+        table.appendChild(row);
+      }
+      card.appendChild(table);
+
+      const footer = document.createElement('div');
+      footer.className = 'pool-fwin-footer';
+
+      const sizing = document.createElement('div');
+      sizing.className = 'pool-fwin-sizing';
+
+      // Le volume vient de la branche O2 (source unique partagée avec le
+      // dosage) ; le firmware recalcule le plan quand il change.
+      const o2Data = modules['poollogic/o2'] || {};
+      const volumeWrap = document.createElement('label');
+      volumeWrap.className = 'pool-fwin-flow';
+      const volumeLabel = document.createElement('span');
+      volumeLabel.textContent = tr('pool.filtration.poolVolume', 'Volume bassin (m³)');
+      const volumeInput = document.createElement('input');
+      volumeInput.type = 'number';
+      volumeInput.min = '1';
+      volumeInput.max = '500';
+      volumeInput.step = '1';
+      volumeInput.className = 'control-input pool-fwin-flow-input';
+      const volumeValue = Number(o2Data.pool_volume_m3);
+      volumeInput.value = Number.isFinite(volumeValue) ? String(volumeValue) : '';
+      volumeWrap.appendChild(volumeLabel);
+      volumeWrap.appendChild(volumeInput);
+      sizing.appendChild(volumeWrap);
+      fields.push({
+        key: 'pool_volume_m3',
+        branch: 'poollogic/o2',
+        label: tr('pool.filtration.poolVolume', 'Volume bassin (m³)'),
+        initial: Number.isFinite(volumeValue) ? volumeValue : null,
+        read: () => {
+          const v = Number(volumeInput.value);
+          return (Number.isFinite(v) && v > 0) ? v : null;
+        }
+      });
+
+      const flowWrap = document.createElement('label');
+      flowWrap.className = 'pool-fwin-flow';
+      const flowLabel = document.createElement('span');
+      flowLabel.textContent = tr('pool.filtration.pumpFlow', 'Débit pompe (m³/h)');
+      const flowInput = document.createElement('input');
+      flowInput.type = 'number';
+      flowInput.min = '0.5';
+      flowInput.max = '60';
+      flowInput.step = '0.5';
+      flowInput.className = 'control-input pool-fwin-flow-input';
+      const flowValue = Number(data.pump_flow_m3h);
+      flowInput.value = Number.isFinite(flowValue) ? String(flowValue) : '';
+      flowWrap.appendChild(flowLabel);
+      flowWrap.appendChild(flowInput);
+      sizing.appendChild(flowWrap);
+      footer.appendChild(sizing);
+      fields.push({
+        key: 'pump_flow_m3h',
+        label: tr('pool.filtration.pumpFlow', 'Débit pompe (m³/h)'),
+        initial: Number.isFinite(flowValue) ? flowValue : null,
+        read: () => {
+          const v = Number(flowInput.value);
+          return (Number.isFinite(v) && v > 0) ? v : null;
+        }
+      });
+
+      const hint = document.createElement('p');
+      hint.className = 'pool-fwin-hint';
+      hint.textContent = tr('pool.filtration.hint', 'Une fin avant le début fait traverser minuit (ex. heures creuses 23:30 → 07:30). Priorité 1 = fenêtre remplie en premier. Contrat HC : mettez vos plages creuses en priorité 1-2 et une fenêtre diurne en priorité 3 pour le débordement.');
+      footer.appendChild(hint);
+
+      const actions = document.createElement('div');
+      actions.className = 'pool-fwin-actions';
+      const status = document.createElement('span');
+      status.className = 'pool-filtration-status';
+      const applyBtn = document.createElement('button');
+      applyBtn.type = 'button';
+      applyBtn.className = 'btn-primary pool-fwin-apply';
+      applyBtn.textContent = tr('pool.filtration.apply', 'Appliquer');
+      applyBtn.addEventListener('click', () => {
+        poolFiltrationApplyPatch(fields, status, applyBtn).catch(() => {});
+      });
+      actions.appendChild(status);
+      actions.appendChild(applyBtn);
+      footer.appendChild(actions);
+
+      card.appendChild(footer);
+      poolFiltrationPanel.appendChild(card);
     }
 
     function poolConfigRenderGeneralCards(modules) {
@@ -7176,10 +7407,6 @@
       orderedDefs.forEach((def) => {
         if (def.module === 'poollogic/modes' || def.module === 'poollogic/filtration' || def.module === 'poollogic/refill') return;
         const data = modules[def.module] || {};
-        if (def.module === 'poollogic/filtration') {
-          poolConfigGrid.appendChild(poolConfigRenderFiltrationCard(def, data));
-          return;
-        }
         const card = document.createElement('article');
         card.className = 'pool-config-card pool-config-card-' + runtimeMeasureCssSlug(def.module);
 
@@ -7209,6 +7436,7 @@
       const source = modules && typeof modules === 'object' ? modules : {};
       poolConfigRenderHero(source, alarmSlots);
       poolConfigRenderDisinfection(source);
+      poolConfigRenderFiltrationPanel(source);
       poolConfigRenderAlarms([]);
       poolConfigRenderGeneralCards(source);
     }
@@ -7224,6 +7452,15 @@
           card.appendChild(createSkeletonLine('', 42));
           poolDisinfectionModes.appendChild(card);
         }
+      }
+      if (poolFiltrationPanel) {
+        poolFiltrationPanel.innerHTML = '';
+        const card = document.createElement('article');
+        card.className = 'pool-config-card pool-config-skeleton';
+        card.appendChild(createSkeletonLine('', 46));
+        card.appendChild(createSkeletonLine('', 92));
+        card.appendChild(createSkeletonLine('', 80));
+        poolFiltrationPanel.appendChild(card);
       }
       if (poolConfigGrid) {
         poolConfigGrid.innerHTML = '';
@@ -7244,6 +7481,7 @@
 
     function poolConfigRenderError(err) {
       if (poolDisinfectionModes) poolDisinfectionModes.innerHTML = '';
+      if (poolFiltrationPanel) poolFiltrationPanel.innerHTML = '';
       if (poolAlarmCard) {
         poolAlarmCard.hidden = true;
         poolAlarmCard.innerHTML = '';
