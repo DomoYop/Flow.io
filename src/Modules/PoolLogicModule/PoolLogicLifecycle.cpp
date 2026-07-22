@@ -261,6 +261,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     calcStartVar_.moduleName = kCfgModuleFiltration;
     calcStopVar_.moduleName = kCfgModuleFiltration;
     filtrSegmentsVar_.moduleName = kCfgModuleFiltration;
+    filtrOptimalVar_.moduleName = kCfgModuleFiltration;
 
     phIdVar_.moduleName = kCfgModuleSensors;
     orpIdVar_.moduleName = kCfgModuleSensors;
@@ -348,6 +349,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(calcStartVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(calcStopVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(filtrSegmentsVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrOptimalVar_, kCfgModuleId, kCfgBranchFiltration);
 
     cfg.registerVar(phIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(orpIdVar_, kCfgModuleId, kCfgBranchSensors);
@@ -1467,7 +1469,8 @@ void PoolLogicModule::onEvent_(const Event& e)
             // recalcul qui les ecrit).
             if (strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStart) != 0 &&
                 strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStop) != 0 &&
-                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrSegments) != 0) {
+                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrSegments) != 0 &&
+                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrOptimalMin) != 0) {
                 portENTER_CRITICAL(&pendingMux_);
                 pendingDailyRecalc_ = true;
                 portEXIT_CRITICAL(&pendingMux_);

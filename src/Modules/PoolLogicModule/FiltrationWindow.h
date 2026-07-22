@@ -38,9 +38,10 @@ struct FiltrationPlanOutput {
     // plus prioritaire retenue).
     FiltrationPlanSegment segments[FILTRATION_PLAN_MAX_WINDOWS];
     uint8_t segmentCount = 0;
-    uint16_t requiredMinutes = 0;  // besoin journalier calcule
-    uint16_t plannedMinutes = 0;   // somme des segments retenus
-    bool fallback = false;         // entree invalide => plan de repli
+    uint16_t requiredMinutes = 0;     // besoin retenu (borne au min et a la capacite)
+    uint16_t requiredRawMinutes = 0;  // duree optimale calculee (bornee au min, PAS a la capacite)
+    uint16_t plannedMinutes = 0;      // somme des segments retenus
+    bool fallback = false;            // entree invalide => plan de repli
 };
 
 /** @brief Cycles de renouvellement/jour pour une temperature d'eau donnee. */

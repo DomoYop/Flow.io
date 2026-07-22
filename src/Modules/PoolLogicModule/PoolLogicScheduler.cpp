@@ -206,8 +206,10 @@ bool PoolLogicModule::recalcAndApplyFiltrationWindow_(uint8_t* startHourOut,
     // Liste complete des segments planifies (sortie pure Runtime), consommee par
     // le ruban 24 h de la page piscine. Vide si aucun segment.
     formatPlanSegments_(plan, filtrationCalcSegments_, sizeof(filtrationCalcSegments_));
+    filtrationOptimalMin_ = plan.requiredRawMinutes;
     if (cfgStore_) {
         cfgStore_->set(filtrSegmentsVar_, filtrationCalcSegments_);
+        cfgStore_->set(filtrOptimalVar_, filtrationOptimalMin_);
     }
 
     if (cfgMqttPub_) {

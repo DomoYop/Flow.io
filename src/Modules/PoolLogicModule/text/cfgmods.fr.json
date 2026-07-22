@@ -109,6 +109,9 @@
     "poollogic/filtration/filtr_segments": {
       "hidden": true
     },
+    "poollogic/filtration/filtr_optimal_min": {
+      "hidden": true
+    },
     "poollogic/filtration/filtr_w1_en": {
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
     },

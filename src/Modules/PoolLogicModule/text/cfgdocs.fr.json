@@ -93,6 +93,12 @@
       "label_t": "cfgdocs.poollogic.filtration.filtr_segments.label",
       "help_t": "cfgdocs.poollogic.filtration.filtr_segments.help"
     },
+    "poollogic/filtration/filtr_optimal_min": {
+      "type": "UInt16",
+      "unit": "min",
+      "label_t": "cfgdocs.poollogic.filtration.filtr_optimal_min.label",
+      "help_t": "cfgdocs.poollogic.filtration.filtr_optimal_min.help"
+    },
     "poollogic/filtration/pump_flow_m3h": {
       "type": "Float",
       "label_t": "cfgdocs.poollogic.filtration.pump_flow_m3h.label",

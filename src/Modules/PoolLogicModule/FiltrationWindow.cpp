@@ -85,12 +85,14 @@ bool computeFiltrationPlan(const FiltrationPlanInput& in, FiltrationPlanOutput& 
         out.segments[0].stopMinute = (uint16_t)((segStart + take) % kMinutesPerDay);
         out.segmentCount = 1;
         out.requiredMinutes = take;
+        out.requiredRawMinutes = take;
         out.plannedMinutes = take;
         out.fallback = true;
         return true;
     }
 
     uint16_t required = totalCapacity;
+    uint16_t requiredRaw = totalCapacity;
     if (inputValid) {
         const float cycles = filtrationCyclesForTemp(in.waterTemp);
         const float hours = (in.poolVolumeM3 * cycles) / in.pumpFlowM3h;
@@ -98,10 +100,12 @@ bool computeFiltrationPlan(const FiltrationPlanInput& in, FiltrationPlanOutput& 
         if (minutes < (long)PoolDefaults::FiltrationMinTotalMinutes) {
             minutes = (long)PoolDefaults::FiltrationMinTotalMinutes;
         }
+        requiredRaw = (uint16_t)minutes;  // duree optimale, avant plafond capacite
         if (minutes > (long)totalCapacity) minutes = (long)totalCapacity;
         required = (uint16_t)minutes;
     }
     out.requiredMinutes = required;
+    out.requiredRawMinutes = requiredRaw;
 
     // Allocation par priorite : chaque fenetre recoit ce qu'il reste, segment
     // centre dans la fenetre. Les reliquats sous la duree minimale de segment

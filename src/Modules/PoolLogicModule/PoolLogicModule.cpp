@@ -53,6 +53,7 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.calcStartVar_.moduleName = kCfgModuleFiltration;
     self.calcStopVar_.moduleName = kCfgModuleFiltration;
     self.filtrSegmentsVar_.moduleName = kCfgModuleFiltration;
+    self.filtrOptimalVar_.moduleName = kCfgModuleFiltration;
 
     self.phIdVar_.moduleName = kCfgModuleSensors;
     self.orpIdVar_.moduleName = kCfgModuleSensors;

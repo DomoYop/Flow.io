@@ -7153,10 +7153,12 @@
       cursor.style.left = ((nowMin / 1440) * 100).toFixed(2) + '%';
       poolRibbonTrack.appendChild(cursor);
 
-      poolConfigRenderNextRun(segments, nowMin);
+      let optimalMin = Number(filtration.filtr_optimal_min);
+      if (!Number.isFinite(optimalMin) || optimalMin < 0) optimalMin = 0;
+      poolConfigRenderNextRun(segments, nowMin, optimalMin);
     }
 
-    function poolConfigRenderNextRun(segments, nowMin) {
+    function poolConfigRenderNextRun(segments, nowMin, optimalMin) {
       if (!poolNextRunText) return;
       if (!segments.length) {
         if (poolNextRun) poolNextRun.className = 'pool-next-run is-idle';
@@ -7164,10 +7166,14 @@
         return;
       }
 
-      // Total de la journee.
-      let total = 0;
-      segments.forEach((s) => { total += poolRibbonSpanMinutes(s.start, s.stop); });
-      const totalText = tr('pool.schedule.total', 'Total {d}').replace('{d}', poolRibbonFormatDelta(total));
+      // Duree planifiee (somme des segments) vs duree optimale calculee.
+      let planned = 0;
+      segments.forEach((s) => { planned += poolRibbonSpanMinutes(s.start, s.stop); });
+      const optimal = (optimalMin > 0) ? optimalMin : planned;
+      const totalText = (optimal > planned + 5)
+        ? tr('pool.schedule.optimalShort', 'Optimale {o} · filtré {p}')
+            .replace('{o}', poolRibbonFormatDelta(optimal)).replace('{p}', poolRibbonFormatDelta(planned))
+        : tr('pool.schedule.optimal', 'Durée optimale {o}').replace('{o}', poolRibbonFormatDelta(optimal));
 
       // Creneau actif ?
       const active = segments.find((s) => {

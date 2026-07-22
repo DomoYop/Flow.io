@@ -34,6 +34,8 @@
     "cfgdocs.poollogic.filtration.filtr_stop_clc.label": "Arrêt filtration calculé",
     "cfgdocs.poollogic.filtration.filtr_segments.help": "Liste des créneaux de filtration calculés de la journée, format « HH:MM-HH:MM, … ». Sortie automatique du plan.",
     "cfgdocs.poollogic.filtration.filtr_segments.label": "Créneaux filtration calculés",
+    "cfgdocs.poollogic.filtration.filtr_optimal_min.help": "Durée optimale de filtration calculée (volume × cycles(T°) ÷ débit), en minutes, avant plafonnement par la capacité des fenêtres. Sortie automatique du plan.",
+    "cfgdocs.poollogic.filtration.filtr_optimal_min.label": "Durée optimale calculée",
     "cfgdocs.poollogic.filtration.pump_flow_m3h.help": "Débit réel de la pompe de filtration en m³/h. Le besoin journalier vaut volume du bassin × cycles(température) ÷ débit.",
     "cfgdocs.poollogic.filtration.pump_flow_m3h.label": "Débit pompe (m³/h)",
     "cfgdocs.poollogic.filtration.filtr_w1_en.help": "Active la fenêtre de filtration 1.",
