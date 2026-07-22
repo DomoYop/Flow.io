@@ -119,8 +119,9 @@ bool computeFiltrationPlan(const FiltrationPlanInput& in, FiltrationPlanOutput& 
             if (len < PoolDefaults::FiltrationMinSegmentMinutes) continue;
             take = PoolDefaults::FiltrationMinSegmentMinutes;
         }
-        const uint16_t offset = (uint16_t)((len - take) / 2u);
-        const uint16_t segStart = (uint16_t)((w.startMinute + offset) % kMinutesPerDay);
+        // Segment cale sur le debut de la fenetre (filtration au plus tot :
+        // attaque les heures creuses des leur ouverture).
+        const uint16_t segStart = w.startMinute;
         FiltrationPlanSegment& seg = out.segments[out.segmentCount++];
         seg.startMinute = segStart;
         seg.stopMinute = (uint16_t)((segStart + take) % kMinutesPerDay);
@@ -134,8 +135,7 @@ bool computeFiltrationPlan(const FiltrationPlanInput& in, FiltrationPlanOutput& 
         const FiltrationPlanWindow& w = in.windows[order[0]];
         const uint16_t len = windowLength_(w);
         const uint16_t take = (required < len) ? required : len;
-        const uint16_t offset = (uint16_t)((len - take) / 2u);
-        const uint16_t segStart = (uint16_t)((w.startMinute + offset) % kMinutesPerDay);
+        const uint16_t segStart = w.startMinute;
         out.segments[0].startMinute = segStart;
         out.segments[0].stopMinute = (uint16_t)((segStart + take) % kMinutesPerDay);
         out.segmentCount = 1;

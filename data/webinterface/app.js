@@ -7110,6 +7110,14 @@
       return String(Math.trunc(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0');
     }
 
+    // Duree totale de filtration planifiee (somme des segments), en minutes.
+    function poolFiltrationTotalMinutes(filtration) {
+      const segs = poolRibbonParseSegments((filtration || {}).filtr_segments);
+      let total = 0;
+      segs.forEach((s) => { total += poolRibbonSpanMinutes(s.start, s.stop); });
+      return total;
+    }
+
     function poolConfigRenderRibbon(filtration, startValue, stopValue) {
       if (!poolRibbonTrack) return;
       poolRibbonTrack.innerHTML = '';
@@ -7385,11 +7393,14 @@
       const source = modules && typeof modules === 'object' ? modules : {};
       const modes = source['poollogic/modes'] || {};
       const heater = source['poollogic/heater'] || {};
+      const filtration = source['poollogic/filtration'] || {};
       const poolLogicEnabled = toBool(modes.enabled);
       const autoMode = toBool(modes.auto_mode);
       const winterMode = toBool(modes.winter_mode);
       const treatment = poolConfigDisinfectionLabel(modes.disinfection_type);
       const heaterState = poolConfigBoolLabel(heater.heater_auto_mode, tr('pool.state.autoShort', 'auto'), tr('pool.state.off', 'arrêt'));
+      const totalMin = poolFiltrationTotalMinutes(filtration);
+      const duration = totalMin > 0 ? poolRibbonFormatDelta(totalMin) : '—';
 
       if (!poolLogicEnabled) {
         return tr('pool.summary.poollogicOff', 'PoolLogic désactivé : le système reste en manuel et ne pilote pas la piscine.');
@@ -7399,15 +7410,13 @@
           .replace('{treatment}', treatment);
       }
       if (winterMode) {
-        return tr('pool.summary.autoWinter', 'Mode automatique hiver : filtration {start}-{stop}, traitement {treatment}, chauffage {heater}.')
-          .replace('{start}', start)
-          .replace('{stop}', stop)
+        return tr('pool.summary.autoWinter', 'Mode automatique hiver : filtration {duration}/jour, traitement {treatment}, chauffage {heater}.')
+          .replace('{duration}', duration)
           .replace('{treatment}', treatment)
           .replace('{heater}', heaterState);
       }
-      return tr('pool.summary.auto', 'Mode automatique : filtration {start}-{stop}, traitement {treatment}, chauffage {heater}.')
-        .replace('{start}', start)
-        .replace('{stop}', stop)
+      return tr('pool.summary.auto', 'Mode automatique : filtration {duration}/jour, traitement {treatment}, chauffage {heater}.')
+        .replace('{duration}', duration)
         .replace('{treatment}', treatment)
         .replace('{heater}', heaterState);
     }
@@ -7637,6 +7646,10 @@
         statusEl.textContent = tr('pool.filtration.applied', 'Fenêtres appliquées, plan recalculé.');
         statusEl.className = 'pool-filtration-status is-ok';
         await loadPoolConfig(true);
+        // Le plan (segments, durée optimale) est recalculé de façon asynchrone
+        // côté firmware après réception de la config : on rafraîchit une 2e fois
+        // peu après pour capter les valeurs recalculées sans action manuelle.
+        setTimeout(() => { loadPoolConfig(true).catch(() => {}); }, 1500);
       } catch (err) {
         statusEl.textContent = String(err || tr('pool.filtration.applyError', 'application des fenêtres impossible'));
         statusEl.className = 'pool-filtration-status is-error';
@@ -7668,17 +7681,10 @@
       copy.appendChild(note);
       const plan = document.createElement('div');
       plan.className = 'pool-filtration-times pool-filtration-plan';
-      const planStart = document.createElement('b');
-      planStart.textContent = poolConfigFormatHour(data.filtr_start_clc);
-      const planArrow = document.createElement('span');
-      planArrow.className = 'ui-msr pool-filtration-arrow';
-      planArrow.setAttribute('aria-hidden', 'true');
-      planArrow.textContent = 'arrow_forward';
-      const planStop = document.createElement('b');
-      planStop.textContent = poolConfigFormatHour(data.filtr_stop_clc);
-      plan.appendChild(planStart);
-      plan.appendChild(planArrow);
-      plan.appendChild(planStop);
+      const planDur = document.createElement('b');
+      const planTotalMin = poolFiltrationTotalMinutes(data);
+      planDur.textContent = planTotalMin > 0 ? poolRibbonFormatDelta(planTotalMin) + tr('pool.filtration.perDay', '/jour') : '—';
+      plan.appendChild(planDur);
       head.appendChild(icon);
       head.appendChild(copy);
       head.appendChild(plan);

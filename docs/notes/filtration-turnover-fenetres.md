@@ -18,7 +18,7 @@ besoin (min) = volume bassin (m³) × cycles(T) / débit pompe (m³/h) × 60
 
 ## Distribution : 3 fenêtres configurables priorisées
 
-Chaque fenêtre (`filtr_w{1..3}_en/start/stop/prio`, NVS `pl_fw{i}e/s/p/r`) est en **minutes depuis minuit** ; `stop < start` = fenêtre traversant minuit. Le besoin est versé dans les fenêtres par ordre de `prio` (1 = remplie en premier), chaque segment **centré** dans sa fenêtre. Reliquat < 30 min arrondi à 30 min (pas de cycle pompe court) ; reliquat non plaçable tronqué.
+Chaque fenêtre (`filtr_w{1..3}_en/start/stop/prio`, NVS `pl_fw{i}e/s/p/r`) est en **minutes depuis minuit** ; `stop < start` = fenêtre traversant minuit. Le besoin est versé dans les fenêtres par ordre de `prio` (1 = remplie en premier), chaque segment **calé sur le début de sa fenêtre** (filtration au plus tôt : attaque les heures creuses dès leur ouverture). Reliquat < 30 min arrondi à 30 min (pas de cycle pompe court) ; reliquat non plaçable tronqué.
 
 **Heures creuses** : créer une fenêtre sur la plage HC et lui donner `prio` 1 — elle est remplie en premier, le reste déborde sur les fenêtres suivantes.
 
@@ -43,7 +43,7 @@ Comportement obtenu selon le besoin calculé (donc selon la température) :
 Points d'attention :
 
 - La capacité totale des fenêtres actives **plafonne** le besoin ; dimensionner F1+F2+F3 ≥ pic de filtration estival (sinon on filtre moins que le besoin théorique).
-- Séparer HC après-midi (F2) et extension HP (F3) plutôt qu'une seule fenêtre 14:00–19:00 : la priorité remplit alors l'HC avant l'HP, ce que le centrage d'un segment unique ne garantirait pas.
+- Séparer HC après-midi (F2) et extension HP (F3) plutôt qu'une seule fenêtre 14:00–19:00 : la priorité remplit alors l'HC avant l'HP, ce qu'un segment unique calé en début de fenêtre ne garantirait pas.
 - **Électrolyse non pilotée par les fenêtres** (choix assumé) : en régulation ORP, l'électrolyseur ne produit que si la pompe tourne *et* l'ORP est sous consigne, donc il s'auto-limite la nuit. Ce préréglage suppose la désinfection en mode **ORP** (en mode « Continu sur filtration », l'électrolyse suivrait la pompe, y compris la nuit).
 
 ## Implémentation

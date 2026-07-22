@@ -23,9 +23,9 @@ void test_cycles_curve_interpolation()
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 3.0f, filtrationCyclesForTemp(35.0f));
 }
 
-void test_single_window_centered_segment()
+void test_single_window_aligned_segment()
 {
-    // 48 m3 * 1.0 cycle / 8 m3/h = 6 h = 360 min, centre dans 08:00-23:00.
+    // 48 m3 * 1.0 cycle / 8 m3/h = 6 h = 360 min, cale au debut de 08:00-23:00.
     FiltrationPlanInput in = makeInput_(22.0f, 48.0f, 8.0f);
     FiltrationPlanOutput out{};
     TEST_ASSERT_TRUE(computeFiltrationPlan(in, out));
@@ -33,8 +33,8 @@ void test_single_window_centered_segment()
     TEST_ASSERT_EQUAL_UINT8(1, out.segmentCount);
     TEST_ASSERT_EQUAL_UINT16(360, out.requiredMinutes);
     TEST_ASSERT_EQUAL_UINT16(360, out.plannedMinutes);
-    TEST_ASSERT_EQUAL_UINT16(750, out.segments[0].startMinute);   // 12:30
-    TEST_ASSERT_EQUAL_UINT16(1110, out.segments[0].stopMinute);   // 18:30
+    TEST_ASSERT_EQUAL_UINT16(480, out.segments[0].startMinute);   // 08:00
+    TEST_ASSERT_EQUAL_UINT16(840, out.segments[0].stopMinute);    // 14:00
 }
 
 void test_priority_fills_off_peak_window_first()
@@ -52,9 +52,9 @@ void test_priority_fills_off_peak_window_first()
     // Segment 0 = fenetre HC remplie en entier (traverse minuit).
     TEST_ASSERT_EQUAL_UINT16(1410, out.segments[0].startMinute);
     TEST_ASSERT_EQUAL_UINT16(450, out.segments[0].stopMinute);
-    // Reliquat 240 min centre dans la fenetre jour (900 min).
-    TEST_ASSERT_EQUAL_UINT16(810, out.segments[1].startMinute);
-    TEST_ASSERT_EQUAL_UINT16(1050, out.segments[1].stopMinute);
+    // Reliquat 240 min cale au debut de la fenetre jour (08:00-23:00).
+    TEST_ASSERT_EQUAL_UINT16(480, out.segments[1].startMinute);   // 08:00
+    TEST_ASSERT_EQUAL_UINT16(720, out.segments[1].stopMinute);    // 12:00
 }
 
 void test_nan_temperature_uses_full_windows()
@@ -124,7 +124,7 @@ int main(int, char**)
 {
     UNITY_BEGIN();
     RUN_TEST(test_cycles_curve_interpolation);
-    RUN_TEST(test_single_window_centered_segment);
+    RUN_TEST(test_single_window_aligned_segment);
     RUN_TEST(test_priority_fills_off_peak_window_first);
     RUN_TEST(test_nan_temperature_uses_full_windows);
     RUN_TEST(test_minimum_total_duration_clamp);
