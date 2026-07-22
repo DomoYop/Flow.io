@@ -127,14 +127,14 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
         }
         case RuntimeUiFlowCopyOut: {
             IoValue value{};
-            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalOutputSlot(16)), &value);
+            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalOutputSlot(8)), &value);
             if (st != IO_OK || !value.valid) return writer.writeUnavailable(runtimeId);
             if (value.type == IO_VAL_BOOL) return writer.writeBool(runtimeId, value.v.b != 0);
             return writer.writeUnavailable(runtimeId);
         }
         case RuntimeUiCoverOut: {
             IoValue value{};
-            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalOutputSlot(17)), &value);
+            const IoStatus st = ioReadValue_(ioIdFromSlot(digitalOutputSlot(9)), &value);
             if (st != IO_OK || !value.valid) return writer.writeUnavailable(runtimeId);
             if (value.type == IO_VAL_BOOL) return writer.writeBool(runtimeId, value.v.b != 0);
             return writer.writeUnavailable(runtimeId);

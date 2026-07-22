@@ -43,8 +43,8 @@ inline constexpr PoolRoleSpec kPoolRoles[] = {
     // FlowIO n'a ni les DIN ni les slots de sortie correspondants.
     {PoolIds::SensorFlowSwitch, digitalInputSlot(4), "Flow Switch", "Flow Switch", "io_flowsw", nullptr, "mdi:waves-arrow-right", nullptr},
     {PoolIds::SensorCoverClosed, digitalInputSlot(5), "Cover Closed", "Cover Closed", "io_cover", nullptr, "mdi:window-shutter", nullptr},
-    {PoolIds::ActuatorFlowCopy, digitalOutputSlot(16), "io_flow_cpy", "Flow Copy Output", nullptr, nullptr, nullptr, nullptr},
-    {PoolIds::ActuatorCoverClosed, digitalOutputSlot(17), "io_cover_out", "Cover Output", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorFlowCopy, digitalOutputSlot(8), "io_flow_cpy", "Flow Copy Output", nullptr, nullptr, nullptr, nullptr},
+    {PoolIds::ActuatorCoverClosed, digitalOutputSlot(9), "io_cover_out", "Cover Output", nullptr, nullptr, nullptr, nullptr},
 #endif
 };
 

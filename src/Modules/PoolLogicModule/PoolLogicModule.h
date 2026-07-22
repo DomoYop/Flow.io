@@ -78,6 +78,7 @@ private:
         RuntimeUiWinterMode = 2,
         RuntimeUiPhAutoMode = 3,
         RuntimeUiOrpAutoMode = 4,
+        RuntimeUiHeaterAutoMode = 5,
     };
 
     enum DisinfectionType : uint8_t {

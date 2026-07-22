@@ -48,23 +48,7 @@ enum : PhysicalPortId {
     PortExio5           = 304, // TCA9554 sortie bit 4.
     PortExio6           = 305, // TCA9554 sortie bit 5.
     PortExio7           = 306, // TCA9554 sortie bit 6.
-    PortExio8           = 307, // TCA9554 sortie bit 7.
-    PortMcpOut1         = 400, // MCP23017 sortie bit 0.
-    PortMcpOut2         = 401, // MCP23017 sortie bit 1.
-    PortMcpOut3         = 402, // MCP23017 sortie bit 2.
-    PortMcpOut4         = 403, // MCP23017 sortie bit 3.
-    PortMcpOut5         = 404, // MCP23017 sortie bit 4.
-    PortMcpOut6         = 405, // MCP23017 sortie bit 5.
-    PortMcpOut7         = 406, // MCP23017 sortie bit 6.
-    PortMcpOut8         = 407, // MCP23017 sortie bit 7.
-    PortMcpOut9         = 408, // MCP23017 sortie bit 8.
-    PortMcpOut10        = 409, // MCP23017 sortie bit 9.
-    PortMcpOut11        = 410, // MCP23017 sortie bit 10.
-    PortMcpOut12        = 411, // MCP23017 sortie bit 11.
-    PortMcpOut13        = 412, // MCP23017 sortie bit 12.
-    PortMcpOut14        = 413, // MCP23017 sortie bit 13.
-    PortMcpOut15        = 414, // MCP23017 sortie bit 14.
-    PortMcpOut16        = 415  // MCP23017 sortie bit 15.
+    PortExio8           = 307  // TCA9554 sortie bit 7.
 };
 
 inline constexpr IOBindingPortSpec kBindingPorts[] = {
@@ -109,29 +93,13 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortExio6, IO_BACKEND_TCA9554, 5, IO_PORT_DIR_OUT, "EXIO6"},
     {PortExio7, IO_BACKEND_TCA9554, 6, IO_PORT_DIR_OUT, "EXIO7"},
     {PortExio8, IO_BACKEND_TCA9554, 7, IO_PORT_DIR_OUT, "EXIO8"},
-    {PortMcpOut1, IO_BACKEND_MCP23017, 0, IO_PORT_DIR_OUT, "COMP01"},
-    {PortMcpOut2, IO_BACKEND_MCP23017, 1, IO_PORT_DIR_OUT, "COMP02"},
-    {PortMcpOut3, IO_BACKEND_MCP23017, 2, IO_PORT_DIR_OUT, "COMP03"},
-    {PortMcpOut4, IO_BACKEND_MCP23017, 3, IO_PORT_DIR_OUT, "COMP04"},
-    {PortMcpOut5, IO_BACKEND_MCP23017, 4, IO_PORT_DIR_OUT, "COMP05"},
-    {PortMcpOut6, IO_BACKEND_MCP23017, 5, IO_PORT_DIR_OUT, "COMP06"},
-    {PortMcpOut7, IO_BACKEND_MCP23017, 6, IO_PORT_DIR_OUT, "COMP07"},
-    {PortMcpOut8, IO_BACKEND_MCP23017, 7, IO_PORT_DIR_OUT, "COMP08"},
-    {PortMcpOut9, IO_BACKEND_MCP23017, 8, IO_PORT_DIR_OUT, "MCP OUT9"},
-    {PortMcpOut10, IO_BACKEND_MCP23017, 9, IO_PORT_DIR_OUT, "MCP OUT10"},
-    {PortMcpOut11, IO_BACKEND_MCP23017, 10, IO_PORT_DIR_OUT, "MCP OUT11"},
-    {PortMcpOut12, IO_BACKEND_MCP23017, 11, IO_PORT_DIR_OUT, "MCP OUT12"},
-    {PortMcpOut13, IO_BACKEND_MCP23017, 12, IO_PORT_DIR_OUT, "MCP OUT13"},
-    {PortMcpOut14, IO_BACKEND_MCP23017, 13, IO_PORT_DIR_OUT, "MCP OUT14"},
-    {PortMcpOut15, IO_BACKEND_MCP23017, 14, IO_PORT_DIR_OUT, "MCP OUT15"},
-    {PortMcpOut16, IO_BACKEND_MCP23017, 15, IO_PORT_DIR_OUT, "MCP OUT16"},
 };
 
 inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
     // {domainSlot, bindingPort, c0, c1, precision}
     {PoolIds::SensorOrp,        (PhysicalPortId)FLOW_WIRDEF_IO_A0PORT, FLOW_WIRDEF_IO_A00, FLOW_WIRDEF_IO_A01, FLOW_WIRDEF_IO_A0P}, // ORP.
     {PoolIds::SensorPh,         (PhysicalPortId)FLOW_WIRDEF_IO_A1PORT, FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
-    {PoolIds::SensorPressure,        (PhysicalPortId)FLOW_WIRDEF_IO_A2PORT, FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
+    {PoolIds::SensorPressure,   (PhysicalPortId)FLOW_WIRDEF_IO_A2PORT, FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
     {PoolIds::SensorSpareAnalog,(PhysicalPortId)FLOW_WIRDEF_IO_A3PORT, FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
     {PoolIds::SensorWaterTemp,  (PhysicalPortId)FLOW_WIRDEF_IO_A4PORT, FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
     {PoolIds::SensorAirTemp,    (PhysicalPortId)FLOW_WIRDEF_IO_A5PORT, FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
@@ -139,19 +107,12 @@ inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
 
 inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {
     // {role, bindingPort, mode, edgeMode, debounceUs}
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    {PoolIds::SensorPoolLevel,      PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine (GPIO6).
     {PoolIds::SensorPhLevel,        PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH (GPIO4).
     {PoolIds::SensorChlorineLevel,  PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau desinfectant (GPIO5).
+    {PoolIds::SensorPoolLevel,      PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine (GPIO6).
     {PoolIds::SensorWaterCounter,   PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (GPIO7, 100 ms debounce).
     {PoolIds::SensorFlowSwitch,     PortDin4, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 50000U}, // Flowswitch (debit present), 50 ms debounce.
     {PoolIds::SensorCoverClosed,    PortDin5, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 50000U}, // Contact volet ferme, 50 ms debounce.
-#else
-    {PoolIds::SensorPoolLevel,      PortDin0, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau piscine.
-    {PoolIds::SensorPhLevel,        PortDin1, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau pH.
-    {PoolIds::SensorChlorineLevel,  PortDin2, IO_DIGITAL_INPUT_STATE, IO_EDGE_RISING, 0U}, // Capteur niveau chlore.
-    {PoolIds::SensorWaterCounter,   PortDin3, IO_DIGITAL_INPUT_COUNTER, IO_EDGE_RISING, 100000U}, // Compteur impulsions eau (100 ms debounce).
-#endif
 };
 
 inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
@@ -164,10 +125,8 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     {PoolIds::ActuatorChlorineGenerator,PortExio6, true, false, false, 0U}, // Electrolyseur.
     {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
     {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
     {PoolIds::ActuatorFlowCopy,         IO_PORT_INVALID, true, false, false, 0U}, // Recopie flowswitch (temporisee), non liee par defaut.
     {PoolIds::ActuatorCoverClosed,      IO_PORT_INVALID, true, false, false, 0U}, // Etat volet ferme, non lie par defaut.
-#endif
 };
 
 

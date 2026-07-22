@@ -56,6 +56,20 @@
       "order": 80,
       "label_t": "runtimeui.poollogic.v04.label",
       "group_t": "runtimeui.poollogic.v04.group"
+    },
+    {
+      "valueId": 5,
+      "key": "pool.heater_auto_mode",
+      "type": "bool",
+      "domain": "mode",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.poollogic.v05.display.activeText",
+        "inactiveText_t": "runtimeui.poollogic.v05.display.inactiveText"
+      },
+      "order": 90,
+      "label_t": "runtimeui.poollogic.v05.label",
+      "group_t": "runtimeui.poollogic.v05.group"
     }
   ]
 }

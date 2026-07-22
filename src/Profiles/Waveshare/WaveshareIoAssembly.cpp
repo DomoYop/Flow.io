@@ -40,19 +40,6 @@ constexpr PoolIoExtraEndpoint kExtraDigitalInputs[] = {
     {(IoId)(IO_ID_DI_BASE + 7), FlowIoLayout::PortDin7},
 };
 
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-constexpr PoolIoExtraEndpoint kExtraDigitalOutputs[] = {
-    {(IoId)(IO_ID_DO_BASE + 8), FlowIoLayout::PortMcpOut1},
-    {(IoId)(IO_ID_DO_BASE + 9), FlowIoLayout::PortMcpOut2},
-    {(IoId)(IO_ID_DO_BASE + 10), FlowIoLayout::PortMcpOut3},
-    {(IoId)(IO_ID_DO_BASE + 11), FlowIoLayout::PortMcpOut4},
-    {(IoId)(IO_ID_DO_BASE + 12), FlowIoLayout::PortMcpOut5},
-    {(IoId)(IO_ID_DO_BASE + 13), FlowIoLayout::PortMcpOut6},
-    {(IoId)(IO_ID_DO_BASE + 14), FlowIoLayout::PortMcpOut7},
-    {(IoId)(IO_ID_DO_BASE + 15), FlowIoLayout::PortMcpOut8},
-};
-#endif
-
 constexpr PoolIoProfileSpec kIoProfileSpec{
     FlowIoLayout::kBindingPorts,
     (uint8_t)(sizeof(FlowIoLayout::kBindingPorts) / sizeof(FlowIoLayout::kBindingPorts[0])),
@@ -64,13 +51,8 @@ constexpr PoolIoProfileSpec kIoProfileSpec{
     (uint8_t)(sizeof(FlowIoLayout::kDigitalOutputRoleDefaults) / sizeof(FlowIoLayout::kDigitalOutputRoleDefaults[0])),
     kExtraDigitalInputs,
     (uint8_t)(sizeof(kExtraDigitalInputs) / sizeof(kExtraDigitalInputs[0])),
-#if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
-    kExtraDigitalOutputs,
-    (uint8_t)(sizeof(kExtraDigitalOutputs) / sizeof(kExtraDigitalOutputs[0])),
-#else
     nullptr,
     0,
-#endif
 };
 
 PoolIoHaContext haContext(ModuleInstances& modules, const AppContext* ctx)

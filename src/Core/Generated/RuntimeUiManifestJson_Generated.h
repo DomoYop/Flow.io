@@ -452,6 +452,28 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       }
     },
     {
+      "id": 2405,
+      "runtimeId": 2405,
+      "moduleId": 24,
+      "module": "poollogic",
+      "valueId": 5,
+      "key": "pool.heater_auto_mode",
+      "label": "Chauffage Auto",
+      "type": "bool",
+      "domain": "mode",
+      "group": "Mode",
+      "unit": null,
+      "decimals": null,
+      "order": 90,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "Actif",
+        "inactiveText": "Arret"
+      }
+    },
+    {
       "id": 2101,
       "runtimeId": 2101,
       "moduleId": 21,

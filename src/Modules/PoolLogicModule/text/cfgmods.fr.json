@@ -175,6 +175,13 @@
         { "module": "pdm/pd7", "fields": ["max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
       ]
     },
+    "poollogic/modes": {
+      "compose": [
+        { "module": "poollogic/ph", "fields": ["ph_auto_mode"] },
+        { "module": "poollogic/chlorine", "fields": ["dis_auto_mode"] },
+        { "module": "poollogic/heater", "fields": ["heater_auto_mode"] }
+      ]
+    },
     "poollogic/modes/disinfection_type": {
       "enum_set": "poollogic_disinfection_type"
     },

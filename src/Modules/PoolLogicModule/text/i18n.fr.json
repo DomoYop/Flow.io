@@ -214,6 +214,10 @@
     "runtimeui.poollogic.v04.display.activeText": "Actif",
     "runtimeui.poollogic.v04.display.inactiveText": "Arret",
     "runtimeui.poollogic.v04.group": "Mode",
-    "runtimeui.poollogic.v04.label": "Désinfection Auto"
+    "runtimeui.poollogic.v04.label": "Désinfection Auto",
+    "runtimeui.poollogic.v05.display.activeText": "Actif",
+    "runtimeui.poollogic.v05.display.inactiveText": "Arret",
+    "runtimeui.poollogic.v05.group": "Mode",
+    "runtimeui.poollogic.v05.label": "Chauffage Auto"
   }
 }

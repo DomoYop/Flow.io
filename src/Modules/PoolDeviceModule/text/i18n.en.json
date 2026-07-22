@@ -1,7 +1,7 @@
 {
   "locale": "en",
   "translations": {
-    "cfgmods.pdm.devices.label": "Equipment & disinfection",
+    "cfgmods.pdm.devices.label": "equipment",
     "cfgmods.pdm.devices.help": "Select the disinfection mode and the active pool equipment. Settings pages only show what is selected here.",
     "cfgmods.pdm.pd0.label": "Filtration (slot pd0)",
     "cfgmods.pdm.pd1.label": "pH pump (slot pd1)",

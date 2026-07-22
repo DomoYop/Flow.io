@@ -8,6 +8,7 @@
 #include "Core/ModuleLog.h"
 #include "Domain/Pool/PoolIds.h"
 #include "Modules/IOModule/IORuntime.h"
+#include "Modules/IOModule/IoAnalogSlotDefaults.h"
 #include "Modules/IOModule/IoBackendTraits.h"
 #include <Arduino.h>
 #include <Preferences.h>
@@ -39,6 +40,85 @@ const IOBindingPortSpec* IOModule::bindingPortSpec_(PhysicalPortId portId) const
         if (bindingPorts_[i].portId == portId) return &bindingPorts_[i];
     }
     return nullptr;
+}
+
+void IOModule::autoBindEnabledAnalogDrivers_()
+{
+    if (!bindingPorts_ || bindingPortCount_ == 0) return;
+
+    for (const IoBackendTraits& traits : kBackendTraits) {
+        // Uniquement les backends analogiques dotes d'un toggle d'activation.
+        if (!traits.analog || !traits.configurableToggle) continue;
+        uint8_t enabled = 0U;
+        uint8_t configurable = 0U;
+        if (ioBackendInfo_(traits.backend, &enabled, &configurable) != IO_OK || !enabled) continue;
+
+        for (uint8_t ch = 0; ch <= traits.maxChannel; ++ch) {
+            // Canaux temperature/energie/charge fournis par l'INA228 seul.
+            if (traits.backend == IO_BACKEND_POWERMON && cfgData_.powermonModel != 228 && ch >= 5U) {
+                continue;
+            }
+
+            // Port physique correspondant a (backend, canal) pour cette carte.
+            const IOBindingPortSpec* port = nullptr;
+            for (uint8_t i = 0; i < bindingPortCount_; ++i) {
+                if (bindingPorts_[i].backend == traits.backend && bindingPorts_[i].channel == ch) {
+                    port = &bindingPorts_[i];
+                    break;
+                }
+            }
+            if (!port) continue;
+
+            // Deja binde par un slot ? -> idempotent, on ne retouche rien.
+            bool alreadyBound = false;
+            for (uint8_t s = 0; s < ANALOG_CFG_SLOTS; ++s) {
+                if (analogCfg_[s].bindingPort == port->portId) { alreadyBound = true; break; }
+            }
+            if (alreadyBound) continue;
+
+            // Premier slot libre (non binde).
+            int freeIdx = -1;
+            for (uint8_t s = 0; s < ANALOG_CFG_SLOTS; ++s) {
+                if (analogCfg_[s].bindingPort == IO_PORT_INVALID) { freeIdx = (int)s; break; }
+            }
+            if (freeIdx < 0) {
+                LOGW("io.autobind: plus de slot analogique libre pour %s ch%u (port %u)",
+                     ioBackendLabel(traits.backend), (unsigned)ch, (unsigned)port->portId);
+                break;  // Inutile d'insister pour les canaux suivants de ce backend.
+            }
+
+            const uint8_t idx = (uint8_t)freeIdx;
+            IOAnalogSlotConfig& slot = analogCfg_[idx];
+            const IoAnalogSlotDefault* def = analogSlotDefault(traits.backend, ch);
+            const char* name = (def && def->name) ? def->name : (port->name ? port->name : "");
+            const float c0 = 1.0f;
+            const float c1 = 0.0f;
+            const int32_t precision = def ? def->precision : 1;
+
+            // Persistance immediate du slot complet : le slot auto-binde devient
+            // un vrai reglage NVS (nom + binding + calibration). Robuste aux
+            // editions partielles de l'UI (un champ a la fois) et idempotent : au
+            // boot suivant le port est deja binde en NVS -> saute, aucune reecriture.
+            if (cfgStore_ && slotCfgVars_) {
+                IoSlotConfigVars::AnalogVars& v = slotCfgVars_->analog[idx];
+                cfgStore_->set(v.name, name);
+                cfgStore_->set(v.binding, port->portId);
+                cfgStore_->set(v.c0, c0);
+                cfgStore_->set(v.c1, c1);
+                cfgStore_->set(v.prec, precision);
+            } else {
+                // Repli non persistant si le store n'est pas encore pret.
+                strncpy(slot.name, name, sizeof(slot.name) - 1);
+                slot.name[sizeof(slot.name) - 1] = '\0';
+                slot.bindingPort = port->portId;
+                slot.c0 = c0;
+                slot.c1 = c1;
+                slot.precision = precision;
+            }
+            LOGI("io.autobind: %s ch%u -> slot a%02u (%s)",
+                 ioBackendLabel(traits.backend), (unsigned)ch, (unsigned)idx, slot.name);
+        }
+    }
 }
 
 namespace {

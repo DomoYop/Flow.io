@@ -1674,13 +1674,15 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
                                 bool& autoMode,
                                 bool& winterMode,
                                 bool& phAutoMode,
-                                bool& orpAutoMode)
+                                bool& orpAutoMode,
+                                uint8_t* disinfectionTypeOut = nullptr)
 {
     hasMode = false;
     autoMode = false;
     winterMode = false;
     phAutoMode = false;
     orpAutoMode = false;
+    if (disinfectionTypeOut) *disinfectionTypeOut = 0U;
     if (!cfgStore) return false;
 
     char moduleJson[320] = {0};
@@ -1697,6 +1699,7 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
     hasMode = true;
     autoMode = root["auto_mode"] | false;
     winterMode = root["winter_mode"] | false;
+    if (disinfectionTypeOut) *disinfectionTypeOut = root["disinfection_type"] | 0U;
 
     memset(moduleJson, 0, sizeof(moduleJson));
     truncated = false;
@@ -1717,6 +1720,27 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
             if (!disRoot.isNull()) orpAutoMode = disRoot["dis_auto_mode"] | false;
         }
     }
+    return true;
+}
+
+// Lit l'etat du mode chauffage auto (branche poollogic/heater).
+bool waveshareLoadPoolHeaterMode_(ConfigStore* cfgStore, bool& heaterAutoMode)
+{
+    heaterAutoMode = false;
+    if (!cfgStore) return false;
+
+    char moduleJson[256] = {0};
+    bool truncated = false;
+    if (!cfgStore->toJsonModule("poollogic/heater", moduleJson, sizeof(moduleJson), &truncated, true)) {
+        return false;
+    }
+
+    StaticJsonDocument<256> doc;
+    if (deserializeJson(doc, moduleJson)) return false;
+    JsonObjectConst root = doc.as<JsonObjectConst>();
+    if (root.isNull()) return false;
+
+    heaterAutoMode = root["heater_auto_mode"] | false;
     return true;
 }
 
@@ -1783,6 +1807,9 @@ struct WaveshareRuntimeContext {
     bool poolWinterMode = false;
     bool poolPhAutoMode = false;
     bool poolOrpAutoMode = false;
+    bool poolHeaterAutoMode = false;
+    // Disponibilite par mode : un mode dont le module associe est desactive est masque.
+    bool poolDisAvailable = false;     // desinfection auto : masquee si disinfection_type == Disabled
     bool mqttServerLoaded = false;
     char mqttServer[96] = {0};
     bool alarmMasksLoaded = false;
@@ -1797,12 +1824,17 @@ void waveshareEnsurePoolMode_(WaveshareRuntimeContext& ctx, ConfigStore* cfgStor
 {
     if (ctx.poolModeLoaded) return;
     ctx.poolModeLoaded = true;
+    uint8_t disinfectionType = 0U;
     ctx.poolModeAvailable = waveshareLoadPoolModeFlags_(cfgStore,
                                                        ctx.poolModeAvailable,
                                                        ctx.poolAutoMode,
                                                        ctx.poolWinterMode,
                                                        ctx.poolPhAutoMode,
-                                                       ctx.poolOrpAutoMode);
+                                                       ctx.poolOrpAutoMode,
+                                                       &disinfectionType);
+    // Desinfection auto masquee quand la desinfection est desactivee (type == Disabled == 3).
+    ctx.poolDisAvailable = ctx.poolModeAvailable && disinfectionType != 3U;
+    (void)waveshareLoadPoolHeaterMode_(cfgStore, ctx.poolHeaterAutoMode);
 }
 
 void waveshareEnsureMqttServer_(WaveshareRuntimeContext& ctx, ConfigStore* cfgStore)
@@ -1840,6 +1872,26 @@ bool waveshareReadIoBool_(const IOServiceV2* ioSvc, IoId ioId, bool& out)
     if (!value.valid || value.type != IO_VAL_BOOL) return false;
     out = (value.v.b != 0);
     return true;
+}
+
+// Lit la valeur flottante d'un endpoint identifie par (backend, channel).
+// Retourne false si le driver est absent/desactive ou la lecture invalide.
+bool waveshareReadIoBackendFloat_(const IOServiceV2* ioSvc, uint8_t backend, uint8_t channel, float& out)
+{
+    if (!ioSvc || !ioSvc->count || !ioSvc->idAt || !ioSvc->meta || !ioSvc->readValue) return false;
+    const uint8_t count = ioSvc->count(ioSvc->ctx);
+    for (uint8_t i = 0U; i < count; ++i) {
+        IoId ioId = IO_ID_INVALID;
+        if (ioSvc->idAt(ioSvc->ctx, i, &ioId) != IO_OK) continue;
+        IoEndpointMeta meta{};
+        if (ioSvc->meta(ioSvc->ctx, ioId, &meta) != IO_OK) continue;
+        if (meta.backend != backend || meta.channel != channel) continue;
+        IoValue value{};
+        if (ioSvc->readValue(ioSvc->ctx, ioId, &value) != IO_OK || !value.valid) return false;
+        out = (value.type == IO_VAL_INT32) ? (float)value.v.i32 : value.v.f;
+        return true;
+    }
+    return false;
 }
 
 bool appendWaveshareLocalRuntimeValue_(Print& out,
@@ -1895,12 +1947,26 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
             return true;
         case 2404:
             waveshareEnsurePoolMode_(ctx, cfgStore);
-            if (!ctx.poolModeAvailable) {
+            if (!ctx.poolDisAvailable) {
                 wavesharePrintUnavailableByManifestType_(out, firstValue, id);
             } else {
                 printRuntimeBool_(out, firstValue, id, "pool.dis_auto_mode", ctx.poolOrpAutoMode);
             }
             return true;
+        case 2405: {
+            waveshareEnsurePoolMode_(ctx, cfgStore);
+            // Chauffage auto masque quand l'equipement chauffe-eau est desactive.
+            PoolDeviceRuntimeStateEntry heaterState{};
+            const bool heaterAvailable = ctx.poolModeAvailable && dataStore &&
+                                         poolDeviceRuntimeState(*dataStore, PoolIds::DeviceWaterHeater, heaterState) &&
+                                         heaterState.enabled;
+            if (!heaterAvailable) {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            } else {
+                printRuntimeBool_(out, firstValue, id, "pool.heater_auto_mode", ctx.poolHeaterAutoMode);
+            }
+            return true;
+        }
         case 2301:
         case 2302:
         case 2303:
@@ -2021,8 +2087,37 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2212:
         case 2213:
         case 2214:
-            wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+        case 2215:
+        case 2216:
+        case 2217: {
+            // Capteurs I2C secondaires (BMP280/BME680/SHT40) + moniteur de puissance
+            // POWERMON (INA226/INA228). Lecture reelle via (backend, channel) : une sonde
+            // dont le driver est desactive renvoie "unavailable" et sera masquee cote UI.
+            uint8_t backend = IO_BACKEND_BMP280;
+            uint8_t channel = 0U;
+            const char* key = "io.bmp280_temp";
+            const char* unit = "\xC2\xB0""C";
+            switch (id) {
+                case 2208: backend = IO_BACKEND_BME680;  channel = 0U; key = "io.bme680_temp";     unit = "\xC2\xB0""C"; break;
+                case 2209: backend = IO_BACKEND_BMP280;  channel = 1U; key = "bmp280.pressure";     unit = "hPa"; break;
+                case 2210: backend = IO_BACKEND_SHT40;   channel = 0U; key = "sht40.temperature";   unit = "\xC2\xB0""C"; break;
+                case 2211: backend = IO_BACKEND_SHT40;   channel = 1U; key = "sht40.humidity";      unit = "%"; break;
+                case 2212: backend = IO_BACKEND_BME680;  channel = 1U; key = "bme680.humidity";     unit = "%"; break;
+                case 2213: backend = IO_BACKEND_BME680;  channel = 2U; key = "bme680.pressure";     unit = "hPa"; break;
+                case 2214: backend = IO_BACKEND_BME680;  channel = 3U; key = "bme680.gaz";          unit = "Ohm"; break;
+                case 2215: backend = IO_BACKEND_POWERMON; channel = 1U; key = "powermon.voltage";   unit = "V"; break;
+                case 2216: backend = IO_BACKEND_POWERMON; channel = 2U; key = "powermon.current";   unit = "mA"; break;
+                case 2217: backend = IO_BACKEND_POWERMON; channel = 3U; key = "powermon.power";     unit = "mW"; break;
+                default: break; // 2207 : BMP280 ch0 (valeurs par defaut)
+            }
+            float value = 0.0f;
+            if (waveshareReadIoBackendFloat_(ioSvc, backend, channel, value)) {
+                printRuntimeF32_(out, firstValue, id, key, value, unit);
+            } else {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            }
             return true;
+        }
         case 2221:
         case 2222: {
             // Entrees digitales flowswitch / volet, lues par IoId (robuste).
@@ -2039,8 +2134,8 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2223:
         case 2224: {
             // Sorties indicatrices (recopie flowswitch temporisee / etat volet),
-            // lues par IoId sur les endpoints digitalOutputSlot(16/17).
-            const IoId ioId = ioIdFromSlot(digitalOutputSlot((id == 2223) ? 16U : 17U));
+            // lues par IoId sur les endpoints digitalOutputSlot(8/9).
+            const IoId ioId = ioIdFromSlot(digitalOutputSlot((id == 2223) ? 8U : 9U));
             const char* key = (id == 2223) ? "io.flow_copy_out" : "io.cover_out";
             bool on = false;
             if (waveshareReadIoBool_(ioSvc, ioId, on)) {
@@ -2693,6 +2788,7 @@ bool waveshareReadDashboardRuntimeValue_(DataStore* dataStore,
             else if (valueId == 2U) out.boolValue = ctx.poolWinterMode;
             else if (valueId == 3U) out.boolValue = ctx.poolPhAutoMode;
             else if (valueId == 4U) out.boolValue = ctx.poolOrpAutoMode;
+            else if (valueId == 5U) out.boolValue = ctx.poolHeaterAutoMode;
             else return false;
             return true;
 

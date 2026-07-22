@@ -1383,6 +1383,11 @@ void IOModule::onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services)
     for (uint8_t i = 0; i < DIGITAL_CFG_SLOTS; ++i) {
         digitalCfg_[i].bindingPort = normalizeConfiguredBindingPort(digitalCfg_[i].bindingPort);
     }
+    // Auto-binding des drivers analogiques actives : remplit (et persiste) les
+    // slots libres avec les ports non encore relies. A faire apres normalisation
+    // (donc apres fusion des valeurs NVS) et avant configureRuntime_ pour que les
+    // endpoints soient crees ce boot.
+    autoBindEnabledAnalogDrivers_();
 #if defined(FLOW_PROFILE_WAVESHARE)
     // On Waveshare, TCA9554 is the only path to drive digital outputs (EXIO1-8);
     // it cannot be an optional, user-disableable driver like PCF8574/MCP23017.

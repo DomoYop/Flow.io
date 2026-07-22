@@ -215,6 +215,15 @@ private:
     /** Adds the polling jobs then finishes runtime bring-up (runtimeReady_ + ready log). */
     void registerSchedulerJobs_(bool needI2cAnalogJob, const ExpanderNeeds& needs);
     const IOBindingPortSpec* bindingPortSpec_(PhysicalPortId portId) const;
+    /**
+     * Auto-binding : pour chaque driver analogique a toggle actuellement active,
+     * relie ses ports encore libres a des slots de config libres, avec des noms
+     * lisibles et une calibration identite. Chaque slot cree est persiste en NVS
+     * (slot complet). Idempotent (ne touche jamais un slot deja binde ; au boot
+     * suivant le port persiste est deja binde -> saute) et non destructif (ne
+     * debinde rien : desactiver le driver arrete le provisioning, sans effacer).
+     */
+    void autoBindEnabledAnalogDrivers_();
     bool resolveAnalogBinding_(PhysicalPortId portId, uint8_t& sourceOut, uint8_t& channelOut, uint8_t& backendOut) const;
     bool resolveDigitalInputBinding_(PhysicalPortId portId, uint8_t& pinOut, uint8_t& backendOut, uint8_t& channelOut) const;
     bool resolveDigitalOutputBinding_(PhysicalPortId portId,

@@ -248,6 +248,13 @@ body.web-icons-disabled .status-flag-check.is-true{font-size:13px;}
 .status-state-dot{width:10px;height:10px;border-radius:999px;flex:0 0 auto;background:var(--state-muted-bg);box-shadow:0 0 0 4px var(--state-muted-ring);}
 .status-card-runtime-group-mode .status-state-tile,.status-card-runtime-group-equipements .status-state-tile,.status-card-runtime-group-equipment .status-state-tile{grid-template-rows:auto 1fr;gap:8px;}
 .status-card-runtime-group-mode .status-state-value,.status-card-runtime-group-equipements .status-state-value,.status-card-runtime-group-equipment .status-state-value{justify-content:flex-end;align-self:end;max-width:100%;text-align:right;}
+/* Tuiles de sondes: nom en haut a gauche, valeur(s) en bas a droite (comme mode/equipements). */
+.status-sonde-tile{grid-template-rows:auto 1fr;gap:8px;}
+.status-sonde-tile .status-state-value{justify-content:flex-end;align-self:end;max-width:100%;text-align:right;}
+.status-sonde-multi{align-self:end;width:100%;display:grid;gap:5px;}
+.status-sonde-multi-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12px;line-height:1.2;}
+.status-sonde-multi-label{font-weight:600;color:var(--panel-frame-title);min-width:0;}
+.status-sonde-multi-value{font-weight:700;color:#6A7F93;text-align:right;white-space:nowrap;}
 .status-gauge{display:inline-grid;gap:5px;min-width:142px;}
 .status-gauge-track{width:142px;max-width:100%;height:10px;border-radius:999px;overflow:hidden;background:rgba(16,43,76,0.1);box-shadow:inset 0 1px 2px rgba(16,43,76,0.1);}
 .status-gauge-fill{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#d14c66 0%,#f0b255 52%,#2f9e68 100%);transition:width 0.2s ease;}
@@ -807,6 +814,7 @@ body.web-icons-disabled .control-field-apply{font-size:15px;font-weight:800;lett
 .pool-metric-value{min-width:0;color:var(--text);font-size:17px;font-weight:850;line-height:1.15;overflow-wrap:anywhere;}
 .pool-alarm-card{border:1px solid rgba(214,69,93,0.34);border-radius:var(--radius);background:#FFF3F5;color:#7A1F32;box-shadow:0 10px 24px rgba(122,31,50,0.08);padding:16px;display:grid;gap:12px;}
 .pool-alarm-card[hidden]{display:none;}
+.pool-water-health[hidden]{display:none;}
 .pool-alarm-head{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;align-items:start;}
 .pool-alarm-icon{width:42px;height:42px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(214,69,93,0.12);color:var(--danger);font-size:24px;box-shadow:inset 0 0 0 1px rgba(214,69,93,0.2);}
 .pool-alarm-title-wrap{display:grid;gap:4px;min-width:0;}
@@ -1039,3 +1047,28 @@ body.web-icons-disabled .control-field-apply{font-size:15px;font-weight:800;lett
 :root[data-theme="dark"] .activity-row-title strong,:root[data-theme="dark"] .activity-row-icon{color:var(--primary);}
 @media (max-width: 760px){.activity-toolbar{gap:10px}.activity-range-card{min-width:0;width:100%;box-sizing:border-box}.activity-row{grid-template-columns:40px minmax(0,1fr);padding:11px 8px}.logs-overlay{padding:8px}.logs-overlay-panel{width:calc(100vw - 16px);height:calc(100vh - 16px);border-radius:8px}.logs-overlay-head{align-items:flex-start;flex-direction:column}.logs-overlay-actions{justify-content:flex-start}.logs-overlay-terminal{font-size:10px}}
 :root[data-theme="dark"] .overlay{background:rgba(0,0,0,0.68);}
+/* Carte de synthese "Sante de l'eau" (dashboard, cote client) */
+.status-card-water-health{border-left:4px solid var(--border);}
+.status-card-water-health--ok{border-left-color:#2F9E68;}
+.status-card-water-health--warn{border-left-color:#F0B255;}
+.status-card-water-health--crit{border-left-color:#D14C66;}
+.water-health-badge{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:7px 14px;border-radius:999px;font-size:14px;font-weight:800;letter-spacing:0.01em;color:#fff;}
+.water-health-badge::before{content:"";width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,0.9);}
+.water-health-badge--ok{background:#2F9E68;}
+.water-health-badge--warn{background:#F0B255;color:#3a2a08;}
+.water-health-badge--warn::before{background:rgba(58,42,8,0.85);}
+.water-health-badge--crit{background:#D14C66;}
+.water-health-badge--na{background:var(--text-muted);}
+.water-health-issues{display:grid;gap:12px;margin-top:14px;}
+.water-health-issue{padding:11px 12px;border-radius:12px;background:var(--surface-soft,rgba(16,43,76,0.04));border:1px solid var(--border);}
+.water-health-issue--warn{border-color:rgba(240,178,85,0.55);}
+.water-health-issue--critical,.water-health-issue--crit{border-color:rgba(209,76,102,0.55);}
+.water-health-issue-head{display:flex;align-items:center;gap:8px;}
+.water-health-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--text-muted);}
+.water-health-dot--warning{background:#F0B255;}
+.water-health-dot--critical{background:#D14C66;}
+.water-health-issue-label{font-size:14px;font-weight:700;color:var(--panel-frame-title,var(--text));}
+.water-health-issue-value{margin-left:auto;font-size:14px;font-weight:800;color:var(--panel-frame-title,var(--text));white-space:nowrap;}
+.water-health-advice{margin:6px 0 0 18px;font-size:12.5px;line-height:1.45;color:var(--panel-frame-text,var(--text-muted));}
+.water-health-summary{margin:12px 0 0 0;font-size:12.5px;color:var(--text-muted);}
+:root[data-theme="dark"] .water-health-issue{background:var(--surface-soft,rgba(255,255,255,0.04));border-color:var(--border);}

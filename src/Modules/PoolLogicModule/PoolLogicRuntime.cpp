@@ -157,6 +157,8 @@ bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wri
             return writer.writeBool(runtimeId, phAutoMode_);
         case RuntimeUiOrpAutoMode:
             return writer.writeBool(runtimeId, orpAutoMode_);
+        case RuntimeUiHeaterAutoMode:
+            return writer.writeBool(runtimeId, heaterAutoMode_);
         default:
             return false;
     }

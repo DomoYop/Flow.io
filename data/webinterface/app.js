@@ -590,7 +590,7 @@
     }
 
     function createRuntimeDomainState() {
-      return { active: false, loading: false, entries: [], values: [], sondeSlots: [], alarmSlots: [], error: '', requestSeq: 0 };
+      return { active: false, loading: false, entries: [], allEntries: [], values: [], sondeSlots: [], alarmSlots: [], outputPorts: {}, error: '', requestSeq: 0 };
     }
 
     function ensureRuntimeDomainState() {
@@ -1989,6 +1989,7 @@
     const poolDisinfectionModes = document.getElementById('poolDisinfectionModes');
     const poolFiltrationPanel = document.getElementById('poolFiltrationPanel');
     const poolAlarmCard = document.getElementById('poolAlarmCard');
+    const poolWaterHealth = document.getElementById('poolWaterHealth');
     const poolConfigGrid = document.getElementById('poolConfigGrid');
     const calibrationSensorSelect = document.getElementById('calibrationSensorSelect');
     const calibrationLoadBtn = document.getElementById('calibrationLoadBtn');
@@ -2071,6 +2072,9 @@
     const cfgCondBranchCache = { supervisor: {}, flow: {} };
     const cfgCondBranchPending = { supervisor: new Map(), flow: new Map() };
     const poolLogicDeviceIoOutputNames = { supervisor: {}, flow: {} };
+    // Cache io_id -> nom lisible pour les selects capteurs (entrees analogiques/digitales).
+    // Alimente depuis /api/io/summary (une seule requete pour tous les endpoints).
+    let poolLogicSensorIoNamesCache = null;
     let supCfgCurrentModule = '';
     let supCfgCurrentData = {};
     let supCfgCurrentPdmExtension = null;
@@ -2088,14 +2092,8 @@
       5: 'Electrolyse',
       6: 'Eclairage',
       7: 'Chauffage eau',
-      8: 'COMP01',
-      9: 'COMP02',
-      10: 'COMP03',
-      11: 'COMP04',
-      12: 'COMP05',
-      13: 'COMP06',
-      14: 'COMP07',
-      15: 'COMP08'
+      8: 'Recopie flowswitch',
+      9: 'Sortie etat volet'
     });
     let wifiScanAutoRequested = false;
     let flowStatusReqSeq = 0;
@@ -5704,6 +5702,21 @@
         .slice(0, 8);
     }
 
+    // Carte index de sortie (0..7) -> nom du port physique (ex. "EXIO1"), a partir du
+    // resume /api/io/summary. Sert a prefixer les libelles d'equipements ("EXIO1 - Filtration").
+    async function fetchPoolOutputPortLabels() {
+      const data = await fetchIoSummary();
+      const slots = Array.isArray(data && data.domain_slots) ? data.domain_slots : [];
+      const map = {};
+      slots.forEach((slot) => {
+        if (String((slot && slot.io_slot) || '').trim() !== 'digital_out') return;
+        const idx = Number(slot && slot.io_slot_index);
+        const name = String(slot && slot.io_name ? slot.io_name : '').trim();
+        if (Number.isFinite(idx) && name) map[idx] = name;
+      });
+      return map;
+    }
+
     function runtimeMeasureDisplayLabel(entry) {
       return entry.label || entry.key || String(entry.id);
     }
@@ -6209,25 +6222,150 @@
 
     // Tableau de bord: ne montrer que ce qui est present/actif.
     // - equipements: masquer ceux reellement absents (valeur indisponible).
-    // - mode: masquer une fonction desactivee (arret) ou indisponible; garder les fonctions actives.
-    // Le domaine sondes n'est pas filtre ici: ses entrees ne servent qu'a declencher la carte,
-    // l'affichage reel passe par les slots dashboard (filtres cote fetchPoolSondeSlots).
+    // - sondes: masquer les sondes non disponibles (driver desactive / absent);
+    //   les sondes activees ET disponibles s'affichent en tuiles dynamiques.
+    // - mode: afficher tous les modes disponibles (Marche ET Arret); seuls les modes
+    //   dont le module associe est desactive (indisponibles cote firmware) sont masques.
     function poolMeasureEntryHiddenByFilter(entry, runtimeValue) {
       const domainKey = String(entry && entry.domain ? entry.domain : '').trim().toLowerCase();
-      if (domainKey === 'equipements') {
+      if (domainKey === 'equipements' || domainKey === 'sondes' || domainKey === 'mode') {
         return runtimeValueIsUnavailable(runtimeValue);
       }
-      if (domainKey === 'mode') {
-        if (runtimeValueIsUnavailable(runtimeValue)) return true;
-        return runtimeValue.value === false;
-      }
       return false;
+    }
+
+    // Prefixe le libelle d'un equipement PoolDevice par son port physique de sortie
+    // (ex. "EXIO1 - Filtration"). Vide si le port n'est pas connu ou l'entree n'est pas un equipement.
+    function poolEquipmentPortPrefix(entry, outputPorts) {
+      if (!outputPorts) return '';
+      if (String((entry && entry.domain) || '').trim().toLowerCase() !== 'equipements') return '';
+      if (String((entry && entry.module) || '').trim().toLowerCase() !== 'pooldev') return '';
+      const idx = Number(entry.valueId) - 1;
+      const name = Number.isFinite(idx) ? outputPorts[idx] : '';
+      return name ? String(name).trim() : '';
+    }
+
+    function resolvePoolMeasureLabel(entry, outputPorts) {
+      const base = runtimeMeasureDisplayLabel(entry);
+      const port = poolEquipmentPortPrefix(entry, outputPorts);
+      return port ? (port + ' - ' + base) : base;
+    }
+
+    // Regroupe les sondes multi-valeurs (BMP280, BME680, SHT40, moniteur de puissance) dans
+    // une meme tuile. Retourne null pour les sondes a valeur unique (une tuile chacune).
+    function poolSondeFamily(entry) {
+      const key = String((entry && entry.key) || '').toLowerCase();
+      if (key.indexOf('powermon') !== -1) return { id: 'powermon', name: 'Moniteur de puissance', strip: /\s*moniteur$/i };
+      if (key.indexOf('bme680') !== -1) return { id: 'bme680', name: 'BME680', strip: /\s*BME680$/i };
+      if (key.indexOf('bmp280') !== -1) return { id: 'bmp280', name: 'BMP280', strip: /\s*BMP280$/i };
+      if (key.indexOf('sht40') !== -1) return { id: 'sht40', name: 'SHT40', strip: /\s*SHT40$/i };
+      return null;
+    }
+
+    // Sous-libelle d'une mesure dans une tuile groupee : le nom du capteur est retire
+    // ("Temperature BMP280" -> "Temperature", "Tension moniteur" -> "Tension").
+    function poolSondeSubLabel(entry, family) {
+      const base = String(runtimeMeasureDisplayLabel(entry) || '').trim();
+      if (family && family.strip) {
+        const stripped = base.replace(family.strip, '').trim();
+        if (stripped) return stripped;
+      }
+      return base;
+    }
+
+    // Tuile de sonde a valeur unique : nom en haut a gauche, valeur en bas a droite.
+    function buildPoolSondeSingleTile(entry, valueById) {
+      const runtimeValue = valueById.get(Number(entry.id));
+      if (String(entry.type || '') === 'bool') {
+        const cfg = runtimeMeasureDisplayConfig(entry);
+        const value = (!runtimeValue || runtimeValue.status === 'not_found' || runtimeValue.status === 'unavailable')
+          ? null
+          : (typeof runtimeValue.value === 'boolean' ? runtimeValue.value : null);
+        const tile = buildFlowReadonlyStateTile(
+          String(runtimeMeasureDisplayLabel(entry) || 'Etat'),
+          value,
+          { activeText: cfg.activeText, inactiveText: cfg.inactiveText, unknownText: cfg.unknownText }
+        );
+        tile.classList.add('status-sonde-tile');
+        return tile;
+      }
+      const tile = document.createElement('div');
+      tile.className = 'status-state-tile status-sonde-tile';
+      const title = document.createElement('div');
+      title.className = 'status-state-title';
+      title.textContent = String(runtimeMeasureDisplayLabel(entry) || '');
+      tile.appendChild(title);
+      const value = document.createElement('div');
+      value.className = 'status-state-value';
+      value.textContent = formatRuntimeMeasureValue(entry, runtimeValue);
+      tile.appendChild(value);
+      return tile;
+    }
+
+    // Tuile de capteur multi-valeurs : nom du capteur en tete, puis une ligne "mesure -> valeur".
+    function buildPoolSondeFamilyTile(family, entries, valueById) {
+      const tile = document.createElement('div');
+      tile.className = 'status-state-tile status-sonde-tile status-sonde-tile-multi';
+      const title = document.createElement('div');
+      title.className = 'status-state-title';
+      title.textContent = family.name;
+      tile.appendChild(title);
+      const list = document.createElement('div');
+      list.className = 'status-sonde-multi';
+      (entries || []).forEach((entry) => {
+        const runtimeValue = valueById.get(Number(entry.id));
+        const row = document.createElement('div');
+        row.className = 'status-sonde-multi-row';
+        const label = document.createElement('span');
+        label.className = 'status-sonde-multi-label';
+        label.textContent = poolSondeSubLabel(entry, family);
+        const val = document.createElement('span');
+        val.className = 'status-sonde-multi-value';
+        val.textContent = formatRuntimeMeasureValue(entry, runtimeValue);
+        row.appendChild(label);
+        row.appendChild(val);
+        list.appendChild(row);
+      });
+      tile.appendChild(list);
+      return tile;
+    }
+
+    // Grille de tuiles pour la carte Sondes (valeurs uniques + capteurs multi-valeurs groupes).
+    function buildPoolSondeTilesGrid(entries, valueById) {
+      const grid = document.createElement('div');
+      grid.className = 'status-state-grid status-sonde-tile-grid';
+      const families = new Map();
+      const cells = [];
+      (entries || []).forEach((entry) => {
+        const fam = poolSondeFamily(entry);
+        if (fam) {
+          let bucket = families.get(fam.id);
+          if (!bucket) {
+            bucket = { family: fam, entries: [] };
+            families.set(fam.id, bucket);
+            cells.push({ family: fam.id });
+          }
+          bucket.entries.push(entry);
+        } else {
+          cells.push({ entry });
+        }
+      });
+      cells.forEach((cell) => {
+        if (cell.family) {
+          const bucket = families.get(cell.family);
+          grid.appendChild(buildPoolSondeFamilyTile(bucket.family, bucket.entries, valueById));
+        } else {
+          grid.appendChild(buildPoolSondeSingleTile(cell.entry, valueById));
+        }
+      });
+      return grid;
     }
 
     function buildPoolMeasureCards(entries, values, options) {
       const fragment = document.createDocumentFragment();
       const opts = options && typeof options === 'object' ? options : {};
       const sondeSlots = Array.isArray(opts.sondeSlots) ? opts.sondeSlots : [];
+      const outputPorts = opts.outputPorts && typeof opts.outputPorts === 'object' ? opts.outputPorts : {};
       const alarmSlots = Array.isArray(opts.alarmSlots) ? opts.alarmSlots : [];
       const valueById = new Map();
       (values || []).forEach((item) => {
@@ -6240,9 +6378,12 @@
       (entries || []).forEach((entry) => {
         if (poolMeasureEntryHiddenByFilter(entry, valueById.get(Number(entry.id)))) return;
         const domainKey = String(entry.domain || 'runtime');
-        const groupKey = String(entry.group || '').trim();
+        // Toutes les sondes sont regroupees dans une carte "Sondes" unique (liste dynamique
+        // triee par l'ordre du manifeste), au lieu des anciens emplacements figes.
+        const isSondesDomain = domainKey.trim().toLowerCase() === 'sondes';
+        const groupKey = isSondesDomain ? 'Sondes' : String(entry.group || '').trim();
         const cardKey = domainKey + '::' + groupKey;
-        const cardTitle = formatRuntimeGroupCardTitle(domainKey, groupKey);
+        const cardTitle = isSondesDomain ? 'Sondes' : formatRuntimeGroupCardTitle(domainKey, groupKey);
         let group = groupsByName.get(cardKey);
         if (!group) {
           group = { name: cardTitle, domainKey, groupKey, entries: [] };
@@ -6261,9 +6402,8 @@
         const isPoolModeGroup =
           String(group.domainKey || '').trim().toLowerCase() === 'mode' &&
           String(group.groupKey || '').trim().localeCompare('Mode', 'fr', { sensitivity: 'base' }) === 0;
-        const isPoolSondesGroup = isPoolSondesGroupKey(group.domainKey, group.groupKey);
         const groupDisplayOptions = {
-          displayLabelResolver: (entry) => runtimeMeasureDisplayLabel(entry),
+          displayLabelResolver: (entry) => resolvePoolMeasureLabel(entry, outputPorts),
           booleanTexts: isPoolModeGroup
             ? {
               activeText: 'Marche',
@@ -6272,20 +6412,17 @@
             : null
         };
 
-        if (isPoolSondesGroup) {
-          // sondeSlots deja filtre aux sondes disponibles: si aucune, pas de carte vide.
-          if (!sondeSlots.length) return;
-          const heading = document.createElement('h3');
-          heading.textContent = group.name;
-          card.appendChild(heading);
-          card.appendChild(buildPoolSondeSlotsGrid(sondeSlots));
-          fragment.appendChild(card);
-          return;
-        }
-
         const heading = document.createElement('h3');
         heading.textContent = group.name;
         card.appendChild(heading);
+
+        // Sondes : rendu dedie en tuiles (nom en haut a gauche, valeur en bas a droite),
+        // capteurs multi-valeurs regroupes dans une meme tuile.
+        if (String(group.domainKey || '').trim().toLowerCase() === 'sondes') {
+          card.appendChild(buildPoolSondeTilesGrid(group.entries, valueById));
+          fragment.appendChild(card);
+          return;
+        }
 
         const badgeNodes = [];
         const horizGaugeRows = [];
@@ -6463,9 +6600,168 @@
       const cleanDomain = normalizeRuntimeMeasureDomainKey(domainKey);
       const domainState = state && typeof state === 'object' ? state : null;
       if (!cleanDomain || !domainState) return false;
-      if (cleanDomain === 'sondes' && Array.isArray(domainState.sondeSlots) && domainState.sondeSlots.length > 0) return true;
       if (cleanDomain === 'alarm' && Array.isArray(domainState.alarmSlots) && domainState.alarmSlots.length > 0) return true;
       return Array.isArray(domainState.entries) && domainState.entries.length > 0;
+    }
+
+    // Mesures prises en compte dans l'indice "Sante de l'eau" : parametres de qualite d'eau
+    // uniquement (la temperature d'air est environnementale ; la pression a ses propres alarmes).
+    const WATER_HEALTH_MEASURE_SLUGS = { ph: true, orp: true, water_temp: true };
+
+    // Fallbacks de conseils "Sante de l'eau" (surchargeables via i18n dashboard.health.advice.*).
+    const WATER_HEALTH_ADVICE_FALLBACK = {
+      'ph.low': 'pH bas : l’eau est acide, elle devient corrosive pour les équipements — vérifiez le dosage de correcteur.',
+      'ph.high': 'pH élevé : l’eau est basique, le désinfectant agit moins bien — vérifiez le dosage d’acide.',
+      'orp.low': 'ORP bas : la désinfection est insuffisante, risque de développement d’algues — contrôlez le traitement.',
+      'orp.high': 'ORP élevé : la désinfection est excessive — réduisez la production de désinfectant.',
+      'water_temp.low': 'Température d’eau basse : la filtration peut être réduite, surveillez le risque de gel.',
+      'water_temp.high': 'Température d’eau élevée : la consommation de désinfectant augmente, renforcez la surveillance.',
+      'pressure.low': 'Pression basse : débit insuffisant, vérifiez la pompe et l’amorçage.',
+      'pressure.high': 'Pression élevée : filtre encrassé probable — pensez au contre-lavage.'
+    };
+
+    function waterHealthMeasureSlug(entry) {
+      const key = String(entry && entry.key ? entry.key : '').trim();
+      if (!key) return '';
+      const parts = key.split('.');
+      return parts[parts.length - 1];
+    }
+
+    // Classe une mesure a bandes en ok/warning/critical/unknown en reutilisant les bornes
+    // du displayConfig (memes seuils que les jauges), sans dependre des couleurs.
+    function classifyMeasureStatus(entry, runtimeValue) {
+      const displayConfig = runtimeMeasureDisplayConfig(entry);
+      const bands = displayConfig && displayConfig.bands;
+      if (!bands || typeof bands !== 'object' || Array.isArray(bands)) {
+        return { status: 'unknown', direction: null };
+      }
+      if (!runtimeValue || runtimeValue.status === 'not_found' || runtimeValue.status === 'unavailable') {
+        return { status: 'unknown', direction: null };
+      }
+      const value = Number(runtimeValue.value);
+      if (!Number.isFinite(value)) return { status: 'unknown', direction: null };
+      const criticalLowEnd = Number(bands.criticalLowEnd);
+      const warningLowEnd = Number(bands.warningLowEnd);
+      const warningHighStart = Number(bands.warningHighStart);
+      const criticalHighStart = Number(bands.criticalHighStart);
+      if (
+        !Number.isFinite(criticalLowEnd) || !Number.isFinite(warningLowEnd) ||
+        !Number.isFinite(warningHighStart) || !Number.isFinite(criticalHighStart)
+      ) {
+        return { status: 'unknown', direction: null };
+      }
+      if (value <= criticalLowEnd) return { status: 'critical', direction: 'low' };
+      if (value <= warningLowEnd) return { status: 'warning', direction: 'low' };
+      if (value <= warningHighStart) return { status: 'ok', direction: null };
+      if (value <= criticalHighStart) return { status: 'warning', direction: 'high' };
+      return { status: 'critical', direction: 'high' };
+    }
+
+    // Carte de synthese "Sante de l'eau" : agrege l'etat de toutes les sondes a bandes en un
+    // seul indicateur (pire etat) et liste les mesures hors plage avec un conseil qualitatif.
+    // 100% cote client, a partir des donnees deja chargees (aucun appel API supplementaire).
+    function buildWaterHealthCard(entries, values) {
+      const valueById = new Map();
+      (values || []).forEach((item) => {
+        const id = Number(item && item.id);
+        if (Number.isFinite(id)) valueById.set(id, item);
+      });
+
+      const assessed = [];
+      (entries || []).forEach((entry) => {
+        if (!WATER_HEALTH_MEASURE_SLUGS[waterHealthMeasureSlug(entry)]) return;
+        const displayConfig = runtimeMeasureDisplayConfig(entry);
+        const bands = displayConfig && displayConfig.bands;
+        if (!bands || typeof bands !== 'object' || Array.isArray(bands)) return;
+        const runtimeValue = valueById.get(Number(entry.id));
+        const cls = classifyMeasureStatus(entry, runtimeValue);
+        assessed.push({ entry: entry, runtimeValue: runtimeValue, status: cls.status, direction: cls.direction });
+      });
+      if (!assessed.length) return null;
+
+      const severityRank = { ok: 0, warning: 1, critical: 2 };
+      let okCount = 0;
+      let worst = null;
+      assessed.forEach((m) => {
+        if (m.status === 'ok') okCount += 1;
+        if (m.status === 'unknown') return;
+        if (worst === null || severityRank[m.status] > severityRank[worst]) worst = m.status;
+      });
+
+      let variant = 'na';
+      let badgeText = tr('dashboard.health.badge.na', 'État indisponible');
+      if (worst === 'ok') { variant = 'ok'; badgeText = tr('dashboard.health.badge.ok', 'Eau saine'); }
+      else if (worst === 'warning') { variant = 'warn'; badgeText = tr('dashboard.health.badge.warn', 'Eau à surveiller'); }
+      else if (worst === 'critical') { variant = 'crit'; badgeText = tr('dashboard.health.badge.crit', 'Eau à corriger'); }
+
+      const card = document.createElement('div');
+      card.className = 'status-card status-card-water-health status-card-water-health--' + variant;
+
+      const heading = document.createElement('h3');
+      heading.textContent = tr('dashboard.health.title', 'Santé de l’eau');
+      card.appendChild(heading);
+
+      const badge = document.createElement('div');
+      badge.className = 'water-health-badge water-health-badge--' + variant;
+      badge.textContent = badgeText;
+      card.appendChild(badge);
+
+      const issues = assessed.filter((m) => m.status === 'warning' || m.status === 'critical');
+      if (issues.length) {
+        const list = document.createElement('div');
+        list.className = 'water-health-issues';
+        issues
+          .sort((a, b) => severityRank[b.status] - severityRank[a.status])
+          .forEach((m) => {
+            const row = document.createElement('div');
+            row.className = 'water-health-issue water-health-issue--' + m.status;
+
+            const head = document.createElement('div');
+            head.className = 'water-health-issue-head';
+            const dot = document.createElement('span');
+            dot.className = 'water-health-dot water-health-dot--' + m.status;
+            head.appendChild(dot);
+            const label = document.createElement('span');
+            label.className = 'water-health-issue-label';
+            label.textContent = runtimeMeasureResolvedLabel(m.entry);
+            head.appendChild(label);
+            const valueEl = document.createElement('b');
+            valueEl.className = 'water-health-issue-value';
+            const decimals = Number.isFinite(Number(m.entry.decimals)) ? Number(m.entry.decimals) : 0;
+            const unit = m.entry.unit ? String(m.entry.unit) : '';
+            const num = fmtFlowGaugeNumber(m.runtimeValue && m.runtimeValue.value, decimals);
+            valueEl.textContent = unit ? (num + ' ' + unit) : num;
+            head.appendChild(valueEl);
+            row.appendChild(head);
+
+            const slug = waterHealthMeasureSlug(m.entry);
+            const adviceKey = 'dashboard.health.advice.' + slug + '.' + m.direction;
+            const genericFallback = m.direction === 'low'
+              ? tr('dashboard.health.advice.generic.low', 'Valeur sous la plage recommandée.')
+              : tr('dashboard.health.advice.generic.high', 'Valeur au-dessus de la plage recommandée.');
+            const adviceFallback = WATER_HEALTH_ADVICE_FALLBACK[slug + '.' + m.direction] || genericFallback;
+            const adviceText = tr(adviceKey, adviceFallback);
+            if (adviceText) {
+              const advice = document.createElement('p');
+              advice.className = 'water-health-advice';
+              advice.textContent = adviceText;
+              row.appendChild(advice);
+            }
+
+            list.appendChild(row);
+          });
+        card.appendChild(list);
+      }
+
+      if (okCount > 0) {
+        const summary = document.createElement('p');
+        summary.className = 'water-health-summary';
+        summary.textContent = tr('dashboard.health.inRange', '{n} mesure(s) dans la plage.')
+          .replace('{n}', String(okCount));
+        card.appendChild(summary);
+      }
+
+      return card;
     }
 
     function renderPoolMeasuresGrid() {
@@ -6482,6 +6778,10 @@
       }
 
       let renderedCardCount = 0;
+
+      // Note: la carte de synthese "Sante de l'eau" a ete deplacee sur la page Piscine
+      // (cf. poolConfigRenderWaterHealth).
+
       activeDomains.forEach((domainKey) => {
         const state = poolMeasureDomainState[domainKey];
         const hasRenderableData = poolMeasureDomainHasRenderableData(domainKey, state);
@@ -6529,7 +6829,8 @@
         }
         const cards = buildPoolMeasureCards(state.entries, state.values, {
           sondeSlots: state.sondeSlots,
-          alarmSlots: state.alarmSlots
+          alarmSlots: state.alarmSlots,
+          outputPorts: state.outputPorts
         });
         renderedCardCount += cards.childNodes.length;
         poolMeasuresGrid.appendChild(cards);
@@ -6616,31 +6917,36 @@
       }
 
       try {
+        // Sondes en liste dynamique : toutes les entrees sont rendues en tuiles, filtrees
+        // par disponibilite (une sonde au driver desactive remonte "unavailable" et est masquee).
         const allEntries = await runtimeMeasureEntriesForDomain(cleanDomain, !!forceRefresh);
-        const entries = cleanDomain === 'sondes'
-          ? allEntries.filter((entry) => !isPoolDashboardGroupEntry(entry))
-          : allEntries;
-        const ids = entries.map((entry) => Number(entry.id)).filter((id) => Number.isFinite(id));
+        const entries = allEntries;
+        const ids = allEntries.map((entry) => Number(entry.id)).filter((id) => Number.isFinite(id));
         const values = ids.length ? await fetchRuntimeValues(ids) : [];
-        const sondeSlots = cleanDomain === 'sondes'
-          ? await fetchPoolSondeSlots().catch(() => [])
-          : [];
         const alarmSlots = cleanDomain === 'alarm'
           ? await fetchPoolAlarmSlots().catch(() => [])
           : [];
+        // Equipements : ports physiques (EXIO1..EXIO8) pour prefixer les libelles.
+        const outputPorts = cleanDomain === 'equipements'
+          ? await fetchPoolOutputPortLabels().catch(() => ({}))
+          : {};
         if (state.requestSeq !== requestSeq) return;
         state.entries = entries;
+        state.allEntries = allEntries;
         state.values = values;
-        state.sondeSlots = sondeSlots;
+        state.sondeSlots = [];
         state.alarmSlots = alarmSlots;
+        state.outputPorts = outputPorts;
         state.error = '';
       } catch (err) {
         if (state.requestSeq !== requestSeq) return;
         if (!hadRenderableData) {
           state.entries = [];
+          state.allEntries = [];
           state.values = [];
           state.sondeSlots = [];
           state.alarmSlots = [];
+          state.outputPorts = {};
         }
         state.error = 'Chargement ' + formatRuntimeDomainLabel(cleanDomain) + ' echoue: ' + err;
       } finally {
@@ -7435,10 +7741,34 @@
     function poolConfigRender(modules, alarmSlots) {
       const source = modules && typeof modules === 'object' ? modules : {};
       poolConfigRenderHero(source, alarmSlots);
+      poolConfigRenderWaterHealth();
       poolConfigRenderDisinfection(source);
       poolConfigRenderFiltrationPanel(source);
       poolConfigRenderAlarms([]);
       poolConfigRenderGeneralCards(source);
+    }
+
+    // Carte de synthese "Sante de l'eau" (ph/orp/temperature) affichee sur la page Piscine.
+    // Les entrees/valeurs du domaine sondes sont chargees a la demande (le manifeste est mis
+    // en cache par loadRuntimeManifestDomains).
+    async function poolConfigRenderWaterHealth() {
+      if (!poolWaterHealth) return;
+      try {
+        const entries = await runtimeMeasureEntriesForDomain('sondes', false);
+        const ids = (entries || []).map((entry) => Number(entry.id)).filter((id) => Number.isFinite(id));
+        const values = ids.length ? await fetchRuntimeValues(ids) : [];
+        const card = buildWaterHealthCard(entries, values);
+        poolWaterHealth.innerHTML = '';
+        if (card) {
+          poolWaterHealth.hidden = false;
+          poolWaterHealth.appendChild(card);
+        } else {
+          poolWaterHealth.hidden = true;
+        }
+      } catch (err) {
+        poolWaterHealth.innerHTML = '';
+        poolWaterHealth.hidden = true;
+      }
     }
 
     function poolConfigRenderSkeleton() {
@@ -7485,6 +7815,10 @@
       if (poolAlarmCard) {
         poolAlarmCard.hidden = true;
         poolAlarmCard.innerHTML = '';
+      }
+      if (poolWaterHealth) {
+        poolWaterHealth.hidden = true;
+        poolWaterHealth.innerHTML = '';
       }
       if (!poolConfigGrid) return;
       poolConfigGrid.innerHTML = '';
@@ -9322,6 +9656,57 @@
       return out;
     }
 
+    // Selects "capteur -> entree IO" (poollogic/sensors). Les enum_sets statiques
+    // affichent "io/input/a00 [192]" ; on les remplace par "a00 - <nom entree>" en
+    // reutilisant le nom lisible configure sur l'endpoint (comme les slots PDM).
+    const POOLLOGIC_SENSOR_IO_ENUM_SETS = new Set([
+      'flowio_logical_input_analog',
+      'flowio_logical_input_digital'
+    ]);
+
+    function isPoolLogicSensorIoField(doc) {
+      return !!doc && POOLLOGIC_SENSOR_IO_ENUM_SETS.has(String(doc.enum_set || '').trim());
+    }
+
+    function poolLogicSensorIoRefFromOption(opt) {
+      // Libelle statique de la forme "io/input/a00 [192]" : on extrait "a00"/"i00".
+      const label = String(opt && opt.label ? opt.label : '');
+      const m = label.match(/\/((?:a|i|d)\d{2})\b/);
+      return m ? m[1] : '';
+    }
+
+    function dynamicPoolLogicSensorIoOptions(enumOptions) {
+      const nameByIoId = poolLogicSensorIoNamesCache || {};
+      return (Array.isArray(enumOptions) ? enumOptions : []).map((opt) => {
+        if (!opt || typeof opt !== 'object') return opt;
+        const out = Object.assign({}, opt);
+        const ref = poolLogicSensorIoRefFromOption(opt);
+        if (!ref) return out;
+        const id = Number.parseInt(opt.value, 10);
+        const name = Number.isFinite(id) ? String(nameByIoId[id] || '').trim() : '';
+        out.label = name ? (ref + ' - ' + name) : ref;
+        return out;
+      });
+    }
+
+    async function loadPoolLogicSensorIoLabels(forceReload) {
+      if (!isWaveshareProfile()) return;
+      if (poolLogicSensorIoNamesCache && !forceReload) return;
+      try {
+        const data = await fetchIoSummary();
+        const map = {};
+        const slots = Array.isArray(data && data.io_slots) ? data.io_slots : [];
+        slots.forEach((slot) => {
+          const id = Number(slot && slot.io_id);
+          const name = String(slot && slot.name ? slot.name : '').trim();
+          if (Number.isFinite(id) && name) map[id] = name;
+        });
+        poolLogicSensorIoNamesCache = map;
+      } catch (err) {
+        if (!poolLogicSensorIoNamesCache) poolLogicSensorIoNamesCache = {};
+      }
+    }
+
     function bindingPortEnumSetForField(moduleName) {
       const m = String(moduleName || '').trim().toLowerCase();
       if (/^io\/output\/d\d{2}$/.test(m)) return 'flowio_binding_port_digital_output';
@@ -9344,6 +9729,9 @@
       if (!options) return null;
       if (isWaveshareProfile() && isPoolLogicDeviceSlotField(moduleName, key, doc)) {
         return dynamicPoolLogicDeviceSlotOptions(source, options);
+      }
+      if (isWaveshareProfile() && isPoolLogicSensorIoField(doc)) {
+        return dynamicPoolLogicSensorIoOptions(options);
       }
       return options;
     }
@@ -10783,6 +11171,15 @@
         isPoolLogicDeviceSlotField(moduleName, key, configDocFor(moduleName, key, [])));
     }
 
+    // Detection des selects "capteur -> entree IO" (enum_sets flowio_logical_input_*)
+    // pour charger les noms d'entrees avant le rendu du module porteur.
+    function moduleHasSensorIoField(moduleName, dataObj) {
+      if (!isWaveshareProfile()) return false;
+      const data = (dataObj && typeof dataObj === 'object') ? dataObj : {};
+      return Object.keys(data).some((key) =>
+        isPoolLogicSensorIoField(configDocFor(moduleName, key, [])));
+    }
+
     async function chargerFlowCfgModule(moduleName) {
       beginFlowCfgLoading('Chargement de la branche distante...', { tree: false, detail: true });
       const m = nettoyerNomFlowCfg(moduleName);
@@ -10806,6 +11203,9 @@
         }
         if (moduleHasDeviceSlotField(m, data.data)) {
           await loadPoolLogicDeviceSlotLabels('flow', true);
+        }
+        if (moduleHasSensorIoField(m, data.data)) {
+          await loadPoolLogicSensorIoLabels(true);
         }
         flowCfgCurrentModule = m;
         flowCfgCurrentData = data.data;
@@ -10846,6 +11246,9 @@
         }
         if (moduleHasDeviceSlotField(m, data.data)) {
           await loadPoolLogicDeviceSlotLabels('supervisor', true);
+        }
+        if (moduleHasSensorIoField(m, data.data)) {
+          await loadPoolLogicSensorIoLabels(true);
         }
         supCfgCurrentModule = m;
         supCfgCurrentData = data.data;
