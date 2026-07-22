@@ -260,6 +260,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     filtrWin3PrioVar_.moduleName = kCfgModuleFiltration;
     calcStartVar_.moduleName = kCfgModuleFiltration;
     calcStopVar_.moduleName = kCfgModuleFiltration;
+    filtrSegmentsVar_.moduleName = kCfgModuleFiltration;
 
     phIdVar_.moduleName = kCfgModuleSensors;
     orpIdVar_.moduleName = kCfgModuleSensors;
@@ -346,6 +347,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(filtrWin3PrioVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(calcStartVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(calcStopVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrSegmentsVar_, kCfgModuleId, kCfgBranchFiltration);
 
     cfg.registerVar(phIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(orpIdVar_, kCfgModuleId, kCfgBranchSensors);
@@ -1464,7 +1466,8 @@ void PoolLogicModule::onEvent_(const Event& e)
             // ici ecraserait les segments multi-fenetres (et bouclerait avec le
             // recalcul qui les ecrit).
             if (strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStart) != 0 &&
-                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStop) != 0) {
+                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrationCalcStop) != 0 &&
+                strcmp(p->nvsKey, NvsKeys::PoolLogic::FiltrSegments) != 0) {
                 portENTER_CRITICAL(&pendingMux_);
                 pendingDailyRecalc_ = true;
                 portEXIT_CRITICAL(&pendingMux_);

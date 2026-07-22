@@ -106,6 +106,9 @@
       "enum_set": "hours_of_day",
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
     },
+    "poollogic/filtration/filtr_segments": {
+      "hidden": true
+    },
     "poollogic/filtration/filtr_w1_en": {
       "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
     },

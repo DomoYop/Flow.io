@@ -771,10 +771,16 @@ body.web-icons-disabled .control-field-apply{font-size:15px;font-weight:800;lett
 .pool-hero-state.is-ok{color:var(--success);}
 .pool-hero-state.is-alert{color:var(--danger);}
 .pool-hero-state-icon{font-size:18px;}
-.pool-filtration-daybar{display:grid;grid-template-columns:auto minmax(130px,1fr) auto;gap:12px;align-items:center;margin-top:16px;}
-.pool-daybar-time{color:var(--text);font-size:14px;font-weight:850;white-space:nowrap;}
-.pool-daybar-track{height:8px;border-radius:999px;background:#E6EEF7;overflow:hidden;}
-.pool-daybar-fill{display:block;width:0;height:100%;border-radius:999px;background:var(--primary);transition:width 0.28s ease;}
+.pool-day-ribbon{margin-top:16px;display:grid;gap:8px;}
+.pool-next-run{display:inline-flex;align-items:center;gap:7px;width:max-content;max-width:100%;font-size:13px;font-weight:750;color:var(--primary);background:var(--primary-soft);border:1px solid var(--border);border-radius:999px;padding:5px 12px;}
+.pool-next-run-icon{font-size:16px;}
+.pool-next-run.is-active{color:var(--success);background:rgba(22,164,93,0.10);}
+.pool-next-run.is-idle{color:var(--text-muted);background:var(--surface-soft);}
+.pool-ribbon-track{position:relative;height:24px;border-radius:6px;background:var(--surface-soft);border:1px solid var(--border);overflow:hidden;}
+.pool-ribbon-window{position:absolute;top:0;bottom:0;background:var(--primary-soft);}
+.pool-ribbon-segment{position:absolute;top:2px;bottom:2px;background:var(--primary);border-radius:4px;}
+.pool-ribbon-now{position:absolute;top:-2px;bottom:-2px;width:2px;transform:translateX(-1px);background:var(--text);border-radius:2px;}
+.pool-ribbon-axis{position:relative;display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);}
 .pool-hero-side{position:relative;z-index:1;display:grid;grid-template-rows:auto 1fr;gap:18px;justify-items:end;align-self:stretch;min-width:260px;border-left:1px solid var(--border);padding-left:24px;}
 .pool-hero-refresh{justify-self:end;}
 .pool-mode-badges{display:flex;align-items:center;justify-content:flex-end;align-content:center;gap:10px;flex-wrap:wrap;min-width:220px;}
@@ -884,7 +890,6 @@ body.web-icons-disabled .control-field-apply{font-size:15px;font-weight:800;lett
 }
 @media (max-width:640px){
   .pool-hero-copy h2{font-size:23px;}
-  .pool-filtration-daybar{grid-template-columns:auto minmax(80px,1fr) auto;gap:8px;}
   .pool-card-head{grid-template-columns:36px minmax(0,1fr);align-items:start;}
   .pool-config-card .pool-card-head,.pool-treatment-detail .pool-card-head{grid-template-columns:36px minmax(0,1fr);}
   .pool-selected-chip{grid-column:2;justify-self:start;}

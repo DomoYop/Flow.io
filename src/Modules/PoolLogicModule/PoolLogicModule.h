@@ -189,6 +189,8 @@ private:
     uint8_t filtrWinPriority_[FILTRATION_PLAN_MAX_WINDOWS] = {1, 2, 3};
     uint8_t filtrationCalcStart_ = PoolDefaults::FiltrationStartMinHour;
     uint8_t filtrationCalcStop_ = PoolDefaults::FiltrationStopMaxHour;
+    // Segments planifies "HH:MM-HH:MM, ..." (sortie pure du plan, jamais en NVS).
+    char filtrationCalcSegments_[64] = {0};
     FiltrationPlanOutput filtrationPlan_{};  // dernier plan applique (garde par pendingMux_)
 
     // Sensor IO ids for IOServiceV2 reads.
@@ -359,6 +361,8 @@ private:
                                             &filtrationCalcStart_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> calcStopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationCalcStop), "filtr_stop_clc", "poollogic/filtration", ConfigType::UInt8,
                                            &filtrationCalcStop_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<char,0> filtrSegmentsVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrSegments), "filtr_segments", "poollogic/filtration", ConfigType::CharArray,
+                                             filtrationCalcSegments_, ConfigPersistence::Runtime, sizeof(filtrationCalcSegments_)};
 
     ConfigVariable<IoId,0> phIdVar_{NVS_KEY(NvsKeys::PoolLogic::PhIoId), "ph_io_id", "poollogic/sensors", ConfigType::UInt16,
                                        &phIoId_, ConfigPersistence::Persistent, 0};

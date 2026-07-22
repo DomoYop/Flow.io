@@ -1982,9 +1982,9 @@
     const poolConfigTitle = document.getElementById('poolConfigTitle');
     const poolConfigSummary = document.getElementById('poolConfigSummary');
     const poolHeroState = document.getElementById('poolHeroState');
-    const poolFiltrationStart = document.getElementById('poolFiltrationStart');
-    const poolFiltrationStop = document.getElementById('poolFiltrationStop');
-    const poolFiltrationFill = document.getElementById('poolFiltrationFill');
+    const poolRibbonTrack = document.getElementById('poolRibbonTrack');
+    const poolNextRunText = document.getElementById('poolNextRunText');
+    const poolNextRun = document.getElementById('poolNextRun');
     const poolModeBadges = document.getElementById('poolModeBadges');
     const poolDisinfectionModes = document.getElementById('poolDisinfectionModes');
     const poolFiltrationPanel = document.getElementById('poolFiltrationPanel');
@@ -7046,6 +7046,159 @@
       return Math.max(0, Math.min(100, ((current - start) / (stop - start)) * 100));
     }
 
+    // "HH:MM" -> minutes depuis minuit (ou null).
+    function poolRibbonHmToMinutes(text) {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(String(text || '').trim());
+      if (!m) return null;
+      const v = (Number(m[1]) * 60) + Number(m[2]);
+      return (v >= 0 && v <= 1440) ? v : null;
+    }
+
+    // Parse la chaine "HH:MM-HH:MM, HH:MM-HH:MM" en segments {start, stop} (minutes).
+    function poolRibbonParseSegments(raw) {
+      const out = [];
+      String(raw || '').split(',').forEach((part) => {
+        const m = /^\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*$/.exec(part);
+        if (!m) return;
+        const start = poolRibbonHmToMinutes(m[1]);
+        const stop = poolRibbonHmToMinutes(m[2]);
+        if (start === null || stop === null) return;
+        out.push({ start, stop });
+      });
+      return out;
+    }
+
+    // Fenetres autorisees activees (fond du ruban), en minutes depuis minuit.
+    function poolRibbonAllowedWindows(filtration) {
+      const wins = [];
+      for (let i = 1; i <= 3; i += 1) {
+        if (filtration['filtr_w' + i + '_en'] !== true) continue;
+        const start = Number(filtration['filtr_w' + i + '_start']);
+        const stop = Number(filtration['filtr_w' + i + '_stop']);
+        if (!Number.isFinite(start) || !Number.isFinite(stop)) continue;
+        if (start === stop) continue;
+        wins.push({ start, stop });
+      }
+      return wins;
+    }
+
+    // Duree (min) d'un intervalle [start,stop[ pouvant traverser minuit.
+    function poolRibbonSpanMinutes(start, stop) {
+      return stop > start ? (stop - start) : (1440 - start + stop);
+    }
+
+    // Un intervalle -> 1 ou 2 blocs {left, width} en % (coupe a minuit).
+    function poolRibbonBlocks(start, stop) {
+      const s = ((start % 1440) + 1440) % 1440;
+      const e = ((stop % 1440) + 1440) % 1440;
+      const pct = (a, b) => ({ left: (a / 1440) * 100, width: ((b - a) / 1440) * 100 });
+      if (e > s) return [pct(s, e)];
+      if (e === s) return [{ left: 0, width: 100 }]; // 24 h plein
+      return [pct(s, 1440), pct(0, e)];
+    }
+
+    function poolRibbonFormatDelta(minutes) {
+      const h = Math.trunc(minutes / 60);
+      const m = minutes % 60;
+      if (h > 0 && m > 0) return h + ' h ' + String(m).padStart(2, '0');
+      if (h > 0) return h + ' h';
+      return m + ' min';
+    }
+
+    function poolRibbonMinutesToHm(min) {
+      const v = ((Math.round(min) % 1440) + 1440) % 1440;
+      return String(Math.trunc(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0');
+    }
+
+    function poolConfigRenderRibbon(filtration, startValue, stopValue) {
+      if (!poolRibbonTrack) return;
+      poolRibbonTrack.innerHTML = '';
+
+      // Segments reels du plan ; repli mono-segment (ancien firmware) via l'enveloppe.
+      let segments = poolRibbonParseSegments(filtration.filtr_segments);
+      if (!segments.length) {
+        const s = poolConfigHourToMinutes(startValue);
+        const e = poolConfigHourToMinutes(stopValue);
+        if (s !== null && e !== null && s !== e) segments = [{ start: s, stop: e }];
+      }
+
+      // Fond : fenetres autorisees.
+      poolRibbonAllowedWindows(filtration).forEach((w) => {
+        poolRibbonBlocks(w.start, w.stop).forEach((b) => {
+          const el = document.createElement('span');
+          el.className = 'pool-ribbon-window';
+          el.style.left = b.left.toFixed(2) + '%';
+          el.style.width = b.width.toFixed(2) + '%';
+          poolRibbonTrack.appendChild(el);
+        });
+      });
+
+      // Creneaux pompe reels.
+      segments.forEach((seg) => {
+        poolRibbonBlocks(seg.start, seg.stop).forEach((b) => {
+          const el = document.createElement('span');
+          el.className = 'pool-ribbon-segment';
+          el.style.left = b.left.toFixed(2) + '%';
+          el.style.width = b.width.toFixed(2) + '%';
+          el.title = poolRibbonMinutesToHm(seg.start) + ' - ' + poolRibbonMinutesToHm(seg.stop);
+          poolRibbonTrack.appendChild(el);
+        });
+      });
+
+      // Repere "maintenant".
+      const now = new Date();
+      const nowMin = (now.getHours() * 60) + now.getMinutes();
+      const cursor = document.createElement('span');
+      cursor.className = 'pool-ribbon-now';
+      cursor.style.left = ((nowMin / 1440) * 100).toFixed(2) + '%';
+      poolRibbonTrack.appendChild(cursor);
+
+      poolConfigRenderNextRun(segments, nowMin);
+    }
+
+    function poolConfigRenderNextRun(segments, nowMin) {
+      if (!poolNextRunText) return;
+      if (!segments.length) {
+        if (poolNextRun) poolNextRun.className = 'pool-next-run is-idle';
+        poolNextRunText.textContent = tr('pool.schedule.none', 'Aucun créneau de filtration programmé.');
+        return;
+      }
+
+      // Total de la journee.
+      let total = 0;
+      segments.forEach((s) => { total += poolRibbonSpanMinutes(s.start, s.stop); });
+      const totalText = tr('pool.schedule.total', 'Total {d}').replace('{d}', poolRibbonFormatDelta(total));
+
+      // Creneau actif ?
+      const active = segments.find((s) => {
+        const span = poolRibbonSpanMinutes(s.start, s.stop);
+        const rel = ((nowMin - s.start) % 1440 + 1440) % 1440;
+        return rel < span;
+      });
+      if (active) {
+        if (poolNextRun) poolNextRun.className = 'pool-next-run is-active';
+        poolNextRunText.textContent =
+          tr('pool.schedule.running', 'Filtration en cours jusqu’à {t}').replace('{t}', poolRibbonMinutesToHm(active.stop))
+          + ' · ' + totalText;
+        return;
+      }
+
+      // Prochain depart (aujourd'hui puis demain).
+      let best = Infinity;
+      let bestStart = null;
+      segments.forEach((s) => {
+        const delta = ((s.start - nowMin) % 1440 + 1440) % 1440;
+        if (delta > 0 && delta < best) { best = delta; bestStart = s.start; }
+      });
+      if (bestStart === null) { best = 0; bestStart = segments[0].start; }
+      if (poolNextRun) poolNextRun.className = 'pool-next-run';
+      poolNextRunText.textContent =
+        tr('pool.schedule.next', 'Prochaine filtration à {t} · dans {d}')
+          .replace('{t}', poolRibbonMinutesToHm(bestStart))
+          .replace('{d}', poolRibbonFormatDelta(best))
+        + ' · ' + totalText;
+    }
+
     function poolConfigFormatDurationMs(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return String(value ?? '-');
@@ -7281,11 +7434,7 @@
       if (poolConfigSummary) {
         poolConfigSummary.textContent = poolConfigHeroSummary(modules, start, stop);
       }
-      if (poolFiltrationStart) poolFiltrationStart.textContent = start;
-      if (poolFiltrationStop) poolFiltrationStop.textContent = stop;
-      if (poolFiltrationFill) {
-        poolFiltrationFill.style.width = poolConfigDayProgress(startValue, stopValue).toFixed(1) + '%';
-      }
+      poolConfigRenderRibbon(filtration, startValue, stopValue);
       poolConfigRenderModeBadges(modules);
     }
 

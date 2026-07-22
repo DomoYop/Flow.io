@@ -13,14 +13,17 @@ Résultat build:
 - statut: succès
 - génération cfgdocs: `docs=514`, `cfgmods=93`, `modules web chunks=118`
 - image: `1 946 862` octets sur `2 097 152` octets, soit `92,8 %` de la
-  partition applicative
+  partition applicative **au moment de ce relevé** ; la partition a depuis été
+  portée à `4 194 304` octets (4 Mo), ramenant l'occupation réelle à **~47 %**
+  (build à jour : `1 969 566` octets)
 - RAM PlatformIO: `124 588` octets sur `327 680`, soit `38,0 %`
 - DIRAM résumé linker: `209 026` octets utilisés sur `341 760`, soit `61,16 %`
 
-Conclusion globale: le profil est compilable et structurellement cohérent, mais
-la marge flash est faible. Les modules réseau, interface web, MQTT, OTA, IO et
-logique piscine doivent donc être évalués aussi sur leur coût binaire et leur
-capacité à rester sobres.
+Conclusion globale: le profil est compilable et structurellement cohérent. La
+marge flash est désormais **confortable** (partition portée à 4 Mo, ~47 %
+utilisé) et n'est plus un facteur limitant ; les contraintes dures sont les
+capacités compile-time. Rester néanmoins sobre sur le coût binaire des modules
+réseau, interface web, MQTT, OTA, IO et logique piscine par bonne hygiène.
 
 ## Périmètre Waveshare
 
@@ -776,11 +779,12 @@ Priorité 1 - réduire les gates C:
    `WebInterface` démarre tôt avec dépendances minimales, puis attache les
    services dynamiquement.
 
-Priorité 2 - surveiller la marge binaire:
+Priorité 2 - surveiller la marge binaire (non critique):
 
-- la partition applicative est à `92,8 %`
-- toute nouvelle page web, tout nouveau driver IO ou toute extension OTA/MQTT
-  doit être accompagnée d'une mesure de taille
+- la partition applicative (4 Mo) est à **~47 %** — marge confortable, ce point
+  n'est plus bloquant
+- par hygiène, accompagner d'une mesure de taille toute nouvelle page web, tout
+  nouveau driver IO ou toute extension OTA/MQTT d'ampleur
 - envisager d'exclure `log.sink.alarm` si non utilisé par Waveshare
 
 Priorité 3 - renforcer les scénarios critiques:

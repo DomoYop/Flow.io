@@ -203,6 +203,13 @@ bool PoolLogicModule::recalcAndApplyFiltrationWindow_(uint8_t* startHourOut,
     if (!cfgStore_ || !startStored) filtrationCalcStart_ = startHour;
     if (!cfgStore_ || !stopStored) filtrationCalcStop_ = stopHour;
 
+    // Liste complete des segments planifies (sortie pure Runtime), consommee par
+    // le ruban 24 h de la page piscine. Vide si aucun segment.
+    formatPlanSegments_(plan, filtrationCalcSegments_, sizeof(filtrationCalcSegments_));
+    if (cfgStore_) {
+        cfgStore_->set(filtrSegmentsVar_, filtrationCalcSegments_);
+    }
+
     if (cfgMqttPub_) {
         // Recompute commands should always refresh MQTT cfg consumers, even if
         // computed values stayed identical and ConfigStore emitted no change.

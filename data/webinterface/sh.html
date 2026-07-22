@@ -111,10 +111,15 @@
                   <span data-i18n="pool.state.normalStatus">État normal</span>
                 </div>
                 <p id="poolConfigSummary" data-i18n="pool.summary">Lecture des paramètres utilisateur de filtration, traitement, chauffage et remplissage.</p>
-                <div class="pool-filtration-daybar" aria-hidden="true">
-                  <span id="poolFiltrationStart" class="pool-daybar-time">--:--</span>
-                  <span class="pool-daybar-track"><span id="poolFiltrationFill" class="pool-daybar-fill"></span></span>
-                  <span id="poolFiltrationStop" class="pool-daybar-time">--:--</span>
+                <div id="poolFiltrationRibbon" class="pool-day-ribbon">
+                  <div class="pool-next-run" id="poolNextRun">
+                    <span class="ui-msr pool-next-run-icon" aria-hidden="true">schedule</span>
+                    <span id="poolNextRunText">--:--</span>
+                  </div>
+                  <div class="pool-ribbon-track" id="poolRibbonTrack" role="img" aria-label="Programme de filtration de la journée"></div>
+                  <div class="pool-ribbon-axis" aria-hidden="true">
+                    <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span>
+                  </div>
                 </div>
               </div>
             </div>

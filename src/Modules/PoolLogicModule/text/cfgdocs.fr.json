@@ -88,6 +88,11 @@
       "label_t": "cfgdocs.poollogic.filtration.filtr_stop_clc.label",
       "help_t": "cfgdocs.poollogic.filtration.filtr_stop_clc.help"
     },
+    "poollogic/filtration/filtr_segments": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.poollogic.filtration.filtr_segments.label",
+      "help_t": "cfgdocs.poollogic.filtration.filtr_segments.help"
+    },
     "poollogic/filtration/pump_flow_m3h": {
       "type": "Float",
       "label_t": "cfgdocs.poollogic.filtration.pump_flow_m3h.label",

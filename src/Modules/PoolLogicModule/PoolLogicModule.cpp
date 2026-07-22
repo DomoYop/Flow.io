@@ -52,6 +52,7 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.filtrWin3PrioVar_.moduleName = kCfgModuleFiltration;
     self.calcStartVar_.moduleName = kCfgModuleFiltration;
     self.calcStopVar_.moduleName = kCfgModuleFiltration;
+    self.filtrSegmentsVar_.moduleName = kCfgModuleFiltration;
 
     self.phIdVar_.moduleName = kCfgModuleSensors;
     self.orpIdVar_.moduleName = kCfgModuleSensors;
