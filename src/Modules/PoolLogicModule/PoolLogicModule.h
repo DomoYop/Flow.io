@@ -82,10 +82,10 @@ private:
     };
 
     enum DisinfectionType : uint8_t {
-        DisinfectionChlorineBromine = 0,
-        DisinfectionSwg = 1,
-        DisinfectionActiveOxygen = 2,
-        DisinfectionDisabled = 3,
+        DisinfectionDisabled = 0,
+        DisinfectionChlorineBromine = 1,
+        DisinfectionSwg = 2,
+        DisinfectionActiveOxygen = 3,
     };
 
     enum SwgControlMode : uint8_t {
@@ -176,7 +176,7 @@ private:
     bool orpAutoMode_ = false;
     bool heaterAutoMode_ = false;
     bool phDosePlus_ = false;
-    uint8_t disinfectionType_ = DisinfectionChlorineBromine;
+    uint8_t disinfectionType_ = DisinfectionDisabled;
     uint8_t swgControlMode_ = SwgControlContinuous;
 
     // Schedule / filtration plan (turnover volumique + fenetres priorisees)

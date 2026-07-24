@@ -606,6 +606,14 @@ AlarmCondState PoolLogicModule::condChlorineTankLowStatic_(void* ctx, uint32_t)
     PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
     if (!self || !self->enabled_) return AlarmCondState::False;
 
+    // Le bidon de desinfectant n'existe que pour les modes de dosage liquide
+    // (chlore/brome, oxygene actif). En electrolyse ou desinfection desactivee,
+    // le capteur de niveau est libere : pas d'alarme.
+    if (!self->isDisinfectionType_(DisinfectionChlorineBromine) &&
+        !self->isDisinfectionType_(DisinfectionActiveOxygen)) {
+        return AlarmCondState::False;
+    }
+
     bool low = false;
     if (!self->loadDigitalSensor_(self->chlorineLevelIoId_, low)) {
         return AlarmCondState::Unknown;

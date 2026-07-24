@@ -539,9 +539,9 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     }
     if (haSvc && haSvc->addSelect) {
         static const char* kDisinfectionTypeStateTpl =
-            R"({% set v = value_json.disinfection_type | int(0) %}{% if v == 1 %}Electrolyse{% elif v == 2 %}Oxygène actif{% elif v == 3 %}Désactivé{% else %}Chlore/Brome{% endif %})";
+            R"({% set v = value_json.disinfection_type | int(0) %}{% if v == 1 %}Chlore/Brome{% elif v == 2 %}Electrolyse{% elif v == 3 %}Oxygène actif{% else %}Désactivé{% endif %})";
         static const char* kDisinfectionTypeCmdTpl =
-            R"({% if value == 'Electrolyse' %}{\"poollogic/modes\":{\"disinfection_type\":1}}{% elif value == 'Oxygène actif' %}{\"poollogic/modes\":{\"disinfection_type\":2}}{% elif value == 'Désactivé' %}{\"poollogic/modes\":{\"disinfection_type\":3}}{% else %}{\"poollogic/modes\":{\"disinfection_type\":0}}{% endif %})";
+            R"({% if value == 'Chlore/Brome' %}{\"poollogic/modes\":{\"disinfection_type\":1}}{% elif value == 'Electrolyse' %}{\"poollogic/modes\":{\"disinfection_type\":2}}{% elif value == 'Oxygène actif' %}{\"poollogic/modes\":{\"disinfection_type\":3}}{% else %}{\"poollogic/modes\":{\"disinfection_type\":0}}{% endif %})";
         const HASelectEntry disinfectionTypeSelect{
             "poollogic",
             "pl_modes_dis",
@@ -1311,16 +1311,16 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
         const bool heaterOff = !deviceEnabled(heaterDeviceSlot_);
         const bool fillOff = !deviceEnabled(fillingDeviceSlot_);
 
-        // Chlore liquide (type 0) : PID ORP + fenetre.
+        // Chlore liquide (type 1) : PID ORP + fenetre.
         setAbs("pl_dis_auto", notChlorine);
         setAbs("pl_dis_window", notChlorine);
-        // Consigne ORP partagee chlore liquide (0) et electrolyse-ORP (1).
+        // Consigne ORP partagee chlore liquide (1) et electrolyse-ORP (2).
         setAbs("pl_dis_setpoint", notChlorine && notSwg);
-        // Electrolyse (type 1).
+        // Electrolyse (type 2).
         setAbs("pl_swg_ctrl", notSwg);
         setAbs("pl_swg_dly_elec", notSwg);
         setAbs("pl_swg_min_temp", notSwg);
-        // Oxygene actif (type 2).
+        // Oxygene actif (type 3).
         static const char* const kO2Suffixes[] = {
             "pl_o2_temp_comp", "pl_o2_hour", "pl_o2_state", "pl_o2_done",
             "pl_o2_pending", "pl_o2_last_day", "pl_o2_block", "pl_o2_plan",
