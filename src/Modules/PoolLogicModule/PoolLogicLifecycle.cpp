@@ -1240,8 +1240,8 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
 
     if (!enabled_) return;
 
-    if (disinfectionType_ > DisinfectionDisabled) {
-        disinfectionType_ = DisinfectionChlorineBromine;
+    if (disinfectionType_ > DisinfectionActiveOxygen) {
+        disinfectionType_ = DisinfectionDisabled;
         if (cfgStore_) (void)cfgStore_->set(disinfectionTypeVar_, disinfectionType_);
     }
     if (swgControlMode_ > SwgControlContinuous) {
@@ -1495,12 +1495,22 @@ void PoolLogicModule::onEvent_(const Event& e)
                 pendingFiltrationReconcile_ = true;
                 portEXIT_CRITICAL(&pendingMux_);
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisinfectionType) == 0) {
-                if (disinfectionType_ > DisinfectionDisabled) disinfectionType_ = DisinfectionChlorineBromine;
+                if (disinfectionType_ > DisinfectionActiveOxygen) disinfectionType_ = DisinfectionDisabled;
                 (void)writeDeviceDesired_(orpPumpDeviceSlot_, false);
                 (void)writeDeviceDesired_(swgDeviceSlot_, false);
                 if (disinfectionType_ == DisinfectionChlorineBromine && !orpAutoMode_ && cfgStore_) {
                     (void)cfgStore_->set(orpAutoModeVar_, true);
                     orpAutoMode_ = true;
+                }
+                // Resolution one-shot de la strategie : hors oxygene actif, le
+                // protocole O2 n'est plus evalue par la boucle, on le remet donc
+                // au repos ici (remplace le reset qui etait fait a chaque tour).
+                if (disinfectionType_ != DisinfectionActiveOxygen) {
+                    o2PendingMl_ = 0.0f;
+                    o2LastProgressMs_ = 0;
+                    o2ProtocolState_ = O2ProtocolIdle;
+                    o2BlockReason_ = O2BlockInactive;
+                    persistO2Protocol_(millis(), true);
                 }
                 resetTemporalPidState_(orpPidState_, millis());
                 orpPidEnabled_ = false;

@@ -643,7 +643,15 @@ AlarmCondState PoolLogicModule::condPhPumpMaxUptimeStatic_(void* ctx, uint32_t)
 AlarmCondState PoolLogicModule::condChlorinePumpMaxUptimeStatic_(void* ctx, uint32_t)
 {
     PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
-    return self ? self->condPumpMaxUptime_(self->orpPumpDeviceSlot_) : AlarmCondState::Unknown;
+    if (!self) return AlarmCondState::Unknown;
+    // La pompe de desinfection n'est pilotee qu'en dosage liquide (chlore/brome,
+    // oxygene actif). En electrolyse ou desinfection desactivee, pas d'alarme
+    // uptime : le device est libere.
+    if (!self->isDisinfectionType_(DisinfectionChlorineBromine) &&
+        !self->isDisinfectionType_(DisinfectionActiveOxygen)) {
+        return AlarmCondState::False;
+    }
+    return self->condPumpMaxUptime_(self->orpPumpDeviceSlot_);
 }
 
 AlarmCondState PoolLogicModule::condPumpMaxUptime_(uint8_t deviceSlot) const
@@ -1427,22 +1435,25 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         }
     }
 
-    bool o2RequestFiltration = false;
-    bool o2PumpDesired = false;
-    (void)stepO2Protocol_(filtrationDesired,
-                          filtrationFsm_.on,
-                          stateUptimeSec_(filtrationFsm_, nowMs) / 60U,
-                          haveWaterTemp,
-                          waterTemp,
-                          pressureError_,
-                          chlorineTankLowError_,
-                          nowMs,
-                          o2RequestFiltration,
-                          o2PumpDesired);
-    if (o2RequestFiltration && !pressureError_) {
-        filtrationDesired = true;
-    }
+    // Le protocole oxygene actif n'est evalue que dans son mode : hors O2, aucun
+    // appel (donc aucun set() NVS ni recalcul inutile). L'etat O2 est remis au
+    // repos une seule fois au changement de mode (onEvent_/DisinfectionType).
     if (isDisinfectionType_(DisinfectionActiveOxygen)) {
+        bool o2RequestFiltration = false;
+        bool o2PumpDesired = false;
+        (void)stepO2Protocol_(filtrationDesired,
+                              filtrationFsm_.on,
+                              stateUptimeSec_(filtrationFsm_, nowMs) / 60U,
+                              haveWaterTemp,
+                              waterTemp,
+                              pressureError_,
+                              chlorineTankLowError_,
+                              nowMs,
+                              o2RequestFiltration,
+                              o2PumpDesired);
+        if (o2RequestFiltration && !pressureError_) {
+            filtrationDesired = true;
+        }
         orpPumpDesired = o2PumpDesired;
     }
 
@@ -1509,13 +1520,20 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
 
     applyDeviceControl_(filtrationDeviceSlot_, "Filtration Pump", filtrationFsm_, filtrationDesired, nowMs);
     applyDeviceControl_(phPumpDeviceSlot_, "pH Pump", phPumpFsm_, phPumpDesired, nowMs);
-    applyDeviceControl_(orpPumpDeviceSlot_,
-                        isDisinfectionType_(DisinfectionActiveOxygen) ? "O2 Pump" : "Chlorine Pump",
-                        orpPumpFsm_,
-                        orpPumpDesired,
-                        nowMs);
+    // Un seul actionneur de desinfection est pilote selon le mode actif : la
+    // pompe (chlore liquide / oxygene actif) OU l'electrolyseur. Le device du
+    // mode non choisi n'est plus commande chaque tour ; il est deja mis OFF au
+    // boot (defaut Desactive) et a chaque changement de mode (onEvent_).
+    if (isDisinfectionType_(DisinfectionChlorineBromine) || isDisinfectionType_(DisinfectionActiveOxygen)) {
+        applyDeviceControl_(orpPumpDeviceSlot_,
+                            isDisinfectionType_(DisinfectionActiveOxygen) ? "O2 Pump" : "Chlorine Pump",
+                            orpPumpFsm_,
+                            orpPumpDesired,
+                            nowMs);
+    } else if (isDisinfectionType_(DisinfectionSwg)) {
+        applyDeviceControl_(swgDeviceSlot_, "SWG Pump", swgFsm_, swgDesired, nowMs);
+    }
     applyDeviceControl_(robotDeviceSlot_, "Robot Pump", robotFsm_, robotDesired, nowMs);
-    applyDeviceControl_(swgDeviceSlot_, "SWG Pump", swgFsm_, swgDesired, nowMs);
     applyDeviceControl_(heaterDeviceSlot_, "Water Heater", heaterFsm_, heaterDesired, nowMs);
     applyDeviceControl_(fillingDeviceSlot_, "Filling Pump", fillingFsm_, fillingDesired, nowMs);
 }
