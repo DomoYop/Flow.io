@@ -259,12 +259,6 @@
       "help_t": "cfgdocs.poollogic.filtration.filtr_w3_stop.help",
       "unit": "min"
     },
-    "poollogic/filtration/pump_flow_m3h": {
-      "type": "Float",
-      "label_t": "cfgdocs.poollogic.filtration.pump_flow_m3h.label",
-      "help_t": "cfgdocs.poollogic.filtration.pump_flow_m3h.help",
-      "unit": "m3/h"
-    },
     "poollogic/heater/heater_auto_mode": {
       "type": "Bool",
       "label_t": "cfgdocs.poollogic.heater.heater_auto_mode.label",
@@ -371,24 +365,6 @@
       "label_t": "cfgdocs.poollogic.safety.freeze_hold_t.label",
       "help_t": "cfgdocs.poollogic.safety.freeze_hold_t.help",
       "unit": "C"
-    },
-    "poollogic/safety/pressure_high_th": {
-      "type": "Float",
-      "label_t": "cfgdocs.poollogic.safety.pressure_high_th.label",
-      "help_t": "cfgdocs.poollogic.safety.pressure_high_th.help",
-      "unit": "bar"
-    },
-    "poollogic/safety/pressure_low_th": {
-      "type": "Float",
-      "label_t": "cfgdocs.poollogic.safety.pressure_low_th.label",
-      "help_t": "cfgdocs.poollogic.safety.pressure_low_th.help",
-      "unit": "bar"
-    },
-    "poollogic/safety/pressure_start_dly_s": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.safety.pressure_start_dly_s.label",
-      "help_t": "cfgdocs.poollogic.safety.pressure_start_dly_s.help",
-      "unit": "s"
     },
     "poollogic/safety/winter_start_t": {
       "type": "Float",

@@ -7356,7 +7356,8 @@
 
     async function poolConfigEnsureDocs() {
       const modules = poolConfigModuleDefs.map((def) => def.module)
-        .concat(poolDisinfectionModeDefs.map((def) => def.module));
+        .concat(poolDisinfectionModeDefs.map((def) => def.module))
+        .concat(['pdm/pd0']);
       await ensureCfgDocsForModule('');
       for (const moduleName of modules) {
         await ensureCfgDocsForModule(moduleName).catch(() => {});
@@ -7823,7 +7824,9 @@
       flowInput.max = '60';
       flowInput.step = '0.5';
       flowInput.className = 'control-input pool-fwin-flow-input';
-      const flowValue = Number(data.pump_flow_m3h);
+      // Le debit est une caracteristique de la pompe : il vit sur pdm/pd0.
+      const pd0Data = modules['pdm/pd0'] || {};
+      const flowValue = Number(pd0Data.pump_flow_m3h);
       flowInput.value = Number.isFinite(flowValue) ? String(flowValue) : '';
       flowWrap.appendChild(flowLabel);
       flowWrap.appendChild(flowInput);
@@ -7831,6 +7834,7 @@
       footer.appendChild(sizing);
       fields.push({
         key: 'pump_flow_m3h',
+        branch: 'pdm/pd0',
         label: tr('pool.filtration.pumpFlow', 'Débit pompe (m³/h)'),
         initial: Number.isFinite(flowValue) ? flowValue : null,
         read: () => {
@@ -8013,7 +8017,10 @@
       try {
         await poolConfigEnsureDocs().catch(() => {});
         const modules = {};
-        const allDefs = poolConfigModuleDefs.concat(poolDisinfectionModeDefs);
+        // pdm/pd0 : le debit de la pompe de filtration y vit desormais.
+        const allDefs = poolConfigModuleDefs
+          .concat(poolDisinfectionModeDefs)
+          .concat([{ module: 'pdm/pd0' }]);
         for (const def of allDefs) {
           const payload = await poolConfigFetchModule(def.module);
           if (reqSeq !== poolConfigReqSeq) return;

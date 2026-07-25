@@ -144,6 +144,14 @@
     "cfgdocs.pdm.pd6.on_delay_s.label": "Switch-on delay (s)",
     "cfgdocs.pdm.pd6.on_delay_s.help": "Wait time between the start request and actual energising. 0 = immediate.",
     "cfgdocs.pdm.pd7.on_delay_s.label": "Switch-on delay (s)",
-    "cfgdocs.pdm.pd7.on_delay_s.help": "Wait time between the start request and actual energising. 0 = immediate."
+    "cfgdocs.pdm.pd7.on_delay_s.help": "Wait time between the start request and actual energising. 0 = immediate.",
+    "cfgdocs.pdm.pd0.pump_flow_m3h.label": "Débit pump (m³/h)",
+    "cfgdocs.pdm.pd0.pump_flow_m3h.help": "Débit réel de the pump de filtration en m³/h. the besoin journalier vaut volume of bassin × cycles(temperature) ÷ flow rate.",
+    "cfgdocs.pdm.pd0.pressure_low_th.label": "Seuil pressure basse",
+    "cfgdocs.pdm.pd0.pressure_low_th.help": "Seuil de pressure basse for detection of anomalie.",
+    "cfgdocs.pdm.pd0.pressure_high_th.label": "Seuil pressure haute",
+    "cfgdocs.pdm.pd0.pressure_high_th.help": "Seuil de pressure haute for detection of anomalie.",
+    "cfgdocs.pdm.pd0.pressure_start_dly_s.label": "Délai startup pressure (s)",
+    "cfgdocs.pdm.pd0.pressure_start_dly_s.help": "Temps of attente avant vérification pressure après startup."
   }
 }

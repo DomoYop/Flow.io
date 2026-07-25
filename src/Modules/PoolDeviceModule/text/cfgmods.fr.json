@@ -20,6 +20,30 @@
         "eq": true
       }
     },
+    "pdm/pd0/pressure_high_th": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd0/pressure_low_th": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd0/pressure_start_dly_s": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd0/pump_flow_m3h": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd1": {
       "label_t": "cfgmods.pdm.pd1.label"
     },

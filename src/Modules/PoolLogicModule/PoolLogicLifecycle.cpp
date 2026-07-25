@@ -44,6 +44,9 @@ static constexpr const char* kCfgModuleBassin = "poollogic/bassin";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
 static constexpr const char* kCfgModuleSafety = "poollogic/safety";
+// Slot PoolDevice de la pompe de filtration : accueille ses caracteristiques
+// materielles (debit) et celles de son circuit (seuils de pression).
+static constexpr const char* kCfgModulePd0 = "pdm/pd0";
 static constexpr const char* kCfgModulePh = "poollogic/ph";
 static constexpr const char* kCfgModuleDisinfection = "poollogic/disinfection";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
@@ -226,7 +229,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     disinfectionTypeVar_.moduleName = kCfgModuleBassin;
     swgControlModeVar_.moduleName = kCfgModuleDisinfection;
 
-    pumpFlowVar_.moduleName = kCfgModuleFiltration;
+    // Caracteristiques materielles de la pompe de filtration et de son
+    // circuit : elles s affichent et se publient cote pdm/pd0, tout en
+    // restant lues directement par PoolLogic (turnover, alarmes pression).
+    pumpFlowVar_.moduleName = kCfgModulePd0;
     filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
     filtrWin1StartVar_.moduleName = kCfgModuleFiltration;
     filtrWin1StopVar_.moduleName = kCfgModuleFiltration;
@@ -255,8 +261,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     flowSwitchIdVar_.moduleName = kCfgModuleSensors;
     coverClosedIdVar_.moduleName = kCfgModuleSensors;
 
-    pressureLowVar_.moduleName = kCfgModuleSafety;
-    pressureHighVar_.moduleName = kCfgModuleSafety;
+    pressureLowVar_.moduleName = kCfgModulePd0;
+    pressureHighVar_.moduleName = kCfgModulePd0;
     winterStartVar_.moduleName = kCfgModuleSafety;
     freezeHoldVar_.moduleName = kCfgModuleSafety;
     secureElectroVar_.moduleName = kCfgModuleDisinfection;
@@ -276,7 +282,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     disMinOnMsVar_.moduleName = kCfgModuleDisinfection;
     disSampleMsVar_.moduleName = kCfgModuleDisinfection;
 
-    pressureDelayVar_.moduleName = kCfgModuleSafety;
+    pressureDelayVar_.moduleName = kCfgModulePd0;
     delayElectroVar_.moduleName = kCfgModuleDisinfection;
     robotDelayVar_.moduleName = kCfgModuleRobot;
     robotDurationVar_.moduleName = kCfgModuleRobot;
@@ -705,10 +711,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_pump_flow",
             "Filtration Pump Flow",
-            "cfg/poollogic/filtration",
-            "{{ value_json.pump_flow_m3h | float(0) }}",
+            "cfg/pdm",
+            "{{ value_json.pd0.pump_flow_m3h | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/filtration\\\":{\\\"pump_flow_m3h\\\":{{ value | float(0) }}}}",
+            "{\\\"pdm/pd0\\\":{\\\"pump_flow_m3h\\\":{{ value | float(0) }}}}",
             1.0f,
             40.0f,
             0.5f,
@@ -865,10 +871,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_safe_pressure_low",
             "Pressure Low Threshold",
-            "cfg/poollogic/safety",
-            "{{ value_json.pressure_low_th | float(0) }}",
+            "cfg/pdm",
+            "{{ value_json.pd0.pressure_low_th | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/safety\\\":{\\\"pressure_low_th\\\":{{ value | float(0) }}}}",
+            "{\\\"pdm/pd0\\\":{\\\"pressure_low_th\\\":{{ value | float(0) }}}}",
             0.0f,
             5.0f,
             0.01f,
@@ -881,10 +887,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_safe_pressure_high",
             "Pressure High Threshold",
-            "cfg/poollogic/safety",
-            "{{ value_json.pressure_high_th | float(0) }}",
+            "cfg/pdm",
+            "{{ value_json.pd0.pressure_high_th | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/safety\\\":{\\\"pressure_high_th\\\":{{ value | float(0) }}}}",
+            "{\\\"pdm/pd0\\\":{\\\"pressure_high_th\\\":{{ value | float(0) }}}}",
             0.0f,
             5.0f,
             0.01f,
