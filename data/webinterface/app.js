@@ -2035,7 +2035,6 @@
     const flowCfgDetailPane = flowCfgFields ? flowCfgFields.closest('.cfg-pane') : null;
     let flowCfgCurrentModule = '';
     let flowCfgCurrentData = {};
-    let flowCfgCurrentPdmExtension = null;
     let flowCfgCurrentComposeSections = [];
     let flowCfgChildrenCache = {};
     let flowCfgPath = [];
@@ -2077,7 +2076,6 @@
     let poolLogicSensorIoNamesCache = null;
     let supCfgCurrentModule = '';
     let supCfgCurrentData = {};
-    let supCfgCurrentPdmExtension = null;
     let supCfgCurrentComposeSections = [];
     let supCfgTreePath = '';
     let supCfgChildrenCache = {};
@@ -9553,11 +9551,6 @@
       if (!isPageActive('page-control')) return;
       try {
         await ensureCfgDocsForModule(cfgTreeSelectedSource === 'supervisor' ? supCfgCurrentModule : flowCfgCurrentModule);
-        if (cfgTreeSelectedSource === 'supervisor' && supCfgCurrentPdmExtension && supCfgCurrentPdmExtension.module) {
-          await ensureCfgDocsForModule(supCfgCurrentPdmExtension.module);
-        } else if (cfgTreeSelectedSource !== 'supervisor' && flowCfgCurrentPdmExtension && flowCfgCurrentPdmExtension.module) {
-          await ensureCfgDocsForModule(flowCfgCurrentPdmExtension.module);
-        }
       } catch (err) {
       }
       renderFlowCfgTree();
@@ -10524,7 +10517,6 @@
     }
 
     function resetPrimaryCfgEditor(message) {
-      supCfgCurrentPdmExtension = null;
       supCfgCurrentComposeSections = [];
       flowCfgFields.innerHTML = '';
       flowCfgApplyBtn.hidden = false;
@@ -10537,7 +10529,6 @@
     function resetFlowCfgEditor(message) {
       flowCfgCurrentModule = '';
       flowCfgCurrentData = {};
-      flowCfgCurrentPdmExtension = null;
       flowCfgCurrentComposeSections = [];
       resetPrimaryCfgEditor(message);
     }
@@ -11049,96 +11040,12 @@
       } else {
         renderFlowCfgFields(dataObj);
       }
-      if (flowCfgCurrentPdmExtension &&
-          flowCfgCurrentPdmExtension.data &&
-          Object.keys(flowCfgCurrentPdmExtension.data).length > 0) {
-        renderConfigFields(flowCfgFields, flowCfgCurrentPdmExtension.module, flowCfgCurrentPdmExtension.data, {
-          append: true,
-          source: 'flow',
-          sectionTitle: flowCfgPdmSectionTitle(flowCfgCurrentModule, dataObj),
-          controlsPrimaryPane: true,
-          perFieldApply: flowCfgApplyPerFieldEnabled(flowCfgCurrentModule),
-          onApplyField: appliquerFlowCfgField
-        });
-      }
       updatePrimaryCfgApplyState();
     }
 
-    function flowCfgIoOutputSlotIndex(moduleName, dataObj) {
-      const cleanModule = nettoyerNomFlowCfg(moduleName).toLowerCase();
-      const match = cleanModule.match(/^(?:io\/output\/)?d(\d{1,2})$/);
-      if (match) {
-        const slot = Number.parseInt(match[1], 10);
-        if (Number.isFinite(slot) && slot >= 0 && slot <= 15) return slot;
-      }
-      const data = (dataObj && typeof dataObj === 'object') ? dataObj : null;
-      if (data) {
-        const key = Object.keys(data).find((candidate) => /^d\d{2}_name$/i.test(String(candidate || '').trim()));
-        if (key) {
-          const keyMatch = String(key).match(/^d(\d{2})_name$/i);
-          const slot = keyMatch ? Number.parseInt(keyMatch[1], 10) : -1;
-          if (Number.isFinite(slot) && slot >= 0 && slot <= 15) return slot;
-        }
-      }
-      return -1;
-    }
-
-    function flowCfgPdmModuleForIoOutput(moduleName, dataObj) {
-      const slot = flowCfgIoOutputSlotIndex(moduleName, dataObj);
-      if (slot < 0) return '';
-      return 'pdm/pd' + String(slot);
-    }
-
-    function flowCfgPdmSectionTitle(moduleName, dataObj) {
-      const slot = flowCfgIoOutputSlotIndex(moduleName, dataObj);
-      if (slot < 0) return 'Extension PoolDevice';
-      const label = String(ioOutputPdmLabels[slot] || '').trim();
-      if (!label) return 'Extension PoolDevice (pd' + String(slot) + ')';
-      return 'Extension PoolDevice - ' + label + ' (pd' + String(slot) + ')';
-    }
-
-    async function loadFlowCfgPdmExtensionData(moduleName, dataObj) {
-      const pdmModule = flowCfgPdmModuleForIoOutput(moduleName, dataObj);
-      if (!pdmModule) return null;
-      try {
-        const res = await fetchFlowRemoteQueued(
-          '/api/flowcfg/module?name=' + encodeURIComponent(pdmModule),
-          { cache: 'no-store' }
-        );
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data || data.ok !== true || typeof data.data !== 'object') {
-          return null;
-        }
-        return {
-          module: pdmModule,
-          data: data.data
-        };
-      } catch (err) {
-        return null;
-      }
-    }
-
-    async function loadPrimarySupervisorPdmExtensionData(moduleName, dataObj) {
-      if (!isWaveshareProfile()) return null;
-      const pdmModule = flowCfgPdmModuleForIoOutput(moduleName, dataObj);
-      if (!pdmModule) return null;
-      try {
-        const res = await fetchWithBusyRetry(
-          '/api/supervisorcfg/module?name=' + encodeURIComponent(pdmModule),
-          { cache: 'no-store' }
-        );
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data || data.ok !== true || typeof data.data !== 'object') {
-          return null;
-        }
-        return {
-          module: pdmModule,
-          data: data.data
-        };
-      } catch (err) {
-        return null;
-      }
-    }
+    // Les pages E/S restent purement electriques (nom, port, polarite...) : la
+    // config PoolDevice vit dans la branche pdm de premier niveau, ou l'on
+    // choisit le slot depuis la page metier (ph_pump_slot, filtr_slot...).
 
     function renderPrimarySupervisorCfgFields(dataObj) {
       renderConfigFields(flowCfgFields, supCfgCurrentModule, dataObj, {
@@ -11165,18 +11072,6 @@
         });
       } else {
         renderPrimarySupervisorCfgFields(dataObj);
-      }
-      if (supCfgCurrentPdmExtension &&
-          supCfgCurrentPdmExtension.data &&
-          Object.keys(supCfgCurrentPdmExtension.data).length > 0) {
-        renderConfigFields(flowCfgFields, supCfgCurrentPdmExtension.module, supCfgCurrentPdmExtension.data, {
-          append: true,
-          source: 'supervisor',
-          sectionTitle: flowCfgPdmSectionTitle(supCfgCurrentModule, dataObj),
-          controlsPrimaryPane: true,
-          perFieldApply: flowCfgApplyPerFieldEnabled(supCfgCurrentModule),
-          onApplyField: appliquerPrimaryCfgField
-        });
       }
       updatePrimaryCfgApplyState();
     }
@@ -11309,13 +11204,11 @@
           supCfgCurrentModule = m;
           supCfgCurrentData = {};
           supCfgCurrentComposeSections = sections;
-          supCfgCurrentPdmExtension = null;
           renderCfgComposeSections(sections, 'supervisor', perFieldApply, appliquerPrimaryCfgField);
         } else {
           flowCfgCurrentModule = m;
           flowCfgCurrentData = {};
           flowCfgCurrentComposeSections = sections;
-          flowCfgCurrentPdmExtension = null;
           renderCfgComposeSections(sections, 'flow', perFieldApply, appliquerFlowCfgField);
         }
         updatePrimaryCfgApplyState();
@@ -11374,13 +11267,11 @@
         flowCfgCurrentModule = m;
         flowCfgCurrentData = data.data;
         flowCfgCurrentComposeSections = await loadCfgComposeSections('flow', m);
-        flowCfgCurrentPdmExtension = await loadFlowCfgPdmExtensionData(m, flowCfgCurrentData);
         renderFlowCfgFieldsWithExtensions(flowCfgCurrentData);
         flowCfgStatus.textContent = data.truncated
           ? tr('config.branchLoadedTruncated', 'Branche chargée (tronquée, buffer distant atteint).')
           : tr('config.branchLoaded', 'Branche chargée.');
       } catch (err) {
-        flowCfgCurrentPdmExtension = null;
         resetFlowCfgEditor('Chargement branche échoué: ' + err);
       } finally {
         endFlowCfgLoading({ tree: false, detail: true });
@@ -11394,7 +11285,6 @@
         if (!m) {
           supCfgCurrentModule = '';
           supCfgCurrentData = {};
-          supCfgCurrentPdmExtension = null;
           resetPrimaryCfgEditor('Aucune branche locale sélectionnée.');
           return;
         }
@@ -11417,7 +11307,6 @@
         supCfgCurrentModule = m;
         supCfgCurrentData = data.data;
         supCfgCurrentComposeSections = await loadCfgComposeSections('supervisor', m);
-        supCfgCurrentPdmExtension = await loadPrimarySupervisorPdmExtensionData(m, supCfgCurrentData);
         renderPrimarySupervisorCfgFieldsWithExtensions(supCfgCurrentData);
         flowCfgStatus.textContent = data.truncated
           ? 'Branche locale chargée (tronquée, buffer atteint).'
@@ -11425,7 +11314,6 @@
       } catch (err) {
         supCfgCurrentModule = '';
         supCfgCurrentData = {};
-        supCfgCurrentPdmExtension = null;
         resetPrimaryCfgEditor('Chargement branche locale échoué: ' + err);
       } finally {
         endFlowCfgLoading({ tree: false, detail: true });

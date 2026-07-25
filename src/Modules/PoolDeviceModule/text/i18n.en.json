@@ -134,8 +134,6 @@
     "runtimeui.pooldev.v07.group": "Equipements",
     "runtimeui.pooldev.v07.label": "Lumiere",
     "runtimeui.pooldev.v08.group": "Equipements",
-    "runtimeui.pooldev.v08.label": "Chauffe-eau",
-    "cfgmods.pdm.lights.label": "Lighting",
-    "cfgmods.pdm.lights.help": "Pool lighting settings."
+    "runtimeui.pooldev.v08.label": "Chauffe-eau"
   }
 }
