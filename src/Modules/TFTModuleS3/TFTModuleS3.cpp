@@ -1724,7 +1724,7 @@ bool TFTModuleS3::loadPoolModeFlags_(bool& autoMode,
 
     char moduleJson[320] = {0};
     bool truncated = false;
-    if (!cfgStore_->toJsonModule("poollogic/modes", moduleJson, sizeof(moduleJson), &truncated, true) || truncated) return false;
+    if (!cfgStore_->toJsonModule("poollogic/bassin", moduleJson, sizeof(moduleJson), &truncated, true) || truncated) return false;
 
     StaticJsonDocument<384> doc;
     if (deserializeJson(doc, moduleJson)) return false;
@@ -1746,7 +1746,7 @@ bool TFTModuleS3::loadPoolModeFlags_(bool& autoMode,
 
     memset(moduleJson, 0, sizeof(moduleJson));
     truncated = false;
-    if (cfgStore_->toJsonModule("poollogic/chlorine", moduleJson, sizeof(moduleJson), &truncated, true) && !truncated) {
+    if (cfgStore_->toJsonModule("poollogic/disinfection", moduleJson, sizeof(moduleJson), &truncated, true) && !truncated) {
         StaticJsonDocument<128> disDoc;
         if (!deserializeJson(disDoc, moduleJson)) {
             JsonObjectConst disRoot = disDoc.as<JsonObjectConst>();

@@ -21,47 +21,43 @@ namespace {
 // routes used by HA, MQTT config sync, and tooling.
 static constexpr uint8_t kPoolLogicCfgProducerId = 44;
 static constexpr const char* kPoolLogicCfgTopicBase = "cfg/poollogic";
-static constexpr uint8_t kCfgBranchModes = 1;
+// Branche 1 = Bassin (ex-modes) : parametres transverses au bassin.
+static constexpr uint8_t kCfgBranchBassin = 1;
 static constexpr uint8_t kCfgBranchFiltration = 2;
 static constexpr uint8_t kCfgBranchSensors = 3;
 static constexpr uint8_t kCfgBranchSafety = 4;
-static constexpr uint8_t kCfgBranchRegulation = 5;
+// Branche 5 (ex-regulation) liberee : min_on/sample sont passes par boucle
+// (pH / desinfection) et le delai d'armement a rejoint Bassin.
+// Branche 7 = Desinfection : fusion des ex-branches chlorine (7), swg (8) et
+// o2 (9), un seul slot logique de desinfection.
 static constexpr uint8_t kCfgBranchPh = 6;
-static constexpr uint8_t kCfgBranchChlorine = 7;
-static constexpr uint8_t kCfgBranchSwg = 8;
-static constexpr uint8_t kCfgBranchO2 = 9;
+static constexpr uint8_t kCfgBranchDisinfection = 7;
 // kCfgBranch 10 (ex-devices) libere : les slots role->PDM vivent desormais
-// dans leur branche metier (filtration/swg/robot/refill/ph/chlorine/heater).
+// dans leur branche metier (filtration/desinfection/robot/refill/ph/heater).
 static constexpr uint8_t kCfgBranchHeater = 11;
 static constexpr uint8_t kCfgBranchRobot = 12;
 static constexpr uint8_t kCfgBranchRefill = 13;
 static constexpr uint32_t kStartupActivityStabilizeMs = 3000U;
 static constexpr uint32_t kStartupActivityMaxDelayMs = 30000U;
 static constexpr uint64_t kActivityMinEpoch = 1609459200ULL;
-static constexpr const char* kCfgModuleModes = "poollogic/modes";
+static constexpr const char* kCfgModuleBassin = "poollogic/bassin";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
 static constexpr const char* kCfgModuleSafety = "poollogic/safety";
-static constexpr const char* kCfgModuleRegulation = "poollogic/regulation";
 static constexpr const char* kCfgModulePh = "poollogic/ph";
-static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
-static constexpr const char* kCfgModuleSwg = "poollogic/swg";
-static constexpr const char* kCfgModuleO2 = "poollogic/o2";
+static constexpr const char* kCfgModuleDisinfection = "poollogic/disinfection";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
 static constexpr const char* kCfgModuleRobot = "poollogic/robot";
 static constexpr const char* kCfgModuleRefill = "poollogic/refill";
 
 enum : uint16_t {
     kCfgMsgBase = 1,
-    kCfgMsgModes = 2,
+    kCfgMsgBassin = 2,
     kCfgMsgFiltration = 3,
     kCfgMsgSensors = 4,
     kCfgMsgSafety = 5,
-    kCfgMsgRegulation = 6,
     kCfgMsgPh = 7,
-    kCfgMsgChlorine = 8,
-    kCfgMsgSwg = 9,
-    kCfgMsgO2 = 10,
+    kCfgMsgDisinfection = 8,
     kCfgMsgHeater = 12,
     kCfgMsgRobot = 13,
     kCfgMsgRefill = 14,
@@ -75,10 +71,10 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      (uint8_t)MqttPublishPriority::Normal,
      &PoolLogicModule::buildCfgBaseStatic_,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgModes,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchModes},
-     kCfgModuleModes,
-     "modes",
+    {kCfgMsgBassin,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchBassin},
+     kCfgModuleBassin,
+     "bassin",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
@@ -103,13 +99,6 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgRegulation,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchRegulation},
-     kCfgModuleRegulation,
-     "regulation",
-     (uint8_t)MqttPublishPriority::Normal,
-     nullptr,
-     kPoolLogicCfgTopicBase},
     {kCfgMsgPh,
      {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchPh},
      kCfgModulePh,
@@ -117,24 +106,10 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
-    {kCfgMsgChlorine,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchChlorine},
-     kCfgModuleChlorine,
-     "chlorine",
-     (uint8_t)MqttPublishPriority::Normal,
-     nullptr,
-     kPoolLogicCfgTopicBase},
-    {kCfgMsgSwg,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchSwg},
-     kCfgModuleSwg,
-     "swg",
-     (uint8_t)MqttPublishPriority::Normal,
-     nullptr,
-     kPoolLogicCfgTopicBase},
-    {kCfgMsgO2,
-     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchO2},
-     kCfgModuleO2,
-     "o2",
+    {kCfgMsgDisinfection,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchDisinfection},
+     kCfgModuleDisinfection,
+     "disinfection",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
@@ -186,15 +161,19 @@ void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
         orpKd_ = d->orpKd;
         phWindowMs_ = d->pidWindowMs;
         orpWindowMs_ = d->pidWindowMs;
-        pidMinOnMs_ = d->pidMinOnMs;
-        pidSampleMs_ = d->pidSampleMs;
+        // Le defaut de domaine reste commun ; les deux boucles partent de la
+        // meme valeur puis se reglent independamment.
+        phMinOnMs_ = d->pidMinOnMs;
+        phSampleMs_ = d->pidSampleMs;
+        disMinOnMs_ = d->pidMinOnMs;
+        disSampleMs_ = d->pidSampleMs;
         pressureStartupDelaySec_ = d->pressureStartupDelaySec;
         delayPidsMin_ = d->delayPidsMin;
         delayElectroMin_ = d->delayElectroMin;
         robotDelayMin_ = d->robotDelayMin;
         robotDurationMin_ = d->robotDurationMin;
         fillingMinOnSec_ = d->fillingMinOnSec;
-        o2PoolVolumeM3_ = d->o2PoolVolumeM3;
+        poolVolumeM3_ = d->poolVolumeM3;
         o2DoseMlPer10M3Week_ = d->o2DoseMlPer10M3Week;
         o2MainHour_ = d->o2MainHour;
         o2SplitCount_ = d->o2SplitCount;
@@ -235,15 +214,17 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     // Runtime moduleName reassignment keeps the config tree grouped by branch
     // even though the variables are declared on a single facade class.
-    enabledVar_.moduleName = kCfgModuleModes;
-    autoModeVar_.moduleName = kCfgModuleModes;
-    winterModeVar_.moduleName = kCfgModuleModes;
+    enabledVar_.moduleName = kCfgModuleBassin;
+    autoModeVar_.moduleName = kCfgModuleBassin;
+    winterModeVar_.moduleName = kCfgModuleBassin;
+    poolVolumeVar_.moduleName = kCfgModuleBassin;
+    delayPidsVar_.moduleName = kCfgModuleBassin;
     phAutoModeVar_.moduleName = kCfgModulePh;
-    orpAutoModeVar_.moduleName = kCfgModuleChlorine;
+    orpAutoModeVar_.moduleName = kCfgModuleDisinfection;
     heaterAutoModeVar_.moduleName = kCfgModuleHeater;
     phDosePlusVar_.moduleName = kCfgModulePh;
-    disinfectionTypeVar_.moduleName = kCfgModuleModes;
-    swgControlModeVar_.moduleName = kCfgModuleSwg;
+    disinfectionTypeVar_.moduleName = kCfgModuleBassin;
+    swgControlModeVar_.moduleName = kCfgModuleDisinfection;
 
     pumpFlowVar_.moduleName = kCfgModuleFiltration;
     filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
@@ -278,60 +259,64 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     pressureHighVar_.moduleName = kCfgModuleSafety;
     winterStartVar_.moduleName = kCfgModuleSafety;
     freezeHoldVar_.moduleName = kCfgModuleSafety;
-    secureElectroVar_.moduleName = kCfgModuleSwg;
+    secureElectroVar_.moduleName = kCfgModuleDisinfection;
     phSetpointVar_.moduleName = kCfgModulePh;
-    orpSetpointVar_.moduleName = kCfgModuleChlorine;
+    orpSetpointVar_.moduleName = kCfgModuleDisinfection;
     heaterSetpointVar_.moduleName = kCfgModuleHeater;
     phKpVar_.moduleName = kCfgModulePh;
     phKiVar_.moduleName = kCfgModulePh;
     phKdVar_.moduleName = kCfgModulePh;
-    orpKpVar_.moduleName = kCfgModuleChlorine;
-    orpKiVar_.moduleName = kCfgModuleChlorine;
-    orpKdVar_.moduleName = kCfgModuleChlorine;
+    orpKpVar_.moduleName = kCfgModuleDisinfection;
+    orpKiVar_.moduleName = kCfgModuleDisinfection;
+    orpKdVar_.moduleName = kCfgModuleDisinfection;
     phWindowMsVar_.moduleName = kCfgModulePh;
-    orpWindowMsVar_.moduleName = kCfgModuleChlorine;
-    pidMinOnMsVar_.moduleName = kCfgModuleRegulation;
-    pidSampleMsVar_.moduleName = kCfgModuleRegulation;
+    orpWindowMsVar_.moduleName = kCfgModuleDisinfection;
+    phMinOnMsVar_.moduleName = kCfgModulePh;
+    phSampleMsVar_.moduleName = kCfgModulePh;
+    disMinOnMsVar_.moduleName = kCfgModuleDisinfection;
+    disSampleMsVar_.moduleName = kCfgModuleDisinfection;
 
     pressureDelayVar_.moduleName = kCfgModuleSafety;
-    delayPidsVar_.moduleName = kCfgModuleRegulation;
-    delayElectroVar_.moduleName = kCfgModuleSwg;
+    delayElectroVar_.moduleName = kCfgModuleDisinfection;
     robotDelayVar_.moduleName = kCfgModuleRobot;
     robotDurationVar_.moduleName = kCfgModuleRobot;
     fillingMinOnVar_.moduleName = kCfgModuleRefill;
 
-    o2PoolVolumeVar_.moduleName = kCfgModuleO2;
-    o2DoseVar_.moduleName = kCfgModuleO2;
-    o2MainHourVar_.moduleName = kCfgModuleO2;
-    o2SplitCountVar_.moduleName = kCfgModuleO2;
-    o2TempCompVar_.moduleName = kCfgModuleO2;
-    o2LoadFactorVar_.moduleName = kCfgModuleO2;
-    o2MinFilterRunVar_.moduleName = kCfgModuleO2;
-    o2ProtocolStateVar_.moduleName = kCfgModuleO2;
-    o2LastDoseDayVar_.moduleName = kCfgModuleO2;
-    o2WeeklyDoneVar_.moduleName = kCfgModuleO2;
-    o2PendingVar_.moduleName = kCfgModuleO2;
+    o2DoseVar_.moduleName = kCfgModuleDisinfection;
+    o2MainHourVar_.moduleName = kCfgModuleDisinfection;
+    o2SplitCountVar_.moduleName = kCfgModuleDisinfection;
+    o2TempCompVar_.moduleName = kCfgModuleDisinfection;
+    o2LoadFactorVar_.moduleName = kCfgModuleDisinfection;
+    o2MinFilterRunVar_.moduleName = kCfgModuleDisinfection;
+    o2ProtocolStateVar_.moduleName = kCfgModuleDisinfection;
+    o2LastDoseDayVar_.moduleName = kCfgModuleDisinfection;
+    o2WeeklyDoneVar_.moduleName = kCfgModuleDisinfection;
+    o2PendingVar_.moduleName = kCfgModuleDisinfection;
 
     filtrationDeviceVar_.moduleName = kCfgModuleFiltration;
-    swgDeviceVar_.moduleName = kCfgModuleSwg;
+    swgDeviceVar_.moduleName = kCfgModuleDisinfection;
     robotDeviceVar_.moduleName = kCfgModuleRobot;
     fillingDeviceVar_.moduleName = kCfgModuleRefill;
     phPumpDeviceVar_.moduleName = kCfgModulePh;
-    orpPumpDeviceVar_.moduleName = kCfgModuleChlorine;
+    orpPumpDeviceVar_.moduleName = kCfgModuleDisinfection;
     heaterDeviceVar_.moduleName = kCfgModuleHeater;
 
     // Registration order mirrors the published config branches so init remains
     // easy to diff against the generated cfgdocs and MQTT routes.
-    cfg.registerVar(enabledVar_, kCfgModuleId, kCfgBranchModes);
+    // Bassin : parametres transverses (identite du bassin, modes maitres,
+    // methode de desinfection, delai d'armement des regulations).
+    cfg.registerVar(enabledVar_, kCfgModuleId, kCfgBranchBassin);
+    cfg.registerVar(autoModeVar_, kCfgModuleId, kCfgBranchBassin);
+    cfg.registerVar(winterModeVar_, kCfgModuleId, kCfgBranchBassin);
+    cfg.registerVar(poolVolumeVar_, kCfgModuleId, kCfgBranchBassin);
+    cfg.registerVar(disinfectionTypeVar_, kCfgModuleId, kCfgBranchBassin);
+    cfg.registerVar(delayPidsVar_, kCfgModuleId, kCfgBranchBassin);
 
-    cfg.registerVar(autoModeVar_, kCfgModuleId, kCfgBranchModes);
-    cfg.registerVar(winterModeVar_, kCfgModuleId, kCfgBranchModes);
     cfg.registerVar(phAutoModeVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpAutoModeVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(orpAutoModeVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(heaterAutoModeVar_, kCfgModuleId, kCfgBranchHeater);
     cfg.registerVar(phDosePlusVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(disinfectionTypeVar_, kCfgModuleId, kCfgBranchModes);
-    cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchDisinfection);
 
     cfg.registerVar(pumpFlowVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(filtrWin1EnVar_, kCfgModuleId, kCfgBranchFiltration);
@@ -366,48 +351,48 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(pressureHighVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(winterStartVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchSafety);
-    cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(phSetpointVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(heaterSetpointVar_, kCfgModuleId, kCfgBranchHeater);
     cfg.registerVar(phKpVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(phKiVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(phKdVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchChlorine);
-    cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchChlorine);
-    cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(phWindowMsVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchChlorine);
-    cfg.registerVar(pidMinOnMsVar_, kCfgModuleId, kCfgBranchRegulation);
-    cfg.registerVar(pidSampleMsVar_, kCfgModuleId, kCfgBranchRegulation);
+    cfg.registerVar(phMinOnMsVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phSampleMsVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(disMinOnMsVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(disSampleMsVar_, kCfgModuleId, kCfgBranchDisinfection);
 
     cfg.registerVar(pressureDelayVar_, kCfgModuleId, kCfgBranchSafety);
-    cfg.registerVar(delayPidsVar_, kCfgModuleId, kCfgBranchRegulation);
-    cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(robotDelayVar_, kCfgModuleId, kCfgBranchRobot);
     cfg.registerVar(robotDurationVar_, kCfgModuleId, kCfgBranchRobot);
     cfg.registerVar(fillingMinOnVar_, kCfgModuleId, kCfgBranchRefill);
 
-    cfg.registerVar(o2PoolVolumeVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2DoseVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2MainHourVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2SplitCountVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2TempCompVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2LoadFactorVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2MinFilterRunVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2ProtocolStateVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2LastDoseDayVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchO2);
-    cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchO2);
+    cfg.registerVar(o2DoseVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2MainHourVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2SplitCountVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2TempCompVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2LoadFactorVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2MinFilterRunVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2ProtocolStateVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2LastDoseDayVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchDisinfection);
+    cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchDisinfection);
 
     // Slots role -> PDM enregistres apres les reglages de leur branche pour
     // apparaitre en dernier dans chaque page (l'ordre UI suit l'enregistrement).
     cfg.registerVar(filtrationDeviceVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchSwg);
+    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(robotDeviceVar_, kCfgModuleId, kCfgBranchRobot);
     cfg.registerVar(fillingDeviceVar_, kCfgModuleId, kCfgBranchRefill);
     cfg.registerVar(phPumpDeviceVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchChlorine);
+    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchHeater);
 
     cfg.registerVar(flowCopyDelayVar_, kCfgModuleId, kCfgBranchSafety);
@@ -436,11 +421,11 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_modes_auto",
             "Pool Auto-regulation",
-            "cfg/poollogic/modes",
+            "cfg/poollogic/bassin",
             "{% if value_json.auto_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/modes\\\":{\\\"auto_mode\\\":true}}",
-            "{\\\"poollogic/modes\\\":{\\\"auto_mode\\\":false}}",
+            "{\\\"poollogic/bassin\\\":{\\\"auto_mode\\\":true}}",
+            "{\\\"poollogic/bassin\\\":{\\\"auto_mode\\\":false}}",
             "mdi:calendar-clock",
             "config"
         };
@@ -448,11 +433,11 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_modes_winter",
             "Winter Mode",
-            "cfg/poollogic/modes",
+            "cfg/poollogic/bassin",
             "{% if value_json.winter_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/modes\\\":{\\\"winter_mode\\\":true}}",
-            "{\\\"poollogic/modes\\\":{\\\"winter_mode\\\":false}}",
+            "{\\\"poollogic/bassin\\\":{\\\"winter_mode\\\":true}}",
+            "{\\\"poollogic/bassin\\\":{\\\"winter_mode\\\":false}}",
             "mdi:snowflake",
             "config"
         };
@@ -472,11 +457,11 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_dis_auto",
             "Orp Auto-regulation",
-            "cfg/poollogic/chlorine",
+            "cfg/poollogic/disinfection",
             "{% if value_json.dis_auto_mode %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/chlorine\\\":{\\\"dis_auto_mode\\\":true}}",
-            "{\\\"poollogic/chlorine\\\":{\\\"dis_auto_mode\\\":false}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"dis_auto_mode\\\":true}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"dis_auto_mode\\\":false}}",
             "mdi:water-check-outline",
             "config"
         };
@@ -508,11 +493,11 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_o2_temp_comp",
             "O2 Temperature Compensation",
-            "cfg/poollogic/o2",
+            "cfg/poollogic/disinfection",
             "{% if value_json.temp_comp %}ON{% else %}OFF{% endif %}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/o2\\\":{\\\"temp_comp\\\":true}}",
-            "{\\\"poollogic/o2\\\":{\\\"temp_comp\\\":false}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"temp_comp\\\":true}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"temp_comp\\\":false}}",
             "mdi:thermometer-lines",
             "config"
         };
@@ -541,12 +526,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         static const char* kDisinfectionTypeStateTpl =
             R"({% set v = value_json.disinfection_type | int(0) %}{% if v == 1 %}Chlore/Brome{% elif v == 2 %}Electrolyse{% elif v == 3 %}Oxygène actif{% else %}Désactivé{% endif %})";
         static const char* kDisinfectionTypeCmdTpl =
-            R"({% if value == 'Chlore/Brome' %}{\"poollogic/modes\":{\"disinfection_type\":1}}{% elif value == 'Electrolyse' %}{\"poollogic/modes\":{\"disinfection_type\":2}}{% elif value == 'Oxygène actif' %}{\"poollogic/modes\":{\"disinfection_type\":3}}{% else %}{\"poollogic/modes\":{\"disinfection_type\":0}}{% endif %})";
+            R"({% if value == 'Chlore/Brome' %}{\"poollogic/bassin\":{\"disinfection_type\":1}}{% elif value == 'Electrolyse' %}{\"poollogic/bassin\":{\"disinfection_type\":2}}{% elif value == 'Oxygène actif' %}{\"poollogic/bassin\":{\"disinfection_type\":3}}{% else %}{\"poollogic/bassin\":{\"disinfection_type\":0}}{% endif %})";
         const HASelectEntry disinfectionTypeSelect{
             "poollogic",
             "pl_modes_dis",
             "Disinfection Type",
-            "cfg/poollogic/modes",
+            "cfg/poollogic/bassin",
             kDisinfectionTypeStateTpl,
             MqttTopics::SuffixCfgSet,
             kDisinfectionTypeCmdTpl,
@@ -557,12 +542,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         static const char* kSwgControlModeStateTpl =
             R"({% set v = value_json.swg_control_mode | int(1) %}{% if v == 0 %}Suivi consigne ORP{% else %}Continu sur filtration{% endif %})";
         static const char* kSwgControlModeCmdTpl =
-            R"({% if value == 'Suivi consigne ORP' %}{\"poollogic/swg\":{\"swg_control_mode\":0}}{% else %}{\"poollogic/swg\":{\"swg_control_mode\":1}}{% endif %})";
+            R"({% if value == 'Suivi consigne ORP' %}{\"poollogic/disinfection\":{\"swg_control_mode\":0}}{% else %}{\"poollogic/disinfection\":{\"swg_control_mode\":1}}{% endif %})";
         const HASelectEntry swgControlModeSelect{
             "poollogic",
             "pl_swg_ctrl",
             "SWG Control Mode",
-            "cfg/poollogic/swg",
+            "cfg/poollogic/disinfection",
             kSwgControlModeStateTpl,
             MqttTopics::SuffixCfgSet,
             kSwgControlModeCmdTpl,
@@ -573,12 +558,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         static const char* kO2MainHourStateTpl =
             R"({% set h = value_json.main_hour | int(12) %}{{ '%02d:00' | format(h) }})";
         static const char* kO2MainHourCmdTpl =
-            R"({\"poollogic/o2\":{\"main_hour\":{{ value.split(':')[0] | int(12) }}}})";
+            R"({\"poollogic/disinfection\":{\"main_hour\":{{ value.split(':')[0] | int(12) }}}})";
         const HASelectEntry o2MainHourSelect{
             "poollogic",
             "pl_o2_hour",
             "O2 Dosing Hour",
-            "cfg/poollogic/o2",
+            "cfg/poollogic/disinfection",
             kO2MainHourStateTpl,
             MqttTopics::SuffixCfgSet,
             kO2MainHourCmdTpl,
@@ -736,10 +721,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_reg_dly_pid",
             "Delay PIDs",
-            "cfg/poollogic/regulation",
+            "cfg/poollogic/bassin",
             "{{ value_json.dly_pid_min | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/regulation\\\":{\\\"dly_pid_min\\\":{{ value | int(0) }}}}",
+            "{\\\"poollogic/bassin\\\":{\\\"dly_pid_min\\\":{{ value | int(0) }}}}",
             0.0f,
             30.0f,
             1.0f,
@@ -752,10 +737,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_swg_dly_elec",
             "Delay Chlorine Generator",
-            "cfg/poollogic/swg",
+            "cfg/poollogic/disinfection",
             "{{ value_json.dly_electro_min | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/swg\\\":{\\\"dly_electro_min\\\":{{ value | int(0) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"dly_electro_min\\\":{{ value | int(0) }}}}",
             0.0f,
             120.0f,
             1.0f,
@@ -800,10 +785,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_dis_setpoint",
             "Orp Setpoint",
-            "cfg/poollogic/chlorine",
+            "cfg/poollogic/disinfection",
             "{{ value_json.dis_setpoint | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/chlorine\\\":{\\\"dis_setpoint\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"dis_setpoint\\\":{{ value | float(0) }}}}",
             300.0f,
             900.0f,
             1.0f,
@@ -832,10 +817,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_swg_min_temp",
             "Min Temperature Chlorine Generator",
-            "cfg/poollogic/swg",
+            "cfg/poollogic/disinfection",
             "{{ value_json.secure_elec_t | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/swg\\\":{\\\"secure_elec_t\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"secure_elec_t\\\":{{ value | float(0) }}}}",
             5.0f,
             35.0f,
             0.1f,
@@ -864,10 +849,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_dis_window",
             "Orp PID Window Size",
-            "cfg/poollogic/chlorine",
+            "cfg/poollogic/disinfection",
             "{{ ((value_json.dis_window_ms | float(0)) / 60000) | round(0) | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/chlorine\\\":{\\\"dis_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"dis_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
             1.0f,
             180.0f,
             1.0f,
@@ -908,14 +893,16 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:gauge-full",
             "bar"
         };
+        // Volume du bassin : desormais publie dans la branche filtration.
+        // L'object_id reste pl_o2_vol pour ne pas renommer l'entite existante.
         const HANumberEntry o2PoolVolume{
             "poollogic",
             "pl_o2_vol",
-            "O2 Pool Volume",
-            "cfg/poollogic/o2",
+            "Pool Volume",
+            "cfg/poollogic/filtration",
             "{{ value_json.pool_volume_m3 | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/o2\\\":{\\\"pool_volume_m3\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/filtration\\\":{\\\"pool_volume_m3\\\":{{ value | float(0) }}}}",
             1.0f,
             200.0f,
             0.1f,
@@ -928,10 +915,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_o2_dose",
             "O2 Weekly Dose per 10 m3",
-            "cfg/poollogic/o2",
+            "cfg/poollogic/disinfection",
             "{{ value_json.dose_ml_10m3_week | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/o2\\\":{\\\"dose_ml_10m3_week\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"dose_ml_10m3_week\\\":{{ value | float(0) }}}}",
             0.0f,
             5000.0f,
             10.0f,
@@ -944,10 +931,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_o2_split",
             "O2 Weekly Split Count",
-            "cfg/poollogic/o2",
+            "cfg/poollogic/disinfection",
             "{{ value_json.split_count | int(1) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/o2\\\":{\\\"split_count\\\":{{ value | int(1) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"split_count\\\":{{ value | int(1) }}}}",
             1.0f,
             3.0f,
             1.0f,
@@ -960,10 +947,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_o2_load",
             "O2 Load Factor",
-            "cfg/poollogic/o2",
+            "cfg/poollogic/disinfection",
             "{{ value_json.load_factor | float(1) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/o2\\\":{\\\"load_factor\\\":{{ value | float(1) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"load_factor\\\":{{ value | float(1) }}}}",
             0.5f,
             2.0f,
             0.05f,
@@ -976,10 +963,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic",
             "pl_o2_min_flt",
             "O2 Min Filtration Runtime",
-            "cfg/poollogic/o2",
+            "cfg/poollogic/disinfection",
             "{{ value_json.min_filter_run_min | int(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/o2\\\":{\\\"min_filter_run_min\\\":{{ value | int(0) }}}}",
+            "{\\\"poollogic/disinfection\\\":{\\\"min_filter_run_min\\\":{{ value | int(0) }}}}",
             0.0f,
             240.0f,
             1.0f,
@@ -1248,9 +1235,9 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
         swgControlMode_ = SwgControlContinuous;
         if (cfgStore_) (void)cfgStore_->set(swgControlModeVar_, swgControlMode_);
     }
-    if (!std::isfinite(o2PoolVolumeM3_) || o2PoolVolumeM3_ <= 0.0f) {
-        o2PoolVolumeM3_ = 50.0f;
-        if (cfgStore_) (void)cfgStore_->set(o2PoolVolumeVar_, o2PoolVolumeM3_);
+    if (!std::isfinite(poolVolumeM3_) || poolVolumeM3_ <= 0.0f) {
+        poolVolumeM3_ = PoolDefaults::PoolVolumeM3;
+        if (cfgStore_) (void)cfgStore_->set(poolVolumeVar_, poolVolumeM3_);
     }
     if (!std::isfinite(o2DoseMlPer10M3Week_) || o2DoseMlPer10M3Week_ <= 0.0f) {
         o2DoseMlPer10M3Week_ = 500.0f;
@@ -1321,10 +1308,12 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
         setAbs("pl_swg_dly_elec", notSwg);
         setAbs("pl_swg_min_temp", notSwg);
         // Oxygene actif (type 3).
+        // pl_o2_vol absent de cette liste : le volume du bassin est un parametre
+        // general (filtration + doses O2), il reste expose dans tous les modes.
         static const char* const kO2Suffixes[] = {
             "pl_o2_temp_comp", "pl_o2_hour", "pl_o2_state", "pl_o2_done",
             "pl_o2_pending", "pl_o2_last_day", "pl_o2_block", "pl_o2_plan",
-            "pl_o2_flow", "pl_o2_vol", "pl_o2_dose", "pl_o2_split",
+            "pl_o2_flow", "pl_o2_dose", "pl_o2_split",
             "pl_o2_load", "pl_o2_min_flt"
         };
         for (const char* suffix : kO2Suffixes) setAbs(suffix, notO2);
@@ -1478,19 +1467,14 @@ void PoolLogicModule::onEvent_(const Event& e)
             return;
         }
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
-            p->localBranchId == kCfgBranchO2 &&
-            p->nvsKey &&
-            strcmp(p->nvsKey, NvsKeys::PoolLogic::O2PoolVolumeM3) == 0) {
-            // Le volume du bassin sert aussi au besoin de filtration (turnover).
-            portENTER_CRITICAL(&pendingMux_);
-            pendingDailyRecalc_ = true;
-            portEXIT_CRITICAL(&pendingMux_);
-            return;
-        }
-        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
-            p->localBranchId == kCfgBranchModes &&
+            p->localBranchId == kCfgBranchBassin &&
             p->nvsKey) {
-            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::AutoMode) == 0 && autoMode_) {
+            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::PoolVolumeM3) == 0) {
+                // Le volume conditionne le besoin de filtration (turnover).
+                portENTER_CRITICAL(&pendingMux_);
+                pendingDailyRecalc_ = true;
+                portEXIT_CRITICAL(&pendingMux_);
+            } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::AutoMode) == 0 && autoMode_) {
                 portENTER_CRITICAL(&pendingMux_);
                 pendingFiltrationReconcile_ = true;
                 portEXIT_CRITICAL(&pendingMux_);
@@ -1532,15 +1516,19 @@ void PoolLogicModule::onEvent_(const Event& e)
             return;
         }
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
-            p->localBranchId == kCfgBranchChlorine &&
+            p->localBranchId == kCfgBranchDisinfection &&
             p->nvsKey) {
-            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::OrpAutoMode) == 0 && orpAutoMode_) {
+            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisAutoMode) == 0 && orpAutoMode_) {
                 // Global business rule: entering disinfection auto starts from a safe stopped pump.
                 if (!writeDeviceDesired_(orpPumpDeviceSlot_, false)) {
                     LOGW("PoolLogic failed to stop disinfection pump on dis_auto_mode enable (slot=%u)",
                          (unsigned)orpPumpDeviceSlot_);
                 }
                 resetTemporalPidState_(orpPidState_, millis());
+            } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::SwgControlMode) == 0) {
+                if (swgControlMode_ > SwgControlContinuous) swgControlMode_ = SwgControlContinuous;
+                (void)writeDeviceDesired_(swgDeviceSlot_, false);
+                LOGI("PoolLogic SWG control changed: %s", swgControlModeStr_(swgControlMode_));
             }
             return;
         }
@@ -1553,16 +1541,6 @@ void PoolLogicModule::onEvent_(const Event& e)
                     LOGW("PoolLogic failed to stop heater on heater_auto_mode enable (slot=%u)",
                          (unsigned)heaterDeviceSlot_);
                 }
-            }
-            return;
-        }
-        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
-            p->localBranchId == kCfgBranchSwg &&
-            p->nvsKey) {
-            if (strcmp(p->nvsKey, NvsKeys::PoolLogic::SwgControlMode) == 0) {
-                if (swgControlMode_ > SwgControlContinuous) swgControlMode_ = SwgControlContinuous;
-                (void)writeDeviceDesired_(swgDeviceSlot_, false);
-                LOGI("PoolLogic SWG control changed: %s", swgControlModeStr_(swgControlMode_));
             }
             return;
         }

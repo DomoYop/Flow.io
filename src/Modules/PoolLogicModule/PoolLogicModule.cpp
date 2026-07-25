@@ -13,15 +13,12 @@
 // Config-doc generation compatibility anchor:
 // the generator keys runtime moduleName aliases by translation-unit stem.
 namespace {
-static constexpr const char* kCfgModuleModes = "poollogic/modes";
+static constexpr const char* kCfgModuleBassin = "poollogic/bassin";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
 static constexpr const char* kCfgModuleSafety = "poollogic/safety";
-static constexpr const char* kCfgModuleRegulation = "poollogic/regulation";
 static constexpr const char* kCfgModulePh = "poollogic/ph";
-static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
-static constexpr const char* kCfgModuleSwg = "poollogic/swg";
-static constexpr const char* kCfgModuleO2 = "poollogic/o2";
+static constexpr const char* kCfgModuleDisinfection = "poollogic/disinfection";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
 static constexpr const char* kCfgModuleRobot = "poollogic/robot";
 static constexpr const char* kCfgModuleRefill = "poollogic/refill";
@@ -29,14 +26,15 @@ static constexpr const char* kCfgModuleRefill = "poollogic/refill";
 
 static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
 {
-    self.enabledVar_.moduleName = kCfgModuleModes;
-    self.autoModeVar_.moduleName = kCfgModuleModes;
-    self.winterModeVar_.moduleName = kCfgModuleModes;
+    self.enabledVar_.moduleName = kCfgModuleBassin;
+    self.autoModeVar_.moduleName = kCfgModuleBassin;
+    self.winterModeVar_.moduleName = kCfgModuleBassin;
     self.phAutoModeVar_.moduleName = kCfgModulePh;
-    self.orpAutoModeVar_.moduleName = kCfgModuleChlorine;
+    self.orpAutoModeVar_.moduleName = kCfgModuleDisinfection;
     self.heaterAutoModeVar_.moduleName = kCfgModuleHeater;
     self.phDosePlusVar_.moduleName = kCfgModulePh;
-    self.disinfectionTypeVar_.moduleName = kCfgModuleModes;
+    self.disinfectionTypeVar_.moduleName = kCfgModuleBassin;
+    self.poolVolumeVar_.moduleName = kCfgModuleBassin;
     self.pumpFlowVar_.moduleName = kCfgModuleFiltration;
     self.filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
     self.filtrWin1StartVar_.moduleName = kCfgModuleFiltration;
@@ -70,34 +68,36 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.pressureHighVar_.moduleName = kCfgModuleSafety;
     self.winterStartVar_.moduleName = kCfgModuleSafety;
     self.freezeHoldVar_.moduleName = kCfgModuleSafety;
-    self.secureElectroVar_.moduleName = kCfgModuleSwg;
+    self.secureElectroVar_.moduleName = kCfgModuleDisinfection;
     self.phSetpointVar_.moduleName = kCfgModulePh;
-    self.orpSetpointVar_.moduleName = kCfgModuleChlorine;
+    self.orpSetpointVar_.moduleName = kCfgModuleDisinfection;
     self.heaterSetpointVar_.moduleName = kCfgModuleHeater;
     self.phKpVar_.moduleName = kCfgModulePh;
     self.phKiVar_.moduleName = kCfgModulePh;
     self.phKdVar_.moduleName = kCfgModulePh;
-    self.orpKpVar_.moduleName = kCfgModuleChlorine;
-    self.orpKiVar_.moduleName = kCfgModuleChlorine;
-    self.orpKdVar_.moduleName = kCfgModuleChlorine;
+    self.orpKpVar_.moduleName = kCfgModuleDisinfection;
+    self.orpKiVar_.moduleName = kCfgModuleDisinfection;
+    self.orpKdVar_.moduleName = kCfgModuleDisinfection;
     self.phWindowMsVar_.moduleName = kCfgModulePh;
-    self.orpWindowMsVar_.moduleName = kCfgModuleChlorine;
-    self.pidMinOnMsVar_.moduleName = kCfgModuleRegulation;
-    self.pidSampleMsVar_.moduleName = kCfgModuleRegulation;
+    self.orpWindowMsVar_.moduleName = kCfgModuleDisinfection;
+    self.phMinOnMsVar_.moduleName = kCfgModulePh;
+    self.phSampleMsVar_.moduleName = kCfgModulePh;
+    self.disMinOnMsVar_.moduleName = kCfgModuleDisinfection;
+    self.disSampleMsVar_.moduleName = kCfgModuleDisinfection;
 
     self.pressureDelayVar_.moduleName = kCfgModuleSafety;
-    self.delayPidsVar_.moduleName = kCfgModuleRegulation;
-    self.delayElectroVar_.moduleName = kCfgModuleSwg;
+    self.delayPidsVar_.moduleName = kCfgModuleBassin;
+    self.delayElectroVar_.moduleName = kCfgModuleDisinfection;
     self.robotDelayVar_.moduleName = kCfgModuleRobot;
     self.robotDurationVar_.moduleName = kCfgModuleRobot;
     self.fillingMinOnVar_.moduleName = kCfgModuleRefill;
 
     self.filtrationDeviceVar_.moduleName = kCfgModuleFiltration;
-    self.swgDeviceVar_.moduleName = kCfgModuleSwg;
+    self.swgDeviceVar_.moduleName = kCfgModuleDisinfection;
     self.robotDeviceVar_.moduleName = kCfgModuleRobot;
     self.fillingDeviceVar_.moduleName = kCfgModuleRefill;
     self.phPumpDeviceVar_.moduleName = kCfgModulePh;
-    self.orpPumpDeviceVar_.moduleName = kCfgModuleChlorine;
+    self.orpPumpDeviceVar_.moduleName = kCfgModuleDisinfection;
     self.heaterDeviceVar_.moduleName = kCfgModuleHeater;
 }
 #endif

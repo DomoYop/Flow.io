@@ -230,8 +230,12 @@ private:
     float orpKd_ = PoolDefaults::OrpKd;
     int32_t phWindowMs_ = PoolDefaults::PidWindowMs;
     int32_t orpWindowMs_ = PoolDefaults::PidWindowMs;
-    int32_t pidMinOnMs_ = PoolDefaults::PidMinOnMs;
-    int32_t pidSampleMs_ = PoolDefaults::PidSampleMs;
+    // Duree ON minimale et periode d'echantillonnage par boucle : la duree ON
+    // depend de la pompe pilotee, l'echantillonnage se regle avec les gains.
+    int32_t phMinOnMs_ = PoolDefaults::PidMinOnMs;
+    int32_t phSampleMs_ = PoolDefaults::PidSampleMs;
+    int32_t disMinOnMs_ = PoolDefaults::PidMinOnMs;
+    int32_t disSampleMs_ = PoolDefaults::PidSampleMs;
     uint8_t pressureStartupDelaySec_ = PoolDefaults::PressureStartupDelaySec;
     uint8_t delayPidsMin_ = PoolDefaults::DelayPidsMin;
     uint8_t delayElectroMin_ = PoolDefaults::DelayElectroMin;
@@ -245,8 +249,10 @@ private:
     uint8_t flowCopyDelaySec_ = 30;
     bool flowInterlockEnabled_ = false;
 
+    // Volume du bassin : transverse (filtration + doses O2), voir page Bassin.
+    float poolVolumeM3_ = PoolDefaults::PoolVolumeM3;
+
     // Active oxygen phase-2 configuration and persisted protocol cursor.
-    float o2PoolVolumeM3_ = PoolDefaults::O2PoolVolumeM3;
     float o2DoseMlPer10M3Week_ = PoolDefaults::O2DoseMlPer10M3Week;
     uint8_t o2MainHour_ = PoolDefaults::O2MainHour;
     uint8_t o2SplitCount_ = PoolDefaults::O2SplitCount;
@@ -313,24 +319,24 @@ private:
 
     portMUX_TYPE pendingMux_ = portMUX_INITIALIZER_UNLOCKED;
 
-    ConfigVariable<bool,0> enabledVar_{NVS_KEY(NvsKeys::PoolLogic::Enabled), "enabled", "poollogic/modes", ConfigType::Bool,
+    ConfigVariable<bool,0> enabledVar_{NVS_KEY(NvsKeys::PoolLogic::Enabled), "enabled", "poollogic/bassin", ConfigType::Bool,
                                        &enabled_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<bool,0> autoModeVar_{NVS_KEY(NvsKeys::PoolLogic::AutoMode), "auto_mode", "poollogic/modes", ConfigType::Bool,
+    ConfigVariable<bool,0> autoModeVar_{NVS_KEY(NvsKeys::PoolLogic::AutoMode), "auto_mode", "poollogic/bassin", ConfigType::Bool,
                                         &autoMode_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<bool,0> winterModeVar_{NVS_KEY(NvsKeys::PoolLogic::WinterMode), "winter_mode", "poollogic/modes", ConfigType::Bool,
+    ConfigVariable<bool,0> winterModeVar_{NVS_KEY(NvsKeys::PoolLogic::WinterMode), "winter_mode", "poollogic/bassin", ConfigType::Bool,
                                           &winterMode_, ConfigPersistence::Persistent, 0};
     ConfigVariable<bool,0> phAutoModeVar_{NVS_KEY(NvsKeys::PoolLogic::PhAutoMode), "ph_auto_mode", "poollogic/ph", ConfigType::Bool,
                                           &phAutoMode_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<bool,0> orpAutoModeVar_{NVS_KEY(NvsKeys::PoolLogic::OrpAutoMode), "dis_auto_mode", "poollogic/chlorine", ConfigType::Bool,
+    ConfigVariable<bool,0> orpAutoModeVar_{NVS_KEY(NvsKeys::PoolLogic::DisAutoMode), "dis_auto_mode", "poollogic/disinfection", ConfigType::Bool,
                                            &orpAutoMode_, ConfigPersistence::Persistent, 0};
     ConfigVariable<bool,0> heaterAutoModeVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterAutoMode), "heater_auto_mode", "poollogic/heater", ConfigType::Bool,
                                               &heaterAutoMode_, ConfigPersistence::Persistent, 0};
     ConfigVariable<bool,0> phDosePlusVar_{NVS_KEY(NvsKeys::PoolLogic::PhDosePlus), "ph_dose_plus", "poollogic/ph", ConfigType::Bool,
                                           &phDosePlus_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> disinfectionTypeVar_{NVS_KEY(NvsKeys::PoolLogic::DisinfectionType), "disinfection_type", "poollogic/modes", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> disinfectionTypeVar_{NVS_KEY(NvsKeys::PoolLogic::DisinfectionType), "disinfection_type", "poollogic/bassin", ConfigType::UInt8,
                                                    &disinfectionType_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> swgControlModeVar_{NVS_KEY(NvsKeys::PoolLogic::SwgControlMode), "swg_control_mode", "poollogic/swg", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> swgControlModeVar_{NVS_KEY(NvsKeys::PoolLogic::SwgControlMode), "swg_control_mode", "poollogic/disinfection", ConfigType::UInt8,
                                                  &swgControlMode_, ConfigPersistence::Persistent, 0};
 
     ConfigVariable<float,0> pumpFlowVar_{NVS_KEY(NvsKeys::PoolLogic::PumpFlowM3h), "pump_flow_m3h", "poollogic/filtration", ConfigType::Float,
@@ -382,7 +388,7 @@ private:
                                           &levelIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> phLevelIdVar_{NVS_KEY(NvsKeys::PoolLogic::PhLevelIoId), "ph_lvl_io_id", "poollogic/sensors", ConfigType::UInt16,
                                             &phLevelIoId_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<IoId,0> chlorineLevelIdVar_{NVS_KEY(NvsKeys::PoolLogic::ChlorineLevelIoId), "chl_lvl_io_id", "poollogic/sensors", ConfigType::UInt16,
+    ConfigVariable<IoId,0> chlorineLevelIdVar_{NVS_KEY(NvsKeys::PoolLogic::DisLevelIoId), "dis_lvl_io_id", "poollogic/sensors", ConfigType::UInt16,
                                                   &chlorineLevelIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> flowSwitchIdVar_{NVS_KEY(NvsKeys::PoolLogic::FlowSwitchIoId), "flow_io_id", "poollogic/sensors", ConfigType::UInt16,
                                                &flowSwitchIoId_, ConfigPersistence::Persistent, 0};
@@ -397,11 +403,11 @@ private:
                                             &winterStartTempC_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> freezeHoldVar_{NVS_KEY(NvsKeys::PoolLogic::FreezeHold), "freeze_hold_t", "poollogic/safety", ConfigType::Float,
                                            &freezeHoldTempC_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> secureElectroVar_{NVS_KEY(NvsKeys::PoolLogic::SecureElectro), "secure_elec_t", "poollogic/swg", ConfigType::Float,
+    ConfigVariable<float,0> secureElectroVar_{NVS_KEY(NvsKeys::PoolLogic::SecureElectro), "secure_elec_t", "poollogic/disinfection", ConfigType::Float,
                                               &secureElectroTempC_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> phSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::PhSetpoint), "ph_setpoint", "poollogic/ph", ConfigType::Float,
                                            &phSetpoint_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> orpSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::OrpSetpoint), "dis_setpoint", "poollogic/chlorine", ConfigType::Float,
+    ConfigVariable<float,0> orpSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::DisSetpoint), "dis_setpoint", "poollogic/disinfection", ConfigType::Float,
                                             &orpSetpoint_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> heaterSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSetpoint), "heater_setpoint", "poollogic/heater", ConfigType::Float,
                                                &heaterSetpoint_, ConfigPersistence::Persistent, 0};
@@ -411,26 +417,32 @@ private:
                                      &phKi_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> phKdVar_{NVS_KEY(NvsKeys::PoolLogic::PhKd), "ph_kd", "poollogic/ph", ConfigType::Float,
                                      &phKd_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> orpKpVar_{NVS_KEY(NvsKeys::PoolLogic::OrpKp), "dis_kp", "poollogic/chlorine", ConfigType::Float,
+    ConfigVariable<float,0> orpKpVar_{NVS_KEY(NvsKeys::PoolLogic::DisKp), "dis_kp", "poollogic/disinfection", ConfigType::Float,
                                       &orpKp_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> orpKiVar_{NVS_KEY(NvsKeys::PoolLogic::OrpKi), "dis_ki", "poollogic/chlorine", ConfigType::Float,
+    ConfigVariable<float,0> orpKiVar_{NVS_KEY(NvsKeys::PoolLogic::DisKi), "dis_ki", "poollogic/disinfection", ConfigType::Float,
                                       &orpKi_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> orpKdVar_{NVS_KEY(NvsKeys::PoolLogic::OrpKd), "dis_kd", "poollogic/chlorine", ConfigType::Float,
+    ConfigVariable<float,0> orpKdVar_{NVS_KEY(NvsKeys::PoolLogic::DisKd), "dis_kd", "poollogic/disinfection", ConfigType::Float,
                                       &orpKd_, ConfigPersistence::Persistent, 0};
     ConfigVariable<int32_t,0> phWindowMsVar_{NVS_KEY(NvsKeys::PoolLogic::PhWindowMs), "ph_window_ms", "poollogic/ph", ConfigType::Int32,
                                              &phWindowMs_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<int32_t,0> orpWindowMsVar_{NVS_KEY(NvsKeys::PoolLogic::OrpWindowMs), "dis_window_ms", "poollogic/chlorine", ConfigType::Int32,
+    ConfigVariable<int32_t,0> orpWindowMsVar_{NVS_KEY(NvsKeys::PoolLogic::DisWindowMs), "dis_window_ms", "poollogic/disinfection", ConfigType::Int32,
                                               &orpWindowMs_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<int32_t,0> pidMinOnMsVar_{NVS_KEY(NvsKeys::PoolLogic::PidMinOnMs), "pid_min_on_ms", "poollogic/regulation", ConfigType::Int32,
-                                             &pidMinOnMs_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<int32_t,0> pidSampleMsVar_{NVS_KEY(NvsKeys::PoolLogic::PidSampleMs), "pid_sample_ms", "poollogic/regulation", ConfigType::Int32,
-                                              &pidSampleMs_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<int32_t,0> phMinOnMsVar_{NVS_KEY(NvsKeys::PoolLogic::PhMinOnMs), "ph_min_on_ms", "poollogic/ph", ConfigType::Int32,
+                                            &phMinOnMs_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<int32_t,0> phSampleMsVar_{NVS_KEY(NvsKeys::PoolLogic::PhSampleMs), "ph_sample_ms", "poollogic/ph", ConfigType::Int32,
+                                             &phSampleMs_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<int32_t,0> disMinOnMsVar_{NVS_KEY(NvsKeys::PoolLogic::DisMinOnMs), "dis_min_on_ms", "poollogic/disinfection", ConfigType::Int32,
+                                             &disMinOnMs_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<int32_t,0> disSampleMsVar_{NVS_KEY(NvsKeys::PoolLogic::DisSampleMs), "dis_sample_ms", "poollogic/disinfection", ConfigType::Int32,
+                                              &disSampleMs_, ConfigPersistence::Persistent, 0};
 
     ConfigVariable<uint8_t,0> pressureDelayVar_{NVS_KEY(NvsKeys::PoolLogic::PressureDelay), "pressure_start_dly_s", "poollogic/safety", ConfigType::UInt8,
                                            &pressureStartupDelaySec_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> delayPidsVar_{NVS_KEY(NvsKeys::PoolLogic::DelayPids), "dly_pid_min", "poollogic/regulation", ConfigType::UInt8,
+    // Delai d'armement des regulations apres demarrage filtration : temps
+    // d'homogeneisation de l'eau et de stabilisation des sondes, commun pH/ORP.
+    ConfigVariable<uint8_t,0> delayPidsVar_{NVS_KEY(NvsKeys::PoolLogic::DelayPids), "dly_pid_min", "poollogic/bassin", ConfigType::UInt8,
                                             &delayPidsMin_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> delayElectroVar_{NVS_KEY(NvsKeys::PoolLogic::DelayElectro), "dly_electro_min", "poollogic/swg", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> delayElectroVar_{NVS_KEY(NvsKeys::PoolLogic::DelayElectro), "dly_electro_min", "poollogic/disinfection", ConfigType::UInt8,
                                                &delayElectroMin_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> robotDelayVar_{NVS_KEY(NvsKeys::PoolLogic::RobotDelay), "robot_delay_min", "poollogic/robot", ConfigType::UInt8,
                                              &robotDelayMin_, ConfigPersistence::Persistent, 0};
@@ -439,34 +451,37 @@ private:
     ConfigVariable<uint8_t,0> fillingMinOnVar_{NVS_KEY(NvsKeys::PoolLogic::FillingMinOn), "fill_min_on_s", "poollogic/refill", ConfigType::UInt8,
                                                &fillingMinOnSec_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<float,0> o2PoolVolumeVar_{NVS_KEY(NvsKeys::PoolLogic::O2PoolVolumeM3), "pool_volume_m3", "poollogic/o2", ConfigType::Float,
-                                             &o2PoolVolumeM3_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> o2DoseVar_{NVS_KEY(NvsKeys::PoolLogic::O2DoseMlPer10M3Week), "dose_ml_10m3_week", "poollogic/o2", ConfigType::Float,
+    // Volume du bassin : caracteristique de l'installation, utilisee par le
+    // besoin de filtration (renouvellement volumique) autant que par les doses
+    // O2 -> parametre transverse, page Bassin.
+    ConfigVariable<float,0> poolVolumeVar_{NVS_KEY(NvsKeys::PoolLogic::PoolVolumeM3), "pool_volume_m3", "poollogic/bassin", ConfigType::Float,
+                                           &poolVolumeM3_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> o2DoseVar_{NVS_KEY(NvsKeys::PoolLogic::O2DoseMlPer10M3Week), "dose_ml_10m3_week", "poollogic/disinfection", ConfigType::Float,
                                        &o2DoseMlPer10M3Week_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> o2MainHourVar_{NVS_KEY(NvsKeys::PoolLogic::O2MainHour), "main_hour", "poollogic/o2", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> o2MainHourVar_{NVS_KEY(NvsKeys::PoolLogic::O2MainHour), "main_hour", "poollogic/disinfection", ConfigType::UInt8,
                                              &o2MainHour_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> o2SplitCountVar_{NVS_KEY(NvsKeys::PoolLogic::O2SplitCount), "split_count", "poollogic/o2", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> o2SplitCountVar_{NVS_KEY(NvsKeys::PoolLogic::O2SplitCount), "split_count", "poollogic/disinfection", ConfigType::UInt8,
                                                &o2SplitCount_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<bool,0> o2TempCompVar_{NVS_KEY(NvsKeys::PoolLogic::O2TempComp), "temp_comp", "poollogic/o2", ConfigType::Bool,
+    ConfigVariable<bool,0> o2TempCompVar_{NVS_KEY(NvsKeys::PoolLogic::O2TempComp), "temp_comp", "poollogic/disinfection", ConfigType::Bool,
                                           &o2TempComp_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> o2LoadFactorVar_{NVS_KEY(NvsKeys::PoolLogic::O2LoadFactor), "load_factor", "poollogic/o2", ConfigType::Float,
+    ConfigVariable<float,0> o2LoadFactorVar_{NVS_KEY(NvsKeys::PoolLogic::O2LoadFactor), "load_factor", "poollogic/disinfection", ConfigType::Float,
                                              &o2LoadFactor_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> o2MinFilterRunVar_{NVS_KEY(NvsKeys::PoolLogic::O2MinFilterRunMin), "min_filter_run_min", "poollogic/o2", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> o2MinFilterRunVar_{NVS_KEY(NvsKeys::PoolLogic::O2MinFilterRunMin), "min_filter_run_min", "poollogic/disinfection", ConfigType::UInt8,
                                                  &o2MinFilterRunMin_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> o2ProtocolStateVar_{NVS_KEY(NvsKeys::PoolLogic::O2ProtocolState), "protocol_state", "poollogic/o2", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> o2ProtocolStateVar_{NVS_KEY(NvsKeys::PoolLogic::O2ProtocolState), "protocol_state", "poollogic/disinfection", ConfigType::UInt8,
                                                   &o2ProtocolState_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> o2LastDoseDayVar_{NVS_KEY(NvsKeys::PoolLogic::O2LastDoseDay), "last_dose_day", "poollogic/o2", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> o2LastDoseDayVar_{NVS_KEY(NvsKeys::PoolLogic::O2LastDoseDay), "last_dose_day", "poollogic/disinfection", ConfigType::UInt16,
                                                  &o2LastDoseDay_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> o2WeeklyDoneVar_{NVS_KEY(NvsKeys::PoolLogic::O2WeeklyDoneMl), "weekly_done_ml", "poollogic/o2", ConfigType::Float,
+    ConfigVariable<float,0> o2WeeklyDoneVar_{NVS_KEY(NvsKeys::PoolLogic::O2WeeklyDoneMl), "weekly_done_ml", "poollogic/disinfection", ConfigType::Float,
                                              &o2WeeklyDoneMl_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> o2PendingVar_{NVS_KEY(NvsKeys::PoolLogic::O2PendingMl), "pending_ml", "poollogic/o2", ConfigType::Float,
+    ConfigVariable<float,0> o2PendingVar_{NVS_KEY(NvsKeys::PoolLogic::O2PendingMl), "pending_ml", "poollogic/disinfection", ConfigType::Float,
                                           &o2PendingMl_, ConfigPersistence::Persistent, 0};
 
     // Aiguillage role -> slot PoolDevice : chaque variable vit dans la branche
     // metier correspondante (les cles NVS pl_s* restent inchangees).
     ConfigVariable<uint8_t,0> filtrationDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationSlot), "filtr_slot", "poollogic/filtration", ConfigType::UInt8,
                                                    &filtrationDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> swgDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::SwgSlot), "swg_slot", "poollogic/swg", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> swgDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::SwgSlot), "swg_slot", "poollogic/disinfection", ConfigType::UInt8,
                                             &swgDeviceSlot_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> robotDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::RobotSlot), "robot_slot", "poollogic/robot", ConfigType::UInt8,
                                               &robotDeviceSlot_, ConfigPersistence::Persistent, 0};
@@ -474,7 +489,7 @@ private:
                                                 &fillingDeviceSlot_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> phPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::PhPumpSlot), "ph_pump_slot", "poollogic/ph", ConfigType::UInt8,
                                                &phPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> orpPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::OrpPumpSlot), "dis_pump_slot", "poollogic/chlorine", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> orpPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::DisPumpSlot), "dis_pump_slot", "poollogic/disinfection", ConfigType::UInt8,
                                                 &orpPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> heaterDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSlot), "heater_slot", "poollogic/heater", ConfigType::UInt8,
                                                &heaterDeviceSlot_, ConfigPersistence::Persistent, 0};
@@ -540,6 +555,8 @@ private:
                           float ki,
                           float kd,
                           int32_t windowMsCfg,
+                          int32_t minOnMsCfg,
+                          int32_t sampleMsCfg,
                           bool positiveWhenInputHigh,
                           uint32_t nowMs,
                           bool& demandOnOut,

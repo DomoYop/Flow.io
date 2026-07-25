@@ -118,7 +118,7 @@ struct PoolLogicDefaultsSpec {
     uint8_t robotDelayMin;
     uint8_t robotDurationMin;
     uint8_t fillingMinOnSec;
-    float o2PoolVolumeM3;
+    float poolVolumeM3;
     float o2DoseMlPer10M3Week;
     uint8_t o2MainHour;
     uint8_t o2SplitCount;

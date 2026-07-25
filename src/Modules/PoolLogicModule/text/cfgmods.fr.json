@@ -5,287 +5,617 @@
     "version": 1
   },
   "docs": {
-    "poollogic/chlorine": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 1},
+    "poollogic/bassin/disinfection_type": {
+      "enum_set": "poollogic_disinfection_type"
+    },
+    "poollogic/disinfection": {
+      "visible_if": {
+        "path": "poollogic/bassin/disinfection_type",
+        "in": [
+          1,
+          2,
+          3
+        ]
+      },
       "compose": [
-        { "module": "pdm/pd2", "fields": ["flow_l_h", "tank_cap_ml", "tank_init_ml", "max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
+        {
+          "module": "pdm/pd2",
+          "fields": [
+            "enabled",
+            "flow_l_h",
+            "tank_cap_ml",
+            "tank_init_ml",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.pump.label"
+        },
+        {
+          "module": "pdm/pd5",
+          "fields": [
+            "enabled",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.swg.label"
+        }
       ]
     },
-    "poollogic/chlorine/dis_auto_mode": {
+    "poollogic/disinfection/dis_auto_mode": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 1},
-        { "path": "pdm/pd2/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/chlorine/dis_kd": {
+    "poollogic/disinfection/dis_kd": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 1},
-        { "path": "pdm/pd2/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/chlorine/dis_ki": {
+    "poollogic/disinfection/dis_ki": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 1},
-        { "path": "pdm/pd2/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/chlorine/dis_kp": {
+    "poollogic/disinfection/dis_kp": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 1},
-        { "path": "pdm/pd2/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/chlorine/dis_window_ms": {
+    "poollogic/disinfection/dis_min_on_ms": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 1},
-        { "path": "pdm/pd2/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/chlorine/dis_pump_slot": {
+    "poollogic/disinfection/dis_pump_slot": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "in": [1, 3]},
-        { "path": "pdm/pd2/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "in": [
+            1,
+            3
+          ]
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/refill/fill_min_on_s": {
-      "visible_if": { "path": "pdm/pd4/enabled", "eq": true }
-    },
-    "poollogic/refill/fill_slot": {
-      "visible_if": { "path": "pdm/pd4/enabled", "eq": true }
-    },
-    "poollogic/heater/heater_auto_mode": {
-      "visible_if": { "path": "pdm/pd7/enabled", "eq": true }
-    },
-    "poollogic/heater/heater_setpoint": {
-      "visible_if": { "path": "pdm/pd7/enabled", "eq": true }
-    },
-    "poollogic/heater/heater_slot": {
-      "visible_if": { "path": "pdm/pd7/enabled", "eq": true }
-    },
-    "poollogic/robot/robot_delay_min": {
-      "visible_if": { "path": "pdm/pd3/enabled", "eq": true }
-    },
-    "poollogic/robot/robot_dur_min": {
-      "visible_if": { "path": "pdm/pd3/enabled", "eq": true }
-    },
-    "poollogic/robot/robot_slot": {
-      "visible_if": { "path": "pdm/pd3/enabled", "eq": true }
-    },
-    "poollogic/swg/swg_control_mode": {
+    "poollogic/disinfection/dis_sample_ms": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 2},
-        { "path": "pdm/pd5/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/swg/secure_elec_t": {
+    "poollogic/disinfection/dis_setpoint": {
+      "visible_if": {
+        "path": "poollogic/bassin/disinfection_type",
+        "in": [
+          1,
+          2
+        ]
+      }
+    },
+    "poollogic/disinfection/dis_window_ms": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 2},
-        { "path": "pdm/pd5/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 1
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/swg/dly_electro_min": {
+    "poollogic/disinfection/dly_electro_min": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 2},
-        { "path": "pdm/pd5/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 2
+        },
+        {
+          "path": "pdm/pd5/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/swg/swg_slot": {
+    "poollogic/disinfection/dose_ml_10m3_week": {
       "visible_if": [
-        { "path": "poollogic/modes/disinfection_type", "eq": 2},
-        { "path": "pdm/pd5/enabled", "eq": true }
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 3
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
       ]
     },
-    "poollogic/filtration/pump_flow_m3h": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/filtr_start_clc": {
-      "enum_set": "hours_of_day",
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/filtr_stop_clc": {
-      "enum_set": "hours_of_day",
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/filtr_segments": {
+    "poollogic/disinfection/last_dose_day": {
       "hidden": true
+    },
+    "poollogic/disinfection/load_factor": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 3
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/main_hour": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 3
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
+      ],
+      "enum_set": "hours_of_day"
+    },
+    "poollogic/disinfection/min_filter_run_min": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 3
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/pending_ml": {
+      "hidden": true
+    },
+    "poollogic/disinfection/protocol_state": {
+      "hidden": true
+    },
+    "poollogic/disinfection/secure_elec_t": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 2
+        },
+        {
+          "path": "pdm/pd5/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/split_count": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 3
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/swg_control_mode": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 2
+        },
+        {
+          "path": "pdm/pd5/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/swg_slot": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 2
+        },
+        {
+          "path": "pdm/pd5/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/temp_comp": {
+      "visible_if": [
+        {
+          "path": "poollogic/bassin/disinfection_type",
+          "eq": 3
+        },
+        {
+          "path": "pdm/pd2/enabled",
+          "eq": true
+        }
+      ]
+    },
+    "poollogic/disinfection/weekly_done_ml": {
+      "hidden": true
+    },
+    "poollogic/filtration": {
+      "compose": [
+        {
+          "module": "pdm/pd0",
+          "fields": [
+            "enabled",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.device.label"
+        }
+      ]
     },
     "poollogic/filtration/filtr_optimal_min": {
       "hidden": true
     },
+    "poollogic/filtration/filtr_segments": {
+      "hidden": true
+    },
+    "poollogic/filtration/filtr_slot": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/filtr_start_clc": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      },
+      "enum_set": "hours_of_day"
+    },
+    "poollogic/filtration/filtr_stop_clc": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      },
+      "enum_set": "hours_of_day"
+    },
     "poollogic/filtration/filtr_w1_en": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/filtr_w1_start": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration/filtr_w1_stop": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
     },
     "poollogic/filtration/filtr_w1_prio": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/filtr_w1_start": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/filtr_w1_stop": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
     },
     "poollogic/filtration/filtr_w2_en": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/filtr_w2_prio": {
+      "visible_if": [
+        {
+          "path": "pdm/pd0/enabled",
+          "eq": true
+        },
+        {
+          "path": "poollogic/filtration/filtr_w2_en",
+          "eq": true
+        }
+      ]
     },
     "poollogic/filtration/filtr_w2_start": {
       "visible_if": [
-        { "path": "pdm/pd0/enabled", "eq": true },
-        { "path": "poollogic/filtration/filtr_w2_en", "eq": true }
+        {
+          "path": "pdm/pd0/enabled",
+          "eq": true
+        },
+        {
+          "path": "poollogic/filtration/filtr_w2_en",
+          "eq": true
+        }
       ]
     },
     "poollogic/filtration/filtr_w2_stop": {
       "visible_if": [
-        { "path": "pdm/pd0/enabled", "eq": true },
-        { "path": "poollogic/filtration/filtr_w2_en", "eq": true }
-      ]
-    },
-    "poollogic/filtration/filtr_w2_prio": {
-      "visible_if": [
-        { "path": "pdm/pd0/enabled", "eq": true },
-        { "path": "poollogic/filtration/filtr_w2_en", "eq": true }
+        {
+          "path": "pdm/pd0/enabled",
+          "eq": true
+        },
+        {
+          "path": "poollogic/filtration/filtr_w2_en",
+          "eq": true
+        }
       ]
     },
     "poollogic/filtration/filtr_w3_en": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/filtr_w3_prio": {
+      "visible_if": [
+        {
+          "path": "pdm/pd0/enabled",
+          "eq": true
+        },
+        {
+          "path": "poollogic/filtration/filtr_w3_en",
+          "eq": true
+        }
+      ]
     },
     "poollogic/filtration/filtr_w3_start": {
       "visible_if": [
-        { "path": "pdm/pd0/enabled", "eq": true },
-        { "path": "poollogic/filtration/filtr_w3_en", "eq": true }
+        {
+          "path": "pdm/pd0/enabled",
+          "eq": true
+        },
+        {
+          "path": "poollogic/filtration/filtr_w3_en",
+          "eq": true
+        }
       ]
     },
     "poollogic/filtration/filtr_w3_stop": {
       "visible_if": [
-        { "path": "pdm/pd0/enabled", "eq": true },
-        { "path": "poollogic/filtration/filtr_w3_en", "eq": true }
+        {
+          "path": "pdm/pd0/enabled",
+          "eq": true
+        },
+        {
+          "path": "poollogic/filtration/filtr_w3_en",
+          "eq": true
+        }
       ]
     },
-    "poollogic/filtration/filtr_w3_prio": {
-      "visible_if": [
-        { "path": "pdm/pd0/enabled", "eq": true },
-        { "path": "poollogic/filtration/filtr_w3_en", "eq": true }
-      ]
-    },
-    "poollogic/filtration/filtr_slot": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true }
-    },
-    "poollogic/filtration": {
-      "visible_if": { "path": "pdm/pd0/enabled", "eq": true },
-      "compose": [
-        { "module": "pdm/pd0", "fields": ["max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
-      ]
+    "poollogic/filtration/pump_flow_m3h": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
     },
     "poollogic/heater": {
-      "visible_if": { "path": "pdm/pd7/enabled", "eq": true },
       "compose": [
-        { "module": "pdm/pd7", "fields": ["max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
+        {
+          "module": "pdm/pd7",
+          "fields": [
+            "enabled",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.device.label"
+        }
       ]
     },
-    "poollogic/modes": {
-      "compose": [
-        { "module": "poollogic/ph", "fields": ["ph_auto_mode"] },
-        { "module": "poollogic/chlorine", "fields": ["dis_auto_mode"] },
-        { "module": "poollogic/heater", "fields": ["heater_auto_mode"] }
-      ]
+    "poollogic/heater/heater_auto_mode": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
     },
-    "poollogic/modes/disinfection_type": {
-      "enum_set": "poollogic_disinfection_type"
+    "poollogic/heater/heater_setpoint": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
     },
-    "poollogic/o2": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3},
-      "compose": [
-        { "module": "poollogic/chlorine", "fields": ["dis_setpoint", "dis_pump_slot"], "label_t": "cfgmods.poollogic.compose.disinfection.label" },
-        { "module": "pdm/pd2", "fields": ["flow_l_h", "tank_cap_ml", "tank_init_ml", "max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
-      ]
-    },
-    "poollogic/o2/pool_volume_m3": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/dose_ml_10m3_week": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/main_hour": {
-      "enum_set": "hours_of_day",
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/split_count": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/temp_comp": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/load_factor": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/min_filter_run_min": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 3}
-    },
-    "poollogic/o2/last_dose_day": {
-      "hidden": true
-    },
-    "poollogic/o2/pending_ml": {
-      "hidden": true
-    },
-    "poollogic/o2/protocol_state": {
-      "hidden": true
-    },
-    "poollogic/o2/weekly_done_ml": {
-      "hidden": true
+    "poollogic/heater/heater_slot": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
     },
     "poollogic/ph": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true },
       "compose": [
-        { "module": "pdm/pd1", "fields": ["flow_l_h", "tank_cap_ml", "tank_init_ml", "max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
+        {
+          "module": "pdm/pd1",
+          "fields": [
+            "enabled",
+            "flow_l_h",
+            "tank_cap_ml",
+            "tank_init_ml",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.device.label"
+        }
       ]
     },
     "poollogic/ph/ph_auto_mode": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
     },
     "poollogic/ph/ph_dose_plus": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
-    },
-    "poollogic/ph/ph_setpoint": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
-    },
-    "poollogic/ph/ph_kp": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
-    },
-    "poollogic/ph/ph_ki": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
     },
     "poollogic/ph/ph_kd": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
     },
-    "poollogic/ph/ph_window_ms": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
+    "poollogic/ph/ph_ki": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/ph/ph_kp": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/ph/ph_min_on_ms": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
     },
     "poollogic/ph/ph_pump_slot": {
-      "visible_if": { "path": "pdm/pd1/enabled", "eq": true }
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/ph/ph_sample_ms": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/ph/ph_setpoint": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/ph/ph_window_ms": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
     },
     "poollogic/refill": {
-      "visible_if": { "path": "pdm/pd4/enabled", "eq": true },
       "compose": [
-        { "module": "pdm/pd4", "fields": ["max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
+        {
+          "module": "pdm/pd4",
+          "fields": [
+            "enabled",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.device.label"
+        }
       ]
+    },
+    "poollogic/refill/fill_min_on_s": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/refill/fill_slot": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
     },
     "poollogic/robot": {
-      "visible_if": { "path": "pdm/pd3/enabled", "eq": true },
       "compose": [
-        { "module": "pdm/pd3", "fields": ["max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
+        {
+          "module": "pdm/pd3",
+          "fields": [
+            "enabled",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.device.label"
+        }
       ]
     },
-    "poollogic/sensors/chl_lvl_io_id": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "in": [1, 3]}
+    "poollogic/robot/robot_delay_min": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/robot/robot_dur_min": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/robot/robot_slot": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
     },
     "poollogic/sensors/dis_io_id": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "in": [1, 2, 3]}
+      "visible_if": {
+        "path": "poollogic/bassin/disinfection_type",
+        "in": [
+          1,
+          2,
+          3
+        ]
+      }
     },
-    "poollogic/swg": {
-      "visible_if": { "path": "poollogic/modes/disinfection_type", "eq": 2},
-      "compose": [
-        { "module": "poollogic/chlorine", "fields": ["dis_setpoint"], "label_t": "cfgmods.poollogic.compose.disinfection.label" },
-        { "module": "pdm/pd5", "fields": ["max_uptime_day_s", "depends_on_mask"], "label_t": "cfgmods.poollogic.compose.device.label" }
-      ]
+    "poollogic/sensors/dis_lvl_io_id": {
+      "visible_if": {
+        "path": "poollogic/bassin/disinfection_type",
+        "in": [
+          1,
+          3
+        ]
+      }
     }
   },
   "meta": {

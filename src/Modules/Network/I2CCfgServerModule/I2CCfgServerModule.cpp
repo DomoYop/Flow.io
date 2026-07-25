@@ -417,14 +417,14 @@ bool I2CCfgServerModule::collectPoolModeFlags_(bool& hasModeOut,
     bool truncated = false;
     bool ok = false;
     if (cfgStore_) {
-        ok = cfgStore_->toJsonModule("poollogic/modes",
+        ok = cfgStore_->toJsonModule("poollogic/bassin",
                                      poolModeJsonScratch_,
                                      sizeof(poolModeJsonScratch_),
                                      &truncated,
                                      true);
     } else if (cfgSvc_ && cfgSvc_->toJsonModule) {
         ok = cfgSvc_->toJsonModule(cfgSvc_->ctx,
-                                   "poollogic/modes",
+                                   "poollogic/bassin",
                                    poolModeJsonScratch_,
                                    sizeof(poolModeJsonScratch_),
                                    &truncated);
@@ -460,14 +460,14 @@ bool I2CCfgServerModule::collectPoolModeFlags_(bool& hasModeOut,
     truncated = false;
     ok = false;
     if (cfgStore_) {
-        ok = cfgStore_->toJsonModule("poollogic/chlorine",
+        ok = cfgStore_->toJsonModule("poollogic/disinfection",
                                      poolModeJsonScratch_,
                                      sizeof(poolModeJsonScratch_),
                                      &truncated,
                                      true);
     } else if (cfgSvc_ && cfgSvc_->toJsonModule) {
         ok = cfgSvc_->toJsonModule(cfgSvc_->ctx,
-                                   "poollogic/chlorine",
+                                   "poollogic/disinfection",
                                    poolModeJsonScratch_,
                                    sizeof(poolModeJsonScratch_),
                                    &truncated);

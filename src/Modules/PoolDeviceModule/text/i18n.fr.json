@@ -1,7 +1,5 @@
 {
   "translations": {
-    "cfgmods.pdm.devices.label": "equipements",
-    "cfgmods.pdm.devices.help": "Choix du mode de désinfection et des équipements actifs de la piscine. Les pages de réglages n'affichent que ce qui est sélectionné ici.",
     "cfgmods.pdm.pd0.label": "Filtration (slot pd0)",
     "cfgmods.pdm.pd1.label": "Pompe pH (slot pd1)",
     "cfgmods.pdm.pd2.label": "Pompe désinfectant (slot pd2)",
@@ -135,6 +133,8 @@
     "runtimeui.pooldev.v07.group": "Equipements",
     "runtimeui.pooldev.v07.label": "Lumiere",
     "runtimeui.pooldev.v08.group": "Equipements",
-    "runtimeui.pooldev.v08.label": "Chauffe-eau"
+    "runtimeui.pooldev.v08.label": "Chauffe-eau",
+    "cfgmods.pdm.lights.label": "Éclairage",
+    "cfgmods.pdm.lights.help": "Réglages de l'éclairage du bassin."
   }
 }

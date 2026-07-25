@@ -264,7 +264,7 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
         if (readConfigUInt8_(cfgStore_, "poollogic/ph", "ph_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
             phPumpSlot = slotVal;
         }
-        if (readConfigUInt8_(cfgStore_, "poollogic/chlorine", "dis_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
+        if (readConfigUInt8_(cfgStore_, "poollogic/disinfection", "dis_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
             orpPumpSlot = slotVal;
         }
 
@@ -280,13 +280,13 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
             if (strcmp(modeKey, "disinfection_type") == 0) {
                 uint8_t disinfectionType = 0;
                 shouldLogAutoDisabled = !readConfigUInt8_(cfgStore_,
-                                                           "poollogic/modes",
+                                                           "poollogic/bassin",
                                                            "disinfection_type",
                                                            disinfectionType) ||
                                         disinfectionType != 3U;
                 disabledRole = ActivityRole::Disinfection;
                 disabledLabel = "ORP";
-                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"disinfection_type\":3}}");
+                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"disinfection_type\":3}}");
             } else if (strcmp(modeKey, "ph_auto_mode") == 0) {
                 bool phAutoMode = false;
                 shouldLogAutoDisabled = !readConfigBool_(cfgStore_,
@@ -298,7 +298,7 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
                 disabledLabel = "pH";
                 snprintf(patch, sizeof(patch), "{\"poollogic/ph\":{\"ph_auto_mode\":false}}");
             } else {
-                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"%s\":false}}", modeKey);
+                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"%s\":false}}", modeKey);
             }
             if (!cfgStore_->applyJson(patch)) {
                 LOGW("Manual pump start slot=%u failed to clear %s",

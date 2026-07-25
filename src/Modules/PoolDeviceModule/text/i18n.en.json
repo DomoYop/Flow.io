@@ -1,8 +1,6 @@
 {
   "locale": "en",
   "translations": {
-    "cfgmods.pdm.devices.label": "equipment",
-    "cfgmods.pdm.devices.help": "Select the disinfection mode and the active pool equipment. Settings pages only show what is selected here.",
     "cfgmods.pdm.pd0.label": "Filtration (slot pd0)",
     "cfgmods.pdm.pd1.label": "pH pump (slot pd1)",
     "cfgmods.pdm.pd2.label": "Disinfectant pump (slot pd2)",
@@ -136,6 +134,8 @@
     "runtimeui.pooldev.v07.group": "Equipements",
     "runtimeui.pooldev.v07.label": "Lumiere",
     "runtimeui.pooldev.v08.group": "Equipements",
-    "runtimeui.pooldev.v08.label": "Chauffe-eau"
+    "runtimeui.pooldev.v08.label": "Chauffe-eau",
+    "cfgmods.pdm.lights.label": "Lighting",
+    "cfgmods.pdm.lights.help": "Pool lighting settings."
   }
 }

@@ -345,13 +345,13 @@ float PoolLogicModule::o2TemperatureFactor_(bool haveWaterTemp, float waterTemp)
 
 float PoolLogicModule::computeO2WeeklyDoseMl_(bool haveWaterTemp, float waterTemp) const
 {
-    if (!std::isfinite(o2PoolVolumeM3_) || o2PoolVolumeM3_ <= 0.0f ||
+    if (!std::isfinite(poolVolumeM3_) || poolVolumeM3_ <= 0.0f ||
         !std::isfinite(o2DoseMlPer10M3Week_) || o2DoseMlPer10M3Week_ <= 0.0f ||
         !std::isfinite(o2LoadFactor_) || o2LoadFactor_ <= 0.0f) {
         return 0.0f;
     }
 
-    const float base = (o2PoolVolumeM3_ / 10.0f) * o2DoseMlPer10M3Week_;
+    const float base = (poolVolumeM3_ / 10.0f) * o2DoseMlPer10M3Week_;
     const float dose = base * o2LoadFactor_ * o2TemperatureFactor_(haveWaterTemp, waterTemp);
     if (!std::isfinite(dose) || dose <= 0.0f) return 0.0f;
     return dose;
@@ -832,6 +832,8 @@ bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
                                        float ki,
                                        float kd,
                                        int32_t windowMsCfg,
+                                       int32_t minOnMsCfg,
+                                       int32_t sampleMsCfg,
                                        bool positiveWhenInputHigh,
                                        uint32_t nowMs,
                                        bool& demandOnOut,
@@ -839,9 +841,10 @@ bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
 {
     // The PID output is converted into a time-on window so peristaltic pumps
     // can be driven with coarse duty-cycle control instead of a raw analog value.
+    // Fenetre, duree ON minimale et echantillonnage sont propres a chaque boucle.
     const uint32_t windowMs = (windowMsCfg > 1000) ? (uint32_t)windowMsCfg : 1000U;
-    const uint32_t sampleMs = (pidSampleMs_ > 100) ? (uint32_t)pidSampleMs_ : 100U;
-    const uint32_t minOnMs = (pidMinOnMs_ > 0) ? (uint32_t)pidMinOnMs_ : 0U;
+    const uint32_t sampleMs = (sampleMsCfg > 100) ? (uint32_t)sampleMsCfg : 100U;
+    const uint32_t minOnMs = (minOnMsCfg > 0) ? (uint32_t)minOnMsCfg : 0U;
 
     if (!st.initialized) {
         st.initialized = true;
@@ -1386,6 +1389,8 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                                            phKi_,
                                            phKd_,
                                            phWindowMs_,
+                                           phMinOnMs_,
+                                           phSampleMs_,
                                            !phDosePlus_,
                                            nowMs,
                                            phPumpDesired,
@@ -1410,6 +1415,8 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                                            orpKi_,
                                            orpKd_,
                                            orpWindowMs_,
+                                           disMinOnMs_,
+                                           disSampleMs_,
                                            false,
                                            nowMs,
                                            orpPumpDesired,

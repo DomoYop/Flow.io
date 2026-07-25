@@ -1687,7 +1687,7 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
 
     char moduleJson[320] = {0};
     bool truncated = false;
-    if (!cfgStore->toJsonModule("poollogic/modes", moduleJson, sizeof(moduleJson), &truncated, true)) {
+    if (!cfgStore->toJsonModule("poollogic/bassin", moduleJson, sizeof(moduleJson), &truncated, true)) {
         return false;
     }
 
@@ -1713,7 +1713,7 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
 
     memset(moduleJson, 0, sizeof(moduleJson));
     truncated = false;
-    if (cfgStore->toJsonModule("poollogic/chlorine", moduleJson, sizeof(moduleJson), &truncated, true)) {
+    if (cfgStore->toJsonModule("poollogic/disinfection", moduleJson, sizeof(moduleJson), &truncated, true)) {
         StaticJsonDocument<128> disDoc;
         if (!deserializeJson(disDoc, moduleJson)) {
             JsonObjectConst disRoot = disDoc.as<JsonObjectConst>();

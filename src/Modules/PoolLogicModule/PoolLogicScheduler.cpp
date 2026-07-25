@@ -51,7 +51,7 @@ bool PoolLogicModule::computeFiltrationPlan_(float waterTemp, FiltrationPlanOutp
     // this method only adapts module config into that pure helper.
     FiltrationPlanInput in{};
     in.waterTemp = waterTemp;
-    in.poolVolumeM3 = o2PoolVolumeM3_;
+    in.poolVolumeM3 = poolVolumeM3_;
     in.pumpFlowM3h = pumpFlowM3h_;
     for (uint8_t i = 0; i < FILTRATION_PLAN_MAX_WINDOWS; ++i) {
         in.windows[i].enabled = filtrWinEnabled_[i];

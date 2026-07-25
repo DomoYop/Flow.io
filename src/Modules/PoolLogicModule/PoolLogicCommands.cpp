@@ -312,13 +312,13 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
                                               (disinfectionType_ != DisinfectionDisabled);
             char patch[96]{};
             if (strcmp(clearDosingModeKey, "disinfection_type") == 0) {
-                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"disinfection_type\":%u}}", (unsigned)DisinfectionDisabled);
+                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"disinfection_type\":%u}}", (unsigned)DisinfectionDisabled);
             } else if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) {
                 snprintf(patch, sizeof(patch), "{\"poollogic/ph\":{\"ph_auto_mode\":false}}");
             } else if (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) {
-                snprintf(patch, sizeof(patch), "{\"poollogic/chlorine\":{\"dis_auto_mode\":false}}");
+                snprintf(patch, sizeof(patch), "{\"poollogic/disinfection\":{\"dis_auto_mode\":false}}");
             } else {
-                snprintf(patch, sizeof(patch), "{\"poollogic/modes\":{\"%s\":false}}", clearDosingModeKey);
+                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"%s\":false}}", clearDosingModeKey);
             }
             if (cfgStore_->applyJson(patch)) {
                 if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) phAutoMode_ = false;
@@ -512,10 +512,10 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
     if (strcmp(cmdName, "poollogic.heater.toggle") == 0) {
         return toggleDeviceValue("poollogic.heater.toggle", heaterDeviceSlot_, false, nullptr);
     }
-    if (strcmp(cmdName, "poollogic.chlorine_generator.write") == 0 || strcmp(cmdName, "poollogic.swg.write") == 0) {
+    if (strcmp(cmdName, "poollogic.chlorine_generator.write") == 0 || strcmp(cmdName, "poollogic.disinfection.write") == 0) {
         return writeDeviceFromArgs("poollogic.chlorine_generator.write", swgDeviceSlot_, false, nullptr);
     }
-    if (strcmp(cmdName, "poollogic.chlorine_generator.toggle") == 0 || strcmp(cmdName, "poollogic.swg.toggle") == 0) {
+    if (strcmp(cmdName, "poollogic.chlorine_generator.toggle") == 0 || strcmp(cmdName, "poollogic.disinfection.toggle") == 0) {
         return toggleDeviceValue("poollogic.chlorine_generator.toggle", swgDeviceSlot_, false, nullptr);
     }
 

@@ -42,9 +42,9 @@ namespace {
 static constexpr bool kConfigMenuEnabled = (FLOW_HMI_CONFIG_MENU_ENABLED != 0);
 static constexpr const char* kHmiModulePrefix = "hmi/";
 static constexpr const char* kPoolLogicSensorsModule = "poollogic/sensors";
-static constexpr const char* kPoolLogicModesModule = "poollogic/modes";
+static constexpr const char* kPoolLogicModesModule = "poollogic/bassin";
 static constexpr const char* kPoolLogicPhModule = "poollogic/ph";
-static constexpr const char* kPoolLogicChlorineModule = "poollogic/chlorine";
+static constexpr const char* kPoolLogicChlorineModule = "poollogic/disinfection";
 static constexpr const char* kPoolLogicFiltrationModule = "poollogic/filtration";
 static constexpr const char* kPoolLogicRobotModule = "poollogic/robot";
 static constexpr const char* kPoolLogicRefillModule = "poollogic/refill";
@@ -438,7 +438,7 @@ static bool extractJsonStringField_(const char* json, const char* key, char* out
 static const ConfigMenuHint kHints[] = {
     {"poollogic/filtration", "pump_flow_m3h", {ConfigMenuWidget::Slider, true, 1.0f, 40.0f, 0.5f, nullptr}},
     {"poollogic/ph", "ph_setpoint", {ConfigMenuWidget::Slider, true, 6.6f, 7.8f, 0.1f, nullptr}},
-    {"poollogic/chlorine", "dis_setpoint", {ConfigMenuWidget::Slider, true, 450.0f, 950.0f, 10.0f, nullptr}},
+    {"poollogic/disinfection", "dis_setpoint", {ConfigMenuWidget::Slider, true, 450.0f, 950.0f, 10.0f, nullptr}},
     {"time", "tz", {ConfigMenuWidget::Select, true, 0.0f, 0.0f, 1.0f,
                     "CET-1CEST,M3.5.0/2,M10.5.0/3|UTC0|EST5EDT,M3.2.0/2,M11.1.0/2"}}
 };
@@ -922,7 +922,7 @@ void HMIModule::refreshHomeBindings_()
                 phLevelIoId_ = (IoId)ioId;
             }
             ioId = (uint16_t)chlorineLevelIoId_;
-            foundChlorineLevel = findJsonUInt16_(jsonBuf, "chl_lvl_io_id", ioId);
+            foundChlorineLevel = findJsonUInt16_(jsonBuf, "dis_lvl_io_id", ioId);
             if (foundChlorineLevel) {
                 chlorineLevelIoId_ = (IoId)ioId;
             }
@@ -2424,11 +2424,11 @@ bool HMIModule::executePoolLogicModePatch_(const char* key, bool value)
     }
 
     char json[96]{};
-    const char* moduleName = "poollogic/modes";
+    const char* moduleName = "poollogic/bassin";
     if (strcmp(key, "ph_auto_mode") == 0) {
         moduleName = "poollogic/ph";
     } else if (strcmp(key, "dis_auto_mode") == 0) {
-        moduleName = "poollogic/chlorine";
+        moduleName = "poollogic/disinfection";
     }
     snprintf(json, sizeof(json), "{\"%s\":{\"%s\":%s}}", moduleName, key, value ? "true" : "false");
     const bool ok = cfgSvc_->applyJson(cfgSvc_->ctx, json);

@@ -2221,19 +2221,19 @@
     let poolConfigLoadedOnce = false;
     let poolConfigReqSeq = 0;
     const poolConfigModuleDefs = Object.freeze([
-      Object.freeze({ module: 'poollogic/modes', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
+      Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
       Object.freeze({ module: 'poollogic/filtration', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
       Object.freeze({ module: 'poollogic/heater', titleKey: 'pool.card.heater.title', title: 'Chauffage', icon: 'thermostat', noteKey: 'pool.card.heater.note', note: 'Le chauffage suit sa consigne seulement quand le mode automatique le permet.' }),
       Object.freeze({ module: 'poollogic/refill', titleKey: 'pool.card.refill.title', title: 'Remplissage', icon: 'water_drop', noteKey: 'pool.card.refill.note', note: 'Le remplissage garde une durée minimale pour éviter les cycles trop courts.' }),
       Object.freeze({ module: 'poollogic/safety', titleKey: 'pool.card.safety.title', title: 'Protections', icon: 'health_and_safety', noteKey: 'pool.card.safety.note', note: 'Seuils de pression, hors gel et bascule hiver utilisés par les automatismes.' }),
-      Object.freeze({ module: 'poollogic/regulation', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.' }),
+      Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.' }),
       Object.freeze({ module: 'poollogic/robot', titleKey: 'pool.card.robot.title', title: 'Robot', icon: 'smart_toy', noteKey: 'pool.card.robot.note', note: 'Fenêtre de lancement et durée du nettoyage automatique.' })
     ]);
     const poolDisinfectionModeDefs = Object.freeze([
       Object.freeze({
         key: 'chlorine',
         typeValue: 0,
-        module: 'poollogic/chlorine',
+        module: 'poollogic/disinfection',
         titleKey: 'pool.disinfection.chlorine.title',
         title: 'Chlore / Brome',
         icon: 'science',
@@ -2244,7 +2244,7 @@
       Object.freeze({
         key: 'swg',
         typeValue: 1,
-        module: 'poollogic/swg',
+        module: 'poollogic/disinfection',
         titleKey: 'pool.disinfection.swg.title',
         title: 'Électrolyse',
         icon: 'bolt',
@@ -2255,7 +2255,7 @@
       Object.freeze({
         key: 'o2',
         typeValue: 2,
-        module: 'poollogic/o2',
+        module: 'poollogic/disinfection',
         titleKey: 'pool.disinfection.o2.title',
         title: 'Oxygène actif',
         icon: 'bubble_chart',
@@ -7368,7 +7368,7 @@
     function poolConfigRenderModeBadges(modules) {
       if (!poolModeBadges) return;
       poolModeBadges.innerHTML = '';
-      const modes = modules['poollogic/modes'] || {};
+      const modes = modules['poollogic/bassin'] || {};
       const items = [
         [tr('pool.badge.poollogic', 'PoolLogic'), poolConfigBoolLabel(modes.enabled, tr('pool.state.active', 'Actif'), tr('pool.state.disabled', 'Désactivé')), toBool(modes.enabled), 'bolt'],
         [tr('pool.badge.auto', 'Auto'), poolConfigBoolLabel(modes.auto_mode, tr('pool.state.automatic', 'Automatique'), tr('pool.state.manual', 'Manuel')), toBool(modes.auto_mode), 'settings'],
@@ -7391,7 +7391,7 @@
 
     function poolConfigHeroSummary(modules, start, stop) {
       const source = modules && typeof modules === 'object' ? modules : {};
-      const modes = source['poollogic/modes'] || {};
+      const modes = source['poollogic/bassin'] || {};
       const heater = source['poollogic/heater'] || {};
       const filtration = source['poollogic/filtration'] || {};
       const poolLogicEnabled = toBool(modes.enabled);
@@ -7422,7 +7422,7 @@
     }
 
     function poolConfigRenderHero(modules, alarmSlots) {
-      const modes = modules['poollogic/modes'] || {};
+      const modes = modules['poollogic/bassin'] || {};
       const filtration = modules['poollogic/filtration'] || {};
       const alarms = poolConfigActiveAlarms(alarmSlots);
       const startValue = filtration.filtr_start_clc ?? filtration.filtr_start_min;
@@ -7456,7 +7456,7 @@
     function poolConfigRenderDisinfection(modules) {
       if (!poolDisinfectionModes) return;
       poolDisinfectionModes.innerHTML = '';
-      const modes = modules['poollogic/modes'] || {};
+      const modes = modules['poollogic/bassin'] || {};
       const selectedType = Number(modes.disinfection_type);
       const selectedDef = poolDisinfectionModeDefs.find((def) => selectedType === def.typeValue) || poolDisinfectionModeDefs[0];
       const selected = selectedType === selectedDef.typeValue;
@@ -7529,7 +7529,10 @@
           poolConfigAppendMetric(metrics, tr('pool.metric.delay', 'Délai'), poolConfigFormatValue(selectedDef.module, 'dly_electro_min', data.dly_electro_min));
           poolConfigAppendMetric(metrics, tr('pool.metric.waterSafety', 'Sécurité eau'), poolConfigFormatValue(selectedDef.module, 'secure_elec_t', data.secure_elec_t));
         } else if (selectedDef.key === 'o2') {
-          poolConfigAppendMetric(metrics, tr('pool.metric.poolVolume', 'Volume bassin'), poolConfigFormatValue(selectedDef.module, 'pool_volume_m3', data.pool_volume_m3), { featured: true });
+          // Le volume du bassin vit dans la branche filtration (partage avec le
+          // calcul de renouvellement volumique), pas dans la branche o2.
+          const filtrationData = modules['poollogic/filtration'] || {};
+          poolConfigAppendMetric(metrics, tr('pool.metric.poolVolume', 'Volume bassin'), poolConfigFormatValue('poollogic/filtration', 'pool_volume_m3', filtrationData.pool_volume_m3), { featured: true });
           poolConfigAppendMetric(metrics, tr('pool.metric.weeklyDose', 'Dose hebdo'), poolConfigFormatValue(selectedDef.module, 'dose_ml_10m3_week', data.dose_ml_10m3_week));
           poolConfigAppendMetric(metrics, tr('pool.metric.injections', 'Injections'), poolConfigFormatValue(selectedDef.module, 'split_count', data.split_count));
           poolConfigAppendMetric(metrics, tr('pool.metric.pending', 'En attente'), poolConfigFormatValue(selectedDef.module, 'pending_ml', data.pending_ml));
@@ -7783,9 +7786,9 @@
       const sizing = document.createElement('div');
       sizing.className = 'pool-fwin-sizing';
 
-      // Le volume vient de la branche O2 (source unique partagée avec le
-      // dosage) ; le firmware recalcule le plan quand il change.
-      const o2Data = modules['poollogic/o2'] || {};
+      // Le volume vit dans la branche filtration (source unique partagée avec le
+      // dosage O2) ; le firmware recalcule le plan quand il change.
+      const o2Data = modules['poollogic/filtration'] || {};
       const volumeWrap = document.createElement('label');
       volumeWrap.className = 'pool-fwin-flow';
       const volumeLabel = document.createElement('span');
@@ -7803,7 +7806,7 @@
       sizing.appendChild(volumeWrap);
       fields.push({
         key: 'pool_volume_m3',
-        branch: 'poollogic/o2',
+        branch: 'poollogic/filtration',
         label: tr('pool.filtration.poolVolume', 'Volume bassin (m³)'),
         initial: Number.isFinite(volumeValue) ? volumeValue : null,
         read: () => {
@@ -7865,14 +7868,14 @@
     function poolConfigRenderGeneralCards(modules) {
       if (!poolConfigGrid) return;
       poolConfigGrid.innerHTML = '';
-      const order = ['poollogic/heater', 'poollogic/safety', 'poollogic/regulation', 'poollogic/robot'];
+      const order = ['poollogic/heater', 'poollogic/safety', 'poollogic/bassin', 'poollogic/robot'];
       const orderedDefs = poolConfigModuleDefs.slice().sort((a, b) => {
         const ai = order.indexOf(a.module);
         const bi = order.indexOf(b.module);
         return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
       });
       orderedDefs.forEach((def) => {
-        if (def.module === 'poollogic/modes' || def.module === 'poollogic/filtration' || def.module === 'poollogic/refill') return;
+        if (def.module === 'poollogic/bassin' || def.module === 'poollogic/filtration' || def.module === 'poollogic/refill') return;
         const data = modules[def.module] || {};
         const card = document.createElement('article');
         card.className = 'pool-config-card pool-config-card-' + runtimeMeasureCssSlug(def.module);
@@ -10303,7 +10306,7 @@
     }
 
     // --- Visibilite conditionnelle generique (attribut visible_if des cfgdocs) ---
-    // Format : { "path": "poollogic/modes/disinfection_type", "eq": 1 }
+    // Format : { "path": "poollogic/bassin/disinfection_type", "eq": 1 }
     //       ou { "path": "...", "in": [0, 2] }
     //       ou un tableau de conditions toutes requises (ET logique).
     // `path` est un chemin store absolu, evalue contre la source affichee

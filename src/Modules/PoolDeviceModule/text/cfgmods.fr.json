@@ -5,72 +5,289 @@
     "version": 1
   },
   "docs": {
-    "poollogic/devices": {
-      "label_t": "cfgmods.pdm.devices.label",
-      "help_t": "cfgmods.pdm.devices.help",
-      "order": 0,
-      "compose": [
-        { "module": "poollogic/modes", "fields": ["disinfection_type"], "label_t": "cfgmods.poollogic.compose.disinfection.label" },
-        { "module": "pdm/pd0", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd0.label" },
-        { "module": "pdm/pd1", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd1.label" },
-        { "module": "pdm/pd2", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd2.label" },
-        { "module": "pdm/pd3", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd3.label" },
-        { "module": "pdm/pd4", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd4.label" },
-        { "module": "pdm/pd5", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd5.label" },
-        { "module": "pdm/pd6", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd6.label" },
-        { "module": "pdm/pd7", "fields": ["enabled"], "label_t": "cfgmods.pdm.pd7.label" }
-      ]
+    "pdm/pd0/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
     },
-    "pdm/pd0/depends_on_mask": { "visible_if": { "path": "pdm/pd0/enabled", "eq": true } },
-    "pdm/pd0/flow_l_h": { "visible_if": { "path": "pdm/pd0/enabled", "eq": true } },
-    "pdm/pd0/max_uptime_day_s": { "visible_if": { "path": "pdm/pd0/enabled", "eq": true } },
-    "pdm/pd0/tank_cap_ml": { "visible_if": { "path": "pdm/pd0/enabled", "eq": true } },
-    "pdm/pd0/tank_init_ml": { "visible_if": { "path": "pdm/pd0/enabled", "eq": true } },
-    "pdm/pd1/depends_on_mask": { "visible_if": { "path": "pdm/pd1/enabled", "eq": true } },
-    "pdm/pd1/flow_l_h": { "visible_if": { "path": "pdm/pd1/enabled", "eq": true } },
-    "pdm/pd1/max_uptime_day_s": { "visible_if": { "path": "pdm/pd1/enabled", "eq": true } },
-    "pdm/pd1/tank_cap_ml": { "visible_if": { "path": "pdm/pd1/enabled", "eq": true } },
-    "pdm/pd1/tank_init_ml": { "visible_if": { "path": "pdm/pd1/enabled", "eq": true } },
-    "pdm/pd2/depends_on_mask": { "visible_if": { "path": "pdm/pd2/enabled", "eq": true } },
-    "pdm/pd2/flow_l_h": { "visible_if": { "path": "pdm/pd2/enabled", "eq": true } },
-    "pdm/pd2/max_uptime_day_s": { "visible_if": { "path": "pdm/pd2/enabled", "eq": true } },
-    "pdm/pd2/tank_cap_ml": { "visible_if": { "path": "pdm/pd2/enabled", "eq": true } },
-    "pdm/pd2/tank_init_ml": { "visible_if": { "path": "pdm/pd2/enabled", "eq": true } },
-    "pdm/pd3/depends_on_mask": { "visible_if": { "path": "pdm/pd3/enabled", "eq": true } },
-    "pdm/pd3/flow_l_h": { "visible_if": { "path": "pdm/pd3/enabled", "eq": true } },
-    "pdm/pd3/max_uptime_day_s": { "visible_if": { "path": "pdm/pd3/enabled", "eq": true } },
-    "pdm/pd3/tank_cap_ml": { "visible_if": { "path": "pdm/pd3/enabled", "eq": true } },
-    "pdm/pd3/tank_init_ml": { "visible_if": { "path": "pdm/pd3/enabled", "eq": true } },
-    "pdm/pd4/depends_on_mask": { "visible_if": { "path": "pdm/pd4/enabled", "eq": true } },
-    "pdm/pd4/flow_l_h": { "visible_if": { "path": "pdm/pd4/enabled", "eq": true } },
-    "pdm/pd4/max_uptime_day_s": { "visible_if": { "path": "pdm/pd4/enabled", "eq": true } },
-    "pdm/pd4/tank_cap_ml": { "visible_if": { "path": "pdm/pd4/enabled", "eq": true } },
-    "pdm/pd4/tank_init_ml": { "visible_if": { "path": "pdm/pd4/enabled", "eq": true } },
-    "pdm/pd5/depends_on_mask": { "visible_if": { "path": "pdm/pd5/enabled", "eq": true } },
-    "pdm/pd5/flow_l_h": { "visible_if": { "path": "pdm/pd5/enabled", "eq": true } },
-    "pdm/pd5/max_uptime_day_s": { "visible_if": { "path": "pdm/pd5/enabled", "eq": true } },
-    "pdm/pd5/tank_cap_ml": { "visible_if": { "path": "pdm/pd5/enabled", "eq": true } },
-    "pdm/pd5/tank_init_ml": { "visible_if": { "path": "pdm/pd5/enabled", "eq": true } },
-    "pdm/pd6/depends_on_mask": { "visible_if": { "path": "pdm/pd6/enabled", "eq": true } },
-    "pdm/pd6/flow_l_h": { "visible_if": { "path": "pdm/pd6/enabled", "eq": true } },
-    "pdm/pd6/max_uptime_day_s": { "visible_if": { "path": "pdm/pd6/enabled", "eq": true } },
-    "pdm/pd6/tank_cap_ml": { "visible_if": { "path": "pdm/pd6/enabled", "eq": true } },
-    "pdm/pd6/tank_init_ml": { "visible_if": { "path": "pdm/pd6/enabled", "eq": true } },
-    "pdm/pd7/depends_on_mask": { "visible_if": { "path": "pdm/pd7/enabled", "eq": true } },
-    "pdm/pd7/flow_l_h": { "visible_if": { "path": "pdm/pd7/enabled", "eq": true } },
-    "pdm/pd7/max_uptime_day_s": { "visible_if": { "path": "pdm/pd7/enabled", "eq": true } },
-    "pdm/pd7/tank_cap_ml": { "visible_if": { "path": "pdm/pd7/enabled", "eq": true } },
-    "pdm/pd7/tank_init_ml": { "visible_if": { "path": "pdm/pd7/enabled", "eq": true } }
+    "pdm/pd0/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd0/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd0/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd0/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd1/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd1/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd1/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd1/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd1/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd1/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd2/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd2/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd2/enabled": {
+      "visible_if": {
+        "path": "poollogic/bassin/disinfection_type",
+        "in": [
+          1,
+          3
+        ]
+      }
+    },
+    "pdm/pd2/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd2/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd2/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd2/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd2/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd2/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd2/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd2/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd3/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd3/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd3/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd3/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd3/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd5/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd5/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd5/enabled": {
+      "visible_if": {
+        "path": "poollogic/bassin/disinfection_type",
+        "eq": 2
+      }
+    },
+    "pdm/pd5/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd5/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd5/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd5/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd5/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd5/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd5/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd5/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd6/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd6/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd6/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd6/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd6/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd6/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd6/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd6/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd6/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd6/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd7/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd7/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd7/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd7/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd7/tank_init_ml": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
+    },
+    "poollogic/lights": {
+      "compose": [
+        {
+          "module": "pdm/pd6",
+          "fields": [
+            "enabled",
+            "max_uptime_day_s",
+            "depends_on_mask"
+          ],
+          "label_t": "cfgmods.poollogic.compose.device.label"
+        }
+      ],
+      "label_t": "cfgmods.pdm.lights.label",
+      "help_t": "cfgmods.pdm.lights.help"
+    }
   },
   "meta": {
     "cfg_tree_aliases": [
-      { "display": "poollogic/devices", "store": "pdm" }
+      {
+        "display": "poollogic/appareils",
+        "store": "pdm"
+      }
     ],
     "cfg_tree_virtual_branches": [
       {
-        "display": "poollogic/devices",
+        "display": "poollogic/lights",
         "children": [],
-        "requires": "poollogic/modes"
+        "requires": "poollogic/bassin"
       }
     ]
   }

@@ -19,15 +19,12 @@ namespace {
 // The aggregated cfg payload republishes the same branch split used by the
 // config routes so MQTT consumers can fetch one coherent snapshot.
 static constexpr const char* kPoolLogicCfgTopicBase = "cfg/poollogic";
-static constexpr const char* kCfgModuleModes = "poollogic/modes";
+static constexpr const char* kCfgModuleBassin = "poollogic/bassin";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
 static constexpr const char* kCfgModuleSafety = "poollogic/safety";
-static constexpr const char* kCfgModuleRegulation = "poollogic/regulation";
 static constexpr const char* kCfgModulePh = "poollogic/ph";
-static constexpr const char* kCfgModuleChlorine = "poollogic/chlorine";
-static constexpr const char* kCfgModuleSwg = "poollogic/swg";
-static constexpr const char* kCfgModuleO2 = "poollogic/o2";
+static constexpr const char* kCfgModuleDisinfection = "poollogic/disinfection";
 static constexpr const char* kCfgModuleHeater = "poollogic/heater";
 static constexpr const char* kCfgModuleRobot = "poollogic/robot";
 static constexpr const char* kCfgModuleRefill = "poollogic/refill";
@@ -65,15 +62,12 @@ MqttBuildResult PoolLogicModule::buildCfgBase_(MqttBuildContext& buildCtx)
         const char* moduleName;
     };
     static constexpr Entry kEntries[] = {
-        {"modes", kCfgModuleModes},
+        {"bassin", kCfgModuleBassin},
         {"filtration", kCfgModuleFiltration},
         {"sensors", kCfgModuleSensors},
         {"safety", kCfgModuleSafety},
-        {"regulation", kCfgModuleRegulation},
         {"ph", kCfgModulePh},
-        {"chlorine", kCfgModuleChlorine},
-        {"swg", kCfgModuleSwg},
-        {"o2", kCfgModuleO2},
+        {"disinfection", kCfgModuleDisinfection},
         {"heater", kCfgModuleHeater},
         {"robot", kCfgModuleRobot},
         {"refill", kCfgModuleRefill},
@@ -348,8 +342,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             (double)ki,
             (double)kd,
             (long)windowMsCfg,
-            (long)pidSampleMs_,
-            (long)pidMinOnMs_,
+            (long)(isPh ? phSampleMs_ : disSampleMs_),
+            (long)(isPh ? phMinOnMs_ : disMinOnMs_),
             (unsigned long)st.outputOnMs,
             (unsigned long)elapsedMs,
             (unsigned long)st.sampleTsMs,
@@ -377,8 +371,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             (double)ki,
             (double)kd,
             (long)windowMsCfg,
-            (long)pidSampleMs_,
-            (long)pidMinOnMs_,
+            (long)(isPh ? phSampleMs_ : disSampleMs_),
+            (long)(isPh ? phMinOnMs_ : disMinOnMs_),
             (unsigned long)st.outputOnMs,
             (unsigned long)elapsedMs,
             (unsigned)disinfectionType_,

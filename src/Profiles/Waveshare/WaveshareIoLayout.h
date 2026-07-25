@@ -126,10 +126,10 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     // A la mise en service : lier l'actionneur du mode choisi a un relais libre
     // (EXIO3 et EXIO6 le sont), les autres restant non connectes. Un seul mode
     // etant actif a la fois. Rebinding pris en compte au prochain demarrage.
-    {PoolIds::ActuatorChlorinePump,     IO_PORT_INVALID, true, false, false, 0U}, // Pompe chlore/oxygene actif.
+    {PoolIds::ActuatorChlorinePump,     IO_PORT_INVALID, true, false, false, 0U}, // Pompe chlore/oxygene actif, non liee par defaut.
+    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur, non liee par defaut.
     {PoolIds::ActuatorRobot,            PortExio4, true, false, false, 0U}, // Robot.
     {PoolIds::ActuatorFillPump,         PortExio5, true, false, false, 0U}, // Pompe de remplissage.
-    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur.
     {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
     {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
     {PoolIds::ActuatorFlowCopy,         IO_PORT_INVALID, true, false, false, 0U}, // Recopie flowswitch (temporisee), non liee par defaut.

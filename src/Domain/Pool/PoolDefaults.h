@@ -72,7 +72,7 @@ constexpr uint8_t RobotDelayMin = 30;
 constexpr uint8_t RobotDurationMin = 120;
 constexpr uint8_t FillingMinOnSec = 30;
 
-constexpr float O2PoolVolumeM3 = 50.0f;
+constexpr float PoolVolumeM3 = 50.0f;
 constexpr float O2DoseMlPer10M3Week = 500.0f;
 constexpr uint8_t O2MainHour = 20;
 constexpr uint8_t O2SplitCount = 2;
@@ -115,7 +115,7 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     RobotDelayMin,
     RobotDurationMin,
     FillingMinOnSec,
-    O2PoolVolumeM3,
+    PoolVolumeM3,
     O2DoseMlPer10M3Week,
     O2MainHour,
     O2SplitCount,
