@@ -119,15 +119,17 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     // {domainSlot, bindingPort, activeHigh, retainOnWarmReboot, momentary, pulseMs}
     {PoolIds::ActuatorFiltrationPump,   PortExio1, true, true,  false, 0U}, // Pompe filtration.
     {PoolIds::ActuatorPhPump,           PortExio2, true, false, false, 0U}, // Pompe pH.
-    // EXIO3 est LE relais de desinfection : l'actionneur du mode actif y est lie.
-    // Un seul mode etant actif a la fois (voir disinfection_type), les actionneurs
-    // des autres modes restent non connectes -> endpoint inerte (pas de provider,
-    // ecriture no-op) et le port reste disponible. Rebinding pris en compte au
-    // prochain demarrage.
-    {PoolIds::ActuatorChlorinePump,     PortExio3, true, false, false, 0U}, // Pompe chlore/oxygene actif.
+    // Desinfection : aucun actionneur lie par defaut, en coherence avec
+    // disinfection_type = Desactive. Un actionneur non connecte est inerte
+    // (pas de provider, ecriture no-op), donc une commande manuelle ne peut pas
+    // doser ni electrolyser tant que la mise en service n'a pas eu lieu.
+    // A la mise en service : lier l'actionneur du mode choisi a un relais libre
+    // (EXIO3 et EXIO6 le sont), les autres restant non connectes. Un seul mode
+    // etant actif a la fois. Rebinding pris en compte au prochain demarrage.
+    {PoolIds::ActuatorChlorinePump,     IO_PORT_INVALID, true, false, false, 0U}, // Pompe chlore/oxygene actif.
     {PoolIds::ActuatorRobot,            PortExio4, true, false, false, 0U}, // Robot.
     {PoolIds::ActuatorFillPump,         PortExio5, true, false, false, 0U}, // Pompe de remplissage.
-    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur : a lier au relais de desinfection si ce mode est choisi.
+    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur.
     {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
     {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
     {PoolIds::ActuatorFlowCopy,         IO_PORT_INVALID, true, false, false, 0U}, // Recopie flowswitch (temporisee), non liee par defaut.
