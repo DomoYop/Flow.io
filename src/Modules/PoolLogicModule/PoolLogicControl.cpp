@@ -51,6 +51,9 @@ const char* poolDeviceBlockReasonStr_(uint8_t reason)
         case POOL_DEVICE_BLOCK_INTERLOCK: return "interlock";
         case POOL_DEVICE_BLOCK_IO_ERROR: return "io_error";
         case POOL_DEVICE_BLOCK_MAX_UPTIME: return "max_uptime";
+        // Actionneur non lie a un port : etat normal pour le mode de desinfection
+        // non utilise (voir kDigitalOutputRoleDefaults / binding_port).
+        case POOL_DEVICE_BLOCK_UNBOUND: return "unbound";
         default: return "unknown";
     }
 }

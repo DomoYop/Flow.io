@@ -119,10 +119,15 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     // {domainSlot, bindingPort, activeHigh, retainOnWarmReboot, momentary, pulseMs}
     {PoolIds::ActuatorFiltrationPump,   PortExio1, true, true,  false, 0U}, // Pompe filtration.
     {PoolIds::ActuatorPhPump,           PortExio2, true, false, false, 0U}, // Pompe pH.
-    {PoolIds::ActuatorChlorinePump,     PortExio3, true, false, false, 0U}, // Pompe chlore.
+    // EXIO3 est LE relais de desinfection : l'actionneur du mode actif y est lie.
+    // Un seul mode etant actif a la fois (voir disinfection_type), les actionneurs
+    // des autres modes restent non connectes -> endpoint inerte (pas de provider,
+    // ecriture no-op) et le port reste disponible. Rebinding pris en compte au
+    // prochain demarrage.
+    {PoolIds::ActuatorChlorinePump,     PortExio3, true, false, false, 0U}, // Pompe chlore/oxygene actif.
     {PoolIds::ActuatorRobot,            PortExio4, true, false, false, 0U}, // Robot.
     {PoolIds::ActuatorFillPump,         PortExio5, true, false, false, 0U}, // Pompe de remplissage.
-    {PoolIds::ActuatorChlorineGenerator,PortExio6, true, false, false, 0U}, // Electrolyseur.
+    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur : a lier au relais de desinfection si ce mode est choisi.
     {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
     {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
     {PoolIds::ActuatorFlowCopy,         IO_PORT_INVALID, true, false, false, 0U}, // Recopie flowswitch (temporisee), non liee par defaut.
