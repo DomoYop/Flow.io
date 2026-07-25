@@ -11254,10 +11254,6 @@
           throw new Error('lecture module impossible');
         }
         await ensureCfgDocsForModule(m);
-        const pdmModule = flowCfgPdmModuleForIoOutput(m, data.data);
-        if (pdmModule) {
-          await ensureCfgDocsForModule(pdmModule);
-        }
         if (moduleHasDeviceSlotField(m, data.data)) {
           await loadPoolLogicDeviceSlotLabels('flow', true);
         }
@@ -11294,10 +11290,6 @@
           throw new Error('lecture module supervisor impossible');
         }
         await ensureCfgDocsForModule(m);
-        const pdmModule = isWaveshareProfile() ? flowCfgPdmModuleForIoOutput(m, data.data) : '';
-        if (pdmModule) {
-          await ensureCfgDocsForModule(pdmModule);
-        }
         if (moduleHasDeviceSlotField(m, data.data)) {
           await loadPoolLogicDeviceSlotLabels('supervisor', true);
         }
