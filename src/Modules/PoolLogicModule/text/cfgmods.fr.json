@@ -321,6 +321,10 @@
       ],
       "poollogic_device_slot": [
         {
+          "value": 255,
+          "label_t": "cfgmods_meta.poollogicmodule.enum_sets.poollogic_device_slot.none.label"
+        },
+        {
           "value": 0,
           "label_t": "cfgmods_meta.poollogicmodule.enum_sets.poollogic_device_slot.0.label"
         },

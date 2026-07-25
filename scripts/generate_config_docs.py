@@ -396,6 +396,13 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
             if value is not None:
                 current_by_value[value] = entry
         relabeled: List[dict] = []
+        # Entrees hors plage (ex. 255 = "aucun PDM") : conservees telles quelles,
+        # en tete, sinon la reconstruction 0..15 les ferait disparaitre.
+        for entry in current:
+            value = _to_int(entry.get("value"))
+            if value is None or value in range(16):
+                continue
+            relabeled.append(entry)
         for value in range(16):
             entry = current_by_value.get(value, {"value": value})
             relabeled.append(sanitize_enum_entry(entry, slot_labels_waveshare[value]))

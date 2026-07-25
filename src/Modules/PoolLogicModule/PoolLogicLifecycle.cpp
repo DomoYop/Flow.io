@@ -1590,12 +1590,13 @@ void PoolLogicModule::onEvent_(const Event& e)
 void PoolLogicModule::normalizeDeviceSlots_()
 {
     // Persisting invalid slots back to defaults keeps future boots and cfg
-    // publications aligned with the effective runtime wiring.
+    // publications aligned with the effective runtime wiring. POOL_DEVICE_INVALID
+    // est un choix legitime ("aucun PDM") : le role n'est alors pas pilote.
     auto normalize = [this](uint8_t& slot,
                             uint8_t defSlot,
                             ConfigVariable<uint8_t,0>& var,
                             const char* role) {
-        if (slot < POOL_DEVICE_MAX) return;
+        if (slot < POOL_DEVICE_MAX || slot == POOL_DEVICE_INVALID) return;
         LOGW("PoolLogic invalid device slot role=%s slot=%u -> default=%u",
              role ? role : "?",
              (unsigned)slot,

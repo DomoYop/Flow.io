@@ -228,6 +228,7 @@
     "cfgdocs.poollogic.disinfection.dis_sample_ms.label": "Échantillonnage PID (ms)",
     "cfgdocs.poollogic.disinfection.dis_sample_ms.help": "Période de calcul du régulateur ORP.",
     "cfgmods.poollogic.compose.pump.label": "Pompe de dosage",
-    "cfgmods.poollogic.compose.swg.label": "Électrolyseur"
+    "cfgmods.poollogic.compose.swg.label": "Électrolyseur",
+    "cfgmods_meta.poollogicmodule.enum_sets.poollogic_device_slot.none.label": "Aucun (pas de PDM)"
   }
 }

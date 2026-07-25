@@ -659,6 +659,8 @@ AlarmCondState PoolLogicModule::condChlorinePumpMaxUptimeStatic_(void* ctx, uint
 
 AlarmCondState PoolLogicModule::condPumpMaxUptime_(uint8_t deviceSlot) const
 {
+    // Aucun appareil associe : pas d'uptime a surveiller.
+    if (deviceSlot >= POOL_DEVICE_MAX) return AlarmCondState::False;
     if (!poolSvc_ || !poolSvc_->meta) return AlarmCondState::Unknown;
 
     PoolDeviceSvcMeta meta{};
@@ -672,6 +674,8 @@ AlarmCondState PoolLogicModule::condPumpMaxUptime_(uint8_t deviceSlot) const
 
 bool PoolLogicModule::readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const
 {
+    // Role sans appareil associe ("aucun PDM") : rien a lire, sans erreur.
+    if (deviceSlot >= POOL_DEVICE_MAX) return false;
     if (!poolSvc_ || !poolSvc_->readActualOn) return false;
     uint8_t on = 0;
     if (poolSvc_->readActualOn(poolSvc_->ctx, deviceSlot, &on, nullptr) != POOLDEV_SVC_OK) return false;
@@ -681,6 +685,9 @@ bool PoolLogicModule::readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const
 
 bool PoolLogicModule::writeDeviceDesired_(uint8_t deviceSlot, bool on)
 {
+    // Role sans appareil associe : commande ignoree silencieusement (pas de
+    // log repete toutes les 5 s via la relance de applyDeviceControl_).
+    if (deviceSlot >= POOL_DEVICE_MAX) return false;
     if (!poolSvc_ || !poolSvc_->writeDesired) return false;
     const PoolDeviceSvcStatus st = poolSvc_->writeDesired(poolSvc_->ctx, deviceSlot, on ? 1U : 0U);
     if (st != POOLDEV_SVC_OK) {
@@ -729,6 +736,7 @@ void PoolLogicModule::syncDeviceState_(uint8_t deviceSlot, DeviceFsm& fsm, uint3
 {
     turnedOnOut = false;
     turnedOffOut = false;
+    if (deviceSlot >= POOL_DEVICE_MAX) return;  // role sans appareil associe
 
     bool actualOn = false;
     if (!readDeviceActualOn_(deviceSlot, actualOn)) {
@@ -922,6 +930,7 @@ void PoolLogicModule::applyDeviceControl_(uint8_t deviceSlot,
                                           bool desired,
                                           uint32_t nowMs)
 {
+    if (deviceSlot >= POOL_DEVICE_MAX) return;  // role sans appareil associe
     const bool desiredChanged = (desired != fsm.lastDesired);
     // When the actual state does not follow the requested state, retry at a
     // bounded cadence instead of spamming the downstream pool-device service.

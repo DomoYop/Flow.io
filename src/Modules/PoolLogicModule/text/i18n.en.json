@@ -220,6 +220,7 @@
     "cfgdocs.poollogic.disinfection.dis_sample_ms.label": "PID sampling (ms)",
     "cfgdocs.poollogic.disinfection.dis_sample_ms.help": "ORP controller computation period.",
     "cfgmods.poollogic.compose.pump.label": "Dosing pump",
-    "cfgmods.poollogic.compose.swg.label": "Salt chlorinator"
+    "cfgmods.poollogic.compose.swg.label": "Salt chlorinator",
+    "cfgmods_meta.poollogicmodule.enum_sets.poollogic_device_slot.none.label": "None (no PDM)"
   }
 }
