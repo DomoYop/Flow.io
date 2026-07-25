@@ -156,6 +156,20 @@ PoolDeviceSvcStatus PoolDeviceModule::svcWriteDesiredImpl_(uint8_t slot, uint8_t
         return POOLDEV_SVC_OK;
     }
 
+    // Temporisation de mise en marche : la demande est acceptee mais la sortie
+    // n'est energisee qu'apres onDelaySec (tickDevices_ s'en charge). L'arret
+    // reste immediat.
+    if (requested && !s.actualOn && s.def.onDelaySec > 0) {
+        if (s.onDelaySinceMs == 0U) {
+            const uint32_t nowMs = millis();
+            s.onDelaySinceMs = nowMs ? nowMs : 1U;
+        }
+        tickDevices_(millis(), false);
+        unlockState_();
+        return POOLDEV_SVC_OK;
+    }
+    s.onDelaySinceMs = 0;
+
     if (s.actualOn != requested) {
         if (writeIo_(s.ioId, requested)) {
             s.actualOn = requested;
@@ -599,6 +613,24 @@ void PoolDeviceModule::tickDevices_(uint32_t nowMs, bool allowPersist)
         if (readIoState_(s, ioOn)) {
             if (s.actualOn != ioOn) stateChanged = true;
             s.actualOn = ioOn;
+        }
+
+        // Fin de la temporisation de mise en marche : on energise la sortie si
+        // la demande tient toujours et que rien ne la bloque entre-temps.
+        if (s.onDelaySinceMs != 0U) {
+            if (!s.desiredOn || !writesEnabled_ || s.actualOn) {
+                s.onDelaySinceMs = 0;
+            } else if ((uint32_t)(nowMs - s.onDelaySinceMs) >= (uint32_t)s.def.onDelaySec * 1000UL) {
+                s.onDelaySinceMs = 0;
+                if (writeIo_(s.ioId, true)) {
+                    s.actualOn = true;
+                    s.blockReason = POOL_DEVICE_BLOCK_NONE;
+                    stateChanged = true;
+                } else {
+                    s.blockReason = POOL_DEVICE_BLOCK_IO_ERROR;
+                    stateChanged = true;
+                }
+            }
         }
 
         if (s.def.tankCapacityMl <= 0.0f) {

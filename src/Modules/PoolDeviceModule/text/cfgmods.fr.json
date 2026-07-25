@@ -101,6 +101,12 @@
         "eq": true
       }
     },
+    "pdm/pd3/on_delay_s": {
+      "visible_if": {
+        "path": "pdm/pd3/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd4": {
       "label_t": "cfgmods.pdm.pd4.label"
     },
@@ -111,6 +117,12 @@
       }
     },
     "pdm/pd4/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/on_delay_s": {
       "visible_if": {
         "path": "pdm/pd4/enabled",
         "eq": true
@@ -131,6 +143,12 @@
         "eq": true
       }
     },
+    "pdm/pd5/on_delay_s": {
+      "visible_if": {
+        "path": "pdm/pd5/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd6": {
       "label_t": "cfgmods.pdm.pd6.label"
     },
@@ -146,6 +164,12 @@
         "eq": true
       }
     },
+    "pdm/pd6/on_delay_s": {
+      "visible_if": {
+        "path": "pdm/pd6/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd7": {
       "label_t": "cfgmods.pdm.pd7.label"
     },
@@ -156,6 +180,12 @@
       }
     },
     "pdm/pd7/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd7/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd7/on_delay_s": {
       "visible_if": {
         "path": "pdm/pd7/enabled",
         "eq": true

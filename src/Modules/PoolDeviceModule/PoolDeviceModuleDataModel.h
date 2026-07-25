@@ -58,6 +58,7 @@ struct PoolDeviceSlotDescriptor {
     const char* tankCapKey;
     const char* tankInitKey;
     const char* maxUptimeKey;
+    const char* onDelayKey;
     const char* runtimeKey;
 };
 

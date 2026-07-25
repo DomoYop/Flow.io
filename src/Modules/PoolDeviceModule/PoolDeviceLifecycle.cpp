@@ -57,7 +57,7 @@ bool PoolDeviceModule::ensureStorage_()
     }
 
     if (runtimePersistBuf_ && slots_ && cfgEnabledVar_ && cfgDependsVar_ && cfgFlowVar_ &&
-        cfgTankCapVar_ && cfgTankInitVar_ && cfgMaxUptimeVar_) {
+        cfgTankCapVar_ && cfgTankInitVar_ && cfgMaxUptimeVar_ && cfgOnDelayVar_) {
         return stateMutex_ != nullptr;
     }
 
@@ -71,9 +71,10 @@ bool PoolDeviceModule::ensureStorage_()
     if (!cfgTankCapVar_) cfgTankCapVar_ = allocPsramArray_<ConfigVariable<float,0>>(POOL_DEVICE_MAX);
     if (!cfgTankInitVar_) cfgTankInitVar_ = allocPsramArray_<ConfigVariable<float,0>>(POOL_DEVICE_MAX);
     if (!cfgMaxUptimeVar_) cfgMaxUptimeVar_ = allocPsramArray_<ConfigVariable<int32_t,0>>(POOL_DEVICE_MAX);
+    if (!cfgOnDelayVar_) cfgOnDelayVar_ = allocPsramArray_<ConfigVariable<int32_t,0>>(POOL_DEVICE_MAX);
 
     const bool ok = stateMutex_ && runtimePersistBuf_ && slots_ && cfgEnabledVar_ && cfgDependsVar_ && cfgFlowVar_ &&
-                    cfgTankCapVar_ && cfgTankInitVar_ && cfgMaxUptimeVar_;
+                    cfgTankCapVar_ && cfgTankInitVar_ && cfgMaxUptimeVar_ && cfgOnDelayVar_;
     if (ok) {
         LOGI("PoolDevice scalable storage ready slots=%u persist_bytes=%u",
              (unsigned)POOL_DEVICE_MAX,
@@ -255,6 +256,19 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         cfgMaxUptimeVar_[i].persistence = ConfigPersistence::Persistent;
         cfgMaxUptimeVar_[i].size = 0;
         cfg.registerVar(cfgMaxUptimeVar_[i], kCfgModuleId, localBranchId);
+
+        // Temporisation de mise en marche : specifique aux relais simples
+        // (recopie temporisee, materiel a demarrage differe...).
+        if (s.def.type == POOL_DEVICE_RELAY_STD) {
+            cfgOnDelayVar_[i].nvsKey = slot.onDelayKey;
+            cfgOnDelayVar_[i].jsonName = "on_delay_s";
+            cfgOnDelayVar_[i].moduleName = slot.configModuleName;
+            cfgOnDelayVar_[i].type = ConfigType::Int32;
+            cfgOnDelayVar_[i].value = &s.def.onDelaySec;
+            cfgOnDelayVar_[i].persistence = ConfigPersistence::Persistent;
+            cfgOnDelayVar_[i].size = 0;
+            cfg.registerVar(cfgOnDelayVar_[i], kCfgModuleId, localBranchId);
+        }
     }
 
     if (cmdSvc_ && cmdSvc_->registerHandler) {

@@ -40,6 +40,9 @@ struct PoolDeviceDefinition {
     float tankInitialMl = 0.0f;    // <=0 means "use capacity"
     uint8_t dependsOnMask = 0;     // bit per pool-device slot
     int32_t maxUptimeDaySec = 0;   // 0 means "unlimited"
+    // Relais uniquement : temporisation avant mise sous tension effective
+    // apres une demande de marche. 0 = demarrage immediat.
+    int32_t onDelaySec = 0;
 };
 
 class PoolDeviceModule : public Module, public IRuntimeSnapshotProvider, public IRuntimeUiValueProvider {
@@ -120,6 +123,9 @@ private:
         bool actualOn = false;
         uint8_t blockReason = POOL_DEVICE_BLOCK_NONE;
         bool runtimePublishable = false;
+        // Temporisation de mise en marche en cours (def.onDelaySec > 0) :
+        // date de la demande, 0 = aucune attente en cours.
+        uint32_t onDelaySinceMs = 0;
 
         uint32_t lastTickMs = 0;
         uint64_t runningMsDay = 0;
@@ -261,4 +267,5 @@ private:
     ConfigVariable<float,0>* cfgTankCapVar_ = nullptr;
     ConfigVariable<float,0>* cfgTankInitVar_ = nullptr;
     ConfigVariable<int32_t,0>* cfgMaxUptimeVar_ = nullptr;
+    ConfigVariable<int32_t,0>* cfgOnDelayVar_ = nullptr;
 };

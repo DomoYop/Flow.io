@@ -139,6 +139,12 @@
       "help_t": "cfgdocs.pdm.pd3.max_uptime_day_s.help",
       "unit": "s"
     },
+    "pdm/pd3/on_delay_s": {
+      "type": "Int32",
+      "unit": "s",
+      "label_t": "cfgdocs.pdm.pd3.on_delay_s.label",
+      "help_t": "cfgdocs.pdm.pd3.on_delay_s.help"
+    },
     "pdm/pd4/depends_on_mask": {
       "type": "uint8_t",
       "label_t": "cfgdocs.pdm.pd4.depends_on_mask.label",
@@ -154,6 +160,12 @@
       "label_t": "cfgdocs.pdm.pd4.max_uptime_day_s.label",
       "help_t": "cfgdocs.pdm.pd4.max_uptime_day_s.help",
       "unit": "s"
+    },
+    "pdm/pd4/on_delay_s": {
+      "type": "Int32",
+      "unit": "s",
+      "label_t": "cfgdocs.pdm.pd4.on_delay_s.label",
+      "help_t": "cfgdocs.pdm.pd4.on_delay_s.help"
     },
     "pdm/pd5/depends_on_mask": {
       "type": "uint8_t",
@@ -171,6 +183,12 @@
       "help_t": "cfgdocs.pdm.pd5.max_uptime_day_s.help",
       "unit": "s"
     },
+    "pdm/pd5/on_delay_s": {
+      "type": "Int32",
+      "unit": "s",
+      "label_t": "cfgdocs.pdm.pd5.on_delay_s.label",
+      "help_t": "cfgdocs.pdm.pd5.on_delay_s.help"
+    },
     "pdm/pd6/depends_on_mask": {
       "type": "uint8_t",
       "label_t": "cfgdocs.pdm.pd6.depends_on_mask.label",
@@ -187,6 +205,12 @@
       "help_t": "cfgdocs.pdm.pd6.max_uptime_day_s.help",
       "unit": "s"
     },
+    "pdm/pd6/on_delay_s": {
+      "type": "Int32",
+      "unit": "s",
+      "label_t": "cfgdocs.pdm.pd6.on_delay_s.label",
+      "help_t": "cfgdocs.pdm.pd6.on_delay_s.help"
+    },
     "pdm/pd7/depends_on_mask": {
       "type": "uint8_t",
       "label_t": "cfgdocs.pdm.pd7.depends_on_mask.label",
@@ -202,6 +226,12 @@
       "label_t": "cfgdocs.pdm.pd7.max_uptime_day_s.label",
       "help_t": "cfgdocs.pdm.pd7.max_uptime_day_s.help",
       "unit": "s"
+    },
+    "pdm/pd7/on_delay_s": {
+      "type": "Int32",
+      "unit": "s",
+      "label_t": "cfgdocs.pdm.pd7.on_delay_s.label",
+      "help_t": "cfgdocs.pdm.pd7.on_delay_s.help"
     }
   }
 }
