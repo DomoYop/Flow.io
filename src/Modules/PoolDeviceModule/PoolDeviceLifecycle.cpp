@@ -215,32 +215,37 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         cfgDependsVar_[i].size = 0;
         cfg.registerVar(cfgDependsVar_[i], kCfgModuleId, localBranchId);
 
-        cfgFlowVar_[i].nvsKey = slot.flowKey;
-        cfgFlowVar_[i].jsonName = "flow_l_h";
-        cfgFlowVar_[i].moduleName = slot.configModuleName;
-        cfgFlowVar_[i].type = ConfigType::Float;
-        cfgFlowVar_[i].value = &s.def.flowLPerHour;
-        cfgFlowVar_[i].persistence = ConfigPersistence::Persistent;
-        cfgFlowVar_[i].size = 0;
-        cfg.registerVar(cfgFlowVar_[i], kCfgModuleId, localBranchId);
+        // Debit et suivi de cuve n'ont de sens que pour une pompe doseuse : les
+        // autres types (filtration, relais) n'exposent tout simplement pas ces
+        // variables, plutot que de les afficher vides.
+        if (s.def.type == POOL_DEVICE_PERISTALTIC) {
+            cfgFlowVar_[i].nvsKey = slot.flowKey;
+            cfgFlowVar_[i].jsonName = "flow_l_h";
+            cfgFlowVar_[i].moduleName = slot.configModuleName;
+            cfgFlowVar_[i].type = ConfigType::Float;
+            cfgFlowVar_[i].value = &s.def.flowLPerHour;
+            cfgFlowVar_[i].persistence = ConfigPersistence::Persistent;
+            cfgFlowVar_[i].size = 0;
+            cfg.registerVar(cfgFlowVar_[i], kCfgModuleId, localBranchId);
 
-        cfgTankCapVar_[i].nvsKey = slot.tankCapKey;
-        cfgTankCapVar_[i].jsonName = "tank_cap_ml";
-        cfgTankCapVar_[i].moduleName = slot.configModuleName;
-        cfgTankCapVar_[i].type = ConfigType::Float;
-        cfgTankCapVar_[i].value = &s.def.tankCapacityMl;
-        cfgTankCapVar_[i].persistence = ConfigPersistence::Persistent;
-        cfgTankCapVar_[i].size = 0;
-        cfg.registerVar(cfgTankCapVar_[i], kCfgModuleId, localBranchId);
+            cfgTankCapVar_[i].nvsKey = slot.tankCapKey;
+            cfgTankCapVar_[i].jsonName = "tank_cap_ml";
+            cfgTankCapVar_[i].moduleName = slot.configModuleName;
+            cfgTankCapVar_[i].type = ConfigType::Float;
+            cfgTankCapVar_[i].value = &s.def.tankCapacityMl;
+            cfgTankCapVar_[i].persistence = ConfigPersistence::Persistent;
+            cfgTankCapVar_[i].size = 0;
+            cfg.registerVar(cfgTankCapVar_[i], kCfgModuleId, localBranchId);
 
-        cfgTankInitVar_[i].nvsKey = slot.tankInitKey;
-        cfgTankInitVar_[i].jsonName = "tank_init_ml";
-        cfgTankInitVar_[i].moduleName = slot.configModuleName;
-        cfgTankInitVar_[i].type = ConfigType::Float;
-        cfgTankInitVar_[i].value = &s.def.tankInitialMl;
-        cfgTankInitVar_[i].persistence = ConfigPersistence::Persistent;
-        cfgTankInitVar_[i].size = 0;
-        cfg.registerVar(cfgTankInitVar_[i], kCfgModuleId, localBranchId);
+            cfgTankInitVar_[i].nvsKey = slot.tankInitKey;
+            cfgTankInitVar_[i].jsonName = "tank_init_ml";
+            cfgTankInitVar_[i].moduleName = slot.configModuleName;
+            cfgTankInitVar_[i].type = ConfigType::Float;
+            cfgTankInitVar_[i].value = &s.def.tankInitialMl;
+            cfgTankInitVar_[i].persistence = ConfigPersistence::Persistent;
+            cfgTankInitVar_[i].size = 0;
+            cfg.registerVar(cfgTankInitVar_[i], kCfgModuleId, localBranchId);
+        }
 
         cfgMaxUptimeVar_[i].nvsKey = slot.maxUptimeKey;
         cfgMaxUptimeVar_[i].jsonName = "max_uptime_day_s";

@@ -14,25 +14,7 @@
         "eq": true
       }
     },
-    "pdm/pd0/flow_l_h": {
-      "visible_if": {
-        "path": "pdm/pd0/enabled",
-        "eq": true
-      }
-    },
     "pdm/pd0/max_uptime_day_s": {
-      "visible_if": {
-        "path": "pdm/pd0/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd0/tank_cap_ml": {
-      "visible_if": {
-        "path": "pdm/pd0/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd0/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd0/enabled",
         "eq": true
@@ -113,25 +95,7 @@
         "eq": true
       }
     },
-    "pdm/pd3/flow_l_h": {
-      "visible_if": {
-        "path": "pdm/pd3/enabled",
-        "eq": true
-      }
-    },
     "pdm/pd3/max_uptime_day_s": {
-      "visible_if": {
-        "path": "pdm/pd3/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd3/tank_cap_ml": {
-      "visible_if": {
-        "path": "pdm/pd3/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd3/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd3/enabled",
         "eq": true
@@ -146,25 +110,7 @@
         "eq": true
       }
     },
-    "pdm/pd4/flow_l_h": {
-      "visible_if": {
-        "path": "pdm/pd4/enabled",
-        "eq": true
-      }
-    },
     "pdm/pd4/max_uptime_day_s": {
-      "visible_if": {
-        "path": "pdm/pd4/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd4/tank_cap_ml": {
-      "visible_if": {
-        "path": "pdm/pd4/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd4/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd4/enabled",
         "eq": true
@@ -179,25 +125,7 @@
         "eq": true
       }
     },
-    "pdm/pd5/flow_l_h": {
-      "visible_if": {
-        "path": "pdm/pd5/enabled",
-        "eq": true
-      }
-    },
     "pdm/pd5/max_uptime_day_s": {
-      "visible_if": {
-        "path": "pdm/pd5/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd5/tank_cap_ml": {
-      "visible_if": {
-        "path": "pdm/pd5/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd5/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd5/enabled",
         "eq": true
@@ -212,25 +140,7 @@
         "eq": true
       }
     },
-    "pdm/pd6/flow_l_h": {
-      "visible_if": {
-        "path": "pdm/pd6/enabled",
-        "eq": true
-      }
-    },
     "pdm/pd6/max_uptime_day_s": {
-      "visible_if": {
-        "path": "pdm/pd6/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd6/tank_cap_ml": {
-      "visible_if": {
-        "path": "pdm/pd6/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd6/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd6/enabled",
         "eq": true
@@ -245,25 +155,7 @@
         "eq": true
       }
     },
-    "pdm/pd7/flow_l_h": {
-      "visible_if": {
-        "path": "pdm/pd7/enabled",
-        "eq": true
-      }
-    },
     "pdm/pd7/max_uptime_day_s": {
-      "visible_if": {
-        "path": "pdm/pd7/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd7/tank_cap_ml": {
-      "visible_if": {
-        "path": "pdm/pd7/enabled",
-        "eq": true
-      }
-    },
-    "pdm/pd7/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd7/enabled",
         "eq": true
