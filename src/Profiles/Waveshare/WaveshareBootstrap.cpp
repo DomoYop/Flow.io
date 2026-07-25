@@ -177,28 +177,32 @@ uint8_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset&
 
 void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
 {
+    // Un PoolDevice n'est instancie que pour un role decrit par le domaine.
+    // MaxPoolDevices n'est qu'un plafond de capacite : creer les slots
+    // restants produisait des appareils generiques sans role, lies a des
+    // sorties inexistantes ou deja pilotees en direct (recopie debit, volet),
+    // et polluait l'arbre de configuration et les selecteurs de slot.
     for (uint8_t i = 0; i < Limits::Io::MaxPoolDevices; ++i) {
+        const PoolDevicePreset* preset = findPoolPresetById(*ctx.domain, i);
+        if (!preset) continue;
+
         PoolDeviceDefinition def{};
-        snprintf(def.label, sizeof(def.label), "PD%02u", (unsigned)i);
         def.slot = i;
         def.ioSlot = digitalOutputSlot(i);
-        def.type = POOL_DEVICE_RELAY_STD;
         def.enabled = true;
 
-        if (const PoolDevicePreset* preset = findPoolPresetById(*ctx.domain, i)) {
-            const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset->commandSlot);
-            requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
-            requireSetup(ioSlot == def.ioSlot, "pool device IO slot must match pdXX/dXX");
+        const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset->commandSlot);
+        requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
+        requireSetup(ioSlot == def.ioSlot, "pool device IO slot must match pdXX/dXX");
 
-            snprintf(def.label, sizeof(def.label), "%s", preset->displayName);
-            def.commandSlot = preset->commandSlot;
-            def.type = preset->poolDeviceType;
-            def.flowLPerHour = preset->flowLPerHour;
-            def.tankCapacityMl = preset->tankCapacityMl;
-            def.tankInitialMl = preset->tankInitialMl;
-            def.dependsOnMask = dependsOnMaskForPreset(*ctx.domain, *preset);
-            def.maxUptimeDaySec = preset->maxUptimeDaySec;
-        }
+        snprintf(def.label, sizeof(def.label), "%s", preset->displayName);
+        def.commandSlot = preset->commandSlot;
+        def.type = preset->poolDeviceType;
+        def.flowLPerHour = preset->flowLPerHour;
+        def.tankCapacityMl = preset->tankCapacityMl;
+        def.tankInitialMl = preset->tankInitialMl;
+        def.dependsOnMask = dependsOnMaskForPreset(*ctx.domain, *preset);
+        def.maxUptimeDaySec = preset->maxUptimeDaySec;
 
         requireSetup(modules.poolDeviceModule.defineDevice(def), "define pool device");
     }

@@ -9804,8 +9804,21 @@
         });
       }
       const out = [];
+      // Entrees hors plage 0..15 (ex. 255 = "aucun PDM") : conservees telles
+      // quelles, en tete. Sans cela la reconstruction ci-dessous les perdrait.
+      if (Array.isArray(enumOptions)) {
+        enumOptions.forEach((opt) => {
+          if (!opt || typeof opt !== 'object') return;
+          const value = Number.parseInt(opt.value, 10);
+          if (!Number.isFinite(value) || (value >= 0 && value <= 15)) return;
+          out.push(Object.assign({}, opt));
+        });
+      }
+      // Seuls les slots reellement declares sont proposes : un slot sans
+      // appareil n'a pas de nom d'endpoint et ne sert a rien.
       for (let slot = 0; slot <= 15; slot += 1) {
-        const base = byValue[slot] ? Object.assign({}, byValue[slot]) : { value: slot };
+        if (!byValue[slot]) continue;
+        const base = Object.assign({}, byValue[slot]);
         base.value = slot;
         base.label = poolLogicDeviceSlotLabel(source, slot, base.label);
         out.push(base);

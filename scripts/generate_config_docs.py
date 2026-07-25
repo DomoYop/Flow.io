@@ -397,15 +397,19 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
                 current_by_value[value] = entry
         relabeled: List[dict] = []
         # Entrees hors plage (ex. 255 = "aucun PDM") : conservees telles quelles,
-        # en tete, sinon la reconstruction 0..15 les ferait disparaitre.
+        # en tete, sinon la reconstruction les ferait disparaitre.
         for entry in current:
             value = _to_int(entry.get("value"))
             if value is None or value in range(16):
                 continue
             relabeled.append(entry)
-        for value in range(16):
-            entry = current_by_value.get(value, {"value": value})
-            relabeled.append(sanitize_enum_entry(entry, slot_labels_waveshare[value]))
+        # Seuls les slots declares dans l'enum source sont exposes : le domaine
+        # decide combien d'appareils existent, MaxPoolDevices n'est qu'un
+        # plafond de capacite.
+        for value in sorted(v for v in current_by_value if v in range(16)):
+            relabeled.append(
+                sanitize_enum_entry(current_by_value[value], slot_labels_waveshare[value])
+            )
         enum_sets[slot_key] = relabeled
 
     return meta
