@@ -37,11 +37,15 @@ static constexpr uint8_t kCfgBranchDisinfection = 7;
 static constexpr uint8_t kCfgBranchHeater = 11;
 static constexpr uint8_t kCfgBranchRobot = 12;
 static constexpr uint8_t kCfgBranchRefill = 13;
+// Branche 14 = sous-branche Fenetres de Filtration : regroupe les 3 fenetres
+// (actif/debut/fin/priorite) pour desengorger le menu Filtration.
+static constexpr uint8_t kCfgBranchFiltrationWindows = 14;
 static constexpr uint32_t kStartupActivityStabilizeMs = 3000U;
 static constexpr uint32_t kStartupActivityMaxDelayMs = 30000U;
 static constexpr uint64_t kActivityMinEpoch = 1609459200ULL;
 static constexpr const char* kCfgModuleBassin = "poollogic/bassin";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
+static constexpr const char* kCfgModuleFiltrationWindows = "poollogic/filtration/fenetres";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
 static constexpr const char* kCfgModuleSafety = "poollogic/safety";
 // Slot PoolDevice de la pompe de filtration : accueille ses caracteristiques
@@ -64,6 +68,7 @@ enum : uint16_t {
     kCfgMsgHeater = 12,
     kCfgMsgRobot = 13,
     kCfgMsgRefill = 14,
+    kCfgMsgFiltrationWindows = 15,
 };
 
 static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
@@ -85,6 +90,13 @@ static constexpr MqttConfigRouteProducer::Route kPoolLogicCfgRoutes[] = {
      {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchFiltration},
      kCfgModuleFiltration,
      "filtration",
+     (uint8_t)MqttPublishPriority::Normal,
+     nullptr,
+     kPoolLogicCfgTopicBase},
+    {kCfgMsgFiltrationWindows,
+     {(uint8_t)ConfigModuleId::PoolLogic, kCfgBranchFiltrationWindows},
+     kCfgModuleFiltrationWindows,
+     "filtration/fenetres",
      (uint8_t)MqttPublishPriority::Normal,
      nullptr,
      kPoolLogicCfgTopicBase},
@@ -233,18 +245,23 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     // circuit : elles s affichent et se publient cote pdm/pd0, tout en
     // restant lues directement par PoolLogic (turnover, alarmes pression).
     pumpFlowVar_.moduleName = kCfgModulePd0;
-    filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
-    filtrWin1StartVar_.moduleName = kCfgModuleFiltration;
-    filtrWin1StopVar_.moduleName = kCfgModuleFiltration;
-    filtrWin1PrioVar_.moduleName = kCfgModuleFiltration;
-    filtrWin2EnVar_.moduleName = kCfgModuleFiltration;
-    filtrWin2StartVar_.moduleName = kCfgModuleFiltration;
-    filtrWin2StopVar_.moduleName = kCfgModuleFiltration;
-    filtrWin2PrioVar_.moduleName = kCfgModuleFiltration;
-    filtrWin3EnVar_.moduleName = kCfgModuleFiltration;
-    filtrWin3StartVar_.moduleName = kCfgModuleFiltration;
-    filtrWin3StopVar_.moduleName = kCfgModuleFiltration;
-    filtrWin3PrioVar_.moduleName = kCfgModuleFiltration;
+    // Le ratio de cycles est un reglage de dimensionnement : il reste dans le
+    // menu Filtration, aux cotes des sorties du plan.
+    filtrCycleRatioVar_.moduleName = kCfgModuleFiltration;
+    // Les fenetres sont regroupees dans une sous-branche dediee : le menu
+    // Filtration ne garde que le dimensionnement et les sorties du plan.
+    filtrWin1EnVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin1StartVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin1StopVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin1PrioVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin2EnVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin2StartVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin2StopVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin2PrioVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin3EnVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin3StartVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin3StopVar_.moduleName = kCfgModuleFiltrationWindows;
+    filtrWin3PrioVar_.moduleName = kCfgModuleFiltrationWindows;
     calcStartVar_.moduleName = kCfgModuleFiltration;
     calcStopVar_.moduleName = kCfgModuleFiltration;
     filtrSegmentsVar_.moduleName = kCfgModuleFiltration;
@@ -325,18 +342,19 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchDisinfection);
 
     cfg.registerVar(pumpFlowVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin1EnVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin1StartVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin1StopVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin1PrioVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin2EnVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin2StartVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin2StopVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin2PrioVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin3EnVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin3StartVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin3StopVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(filtrWin3PrioVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrCycleRatioVar_, kCfgModuleId, kCfgBranchFiltration);
+    cfg.registerVar(filtrWin1EnVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin1StartVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin1StopVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin1PrioVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin2EnVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin2StartVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin2StopVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin2PrioVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin3EnVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin3StartVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin3StopVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
+    cfg.registerVar(filtrWin3PrioVar_, kCfgModuleId, kCfgBranchFiltrationWindows);
     cfg.registerVar(calcStartVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(calcStopVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(filtrSegmentsVar_, kCfgModuleId, kCfgBranchFiltration);
@@ -723,6 +741,22 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:pump",
             "m3/h"
         };
+        const HANumberEntry filtrCycleRatio{
+            "poollogic",
+            "pl_filtr_ratio",
+            "Filtration Cycle Ratio",
+            "cfg/poollogic/filtration",
+            "{{ value_json.filtr_cycle_ratio | int(100) }}",
+            MqttTopics::SuffixCfgSet,
+            "{\\\"poollogic/filtration\\\":{\\\"filtr_cycle_ratio\\\":{{ value | int(100) }}}}",
+            50.0f,
+            200.0f,
+            5.0f,
+            "slider",
+            "config",
+            "mdi:sync",
+            "%"
+        };
         const HANumberEntry delayPidsMin{
             "poollogic",
             "pl_reg_dly_pid",
@@ -983,6 +1017,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         (void)haSvc->addNumber(haSvc->ctx, &heaterSetpoint);
         (void)haSvc->addNumber(haSvc->ctx, &pumpFlow);
+        (void)haSvc->addNumber(haSvc->ctx, &filtrCycleRatio);
         (void)haSvc->addNumber(haSvc->ctx, &delayPidsMin);
         (void)haSvc->addNumber(haSvc->ctx, &delayElectroMin);
         (void)haSvc->addNumber(haSvc->ctx, &fillMinUptime);
@@ -1457,8 +1492,11 @@ void PoolLogicModule::onEvent_(const Event& e)
     if (e.id == EventId::ConfigChanged) {
         if (!e.payload || e.len < sizeof(ConfigChangedPayload)) return;
         const ConfigChangedPayload* p = (const ConfigChangedPayload*)e.payload;
+        // Les fenetres vivent dans leur propre sous-branche : sans elle ici, une
+        // modification de plage n'aurait replanifie qu'au recalcul quotidien.
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
-            p->localBranchId == kCfgBranchFiltration) {
+            (p->localBranchId == kCfgBranchFiltration ||
+             p->localBranchId == kCfgBranchFiltrationWindows)) {
             // Les cles calculees sont des sorties pures du plan : les re-appliquer
             // ici ecraserait les segments multi-fenetres (et bouclerait avec le
             // recalcul qui les ecrit).

@@ -36,6 +36,7 @@ static void poolLogicCfgDocsAnchor_(PoolLogicModule& self)
     self.disinfectionTypeVar_.moduleName = kCfgModuleBassin;
     self.poolVolumeVar_.moduleName = kCfgModuleBassin;
     self.pumpFlowVar_.moduleName = kCfgModuleFiltration;
+    self.filtrCycleRatioVar_.moduleName = kCfgModuleFiltration;
     self.filtrWin1EnVar_.moduleName = kCfgModuleFiltration;
     self.filtrWin1StartVar_.moduleName = kCfgModuleFiltration;
     self.filtrWin1StopVar_.moduleName = kCfgModuleFiltration;

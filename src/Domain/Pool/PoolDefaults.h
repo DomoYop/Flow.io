@@ -18,6 +18,13 @@ constexpr float PumpFlowM3h = 10.0f;
 constexpr uint16_t FiltrationMinTotalMinutes = (uint16_t)MinDurationHours * 60u;
 constexpr uint16_t FiltrationMinSegmentMinutes = 30;
 
+// Ratio utilisateur applique aux cycles de renouvellement (%, 100 = courbe de
+// reference). Permet d'allonger (ou de reduire) le temps de filtration
+// preconise sans deformer la courbe temperature.
+constexpr uint8_t FiltrationCycleRatioPct = 100;
+constexpr uint8_t FiltrationCycleRatioMinPct = 50;
+constexpr uint8_t FiltrationCycleRatioMaxPct = 200;
+
 // Courbe cycles de renouvellement par jour en fonction de la temperature de
 // l'eau (interpolation lineaire entre points, plateau aux extremes).
 struct FiltrationCyclesPoint {

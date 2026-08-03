@@ -2218,6 +2218,8 @@
     };
     let poolConfigLoadedOnce = false;
     let poolConfigReqSeq = 0;
+    // Sous-branche Config Store regroupant les 3 fenetres de filtration.
+    const poolFiltrationWindowsBranch = 'poollogic/filtration/fenetres';
     const poolConfigModuleDefs = Object.freeze([
       Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
       Object.freeze({ module: 'poollogic/filtration', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
@@ -7357,7 +7359,7 @@
     async function poolConfigEnsureDocs() {
       const modules = poolConfigModuleDefs.map((def) => def.module)
         .concat(poolDisinfectionModeDefs.map((def) => def.module))
-        .concat(['pdm/pd0']);
+        .concat(['pdm/pd0', poolFiltrationWindowsBranch]);
       await ensureCfgDocsForModule('');
       for (const moduleName of modules) {
         await ensureCfgDocsForModule(moduleName).catch(() => {});
@@ -7731,6 +7733,7 @@
         row.appendChild(enWrap);
         fields.push({
           key: enKey,
+          branch: poolFiltrationWindowsBranch,
           label: windowLabel,
           initial: toBool(data[enKey]),
           read: () => enInput.checked
@@ -7749,6 +7752,7 @@
           const initial = Number(data[key]);
           fields.push({
             key,
+            branch: poolFiltrationWindowsBranch,
             label: windowLabel + ' — ' + (role === 'start' ? tr('pool.filtration.col.start', 'Début') : tr('pool.filtration.col.stop', 'Fin')),
             initial: Number.isFinite(initial) ? Math.trunc(initial) : null,
             read: () => poolFiltrationTimeToMinutes(input.value)
@@ -7769,6 +7773,7 @@
         row.appendChild(prioSelect);
         fields.push({
           key: prioKey,
+          branch: poolFiltrationWindowsBranch,
           label: windowLabel + ' — ' + tr('pool.filtration.col.priority', 'Priorité'),
           initial: Number.isFinite(prioValue) ? Math.trunc(prioValue) : null,
           read: () => Number(prioSelect.value)
@@ -8020,12 +8025,19 @@
         // pdm/pd0 : le debit de la pompe de filtration y vit desormais.
         const allDefs = poolConfigModuleDefs
           .concat(poolDisinfectionModeDefs)
-          .concat([{ module: 'pdm/pd0' }]);
+          .concat([{ module: 'pdm/pd0' }, { module: poolFiltrationWindowsBranch }]);
         for (const def of allDefs) {
           const payload = await poolConfigFetchModule(def.module);
           if (reqSeq !== poolConfigReqSeq) return;
           modules[payload.module] = payload.data;
         }
+        // Les fenetres vivent dans une sous-branche dediee cote Config Store ;
+        // la page Piscine les presente avec le reste de la filtration.
+        modules['poollogic/filtration'] = Object.assign(
+          {},
+          modules['poollogic/filtration'] || {},
+          modules[poolFiltrationWindowsBranch] || {}
+        );
         const alarmSlots = await fetchPoolAlarmSlots().catch(() => []);
         if (reqSeq !== poolConfigReqSeq) return;
         poolConfigRender(modules, alarmSlots);

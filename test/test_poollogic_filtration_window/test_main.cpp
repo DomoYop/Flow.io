@@ -93,6 +93,62 @@ void test_no_valid_window_emergency_plan()
     TEST_ASSERT_EQUAL_UINT16(960, out.segments[0].stopMinute);
 }
 
+void test_cycle_ratio_neutral_at_100()
+{
+    // Le defaut de la struct doit reproduire exactement le plan de reference.
+    FiltrationPlanInput in = makeInput_(22.0f, 48.0f, 8.0f);
+    in.cycleRatioPct = 100;
+    FiltrationPlanOutput out{};
+    TEST_ASSERT_TRUE(computeFiltrationPlan(in, out));
+    TEST_ASSERT_EQUAL_UINT16(360, out.requiredMinutes);
+    TEST_ASSERT_EQUAL_UINT16(360, out.requiredRawMinutes);
+    TEST_ASSERT_EQUAL_UINT16(840, out.segments[0].stopMinute);
+}
+
+void test_cycle_ratio_scales_need()
+{
+    // 48 m3 * 1.0 cycle * 1.5 / 8 m3/h = 9 h = 540 min (fenetre de 900 min).
+    FiltrationPlanInput in = makeInput_(22.0f, 48.0f, 8.0f);
+    in.cycleRatioPct = 150;
+    FiltrationPlanOutput out{};
+    TEST_ASSERT_TRUE(computeFiltrationPlan(in, out));
+    TEST_ASSERT_EQUAL_UINT8(1, out.segmentCount);
+    TEST_ASSERT_EQUAL_UINT16(540, out.requiredMinutes);
+    TEST_ASSERT_EQUAL_UINT16(540, out.plannedMinutes);
+    TEST_ASSERT_EQUAL_UINT16(480, out.segments[0].startMinute);   // 08:00
+    TEST_ASSERT_EQUAL_UINT16(1020, out.segments[0].stopMinute);   // 17:00
+}
+
+void test_cycle_ratio_clamped_to_bounds()
+{
+    // 0 % -> 50 % : 48 * 1.0 * 0.5 / 8 = 3 h = 180 min.
+    FiltrationPlanInput low = makeInput_(22.0f, 48.0f, 8.0f);
+    low.cycleRatioPct = 0;
+    FiltrationPlanOutput outLow{};
+    TEST_ASSERT_TRUE(computeFiltrationPlan(low, outLow));
+    TEST_ASSERT_EQUAL_UINT16(180, outLow.requiredMinutes);
+
+    // 255 % -> 200 % : 48 * 1.0 * 2.0 / 8 = 12 h = 720 min.
+    FiltrationPlanInput high = makeInput_(22.0f, 48.0f, 8.0f);
+    high.cycleRatioPct = 255;
+    FiltrationPlanOutput outHigh{};
+    TEST_ASSERT_TRUE(computeFiltrationPlan(high, outHigh));
+    TEST_ASSERT_EQUAL_UINT16(720, outHigh.requiredMinutes);
+}
+
+void test_cycle_ratio_still_capped_by_window_capacity()
+{
+    // 48 m3 * 2.0 cycles (28 C) * 2.0 / 8 m3/h = 24 h : ecrete a la capacite
+    // de la seule fenetre active (900 min), mais l'optimal reste visible.
+    FiltrationPlanInput in = makeInput_(28.0f, 48.0f, 8.0f);
+    in.cycleRatioPct = 200;
+    FiltrationPlanOutput out{};
+    TEST_ASSERT_TRUE(computeFiltrationPlan(in, out));
+    TEST_ASSERT_EQUAL_UINT16(1440, out.requiredRawMinutes);
+    TEST_ASSERT_EQUAL_UINT16(900, out.requiredMinutes);
+    TEST_ASSERT_EQUAL_UINT16(900, out.plannedMinutes);
+}
+
 void test_plan_active_wraps_midnight()
 {
     FiltrationPlanOutput plan{};
@@ -129,6 +185,10 @@ int main(int, char**)
     RUN_TEST(test_nan_temperature_uses_full_windows);
     RUN_TEST(test_minimum_total_duration_clamp);
     RUN_TEST(test_no_valid_window_emergency_plan);
+    RUN_TEST(test_cycle_ratio_neutral_at_100);
+    RUN_TEST(test_cycle_ratio_scales_need);
+    RUN_TEST(test_cycle_ratio_clamped_to_bounds);
+    RUN_TEST(test_cycle_ratio_still_capped_by_window_capacity);
     RUN_TEST(test_plan_active_wraps_midnight);
     RUN_TEST(test_small_remainder_rounds_up_to_min_segment);
     return UNITY_END();

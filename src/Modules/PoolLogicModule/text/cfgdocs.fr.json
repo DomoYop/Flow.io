@@ -166,6 +166,82 @@
       "help_t": "cfgdocs.poollogic.disinfection.weekly_done_ml.help",
       "unit": "ml"
     },
+    "poollogic/filtration/fenetres": {
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w1_en": {
+      "type": "Bool",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_en.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_en.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w1_prio": {
+      "type": "UInt8",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_prio.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_prio.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w1_start": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_start.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_start.help",
+      "unit": "min"
+    },
+    "poollogic/filtration/fenetres/filtr_w1_stop": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_stop.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w1_stop.help",
+      "unit": "min"
+    },
+    "poollogic/filtration/fenetres/filtr_w2_en": {
+      "type": "Bool",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_en.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_en.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w2_prio": {
+      "type": "UInt8",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_prio.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_prio.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w2_start": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_start.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_start.help",
+      "unit": "min"
+    },
+    "poollogic/filtration/fenetres/filtr_w2_stop": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_stop.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w2_stop.help",
+      "unit": "min"
+    },
+    "poollogic/filtration/fenetres/filtr_w3_en": {
+      "type": "Bool",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_en.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_en.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w3_prio": {
+      "type": "UInt8",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_prio.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_prio.help"
+    },
+    "poollogic/filtration/fenetres/filtr_w3_start": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_start.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_start.help",
+      "unit": "min"
+    },
+    "poollogic/filtration/fenetres/filtr_w3_stop": {
+      "type": "UInt16",
+      "label_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_stop.label",
+      "help_t": "cfgdocs.poollogic.filtration.fenetres.filtr_w3_stop.help",
+      "unit": "min"
+    },
+    "poollogic/filtration/filtr_cycle_ratio": {
+      "type": "UInt8",
+      "unit": "%",
+      "label_t": "cfgdocs.poollogic.filtration.filtr_cycle_ratio.label",
+      "help_t": "cfgdocs.poollogic.filtration.filtr_cycle_ratio.help"
+    },
     "poollogic/filtration/filtr_optimal_min": {
       "type": "UInt16",
       "unit": "min",
@@ -192,72 +268,6 @@
       "type": "UInt8",
       "label_t": "cfgdocs.poollogic.filtration.filtr_stop_clc.label",
       "help_t": "cfgdocs.poollogic.filtration.filtr_stop_clc.help"
-    },
-    "poollogic/filtration/filtr_w1_en": {
-      "type": "Bool",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w1_en.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w1_en.help"
-    },
-    "poollogic/filtration/filtr_w1_prio": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w1_prio.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w1_prio.help"
-    },
-    "poollogic/filtration/filtr_w1_start": {
-      "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w1_start.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w1_start.help",
-      "unit": "min"
-    },
-    "poollogic/filtration/filtr_w1_stop": {
-      "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w1_stop.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w1_stop.help",
-      "unit": "min"
-    },
-    "poollogic/filtration/filtr_w2_en": {
-      "type": "Bool",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w2_en.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w2_en.help"
-    },
-    "poollogic/filtration/filtr_w2_prio": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w2_prio.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w2_prio.help"
-    },
-    "poollogic/filtration/filtr_w2_start": {
-      "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w2_start.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w2_start.help",
-      "unit": "min"
-    },
-    "poollogic/filtration/filtr_w2_stop": {
-      "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w2_stop.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w2_stop.help",
-      "unit": "min"
-    },
-    "poollogic/filtration/filtr_w3_en": {
-      "type": "Bool",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w3_en.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w3_en.help"
-    },
-    "poollogic/filtration/filtr_w3_prio": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w3_prio.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w3_prio.help"
-    },
-    "poollogic/filtration/filtr_w3_start": {
-      "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w3_start.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w3_start.help",
-      "unit": "min"
-    },
-    "poollogic/filtration/filtr_w3_stop": {
-      "type": "UInt16",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_w3_stop.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_w3_stop.help",
-      "unit": "min"
     },
     "poollogic/heater/heater_auto_mode": {
       "type": "Bool",

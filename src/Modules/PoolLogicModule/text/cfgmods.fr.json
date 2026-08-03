@@ -151,6 +151,42 @@
     "poollogic/disinfection/weekly_done_ml": {
       "hidden": true
     },
+    "poollogic/filtration/fenetres/filtr_w2_prio": {
+      "visible_if": {
+        "path": "poollogic/filtration/fenetres/filtr_w2_en",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/fenetres/filtr_w2_start": {
+      "visible_if": {
+        "path": "poollogic/filtration/fenetres/filtr_w2_en",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/fenetres/filtr_w2_stop": {
+      "visible_if": {
+        "path": "poollogic/filtration/fenetres/filtr_w2_en",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/fenetres/filtr_w3_prio": {
+      "visible_if": {
+        "path": "poollogic/filtration/fenetres/filtr_w3_en",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/fenetres/filtr_w3_start": {
+      "visible_if": {
+        "path": "poollogic/filtration/fenetres/filtr_w3_en",
+        "eq": true
+      }
+    },
+    "poollogic/filtration/fenetres/filtr_w3_stop": {
+      "visible_if": {
+        "path": "poollogic/filtration/fenetres/filtr_w3_en",
+        "eq": true
+      }
+    },
     "poollogic/filtration/filtr_optimal_min": {
       "hidden": true
     },
@@ -162,42 +198,6 @@
     },
     "poollogic/filtration/filtr_stop_clc": {
       "enum_set": "hours_of_day"
-    },
-    "poollogic/filtration/filtr_w2_prio": {
-      "visible_if": {
-        "path": "poollogic/filtration/filtr_w2_en",
-        "eq": true
-      }
-    },
-    "poollogic/filtration/filtr_w2_start": {
-      "visible_if": {
-        "path": "poollogic/filtration/filtr_w2_en",
-        "eq": true
-      }
-    },
-    "poollogic/filtration/filtr_w2_stop": {
-      "visible_if": {
-        "path": "poollogic/filtration/filtr_w2_en",
-        "eq": true
-      }
-    },
-    "poollogic/filtration/filtr_w3_prio": {
-      "visible_if": {
-        "path": "poollogic/filtration/filtr_w3_en",
-        "eq": true
-      }
-    },
-    "poollogic/filtration/filtr_w3_start": {
-      "visible_if": {
-        "path": "poollogic/filtration/filtr_w3_en",
-        "eq": true
-      }
-    },
-    "poollogic/filtration/filtr_w3_stop": {
-      "visible_if": {
-        "path": "poollogic/filtration/filtr_w3_en",
-        "eq": true
-      }
     },
     "poollogic/sensors/dis_io_id": {
       "visible_if": {

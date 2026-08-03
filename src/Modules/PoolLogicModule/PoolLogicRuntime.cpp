@@ -21,6 +21,7 @@ namespace {
 static constexpr const char* kPoolLogicCfgTopicBase = "cfg/poollogic";
 static constexpr const char* kCfgModuleBassin = "poollogic/bassin";
 static constexpr const char* kCfgModuleFiltration = "poollogic/filtration";
+static constexpr const char* kCfgModuleFiltrationWindows = "poollogic/filtration/fenetres";
 static constexpr const char* kCfgModuleSensors = "poollogic/sensors";
 static constexpr const char* kCfgModuleSafety = "poollogic/safety";
 static constexpr const char* kCfgModulePh = "poollogic/ph";
@@ -64,6 +65,9 @@ MqttBuildResult PoolLogicModule::buildCfgBase_(MqttBuildContext& buildCtx)
     static constexpr Entry kEntries[] = {
         {"bassin", kCfgModuleBassin},
         {"filtration", kCfgModuleFiltration},
+        // Sous-branche des fenetres : cle a plat pour rester accessible en
+        // notation pointee cote consommateurs (value_json.fenetres.*).
+        {"fenetres", kCfgModuleFiltrationWindows},
         {"sensors", kCfgModuleSensors},
         {"safety", kCfgModuleSafety},
         {"ph", kCfgModulePh},

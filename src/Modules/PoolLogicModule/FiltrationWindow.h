@@ -3,9 +3,10 @@
  * @file FiltrationWindow.h
  * @brief Deterministic turnover-based filtration plan computation helper.
  *
- * Besoin journalier = volume bassin (m3) * cycles(T) / debit pompe (m3/h),
+ * Besoin journalier = volume bassin (m3) * cycles(T) * ratio / debit pompe (m3/h),
  * distribue dans des fenetres horaires priorisees (une fenetre peut traverser
- * minuit, ex. heures creuses 23:30-07:30).
+ * minuit, ex. heures creuses 23:30-07:30). Le ratio est un reglage utilisateur
+ * en pourcentage (100 = courbe de reference).
  */
 
 #include <stdint.h>
@@ -24,6 +25,9 @@ struct FiltrationPlanInput {
     float waterTemp = 0.0f;     // NaN/inf => plan de repli (fenetres actives en entier)
     float poolVolumeM3 = 0.0f;  // <= 0 => plan de repli
     float pumpFlowM3h = 0.0f;   // <= 0 => plan de repli
+    // Ratio applique aux cycles de renouvellement (%) ; 100 = courbe de
+    // reference. Clampe a [FiltrationCycleRatioMinPct, ...MaxPct] au calcul.
+    uint8_t cycleRatioPct = 100;
     FiltrationPlanWindow windows[FILTRATION_PLAN_MAX_WINDOWS];
 };
 

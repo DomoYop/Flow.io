@@ -7,14 +7,15 @@
 Le besoin journalier de filtration est un besoin **physique** de renouvellement de l'eau :
 
 ```
-besoin (min) = volume bassin (m³) × cycles(T) / débit pompe (m³/h) × 60
+besoin (min) = volume bassin (m³) × cycles(T) × ratio / débit pompe (m³/h) × 60
 ```
 
 - `volume bassin` : clé existante `poollogic/o2/pool_volume_m3` (**source unique**, partagée avec le dosage O2 ; un changement de volume déclenche un recalcul du plan).
 - `débit pompe` : nouvelle clé `poollogic/filtration/pump_flow_m3h` (NVS `pl_pflw`, défaut 10 m³/h), exposée en number HA `pl_pump_flow`.
 - `cycles(T)` : courbe non linéaire interpolée (plateau aux extrêmes), points dans `PoolDefaults::kFiltrationCyclesCurve` :
   ≤10°C→0,25 ; 14°C→0,4 ; 18°C→0,6 ; 22°C→1,0 ; 25°C→1,4 ; 28°C→2,0 ; ≥31°C→3,0.
-- Bornes : minimum 2 h/jour (`FiltrationMinTotalMinutes`), maximum = capacité totale des fenêtres actives.
+- `ratio` : clé `poollogic/filtration/filtr_cycle_ratio` (NVS `pl_fcyr`, défaut 100 %, plage **50–200 %**, clampée dans `computeFiltrationPlan`), exposée en number HA `pl_filtr_ratio` et en slider HMI. Réglage utilisateur du **nombre de renouvellements visés**, sans déformer la courbe température : 150 % à 22 °C = 1,5 renouvellement/jour au lieu de 1,0. C'est le levier prévu quand la courbe de référence est jugée trop conservatrice — plutôt que de mentir sur le volume (partagé avec le dosage O2) ou sur le débit.
+- Bornes : minimum 2 h/jour (`FiltrationMinTotalMinutes`), maximum = capacité totale des fenêtres actives. Le ratio s'applique **avant** ces deux bornes : monter le ratio au-delà de la capacité des fenêtres n'allonge plus rien (l'écart reste lisible via `filtr_optimal_min`).
 
 ## Distribution : 3 fenêtres configurables priorisées
 
@@ -51,7 +52,7 @@ Points d'attention :
 - **Fonction pure** : `computeFiltrationPlan()` / `isFiltrationPlanActiveAtMinute()` dans `src/Modules/PoolLogicModule/FiltrationWindow.{h,cpp}` (l'ancienne `computeFiltrationWindowDeterministic` est supprimée). Tests host : `test/test_poollogic_filtration_window/`.
 - **Slots TimeScheduler** : 4–6 (`SLOT_FILTR_WINDOW_BASE` + segment), un par segment, même `eventId`. TimeModule gère nativement les fenêtres traversant minuit. Slot 3 = recalcul quotidien à 15 h (inchangé).
 - **État actif** : recalculé par OU sur le plan (`filtrationPlan_`, gardé par `pendingMux_`) à chaque front scheduler et dans la boucle de contrôle — jamais déduit du dernier front seul (segments adjacents).
-- **Recalcul déclenché par** : recalcul quotidien 15 h, boot (`onStart`), toute clé de la branche `poollogic/filtration` (hors clés calculées), et `pool_volume_m3` (branche O2).
+- **Recalcul déclenché par** : recalcul quotidien 15 h, boot (`onStart`), toute clé des branches `poollogic/filtration` **et `poollogic/filtration/fenetres`** (hors clés calculées), et `pool_volume_m3` (branche O2). La sous-branche « fenetres » manquait à ce filtre depuis son extraction : une modification de plage n'était replanifiée qu'au recalcul quotidien.
 - **Compat affichage** : `filtr_start_clc`/`filtr_stop_clc` publient désormais l'enveloppe (heures) du **segment prioritaire** ; l'activité `PoolLogicFiltrationWindowCalculated` détaille tous les segments. Leur modification externe est devenue sans effet (sorties pures).
 - **Hors périmètre du plan** (inchangés) : hors-gel, hivernage, marches forcées chauffage/électrolyse, interlock débit.
 

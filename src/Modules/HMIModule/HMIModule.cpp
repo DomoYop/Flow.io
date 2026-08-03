@@ -437,6 +437,7 @@ static bool extractJsonStringField_(const char* json, const char* key, char* out
 #if FLOW_HMI_CONFIG_MENU_ENABLED
 static const ConfigMenuHint kHints[] = {
     {"poollogic/filtration", "pump_flow_m3h", {ConfigMenuWidget::Slider, true, 1.0f, 40.0f, 0.5f, nullptr}},
+    {"poollogic/filtration", "filtr_cycle_ratio", {ConfigMenuWidget::Slider, true, 50.0f, 200.0f, 5.0f, nullptr}},
     {"poollogic/ph", "ph_setpoint", {ConfigMenuWidget::Slider, true, 6.6f, 7.8f, 0.1f, nullptr}},
     {"poollogic/disinfection", "dis_setpoint", {ConfigMenuWidget::Slider, true, 450.0f, 950.0f, 10.0f, nullptr}},
     {"time", "tz", {ConfigMenuWidget::Select, true, 0.0f, 0.0f, 1.0f,

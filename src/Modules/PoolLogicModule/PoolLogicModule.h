@@ -181,6 +181,8 @@ private:
 
     // Schedule / filtration plan (turnover volumique + fenetres priorisees)
     float pumpFlowM3h_ = PoolDefaults::PumpFlowM3h;
+    // Ratio utilisateur sur les cycles de renouvellement (%, 100 = courbe).
+    uint8_t filtrCycleRatioPct_ = PoolDefaults::FiltrationCycleRatioPct;
     bool filtrWinEnabled_[FILTRATION_PLAN_MAX_WINDOWS] = {true, false, false};
     uint16_t filtrWinStart_[FILTRATION_PLAN_MAX_WINDOWS] = {
         PoolDefaults::FiltrWin1StartMinute, PoolDefaults::FiltrWin2StartMinute, 0};
@@ -341,29 +343,33 @@ private:
 
     ConfigVariable<float,0> pumpFlowVar_{NVS_KEY(NvsKeys::PoolLogic::PumpFlowM3h), "pump_flow_m3h", "poollogic/filtration", ConfigType::Float,
                                          &pumpFlowM3h_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<bool,0> filtrWin1EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Enabled), "filtr_w1_en", "poollogic/filtration", ConfigType::Bool,
+    ConfigVariable<uint8_t,0> filtrCycleRatioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrCycleRatio), "filtr_cycle_ratio", "poollogic/filtration", ConfigType::UInt8,
+                                                  &filtrCycleRatioPct_, ConfigPersistence::Persistent, 0};
+    // Les 3 fenetres vivent dans la sous-branche "fenetres" pour alleger le
+    // menu Filtration ; les cles NVS restent inchangees (pas de migration).
+    ConfigVariable<bool,0> filtrWin1EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Enabled), "filtr_w1_en", "poollogic/filtration/fenetres", ConfigType::Bool,
                                            &filtrWinEnabled_[0], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> filtrWin1StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Start), "filtr_w1_start", "poollogic/filtration", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> filtrWin1StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Start), "filtr_w1_start", "poollogic/filtration/fenetres", ConfigType::UInt16,
                                                   &filtrWinStart_[0], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> filtrWin1StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Stop), "filtr_w1_stop", "poollogic/filtration", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> filtrWin1StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Stop), "filtr_w1_stop", "poollogic/filtration/fenetres", ConfigType::UInt16,
                                                  &filtrWinStop_[0], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> filtrWin1PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Priority), "filtr_w1_prio", "poollogic/filtration", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> filtrWin1PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin1Priority), "filtr_w1_prio", "poollogic/filtration/fenetres", ConfigType::UInt8,
                                                 &filtrWinPriority_[0], ConfigPersistence::Persistent, 0};
-    ConfigVariable<bool,0> filtrWin2EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Enabled), "filtr_w2_en", "poollogic/filtration", ConfigType::Bool,
+    ConfigVariable<bool,0> filtrWin2EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Enabled), "filtr_w2_en", "poollogic/filtration/fenetres", ConfigType::Bool,
                                            &filtrWinEnabled_[1], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> filtrWin2StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Start), "filtr_w2_start", "poollogic/filtration", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> filtrWin2StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Start), "filtr_w2_start", "poollogic/filtration/fenetres", ConfigType::UInt16,
                                                   &filtrWinStart_[1], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> filtrWin2StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Stop), "filtr_w2_stop", "poollogic/filtration", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> filtrWin2StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Stop), "filtr_w2_stop", "poollogic/filtration/fenetres", ConfigType::UInt16,
                                                  &filtrWinStop_[1], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> filtrWin2PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Priority), "filtr_w2_prio", "poollogic/filtration", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> filtrWin2PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin2Priority), "filtr_w2_prio", "poollogic/filtration/fenetres", ConfigType::UInt8,
                                                 &filtrWinPriority_[1], ConfigPersistence::Persistent, 0};
-    ConfigVariable<bool,0> filtrWin3EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Enabled), "filtr_w3_en", "poollogic/filtration", ConfigType::Bool,
+    ConfigVariable<bool,0> filtrWin3EnVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Enabled), "filtr_w3_en", "poollogic/filtration/fenetres", ConfigType::Bool,
                                            &filtrWinEnabled_[2], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> filtrWin3StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Start), "filtr_w3_start", "poollogic/filtration", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> filtrWin3StartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Start), "filtr_w3_start", "poollogic/filtration/fenetres", ConfigType::UInt16,
                                                   &filtrWinStart_[2], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint16_t,0> filtrWin3StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Stop), "filtr_w3_stop", "poollogic/filtration", ConfigType::UInt16,
+    ConfigVariable<uint16_t,0> filtrWin3StopVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Stop), "filtr_w3_stop", "poollogic/filtration/fenetres", ConfigType::UInt16,
                                                  &filtrWinStop_[2], ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> filtrWin3PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Priority), "filtr_w3_prio", "poollogic/filtration", ConfigType::UInt8,
+    ConfigVariable<uint8_t,0> filtrWin3PrioVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrWin3Priority), "filtr_w3_prio", "poollogic/filtration/fenetres", ConfigType::UInt8,
                                                 &filtrWinPriority_[2], ConfigPersistence::Persistent, 0};
     ConfigVariable<uint8_t,0> calcStartVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationCalcStart), "filtr_start_clc", "poollogic/filtration", ConfigType::UInt8,
                                             &filtrationCalcStart_, ConfigPersistence::Persistent, 0};

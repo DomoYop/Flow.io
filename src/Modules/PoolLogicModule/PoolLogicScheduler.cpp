@@ -53,6 +53,7 @@ bool PoolLogicModule::computeFiltrationPlan_(float waterTemp, FiltrationPlanOutp
     in.waterTemp = waterTemp;
     in.poolVolumeM3 = poolVolumeM3_;
     in.pumpFlowM3h = pumpFlowM3h_;
+    in.cycleRatioPct = filtrCycleRatioPct_;
     for (uint8_t i = 0; i < FILTRATION_PLAN_MAX_WINDOWS; ++i) {
         in.windows[i].enabled = filtrWinEnabled_[i];
         in.windows[i].startMinute = filtrWinStart_[i];
@@ -225,10 +226,11 @@ bool PoolLogicModule::recalcAndApplyFiltrationWindow_(uint8_t* startHourOut,
     formatPlanSegments_(plan, segments, sizeof(segments));
 
     if (hasWaterTemp) {
-        LOGI("Filtration plan required=%umin planned=%umin water=%.2fC segments=%s",
+        LOGI("Filtration plan required=%umin planned=%umin water=%.2fC ratio=%u%% segments=%s",
              (unsigned)plan.requiredMinutes,
              (unsigned)plan.plannedMinutes,
              (double)waterTemp,
+             (unsigned)filtrCycleRatioPct_,
              segments);
         char detail[160] = {0};
         snprintf(detail,

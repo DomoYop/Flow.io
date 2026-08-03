@@ -181,6 +181,7 @@ constexpr char FiltrWin3Enabled[] = "pl_fw3e"; // Filtration window 3 enable.
 constexpr char FiltrWin3Start[] = "pl_fw3s"; // Filtration window 3 start (minutes from midnight).
 constexpr char FiltrWin3Stop[] = "pl_fw3p"; // Filtration window 3 stop (minutes from midnight).
 constexpr char FiltrWin3Priority[] = "pl_fw3r"; // Filtration window 3 fill priority.
+constexpr char FiltrCycleRatio[] = "pl_fcyr"; // Ratio applique aux cycles de renouvellement (%, 100 = courbe de reference).
 constexpr char PhIoId[] = "pl_phiid"; // Pool logic module persisted key for field `pl_phiid`.
 constexpr char OrpIoId[] = "pl_oiid"; // Pool logic module persisted key for field `pl_oiid`.
 constexpr char PressureIoId[] = "pl_piid"; // Pool logic module persisted key for field `pl_piid`.

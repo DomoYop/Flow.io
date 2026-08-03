@@ -377,15 +377,22 @@ Le protocole fractionne la dose selon `split_count`:
 
 Les curseurs `protocol_state`, `last_dose_day`, `weekly_done_ml` et `pending_ml` sont persistés pour reprendre correctement après reboot. La limite `max_uptime_day_s` de la pompe reste gérée par `PoolDeviceModule`; si elle bloque la pompe, le protocole O2 passe en état bloqué sans modifier cette configuration.
 
-### Fenêtre de filtration (calcul quotidien)
+### Filtration (`poollogic/filtration`, calcul quotidien)
 
-- `wat_temp_lo_th`
-- `wat_temp_setpt`
-- `filtr_start_min`
-- `filtr_stop_max`
-- `filtr_start_clc` (calculé)
-- `filtr_stop_clc` (calculé)
+Besoin journalier = `volume × cycles(T°) × ratio ÷ débit`, réparti dans les fenêtres priorisées — voir [filtration-turnover-fenetres.md](../notes/filtration-turnover-fenetres.md).
+
+- `filtr_cycle_ratio` (ratio sur les cycles de renouvellement, % ; défaut 100, plage 50–200)
 - `filtr_slot` (slot PoolDevice de la pompe de filtration)
+- `filtr_start_clc` (calculé : début du segment prioritaire)
+- `filtr_stop_clc` (calculé : fin du segment prioritaire)
+- `filtr_segments` (calculé, runtime : tous les créneaux « HH:MM-HH:MM, … »)
+- `filtr_optimal_min` (calculé, runtime : besoin optimal en minutes, avant plafonnement par la capacité des fenêtres)
+
+Le débit `pump_flow_m3h` est enregistré ici mais publié sur `pdm/pd0` (caractéristique de la pompe) ; le volume `pool_volume_m3` vit dans `poollogic/bassin` et est partagé avec le dosage O2.
+
+### Fenêtres de filtration (`poollogic/filtration/fenetres`)
+
+Pour `{i}` de 1 à 3 : `filtr_w{i}_en`, `filtr_w{i}_start`, `filtr_w{i}_stop` (minutes depuis minuit ; `stop < start` traverse minuit), `filtr_w{i}_prio` (1 = remplie en premier).
 
 ### Bindings capteurs IO (`poollogic/sensors`)
 

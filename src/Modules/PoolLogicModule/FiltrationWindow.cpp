@@ -94,7 +94,12 @@ bool computeFiltrationPlan(const FiltrationPlanInput& in, FiltrationPlanOutput& 
     uint16_t required = totalCapacity;
     uint16_t requiredRaw = totalCapacity;
     if (inputValid) {
-        const float cycles = filtrationCyclesForTemp(in.waterTemp);
+        // Ratio utilisateur sur le nombre de cycles vises (100 % = courbe de
+        // reference) ; borne pour rester dans un domaine physiquement tenable.
+        uint8_t ratioPct = in.cycleRatioPct;
+        if (ratioPct < PoolDefaults::FiltrationCycleRatioMinPct) ratioPct = PoolDefaults::FiltrationCycleRatioMinPct;
+        if (ratioPct > PoolDefaults::FiltrationCycleRatioMaxPct) ratioPct = PoolDefaults::FiltrationCycleRatioMaxPct;
+        const float cycles = filtrationCyclesForTemp(in.waterTemp) * ((float)ratioPct / 100.0f);
         const float hours = (in.poolVolumeM3 * cycles) / in.pumpFlowM3h;
         long minutes = lroundf(hours * 60.0f);
         if (minutes < (long)PoolDefaults::FiltrationMinTotalMinutes) {
