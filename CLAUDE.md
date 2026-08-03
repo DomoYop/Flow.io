@@ -33,6 +33,7 @@ Note Windows : le shell par défaut est PowerShell ; le tool Bash exécute du PO
 
 - **Lancer `pio` depuis PowerShell natif, pas depuis le Bash/MSys** : `esptool` rejette l'environnement MSys/Mingw (« MSys/Mingw is not supported »), ce qui casse notamment le flash/upload.
 - **`pio run -e FlowIO` ne linke pas actuellement**, pour une raison préexistante et indépendante du code métier (dérive du core Arduino-ESP32 : `ledcAttach`, `xTaskCreatePinnedToCoreWithCaps`, `driver/rmt_encoder.h`). Utiliser `Waveshare-ESP32-S3` comme cible de référence pour valider un build.
+- **`pio run -e Supervisor` échoue de la même manière** (mêmes symboles Arduino-ESP32 manquants, plus `NetworkEvents.h` et `RuntimeData::pool` — `PoolDeviceRuntime.h` est compilé alors que `PoolDeviceModuleDataModel.h` est hors `build_src_filter`). Préexistant, vérifié sur commit de référence : ne pas l'attribuer à une modification en cours.
 
 ## Code généré — ne pas éditer à la main
 
@@ -107,6 +108,7 @@ Notes personnelles hors doc officielle — utiles pour l'état d'avancement et l
 - [refactor-powermon-ina226-ina228.md](docs/notes/refactor-powermon-ina226-ina228.md) — unification INA226/INA228 → POWERMON (**implémenté et compilé**).
 - [wifi-ap-sta-reprobe.md](docs/notes/wifi-ap-sta-reprobe.md) — retour automatique AP→STA en signal faible (**analyse + proposition, non implémenté** : sur Waveshare le firmware ne retente jamais le STA une fois en AP).
 - [renommage-capteur-psi-pression.md](docs/notes/renommage-capteur-psi-pression.md) — renommage complet PSI → Pression (**implémenté**, clés NVS binaires et AlarmId inchangés).
+- [temperatures-slots-generiques.md](docs/notes/temperatures-slots-generiques.md) — sondes 1-Wire génériques 1..4 côté IO (ROM par slot), rôle eau/air déplacé dans PoolLogic, index DataStore résolus par IoId (**implémenté** ; RuntimeUiId 2201/2202 → 2406/2407, effacement NVS obligatoire).
 - [ota-spiffs-lenteur-plantage.md](docs/notes/ota-spiffs-lenteur-plantage.md) — plantage TWDT pendant l'OTA SPIFFS (**corrigé** : yield périodique) + traçage `spiffs_version`.
 - [audit-config-defaut-piscine-waveshare.md](docs/notes/audit-config-defaut-piscine-waveshare.md) — matrice des défauts métier injectés par `applyDomainDefaults` (DomainSpec).
 - [audit-configstore-ui-poollogic.md](docs/notes/audit-configstore-ui-poollogic.md) — audit ConfigStore + chaîne cfgdocs/UI, refonte UX « équipements actifs » (**implémentée**) et backlog des chantiers de fond.

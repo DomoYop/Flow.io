@@ -205,8 +205,10 @@ void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
         {PoolIds::SensorPh, &phIoId_},
         {PoolIds::SensorOrp, &orpIoId_},
         {PoolIds::SensorPressure, &pressureIoId_},
-        {PoolIds::SensorWaterTemp, &waterTempIoId_},
-        {PoolIds::SensorAirTemp, &airTempIoId_},
+        // Defaut d'usine : sonde 1 = eau, sonde 2 = air. C'est un simple point
+        // de depart, l'utilisateur reaffecte librement depuis la config.
+        {PoolIds::SensorTemperature1, &waterTempIoId_},
+        {PoolIds::SensorTemperature2, &airTempIoId_},
         {PoolIds::SensorPoolLevel, &levelIoId_},
         {PoolIds::SensorPhLevel, &phLevelIoId_},
         {PoolIds::SensorChlorineLevel, &chlorineLevelIoId_},
@@ -713,6 +715,32 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:pump",
             "L/h"
         };
+        // Temperatures metier. Les suffixes historiques io_wat_tmp / io_air_tmp
+        // sont conserves pour ne pas casser les tableaux de bord existants : ce
+        // sont desormais des entites PoolLogic, qui suivent la sonde designee
+        // par wat_temp_io_id / air_temp_io_id.
+        const HASensorEntry waterTemperature{
+            "poollogic",
+            "io_wat_tmp",
+            "Water Temperature",
+            "rt/poollogic/temp",
+            "{% if value_json.wat is number %}{{ value_json.wat | float | round(1) }}{% else %}unavailable{% endif %}",
+            nullptr,
+            "mdi:water-thermometer",
+            "\xC2\xB0""C"
+        };
+        const HASensorEntry airTemperature{
+            "poollogic",
+            "io_air_tmp",
+            "Air Temperature",
+            "rt/poollogic/temp",
+            "{% if value_json.air is number %}{{ value_json.air | float | round(1) }}{% else %}unavailable{% endif %}",
+            nullptr,
+            "mdi:thermometer",
+            "\xC2\xB0""C"
+        };
+        (void)haSvc->addSensor(haSvc->ctx, &waterTemperature);
+        (void)haSvc->addSensor(haSvc->ctx, &airTemperature);
         (void)haSvc->addSensor(haSvc->ctx, &filtrationStart);
         (void)haSvc->addSensor(haSvc->ctx, &filtrationStop);
         (void)haSvc->addSensor(haSvc->ctx, &heatAssistStatus);

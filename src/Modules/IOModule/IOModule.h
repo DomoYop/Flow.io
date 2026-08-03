@@ -55,14 +55,27 @@ class OneWireBus;
 enum IOAnalogSource : uint8_t {
     IO_SRC_ADS_INTERNAL_SINGLE = 0,
     IO_SRC_ADS_EXTERNAL_DIFF = 1,
-    IO_SRC_DS18_WATER = 2,
-    IO_SRC_DS18_AIR = 3,
-    IO_SRC_SHT40 = 4,
-    IO_SRC_BMP280 = 5,
-    IO_SRC_BME680 = 6,
-    IO_SRC_POWERMON = 7,
-    IO_SRC_COUNT = 8
+    // Sondes 1-Wire generiques : IO_SRC_DS18_1 + rang de la sonde. Le role
+    // metier (eau, air...) est decide par PoolLogic, pas par le rang.
+    IO_SRC_DS18_1 = 2,
+    IO_SRC_DS18_2 = 3,
+    IO_SRC_DS18_3 = 4,
+    IO_SRC_DS18_4 = 5,
+    IO_SRC_SHT40 = 6,
+    IO_SRC_BMP280 = 7,
+    IO_SRC_BME680 = 8,
+    IO_SRC_POWERMON = 9,
+    IO_SRC_COUNT = 10
 };
+
+static_assert(IO_SRC_DS18_1 + IO_DS18_SLOT_COUNT == IO_SRC_SHT40,
+              "les sources DS18 doivent rester contigues et couvrir IO_DS18_SLOT_COUNT");
+
+/** Vrai si la source designe une sonde 1-Wire (quel que soit son rang). */
+constexpr bool isDs18AnalogSource(uint8_t source)
+{
+    return source >= IO_SRC_DS18_1 && source < IO_SRC_DS18_1 + IO_DS18_SLOT_COUNT;
+}
 
 constexpr uint8_t IO_ANALOG_SOURCE_INVALID = 0xFFu;
 
@@ -144,8 +157,8 @@ private:
     struct DigitalSlot;
 
     enum RuntimeUiValueId : uint8_t {
-        RuntimeUiWaterTemp = 1,
-        RuntimeUiAirTemp = 2,
+        // 1 et 2 (temperatures eau/air) ont migre vers PoolLogicModule : ce sont
+        // des roles metier, ils suivent wat_temp_io_id / air_temp_io_id.
         RuntimeUiPh = 3,
         RuntimeUiOrp = 4,
         RuntimeUiWaterCounter = 5,
@@ -233,10 +246,30 @@ private:
                                       bool& usesPcfOut,
                                       bool& usesTcaOut,
                                       bool& usesMcpOut) const;
-    bool resolveDsBusAddress_(OneWireBus* bus, const char* runtimeKey, uint8_t outAddr[8]);
+    /**
+     * Releve des ROM presentes sur les bus 1-Wire actifs, fait une seule fois
+     * par configuration : `getAddress()` relance une recherche 1-Wire complete
+     * a chaque appel, la balayer par sonde multiplierait le trafic au boot.
+     */
+    struct Ds18BusScan {
+        static constexpr uint8_t kMaxBuses = 3;
+        static constexpr uint8_t kMaxRomsPerBus = 8;
+        IOneWireBus* buses[kMaxBuses]{};
+        uint8_t busCount = 0;
+        uint8_t roms[kMaxBuses][kMaxRomsPerBus][8]{};
+        uint8_t romCount[kMaxBuses]{};
+    };
+    void scanDs18Buses_(Ds18BusScan& scan);
+    /**
+     * Affecte une sonde physique a chacun des IO_DS18_SLOT_COUNT slots de
+     * temperature. La ROM configuree fait foi ; a defaut le premier ROM libre
+     * est retenu dans un ordre deterministe (bus 1, bus 2, DS2484 ; ordre de
+     * recherche 1-Wire) puis persiste dans la config, donc visible et
+     * corrigeable depuis l'interface.
+     */
     void resolveDs18Sensors_();
-    bool resolveDsSensor_(IOneWireBus** buses, uint8_t nBuses, char* romCfg, size_t romCfgLen,
-                          const char* nvsKey, const uint8_t* excludeAddr,
+    bool resolveDsSensor_(const Ds18BusScan& scan, uint8_t slotIdx,
+                          const uint8_t (*takenAddrs)[8], uint8_t takenCount,
                           IOneWireBus** busOut, uint8_t outAddr[8]);
     uint32_t dsPollForBus_(const IOneWireBus* bus) const;
     static bool parseDs18Address_(const char* str, uint8_t out[8]);
@@ -264,6 +297,13 @@ private:
     bool ensureDigitalCounterConfigState_();
     bool ensureLastCycleState_();
     bool endpointIndexFromId_(const char* id, uint8_t& idxOut) const;
+    /**
+     * Publie dans le DataStore l'identite logique (IoId) de chaque case du
+     * registre. L'index d'une case est un index d'insertion : il glisse des
+     * qu'un slot amont perd son binding, donc les consommateurs externes
+     * (RuntimeUI, interface web, passerelle I2C) resolvent par IoId.
+     */
+    void publishEndpointIoIds_();
     void configureRuntimeAfterConfig_();
     bool digitalLogicalUsed_(uint8_t kind, uint8_t logicalIdx) const;
     bool findDigitalSlotByLogical_(uint8_t kind, uint8_t logicalIdx, uint8_t& slotIdxOut) const;
@@ -392,13 +432,12 @@ private:
     // GPIO bit-bang 1-Wire buses provided by the profile (board pins).
     OneWireBus* oneWireGpio1_ = nullptr;
     OneWireBus* oneWireGpio2_ = nullptr;
-    // Resolved bus carrying each DS18B20 sensor (any of the enabled buses).
-    IOneWireBus* oneWireWater_ = nullptr;
-    IOneWireBus* oneWireAir_ = nullptr;
-    uint8_t oneWireWaterAddr_[8] = {0};
-    uint8_t oneWireAirAddr_[8] = {0};
-    bool oneWireWaterAddrValid_ = false;
-    bool oneWireAirAddrValid_ = false;
+    // Sonde retenue pour chaque slot de temperature : bus porteur et ROM. Le
+    // bus n'est pas impose par le rang du slot, une sonde peut vivre sur
+    // n'importe quel bus actif.
+    IOneWireBus* dsSlotBus_[IO_DS18_SLOT_COUNT] = {nullptr};
+    uint8_t dsSlotAddr_[IO_DS18_SLOT_COUNT][8] = {{0}};
+    bool dsSlotAddrValid_[IO_DS18_SLOT_COUNT] = {false};
 
     IOAnalogProvider analogProviders_[IO_SRC_COUNT]{};
     IOMaskProvider ledMaskProvider_{};
@@ -439,7 +478,7 @@ private:
     uint8_t (*gpioDriverPool_)[sizeof(GpioDriver)] = nullptr;
     alignas(PcntCounterDriver) uint8_t gpioCounterDriverPool_[MAX_DIGITAL_INPUTS][sizeof(PcntCounterDriver)]{};
     alignas(Ads1115Driver) uint8_t adsDriverPool_[2][sizeof(Ads1115Driver)]{};
-    alignas(Ds18b20Driver) uint8_t dsDriverPool_[2][sizeof(Ds18b20Driver)]{};
+    alignas(Ds18b20Driver) uint8_t dsDriverPool_[IO_DS18_SLOT_COUNT][sizeof(Ds18b20Driver)]{};
     alignas(Sht40Driver) uint8_t sht40DriverPool_[1][sizeof(Sht40Driver)]{};
     alignas(Bmp280Driver) uint8_t bmp280DriverPool_[1][sizeof(Bmp280Driver)]{};
     alignas(Bme680Driver) uint8_t bme680DriverPool_[1][sizeof(Bme680Driver)]{};
@@ -528,8 +567,12 @@ private:
     ConfigVariable<bool,0> oneWire2EnabledVar_ { NVS_KEY(NvsKeys::Io::IO_OW2EN),"enabled","io/drivers/1wire_int2",ConfigType::Bool,&cfgData_.oneWire2Enabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> oneWire2GpioVar_ { NVS_KEY(NvsKeys::Io::IO_OW2GP),"gpio","io/drivers/1wire_int2",ConfigType::Int32,&cfgData_.oneWire2Gpio,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> oneWire2PollVar_ { NVS_KEY(NvsKeys::Io::IO_OW2PL),"poll_ms","io/drivers/1wire_int2",ConfigType::Int32,&cfgData_.oneWire2PollMs,ConfigPersistence::Persistent,0 };
-    ConfigVariable<char,0> dsWaterRomVar_ { NVS_KEY(NvsKeys::Io::IO_DSWR),"water_rom","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsWaterRom,ConfigPersistence::Persistent,sizeof(cfgData_.dsWaterRom) };
-    ConfigVariable<char,0> dsAirRomVar_ { NVS_KEY(NvsKeys::Io::IO_DSAR),"air_rom","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsAirRom,ConfigPersistence::Persistent,sizeof(cfgData_.dsAirRom) };
+    ConfigVariable<char,0> dsRomVar_[IO_DS18_SLOT_COUNT] {
+        { NVS_KEY(NvsKeys::Io::IO_DSR1),"rom1","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsRom[0],ConfigPersistence::Persistent,sizeof(cfgData_.dsRom[0]) },
+        { NVS_KEY(NvsKeys::Io::IO_DSR2),"rom2","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsRom[1],ConfigPersistence::Persistent,sizeof(cfgData_.dsRom[1]) },
+        { NVS_KEY(NvsKeys::Io::IO_DSR3),"rom3","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsRom[2],ConfigPersistence::Persistent,sizeof(cfgData_.dsRom[2]) },
+        { NVS_KEY(NvsKeys::Io::IO_DSR4),"rom4","io/drivers/ds18b20",ConfigType::CharArray,(char*)cfgData_.dsRom[3],ConfigPersistence::Persistent,sizeof(cfgData_.dsRom[3]) },
+    };
     ConfigVariable<bool,0> traceEnabledVar_ { NVS_KEY(NvsKeys::Io::IO_TREN),"trace_enabled","io/debug",ConfigType::Bool,&cfgData_.traceEnabled,ConfigPersistence::Persistent,0 };
     ConfigVariable<int32_t,0> tracePeriodVar_ { NVS_KEY(NvsKeys::Io::IO_TRMS),"trace_period_ms","io/debug",ConfigType::Int32,&cfgData_.tracePeriodMs,ConfigPersistence::Persistent,0 };
 

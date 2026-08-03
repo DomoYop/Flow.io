@@ -124,13 +124,18 @@ void IOModule::autoBindEnabledAnalogDrivers_()
 namespace {
 
 // Transitional mapping to the analog provider pool index (IOAnalogSource).
-// DS18B20 buses map by channel (0 = water bus, 1 = air bus).
+// Chaque canal DS18B20 est un slot de temperature generique (rang 0..N-1).
 uint8_t analogProviderSourceForSpec_(const IOBindingPortSpec& spec)
 {
     switch (spec.backend) {
         case IO_BACKEND_ADS1115_INT: return IO_SRC_ADS_INTERNAL_SINGLE;
         case IO_BACKEND_ADS1115_EXT_DIFF: return IO_SRC_ADS_EXTERNAL_DIFF;
-        case IO_BACKEND_DS18B20: return (spec.channel == 0U) ? IO_SRC_DS18_WATER : IO_SRC_DS18_AIR;
+        case IO_BACKEND_DS18B20:
+            // Borne obligatoire : un canal hors plage deborderait le pool de
+            // providers, que le port vienne d'un profil ou de la config NVS.
+            return (spec.channel < IO_DS18_SLOT_COUNT)
+                       ? (uint8_t)(IO_SRC_DS18_1 + spec.channel)
+                       : IO_ANALOG_SOURCE_INVALID;
         case IO_BACKEND_SHT40: return IO_SRC_SHT40;
         case IO_BACKEND_BMP280: return IO_SRC_BMP280;
         case IO_BACKEND_BME680: return IO_SRC_BME680;
@@ -196,71 +201,6 @@ bool IOModule::resolveDigitalOutputBinding_(PhysicalPortId portId,
     return true;
 }
 
-bool IOModule::resolveDsBusAddress_(OneWireBus* bus, const char* runtimeKey, uint8_t outAddr[8])
-{
-    if (!bus || !runtimeKey || !outAddr) return false;
-
-    bus->begin();
-    const uint8_t count = bus->deviceCount();
-
-    size_t len = 0U;
-    const bool readOk = cfgSvc_ && cfgSvc_->readRuntimeBlob
-        ? cfgSvc_->readRuntimeBlob(cfgSvc_->ctx, runtimeKey, outAddr, 8U, &len)
-        : (cfgStore_ && cfgStore_->readRuntimeBlob(runtimeKey, outAddr, 8U, &len));
-    if (readOk && len == 8U) {
-        char cached[24]{};
-        formatDs18Address_(outAddr, cached, sizeof(cached));
-        if (bus->hasAddress(outAddr)) {
-            LOGI("DS18B20 resolved from cache key=%s GPIO=%d count=%u rom=%s",
-                 runtimeKey,
-                 bus->pin(),
-                 (unsigned)count,
-                 cached);
-            return true;
-        }
-        LOGW("Cached DS18B20 address for %s not found on current bus GPIO=%d count=%u rom=%s; rescanning",
-             runtimeKey,
-             bus->pin(),
-             (unsigned)count,
-             cached);
-    }
-
-    if (count != 1U) {
-        LOGW("DS18B20 scan unresolved key=%s GPIO=%d count=%u expected=1",
-             runtimeKey,
-             bus->pin(),
-             (unsigned)count);
-        for (uint8_t i = 0; i < count; ++i) {
-            uint8_t found[8]{};
-            if (!bus->getAddress(i, found)) continue;
-            char rom[24]{};
-            formatDs18Address_(found, rom, sizeof(rom));
-            LOGW("DS18B20 scan key=%s GPIO=%d index=%u rom=%s",
-                 runtimeKey,
-                 bus->pin(),
-                 (unsigned)i,
-                 rom);
-        }
-        return false;
-    }
-    if (!bus->getAddress(0, outAddr)) {
-        LOGW("DS18B20 scan failed to read address key=%s GPIO=%d count=%u",
-             runtimeKey,
-             bus->pin(),
-             (unsigned)count);
-        return false;
-    }
-
-    char resolved[24]{};
-    formatDs18Address_(outAddr, resolved, sizeof(resolved));
-    LOGI("DS18B20 resolved by scan key=%s GPIO=%d rom=%s", runtimeKey, bus->pin(), resolved);
-
-    if (cfgSvc_ && cfgSvc_->writeRuntimeBlobAsync) {
-        (void)cfgSvc_->writeRuntimeBlobAsync(cfgSvc_->ctx, runtimeKey, outAddr, 8U);
-    }
-    return true;
-}
-
 bool IOModule::parseDs18Address_(const char* str, uint8_t out[8])
 {
     if (!str || !out) return false;
@@ -297,55 +237,92 @@ uint32_t IOModule::dsPollForBus_(const IOneWireBus* bus) const
     return (poll < 750) ? 750U : (uint32_t)poll;
 }
 
-bool IOModule::resolveDsSensor_(IOneWireBus** buses, uint8_t nBuses, char* romCfg, size_t romCfgLen,
-                                const char* nvsKey, const uint8_t* excludeAddr,
-                                IOneWireBus** busOut, uint8_t outAddr[8])
+void IOModule::scanDs18Buses_(Ds18BusScan& scan)
 {
-    if (!busOut || !outAddr) return false;
-    *busOut = nullptr;
+    scan.busCount = 0;
 
-    uint8_t target[8] = {0};
-    bool haveTarget = false;
-
-    // 1) Explicit ROM from the config string.
-    if (romCfg && romCfg[0] != '\0' && parseDs18Address_(romCfg, target)) {
-        haveTarget = true;
+    if (cfgData_.oneWire1Enabled && oneWireGpio1_) {
+        if (cfgData_.oneWire1Gpio >= 0) oneWireGpio1_->setPin(cfgData_.oneWire1Gpio);
+        oneWireGpio1_->begin();
+        scan.buses[scan.busCount++] = oneWireGpio1_;
     }
-    // 2) Else cached ROM from the NVS runtime blob.
-    if (!haveTarget && nvsKey) {
-        size_t len = 0U;
-        const bool readOk = cfgSvc_ && cfgSvc_->readRuntimeBlob
-            ? cfgSvc_->readRuntimeBlob(cfgSvc_->ctx, nvsKey, target, 8U, &len)
-            : (cfgStore_ && cfgStore_->readRuntimeBlob(nvsKey, target, 8U, &len));
-        if (readOk && len == 8U) haveTarget = true;
+    if (cfgData_.oneWire2Enabled && oneWireGpio2_) {
+        if (cfgData_.oneWire2Gpio >= 0) oneWireGpio2_->setPin(cfgData_.oneWire2Gpio);
+        oneWireGpio2_->begin();
+        scan.buses[scan.busCount++] = oneWireGpio2_;
     }
-
-    // Locate the target ROM on any enabled bus.
-    if (haveTarget) {
-        for (uint8_t b = 0; b < nBuses; ++b) {
-            if (buses[b] && buses[b]->hasAddress(target)) {
-                *busOut = buses[b];
-                memcpy(outAddr, target, 8);
-                if (romCfg && romCfgLen > 0) formatDs18Address_(outAddr, romCfg, romCfgLen);
-                return true;
-            }
+    if (cfgData_.ds2484Enabled) {
+        ds2484Bus_.setAddress(cfgData_.ds2484Address);
+        ds2484Bus_.begin();
+        if (ds2484Bus_.present()) {
+            scan.buses[scan.busCount++] = &ds2484Bus_;
+            LOGI("DS2484 1-Wire bridge at 0x%02X, %u sensor(s) found",
+                 (unsigned)ds2484Bus_.i2cAddress(), (unsigned)ds2484Bus_.deviceCount());
+        } else {
+            LOGW("DS2484 enabled but not responding at 0x%02X", (unsigned)cfgData_.ds2484Address);
         }
     }
 
-    // Auto-assign: first ROM not already taken by the other sensor.
-    for (uint8_t b = 0; b < nBuses; ++b) {
-        if (!buses[b]) continue;
-        const uint8_t count = buses[b]->deviceCount();
+    // Un seul releve par bus : getAddress() relance une recherche 1-Wire
+    // complete a chaque appel.
+    for (uint8_t b = 0; b < scan.busCount; ++b) {
+        scan.romCount[b] = 0;
+        if (!scan.buses[b]) continue;
+        uint8_t count = scan.buses[b]->deviceCount();
+        if (count > Ds18BusScan::kMaxRomsPerBus) count = Ds18BusScan::kMaxRomsPerBus;
         for (uint8_t i = 0; i < count; ++i) {
-            uint8_t found[8] = {0};
-            if (!buses[b]->getAddress(i, found)) continue;
-            if (excludeAddr && memcmp(found, excludeAddr, 8) == 0) continue;
-            *busOut = buses[b];
-            memcpy(outAddr, found, 8);
-            if (nvsKey && cfgSvc_ && cfgSvc_->writeRuntimeBlobAsync) {
-                (void)cfgSvc_->writeRuntimeBlobAsync(cfgSvc_->ctx, nvsKey, outAddr, 8U);
+            if (!scan.buses[b]->getAddress(i, scan.roms[b][scan.romCount[b]])) continue;
+            char rom[24]{};
+            formatDs18Address_(scan.roms[b][scan.romCount[b]], rom, sizeof(rom));
+            LOGI("DS18B20 detectee bus=%u index=%u rom=%s", (unsigned)b, (unsigned)i, rom);
+            ++scan.romCount[b];
+        }
+    }
+}
+
+bool IOModule::resolveDsSensor_(const Ds18BusScan& scan, uint8_t slotIdx,
+                                const uint8_t (*takenAddrs)[8], uint8_t takenCount,
+                                IOneWireBus** busOut, uint8_t outAddr[8])
+{
+    if (!busOut || !outAddr || slotIdx >= IO_DS18_SLOT_COUNT) return false;
+    *busOut = nullptr;
+
+    char* romCfg = cfgData_.dsRom[slotIdx];
+    const size_t romCfgLen = sizeof(cfgData_.dsRom[slotIdx]);
+
+    // 1) ROM configuree : elle fait foi, sur n'importe quel bus actif. C'est le
+    //    seul moyen de corriger une affectation, donc jamais ecrasee ici.
+    uint8_t target[8] = {0};
+    if (romCfg[0] != '\0' && parseDs18Address_(romCfg, target)) {
+        for (uint8_t b = 0; b < scan.busCount; ++b) {
+            for (uint8_t i = 0; i < scan.romCount[b]; ++i) {
+                if (memcmp(scan.roms[b][i], target, 8) != 0) continue;
+                *busOut = scan.buses[b];
+                memcpy(outAddr, target, 8);
+                return true;
             }
-            if (romCfg && romCfgLen > 0) formatDs18Address_(outAddr, romCfg, romCfgLen);
+        }
+        LOGW("DS18B20 rom%u=%s absente des bus actifs", (unsigned)(slotIdx + 1U), romCfg);
+        return false;
+    }
+
+    // 2) Champ vide : premiere ROM libre dans un ordre deterministe (bus 1,
+    //    bus 2, DS2484 ; ordre de recherche 1-Wire). Le choix est ecrit dans la
+    //    config, donc visible et modifiable ensuite depuis l'interface.
+    for (uint8_t b = 0; b < scan.busCount; ++b) {
+        for (uint8_t i = 0; i < scan.romCount[b]; ++i) {
+            bool taken = false;
+            for (uint8_t t = 0; t < takenCount && !taken; ++t) {
+                taken = memcmp(scan.roms[b][i], takenAddrs[t], 8) == 0;
+            }
+            if (taken) continue;
+
+            *busOut = scan.buses[b];
+            memcpy(outAddr, scan.roms[b][i], 8);
+            formatDs18Address_(outAddr, romCfg, romCfgLen);
+            if (cfgStore_) (void)cfgStore_->set(dsRomVar_[slotIdx], romCfg);
+            LOGI("DS18B20 rom%u auto-affectee bus=%u rom=%s",
+                 (unsigned)(slotIdx + 1U), (unsigned)b, romCfg);
             return true;
         }
     }
@@ -354,39 +331,20 @@ bool IOModule::resolveDsSensor_(IOneWireBus** buses, uint8_t nBuses, char* romCf
 
 void IOModule::resolveDs18Sensors_()
 {
-    IOneWireBus* buses[3] = {nullptr, nullptr, nullptr};
-    uint8_t nBuses = 0;
+    Ds18BusScan scan{};
+    scanDs18Buses_(scan);
 
-    if (cfgData_.oneWire1Enabled && oneWireGpio1_) {
-        if (cfgData_.oneWire1Gpio >= 0) oneWireGpio1_->setPin(cfgData_.oneWire1Gpio);
-        oneWireGpio1_->begin();
-        buses[nBuses++] = oneWireGpio1_;
-    }
-    if (cfgData_.oneWire2Enabled && oneWireGpio2_) {
-        if (cfgData_.oneWire2Gpio >= 0) oneWireGpio2_->setPin(cfgData_.oneWire2Gpio);
-        oneWireGpio2_->begin();
-        buses[nBuses++] = oneWireGpio2_;
-    }
-    if (cfgData_.ds2484Enabled) {
-        ds2484Bus_.setAddress(cfgData_.ds2484Address);
-        ds2484Bus_.begin();
-        if (ds2484Bus_.present()) {
-            buses[nBuses++] = &ds2484Bus_;
-            LOGI("DS2484 1-Wire bridge at 0x%02X, %u sensor(s) found",
-                 (unsigned)ds2484Bus_.i2cAddress(), (unsigned)ds2484Bus_.deviceCount());
-        } else {
-            LOGW("DS2484 enabled but not responding at 0x%02X", (unsigned)cfgData_.ds2484Address);
+    uint8_t taken[IO_DS18_SLOT_COUNT][8] = {{0}};
+    uint8_t takenCount = 0;
+
+    for (uint8_t slot = 0; slot < IO_DS18_SLOT_COUNT; ++slot) {
+        dsSlotBus_[slot] = nullptr;
+        dsSlotAddrValid_[slot] = resolveDsSensor_(scan, slot, taken, takenCount,
+                                                  &dsSlotBus_[slot], dsSlotAddr_[slot]);
+        if (dsSlotAddrValid_[slot]) {
+            memcpy(taken[takenCount++], dsSlotAddr_[slot], 8);
         }
     }
-
-    oneWireWater_ = nullptr;
-    oneWireAir_ = nullptr;
-    oneWireWaterAddrValid_ = resolveDsSensor_(buses, nBuses, cfgData_.dsWaterRom, sizeof(cfgData_.dsWaterRom),
-                                              NvsKeys::Io::DsRomWater, nullptr, &oneWireWater_, oneWireWaterAddr_);
-    oneWireAirAddrValid_ = resolveDsSensor_(buses, nBuses, cfgData_.dsAirRom, sizeof(cfgData_.dsAirRom),
-                                            NvsKeys::Io::DsRomAir,
-                                            oneWireWaterAddrValid_ ? oneWireWaterAddr_ : nullptr,
-                                            &oneWireAir_, oneWireAirAddr_);
 }
 
 void IOModule::configureAnalogSlots_(bool (&needAnalogSource)[IO_SRC_COUNT])
@@ -853,39 +811,39 @@ void IOModule::configureAnalogProviders_(const bool (&needAnalogSource)[IO_SRC_C
         }
     }
 
-    // Resolve which DS18B20 (by ROM) drives water/air across every enabled
-    // 1-Wire bus (DS2484 bridge and/or bit-bang GPIO buses).
-    if (needAnalogSource[IO_SRC_DS18_WATER] || needAnalogSource[IO_SRC_DS18_AIR]) {
-        resolveDs18Sensors_();
+    // Affecte une sonde (par ROM) a chaque slot de temperature, sur n'importe
+    // lequel des bus 1-Wire actifs (pont DS2484 et/ou bus GPIO bit-bang).
+    bool needAnyDs18 = false;
+    for (uint8_t slot = 0; slot < IO_DS18_SLOT_COUNT && !needAnyDs18; ++slot) {
+        needAnyDs18 = needAnalogSource[IO_SRC_DS18_1 + slot];
     }
+    if (needAnyDs18) resolveDs18Sensors_();
 
     Ds18b20DriverConfig dsCfg{};
     dsCfg.conversionWaitMs = 750;
 
-    if (needAnalogSource[IO_SRC_DS18_WATER] && oneWireWaterAddrValid_ && oneWireWater_) {
-        dsCfg.pollMs = dsPollForBus_(oneWireWater_);
-        IAnalogSourceDriver* driver = allocDsDriver_("ds18_water", oneWireWater_, oneWireWaterAddr_, dsCfg);
-        if (driver) {
-            analogProviders_[IO_SRC_DS18_WATER] = makeAnalogProvider(driver);
-            (void)analogProviders_[IO_SRC_DS18_WATER].begin();
-        } else {
-            LOGW("DS18 water pool exhausted");
+    for (uint8_t slot = 0; slot < IO_DS18_SLOT_COUNT; ++slot) {
+        const uint8_t source = (uint8_t)(IO_SRC_DS18_1 + slot);
+        if (!needAnalogSource[source]) continue;
+        if (!dsSlotAddrValid_[slot] || !dsSlotBus_[slot]) {
+            LOGW("Aucune sonde DS18B20 exploitable pour la temperature %u", (unsigned)(slot + 1U));
+            continue;
         }
-    } else if (needAnalogSource[IO_SRC_DS18_WATER]) {
-        LOGW("No resolvable DS18B20 found for water temperature");
-    }
 
-    if (needAnalogSource[IO_SRC_DS18_AIR] && oneWireAirAddrValid_ && oneWireAir_) {
-        dsCfg.pollMs = dsPollForBus_(oneWireAir_);
-        IAnalogSourceDriver* driver = allocDsDriver_("ds18_air", oneWireAir_, oneWireAirAddr_, dsCfg);
-        if (driver) {
-            analogProviders_[IO_SRC_DS18_AIR] = makeAnalogProvider(driver);
-            (void)analogProviders_[IO_SRC_DS18_AIR].begin();
-        } else {
-            LOGW("DS18 air pool exhausted");
+        // Ds18b20Driver conserve le pointeur d'identifiant : litteraux statiques
+        // obligatoires, pas de buffer de pile.
+        static const char* const kDsDriverIds[IO_DS18_SLOT_COUNT] = {
+            "ds18_1", "ds18_2", "ds18_3", "ds18_4"
+        };
+        dsCfg.pollMs = dsPollForBus_(dsSlotBus_[slot]);
+        IAnalogSourceDriver* driver =
+            allocDsDriver_(kDsDriverIds[slot], dsSlotBus_[slot], dsSlotAddr_[slot], dsCfg);
+        if (!driver) {
+            LOGW("DS18 pool epuise pour la temperature %u", (unsigned)(slot + 1U));
+            continue;
         }
-    } else if (needAnalogSource[IO_SRC_DS18_AIR]) {
-        LOGW("No resolvable DS18B20 found for air temperature");
+        analogProviders_[source] = makeAnalogProvider(driver);
+        (void)analogProviders_[source].begin();
     }
 
     if (needAnalogSource[IO_SRC_SHT40]) {
@@ -1082,6 +1040,10 @@ void IOModule::registerSchedulerJobs_(bool needI2cAnalogJob, const ExpanderNeeds
     dinJob.fn = &IOModule::tickDigitalInputs_;
     dinJob.ctx = this;
     scheduler_.add(dinJob);
+
+    // Le registre est fige : publier l'identite logique de chaque case avant
+    // d'ouvrir le runtime aux consommateurs.
+    publishEndpointIoIds_();
 
     runtimeReady_ = true;
     pcfLastEnabled_ = cfgData_.pcfEnabled;

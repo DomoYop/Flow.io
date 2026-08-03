@@ -591,11 +591,11 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "displayConfig": null
     },
     {
-      "id": 2201,
-      "runtimeId": 2201,
-      "moduleId": 22,
-      "module": "io",
-      "valueId": 1,
+      "id": 2406,
+      "runtimeId": 2406,
+      "moduleId": 24,
+      "module": "poollogic",
+      "valueId": 6,
       "key": "pool.water_temp",
       "label": "Temp\u00e9rature eau",
       "type": "float",
@@ -619,11 +619,11 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       }
     },
     {
-      "id": 2202,
-      "runtimeId": 2202,
-      "moduleId": 22,
-      "module": "io",
-      "valueId": 2,
+      "id": 2407,
+      "runtimeId": 2407,
+      "moduleId": 24,
+      "module": "poollogic",
+      "valueId": 7,
       "key": "pool.air_temp",
       "label": "Temp\u00e9rature air",
       "type": "float",

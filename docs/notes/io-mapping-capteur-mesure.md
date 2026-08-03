@@ -105,15 +105,17 @@ définit les **mesures comme des rôles**, et `kDomainIoSlots` fige **« quelle 
 slot »** :
 
 ```cpp
-{PoolIds::SensorOrp,        analogInputSlot(0)},
-{PoolIds::SensorPh,         analogInputSlot(1)},
-{PoolIds::SensorPsi,        analogInputSlot(2)},
-{PoolIds::SensorSpareAnalog,analogInputSlot(3)},
-{PoolIds::SensorWaterTemp,  analogInputSlot(4)},
-{PoolIds::SensorAirTemp,    analogInputSlot(5)},
+{PoolIds::SensorOrp,         analogInputSlot(0)},
+{PoolIds::SensorPh,          analogInputSlot(1)},
+{PoolIds::SensorPressure,    analogInputSlot(2)},
+{PoolIds::SensorSpareAnalog, analogInputSlot(3)},
+{PoolIds::SensorTemperature1,analogInputSlot(4)},
+{PoolIds::SensorTemperature2,analogInputSlot(5)},
 ```
 
 Le pH est **toujours** le slot analogique 1. Ce mapping rôle → slot est **en dur**.
+
+Exception depuis la refonte des températures : les 4 slots de température sont **génériques**, et le rôle métier eau/air est un réglage de PoolLogic (`wat_temp_io_id` / `air_temp_io_id`), pas une identité de slot — voir [temperatures-slots-generiques.md](temperatures-slots-generiques.md).
 
 ---
 

@@ -95,7 +95,9 @@ bool IOModule::writeAnalogProviderRuntimeValue_(RuntimeUiId runtimeId,
 bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) const
 {
     const RuntimeUiId runtimeId = makeRuntimeUiId(moduleId(), valueId);
-    uint8_t runtimeIndex = 0xFF;
+    // Numero de slot analogique (a00, a01...), pas un index de registre : le
+    // DataStore est resolu par IoId, cf. ioEndpointFloatByIoId.
+    uint8_t analogSlotIdx = 0xFF;
 
     switch (valueId) {
         case RuntimeUiWaterCounter: {
@@ -140,7 +142,7 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
             return writer.writeUnavailable(runtimeId);
         }
         case RuntimeUiPressure:
-            runtimeIndex = 2;
+            analogSlotIdx = 2;
             break;
         case RuntimeUiBmp280Temp:
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_BMP280, 0U, writer);
@@ -170,17 +172,11 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 6U, writer);
         case RuntimeUiPowermonCharge:
             return writeAnalogProviderRuntimeValue_(runtimeId, IO_SRC_POWERMON, 7U, writer);
-        case RuntimeUiWaterTemp:
-            runtimeIndex = 4;
-            break;
-        case RuntimeUiAirTemp:
-            runtimeIndex = 5;
-            break;
         case RuntimeUiPh:
-            runtimeIndex = 1;
+            analogSlotIdx = 1;
             break;
         case RuntimeUiOrp:
-            runtimeIndex = 0;
+            analogSlotIdx = 0;
             break;
         default:
             return false;
@@ -189,7 +185,7 @@ bool IOModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) co
     if (!dataStore_) return writer.writeUnavailable(runtimeId);
 
     float value = 0.0f;
-    if (!ioEndpointFloat(*dataStore_, runtimeIndex, value)) {
+    if (!ioEndpointFloatByIoId(*dataStore_, ioIdFromSlot(analogInputSlot(analogSlotIdx)), value)) {
         return writer.writeUnavailable(runtimeId);
     }
     return writer.writeF32(runtimeId, value);

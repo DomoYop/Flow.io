@@ -15,8 +15,13 @@ enum : PhysicalPortId {
     PortAdsInternal3    = 103, // ADS1115 interne, entree single-ended A3.
     PortAdsExternal0    = 110, // ADS1115 externe, paire differentielle 0.
     PortAdsExternal1    = 111, // ADS1115 externe, paire differentielle 1.
-    PortOneWire1        = 120, // DS18B20 bus 1.
-    PortOneWire2        = 121, // DS18B20 bus 2.
+    // Sondes 1-Wire generiques : un port = un rang de sonde, pas un bus. La
+    // sonde peut vivre sur n'importe quel bus actif, c'est sa ROM qui l'affecte
+    // (io/drivers/ds18b20/romN), et le role metier vient de PoolLogic.
+    PortOneWire1        = 120, // DS18B20 sonde 1.
+    PortOneWire2        = 121, // DS18B20 sonde 2.
+    PortOneWire3        = 122, // DS18B20 sonde 3.
+    PortOneWire4        = 123, // DS18B20 sonde 4.
     PortSht40Temp       = 130, // SHT40: temperature.
     PortSht40Humidity   = 131, // SHT40: humidite.
     PortBmp280Temp      = 132, // BMP280: temperature.
@@ -59,8 +64,10 @@ inline constexpr IOBindingPortSpec kBindingPorts[] = {
     {PortAdsInternal3, IO_BACKEND_ADS1115_INT, 3, IO_PORT_DIR_IN, "ADS int A3"},
     {PortAdsExternal0, IO_BACKEND_ADS1115_EXT_DIFF, 0, IO_PORT_DIR_IN, "ADS ext D0"},
     {PortAdsExternal1, IO_BACKEND_ADS1115_EXT_DIFF, 1, IO_PORT_DIR_IN, "ADS ext D1"},
-    {PortOneWire1, IO_BACKEND_DS18B20, 0, IO_PORT_DIR_IN, "1-Wire 1"},        // Bus eau (GPIO via config oneWire1Gpio).
-    {PortOneWire2, IO_BACKEND_DS18B20, 1, IO_PORT_DIR_IN, "1-Wire 2"},        // Bus air (GPIO via config oneWire2Gpio).
+    {PortOneWire1, IO_BACKEND_DS18B20, 0, IO_PORT_DIR_IN, "Sonde 1-Wire 1"},
+    {PortOneWire2, IO_BACKEND_DS18B20, 1, IO_PORT_DIR_IN, "Sonde 1-Wire 2"},
+    {PortOneWire3, IO_BACKEND_DS18B20, 2, IO_PORT_DIR_IN, "Sonde 1-Wire 3"},
+    {PortOneWire4, IO_BACKEND_DS18B20, 3, IO_PORT_DIR_IN, "Sonde 1-Wire 4"},
     {PortSht40Temp, IO_BACKEND_SHT40, 0, IO_PORT_DIR_IN, "SHT40 temp"},
     {PortSht40Humidity, IO_BACKEND_SHT40, 1, IO_PORT_DIR_IN, "SHT40 hum"},
     {PortBmp280Temp, IO_BACKEND_BMP280, 0, IO_PORT_DIR_IN, "BMP280 temp"},
@@ -101,8 +108,10 @@ inline constexpr AnalogRoleDefault kAnalogRoleDefaults[] = {
     {PoolIds::SensorPh,         (PhysicalPortId)FLOW_WIRDEF_IO_A1PORT, FLOW_WIRDEF_IO_A10, FLOW_WIRDEF_IO_A11, FLOW_WIRDEF_IO_A1P}, // pH.
     {PoolIds::SensorPressure,   (PhysicalPortId)FLOW_WIRDEF_IO_A2PORT, FLOW_WIRDEF_IO_A20, FLOW_WIRDEF_IO_A21, FLOW_WIRDEF_IO_A2P}, // Pression.
     {PoolIds::SensorSpareAnalog,(PhysicalPortId)FLOW_WIRDEF_IO_A3PORT, FLOW_WIRDEF_IO_A30, FLOW_WIRDEF_IO_A31, FLOW_WIRDEF_IO_A3P}, // Entree analogique reservee.
-    {PoolIds::SensorWaterTemp,  (PhysicalPortId)FLOW_WIRDEF_IO_A4PORT, FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Temperature eau.
-    {PoolIds::SensorAirTemp,    (PhysicalPortId)FLOW_WIRDEF_IO_A5PORT, FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Temperature air.
+    {PoolIds::SensorTemperature1,(PhysicalPortId)FLOW_WIRDEF_IO_A4PORT, FLOW_WIRDEF_IO_A40, FLOW_WIRDEF_IO_A41, FLOW_WIRDEF_IO_A4P}, // Sonde 1-Wire 1.
+    {PoolIds::SensorTemperature2,(PhysicalPortId)FLOW_WIRDEF_IO_A5PORT, FLOW_WIRDEF_IO_A50, FLOW_WIRDEF_IO_A51, FLOW_WIRDEF_IO_A5P}, // Sonde 1-Wire 2.
+    {PoolIds::SensorTemperature3,(PhysicalPortId)FLOW_WIRDEF_IO_A6PORT, FLOW_WIRDEF_IO_A60, FLOW_WIRDEF_IO_A61, FLOW_WIRDEF_IO_A6P}, // Sonde 1-Wire 3.
+    {PoolIds::SensorTemperature4,(PhysicalPortId)FLOW_WIRDEF_IO_A7PORT, FLOW_WIRDEF_IO_A70, FLOW_WIRDEF_IO_A71, FLOW_WIRDEF_IO_A7P}, // Sonde 1-Wire 4.
 };
 
 inline constexpr DigitalInputRoleDefault kDigitalInputRoleDefaults[] = {

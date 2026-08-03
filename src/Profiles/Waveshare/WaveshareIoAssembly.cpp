@@ -74,7 +74,7 @@ namespace Waveshare {
 void configureIoModule(const AppContext& ctx, ModuleInstances& modules)
 {
     requireSetup(ctx.domain != nullptr, "missing domain spec");
-    modules.ioModule.setOneWireBuses(&modules.oneWireWater, &modules.oneWireAir);
+    modules.ioModule.setOneWireBuses(&modules.oneWireBus1, &modules.oneWireBus2);
     requireSetup(PoolIo::configure(*ctx.domain, modules.ioModule, kIoProfileSpec), "pool io configure");
 }
 

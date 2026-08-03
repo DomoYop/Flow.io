@@ -30,4 +30,46 @@ public:
     virtual uint8_t deviceCount() const = 0;
     /** GPIO pin for bit-bang buses, or -1 for I2C-bridged buses. */
     virtual int pin() const = 0;
+
+    /**
+     * Fait avancer la conversion partagee du bus et indique si les
+     * scratchpads sont lisibles.
+     *
+     * `request()` est un broadcast sur tout le bus : si chaque sonde le
+     * declenchait pour son compte, une sonde relancerait une conversion
+     * pendant qu'une autre lit, et la lecture renverrait la valeur de mise
+     * sous tension du DS18B20 (85 degC). L'arbitrage est donc porte par le
+     * bus : une seule conversion en vol, et toutes les sondes lisent la meme.
+     *
+     * Peut etre appelee par plusieurs sondes dans le meme tick.
+     *
+     * @param pollMs            periode minimale entre deux conversions
+     * @param conversionWaitMs  duree d'une conversion
+     * @return true quand une mesure convertie est disponible
+     */
+    bool tickConversion(uint32_t nowMs, uint32_t pollMs, uint32_t conversionWaitMs)
+    {
+        if (converting_) {
+            if ((uint32_t)(nowMs - conversionMs_) < conversionWaitMs) return false;
+            converting_ = false;
+            conversionMs_ = nowMs;
+            ++conversionSeq_;
+            return true;
+        }
+        // Mesure encore fraiche : rien a relancer, les sondes peuvent lire.
+        if (conversionSeq_ != 0U && (uint32_t)(nowMs - conversionMs_) < pollMs) return true;
+
+        request();
+        converting_ = true;
+        conversionMs_ = nowMs;
+        return false;
+    }
+
+    /** Numero de la derniere conversion terminee (0 = aucune). */
+    uint32_t conversionSeq() const { return conversionSeq_; }
+
+private:
+    uint32_t conversionMs_ = 0;
+    uint32_t conversionSeq_ = 0;
+    bool converting_ = false;
 };

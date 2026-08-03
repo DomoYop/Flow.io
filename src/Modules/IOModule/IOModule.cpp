@@ -749,13 +749,13 @@ bool IOModule::tickSlowDs_(void* ctx, uint32_t nowMs)
     IOModule* self = static_cast<IOModule*>(ctx);
     if (!self || !self->runtimeReady_) return false;
 
-    self->analogProviders_[IO_SRC_DS18_WATER].tick(nowMs);
-    self->analogProviders_[IO_SRC_DS18_AIR].tick(nowMs);
+    for (uint8_t slot = 0; slot < IO_DS18_SLOT_COUNT; ++slot) {
+        self->analogProviders_[IO_SRC_DS18_1 + slot].tick(nowMs);
+    }
 
     for (uint8_t i = 0; i < MAX_ANALOG_ENDPOINTS; ++i) {
         if (!self->analogSlots_[i].used) continue;
-        uint8_t src = self->analogSlots_[i].source;
-        if (src == IO_SRC_DS18_WATER || src == IO_SRC_DS18_AIR) {
+        if (isDs18AnalogSource(self->analogSlots_[i].source)) {
             self->processAnalogDefinition_(i, nowMs);
         }
     }
@@ -912,8 +912,9 @@ bool IOModule::processAnalogDefinition_(uint8_t idx, uint32_t nowMs)
     }
 
     IOAnalogSample sample{};
-    const uint8_t readChannel =
-        (slot.source == IO_SRC_DS18_WATER || slot.source == IO_SRC_DS18_AIR) ? 0U : slot.channel;
+    // Un driver DS18B20 ne porte qu'une sonde : le canal du port designe le
+    // slot de temperature, pas une mesure dans le driver.
+    const uint8_t readChannel = isDs18AnalogSource(slot.source) ? 0U : slot.channel;
     if (!provider->readSample(readChannel, sample)) {
         invalidateAnalogSlot_(slot, nowMs);
         return false;
@@ -1286,6 +1287,30 @@ bool IOModule::endpointIndexFromId_(const char* id, uint8_t& idxOut) const
     return false;
 }
 
+void IOModule::publishEndpointIoIds_()
+{
+    if (!dataStore_) return;
+    clearIoEndpointIoIds(*dataStore_);
+
+    uint8_t idx = 0;
+    if (analogSlots_) {
+        for (uint8_t i = 0; i < MAX_ANALOG_ENDPOINTS; ++i) {
+            const AnalogSlot& s = analogSlots_[i];
+            if (!s.used || !s.endpoint) continue;
+            if (!endpointIndexFromId_(s.endpoint->id(), idx)) continue;
+            setIoEndpointIoId(*dataStore_, idx, s.ioId);
+        }
+    }
+    if (digitalSlots_) {
+        for (uint8_t i = 0; i < MAX_DIGITAL_SLOTS; ++i) {
+            const DigitalSlot& s = digitalSlots_[i];
+            if (!s.used || !s.endpoint) continue;
+            if (!endpointIndexFromId_(s.endpoint->id(), idx)) continue;
+            setIoEndpointIoId(*dataStore_, idx, s.ioId);
+        }
+    }
+}
+
 void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
 {
     constexpr uint8_t kCfgModuleId = (uint8_t)ConfigModuleId::Io;
@@ -1344,8 +1369,9 @@ void IOModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(oneWire2EnabledVar_, kCfgModuleId, kCfgBranchIo1Wire2);
     cfg.registerVar(oneWire2GpioVar_, kCfgModuleId, kCfgBranchIo1Wire2);
     cfg.registerVar(oneWire2PollVar_, kCfgModuleId, kCfgBranchIo1Wire2);
-    cfg.registerVar(dsWaterRomVar_, kCfgModuleId, kCfgBranchIoDs18b20);
-    cfg.registerVar(dsAirRomVar_, kCfgModuleId, kCfgBranchIoDs18b20);
+    for (uint8_t slot = 0; slot < IO_DS18_SLOT_COUNT; ++slot) {
+        cfg.registerVar(dsRomVar_[slot], kCfgModuleId, kCfgBranchIoDs18b20);
+    }
     cfg.registerVar(traceEnabledVar_, kCfgModuleId, kCfgBranchIoDebug);
     cfg.registerVar(tracePeriodVar_, kCfgModuleId, kCfgBranchIoDebug);
 

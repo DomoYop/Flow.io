@@ -2,50 +2,6 @@
   "moduleId": "io",
   "values": [
     {
-      "valueId": 1,
-      "key": "pool.water_temp",
-      "type": "float",
-      "domain": "sondes",
-      "display": "circ-gauge",
-      "displayConfig": {
-        "bands": {
-          "min": 0,
-          "criticalLowEnd": 8,
-          "warningLowEnd": 14,
-          "warningHighStart": 30,
-          "criticalHighStart": 34,
-          "max": 40
-        }
-      },
-      "unit": "°C",
-      "decimals": 1,
-      "order": 10,
-      "label_t": "runtimeui.io.v01.label",
-      "group_t": "runtimeui.io.v01.group"
-    },
-    {
-      "valueId": 2,
-      "key": "pool.air_temp",
-      "type": "float",
-      "domain": "sondes",
-      "display": "circ-gauge",
-      "displayConfig": {
-        "bands": {
-          "min": -10,
-          "criticalLowEnd": 0,
-          "warningLowEnd": 8,
-          "warningHighStart": 28,
-          "criticalHighStart": 35,
-          "max": 45
-        }
-      },
-      "unit": "°C",
-      "decimals": 1,
-      "order": 20,
-      "label_t": "runtimeui.io.v02.label",
-      "group_t": "runtimeui.io.v02.group"
-    },
-    {
       "valueId": 3,
       "key": "pool.ph",
       "type": "float",

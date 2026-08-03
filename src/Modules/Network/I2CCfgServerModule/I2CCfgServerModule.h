@@ -137,6 +137,12 @@ private:
                                bool& winterModeOut,
                                bool& phAutoModeOut,
                                bool& orpAutoModeOut);
+    /**
+     * IoId de la sonde portant le role metier eau ou air. Le rattachement vit
+     * dans PoolLogic (poollogic/sensors), la couche IO n'expose que des sondes
+     * de temperature numerotees.
+     */
+    IoId poolTempIoId_(bool water);
     void collectActiveAlarmCodes_(uint8_t& activeAlarmCountOut, uint8_t& activeAlarmCodeCountOut);
     bool buildRuntimeStatusDomainJson_(FlowStatusDomain domain, bool& truncatedOut);
     bool buildRuntimeStatusSystemJson_(bool& truncatedOut);

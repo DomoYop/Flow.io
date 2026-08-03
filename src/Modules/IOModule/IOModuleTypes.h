@@ -16,6 +16,15 @@ typedef BindingPointId PhysicalPortId;
 constexpr BindingPointId BINDING_POINT_NONE = 0u;
 constexpr PhysicalPortId IO_PORT_INVALID = BINDING_POINT_NONE;
 
+/**
+ * Nombre de sondes DS18B20 adressables simultanement. Chaque slot est
+ * generique (temperature 1..N) : le role metier eau/air est decide par
+ * PoolLogic. Augmenter cette valeur impose d'etendre en meme temps
+ * `IoBackendTraits::maxChannel` du backend DS18B20, les ports de binding de
+ * chaque profil et les sources IO_SRC_DS18_*.
+ */
+constexpr uint8_t IO_DS18_SLOT_COUNT = 4;
+
 struct IOModuleConfig {
     bool enabled = FLOW_WIRDEF_IO_EN;
     int32_t i2cSda = FLOW_WIRDEF_IO_SDA;
@@ -65,9 +74,10 @@ struct IOModuleConfig {
     bool oneWire2Enabled = true;
     int32_t oneWire2Gpio = -1;
     int32_t oneWire2PollMs = 2000;
-    // DS18B20 sensor->temperature assignment by ROM (hex "AA:BB:..."; empty = auto).
-    char dsWaterRom[24] = {0};
-    char dsAirRom[24] = {0};
+    // Sonde DS18B20 affectee a chaque slot de temperature, par ROM
+    // (hex "AA:BB:..." ; vide = auto-attribution au premier demarrage, ensuite
+    // persistee ici). Le role metier eau/air est decide par PoolLogic.
+    char dsRom[IO_DS18_SLOT_COUNT][24] = {{0}};
     bool traceEnabled = FLOW_MODDEF_IO_TREN;
     int32_t tracePeriodMs = FLOW_MODDEF_IO_TRMS;
 };

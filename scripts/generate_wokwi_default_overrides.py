@@ -106,6 +106,16 @@ SPECS: List[Tuple[str, str, str, str, str]] = [
     ("io_a5p", "FLOW_WIRDEF_IO_A5P", "profile", "int32", "1"),
     ("io_a5n", "FLOW_WIRDEF_IO_A5N", "profile", "float", "Calib::Temperature::Ds18MinValidC"),
     ("io_a5x", "FLOW_WIRDEF_IO_A5X", "profile", "float", "Calib::Temperature::Ds18MaxValidC"),
+
+    ("io_a6port", "FLOW_WIRDEF_IO_A6PORT", "profile", "uint16", "122u"),
+    ("io_a60", "FLOW_WIRDEF_IO_A60", "profile", "float", "1.0f"),
+    ("io_a61", "FLOW_WIRDEF_IO_A61", "profile", "float", "0.0f"),
+    ("io_a6p", "FLOW_WIRDEF_IO_A6P", "profile", "int32", "1"),
+
+    ("io_a7port", "FLOW_WIRDEF_IO_A7PORT", "profile", "uint16", "123u"),
+    ("io_a70", "FLOW_WIRDEF_IO_A70", "profile", "float", "1.0f"),
+    ("io_a71", "FLOW_WIRDEF_IO_A71", "profile", "float", "0.0f"),
+    ("io_a7p", "FLOW_WIRDEF_IO_A7P", "profile", "int32", "1"),
 ]
 
 

@@ -2139,13 +2139,15 @@
         recommendedSpan: 0.4,
         warningOffset: 0.6
       },
+      // Temperatures : la sonde lue suit wat_temp_io_id / air_temp_io_id ;
+      // ioSlot n'est qu'un repli si le reglage PoolLogic est absent.
       water_temp: {
         key: 'water_temp',
         label: 'Température eau',
         mode: 'one',
         poollogicKey: 'wat_temp_io_id',
         ioSlot: 4,
-        runtimeUiId: 2201,
+        runtimeUiId: 2406,
         recommendedSpan: 0,
         warningOffset: 2.0
       },
@@ -2155,7 +2157,7 @@
         mode: 'one',
         poollogicKey: 'air_temp_io_id',
         ioSlot: 5,
-        runtimeUiId: 2202,
+        runtimeUiId: 2407,
         recommendedSpan: 0,
         warningOffset: 2.0
       }

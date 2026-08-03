@@ -35,9 +35,12 @@ inline constexpr IoAnalogSlotDefault kAnalogSlotDefaults[] = {
     {IO_BACKEND_POWERMON, 5, "Puissance temp °C", 1},
     {IO_BACKEND_POWERMON, 6, "Puissance énergie Wh", 2},
     {IO_BACKEND_POWERMON, 7, "Puissance charge mAh", 1},
-    // DS18B20 (sondes 1-Wire) — convention bus eau / bus air.
-    {IO_BACKEND_DS18B20, 0, "DS18B20 eau", 1},
-    {IO_BACKEND_DS18B20, 1, "DS18B20 air", 1},
+    // DS18B20 (sondes 1-Wire) — slots generiques : le role metier eau/air est
+    // decide par PoolLogic, pas par le rang de la sonde.
+    {IO_BACKEND_DS18B20, 0, "Température 1", 1},
+    {IO_BACKEND_DS18B20, 1, "Température 2", 1},
+    {IO_BACKEND_DS18B20, 2, "Température 3", 1},
+    {IO_BACKEND_DS18B20, 3, "Température 4", 1},
     // SHT40.
     {IO_BACKEND_SHT40, 0, "SHT40 température", 1},
     {IO_BACKEND_SHT40, 1, "SHT40 humidité", 0},

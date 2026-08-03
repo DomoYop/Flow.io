@@ -235,7 +235,7 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
         return [non_connected_entry()] + filtered
 
     # Analog bindings: Micronova's local DS18B20 GPIO binding is not valid on
-    # flow.io boards, which expose DS18B20 probes through profile ports 120/121.
+    # flow.io boards, which expose DS18B20 probes through profile ports 120-123.
     analog_key = "flowio_binding_port_analog"
     analog_entries = enum_sets.get(analog_key)
     if profile in ("flowio", "waveshare") and isinstance(analog_entries, list):
@@ -252,8 +252,10 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
                 103: "ADSInt3 - ADS1115 interne canal 3 [103]",
                 110: "ADSExt0 - ADS1115 externe paire diff 0 [110]",
                 111: "ADSExt1 - ADS1115 externe paire diff 1 [111]",
-                120: "OneWire1 - DS18B20 bus 1 [120]",
-                121: "OneWire2 - DS18B20 bus 2 [121]",
+                120: "OneWire1 - Sonde DS18B20 n°1 [120]",
+                121: "OneWire2 - Sonde DS18B20 n°2 [121]",
+                122: "OneWire3 - Sonde DS18B20 n°3 [122]",
+                123: "OneWire4 - Sonde DS18B20 n°4 [123]",
                 130: "SHT40Temp - SHT40 canal 0 [130]",
                 131: "SHT40Humidity - SHT40 canal 1 [131]",
                 132: "BMP280Temp - BMP280 canal 0 [132]",

@@ -81,8 +81,10 @@ struct ModuleInstances {
     IOModule ioModule;
     PoolDeviceModule poolDeviceModule{};
     PoolLogicModule poolLogicModule{};
-    OneWireBus oneWireWater;
-    OneWireBus oneWireAir;
+    // Bus 1-Wire bit-bang de la carte. Un bus ne porte aucun role metier :
+    // n'importe quelle sonde peut vivre sur n'importe lequel.
+    OneWireBus oneWireBus1;
+    OneWireBus oneWireBus2;
     DataStore* ioDataStore = nullptr;
     const HAService* haService = nullptr;
     char topicNetworkState[Limits::TopicBuf] = {0};

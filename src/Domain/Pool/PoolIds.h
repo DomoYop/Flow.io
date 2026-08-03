@@ -9,8 +9,11 @@ enum DomainSlot : DomainSlotId {
     SensorPh = 2,
     SensorPressure = 3,
     SensorSpareAnalog = 4,
-    SensorWaterTemp = 5,
-    SensorAirTemp = 6,
+    // Sondes de temperature generiques. Le role metier (eau, air) est un
+    // reglage de PoolLogic (wat_temp_io_id / air_temp_io_id), pas une identite
+    // de slot : c'est ce qui rend l'affectation corrigeable sans reflasher.
+    SensorTemperature1 = 5,
+    SensorTemperature2 = 6,
     SensorPoolLevel = 7,
     SensorPhLevel = 8,
     SensorChlorineLevel = 9,
@@ -28,7 +31,9 @@ enum DomainSlot : DomainSlotId {
     SensorFlowSwitch = 19,
     SensorCoverClosed = 20,
     ActuatorFlowCopy = 21,
-    ActuatorCoverClosed = 22
+    ActuatorCoverClosed = 22,
+    SensorTemperature3 = 23,
+    SensorTemperature4 = 24
 };
 
 enum Device : PoolDeviceId {
@@ -43,7 +48,7 @@ enum Device : PoolDeviceId {
 };
 
 constexpr uint8_t DeviceCount = 8;
-constexpr uint8_t SensorCount = 12;
-constexpr uint8_t DomainSlotCount = 22;
+constexpr uint8_t SensorCount = 14;
+constexpr uint8_t DomainSlotCount = 24;
 
 }  // namespace PoolIds

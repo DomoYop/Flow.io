@@ -139,7 +139,7 @@ MqttBuildResult PoolLogicModule::buildCfgBase_(MqttBuildContext& buildCtx)
 
 uint8_t PoolLogicModule::runtimeSnapshotCount() const
 {
-    return 5;
+    return 6;
 }
 
 bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) const
@@ -157,6 +157,13 @@ bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wri
             return writer.writeBool(runtimeId, orpAutoMode_);
         case RuntimeUiHeaterAutoMode:
             return writer.writeBool(runtimeId, heaterAutoMode_);
+        case RuntimeUiWaterTemp:
+        case RuntimeUiAirTemp: {
+            const IoId ioId = (valueId == RuntimeUiWaterTemp) ? waterTempIoId_ : airTempIoId_;
+            float value = 0.0f;
+            if (!loadAnalogSensor_(ioId, value)) return writer.writeUnavailable(runtimeId);
+            return writer.writeF32(runtimeId, value);
+        }
         default:
             return false;
     }
@@ -169,6 +176,9 @@ const char* PoolLogicModule::runtimeSnapshotSuffix(uint8_t idx) const
     if (idx == 2) return "rt/poollogic/heat_assist";
     if (idx == 3) return "rt/poollogic/disinfection";
     if (idx == 4) return "rt/poollogic/flow";
+    // Temperatures metier : la sonde publiee suit wat_temp_io_id /
+    // air_temp_io_id, ce qui rend les entites HA independantes du slot IO.
+    if (idx == 5) return "rt/poollogic/temp";
     return nullptr;
 }
 
@@ -180,7 +190,7 @@ RuntimeRouteClass PoolLogicModule::runtimeSnapshotClass(uint8_t idx) const
 
 bool PoolLogicModule::runtimeSnapshotAffectsKey(uint8_t idx, DataKey key) const
 {
-    if (idx > 4) return false;
+    if (idx > 5) return false;
     if (key >= DATAKEY_IO_BASE && key < (DataKey)(DATAKEY_IO_BASE + IO_MAX_ENDPOINTS)) return true;
     if (key >= DATAKEY_POOL_DEVICE_STATE_BASE &&
         key < (DataKey)(DATAKEY_POOL_DEVICE_STATE_BASE + POOL_DEVICE_MAX)) return true;
@@ -192,6 +202,26 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
     if (!out || len == 0) return false;
 
     const uint32_t nowMs = millis();
+    if (idx == 5) {
+        // Temperatures metier. Une sonde absente sort en null : cote Home
+        // Assistant l'entite passe "unavailable" plutot que de figer 0 degC.
+        float waterTemp = 0.0f;
+        float airTemp = 0.0f;
+        const bool haveWater = loadAnalogSensor_(waterTempIoId_, waterTemp);
+        const bool haveAir = loadAnalogSensor_(airTempIoId_, airTemp);
+
+        char waterBuf[16] = "null";
+        char airBuf[16] = "null";
+        if (haveWater) snprintf(waterBuf, sizeof(waterBuf), "%.1f", (double)waterTemp);
+        if (haveAir) snprintf(airBuf, sizeof(airBuf), "%.1f", (double)airTemp);
+
+        const int wrote = snprintf(out, len, "{\"wat\":%s,\"air\":%s,\"t\":%lu}",
+                                   waterBuf, airBuf, (unsigned long)nowMs);
+        if (wrote < 0 || (size_t)wrote >= len) return false;
+        maxTsOut = nowMs ? nowMs : 1U;
+        return true;
+    }
+
     if (idx == 3) {
         // Le sous-objet O2 n'est emis qu'en mode oxygene actif : hors O2 il serait
         // fige et inerte, donc du trafic MQTT inutile. Payload compact sinon.

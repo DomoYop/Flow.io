@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include "Core/Services/IIO.h"
+
 constexpr uint8_t IO_MAX_ENDPOINTS = 40;
 
 enum IOValueType : uint8_t {
@@ -21,6 +23,10 @@ struct IOEndpointRuntime {
     bool boolValue = false;
     int32_t intValue = 0;
     uint32_t timestampMs = 0;
+    // Identite logique du slot occupant cette case. L'index de la case est un
+    // index de registre (ordre d'insertion des endpoints resolus), il glisse des
+    // qu'un slot perd son binding : les consommateurs doivent resoudre par ioId.
+    IoId ioId = IO_ID_INVALID;
 };
 
 struct IORuntimeData {

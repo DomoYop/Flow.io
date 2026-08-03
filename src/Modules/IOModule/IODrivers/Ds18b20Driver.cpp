@@ -18,7 +18,7 @@ bool Ds18b20Driver::begin()
     if (!bus_) return false;
     bus_->begin();
     bus_->setWaitForConversion(false);
-    requested_ = false;
+    readSeq_ = 0;
     valid_ = false;
     return true;
 }
@@ -27,26 +27,21 @@ void Ds18b20Driver::tick(uint32_t nowMs)
 {
     if (!bus_) return;
 
-    if (!requested_) {
-        bus_->request();
-        lastRequestMs_ = nowMs;
-        requested_ = true;
-        return;
-    }
+    // La conversion est arbitree par le bus : plusieurs sondes peuvent le
+    // partager, une seule conversion est en vol et toutes lisent la meme.
+    if (!bus_->tickConversion(nowMs, cfg_.pollMs, cfg_.conversionWaitMs)) return;
 
-    if ((uint32_t)(nowMs - lastRequestMs_) < cfg_.conversionWaitMs) return;
+    // Une seule lecture par conversion.
+    const uint32_t seq = bus_->conversionSeq();
+    if (seq == readSeq_) return;
+    readSeq_ = seq;
 
-    float c = bus_->readC(address_);
+    const float c = bus_->readC(address_);
     if (c != DEVICE_DISCONNECTED_C) {
         celsius_ = c;
         valid_ = true;
     } else {
         valid_ = false;
-    }
-
-    if ((uint32_t)(nowMs - lastRequestMs_) >= cfg_.pollMs) {
-        bus_->request();
-        lastRequestMs_ = nowMs;
     }
 }
 
@@ -63,5 +58,9 @@ bool Ds18b20Driver::readSample(uint8_t, IOAnalogSample& out) const
     if (!readCelsius(c)) return false;
     out = IOAnalogSample{};
     out.value = c;
+    // Sequence de conversion : evite de recalculer le slot a chaque tick alors
+    // qu'une mesure DS18B20 ne change qu'une fois par periode de scrutation.
+    out.seq = readSeq_;
+    out.hasSeq = true;
     return true;
 }

@@ -31,8 +31,10 @@
 
 namespace {
 
-// Nombre de slots analogiques exposes a Home Assistant (historique).
-constexpr uint8_t kAnalogHaSlots = 17;
+// Tous les slots analogiques de la carte sont exposes a Home Assistant : en
+// plafonner une partie tronquerait silencieusement les capteurs auto-provisionnes
+// (POWERMON, BME680, SHT40... consomment deja une vingtaine de slots).
+constexpr uint8_t kAnalogHaSlots = Limits::Io::MaxAnalogEndpoints;
 constexpr uint8_t kDigitalHaSlots = Limits::Io::MaxDigitalInputs;
 
 struct PoolIoDiscoveryHeap {

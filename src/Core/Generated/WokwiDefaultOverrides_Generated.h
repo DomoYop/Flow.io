@@ -482,3 +482,67 @@
 #define FLOW_WIRDEF_IO_A5X Calib::Temperature::Ds18MaxValidC
 #endif
 #endif
+
+#ifndef FLOW_WIRDEF_IO_A6PORT
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A6PORT 122u
+#else
+#define FLOW_WIRDEF_IO_A6PORT 122u
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A60
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A60 1.0f
+#else
+#define FLOW_WIRDEF_IO_A60 1.0f
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A61
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A61 0.0f
+#else
+#define FLOW_WIRDEF_IO_A61 0.0f
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A6P
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A6P 1
+#else
+#define FLOW_WIRDEF_IO_A6P 1
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A7PORT
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A7PORT 123u
+#else
+#define FLOW_WIRDEF_IO_A7PORT 123u
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A70
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A70 1.0f
+#else
+#define FLOW_WIRDEF_IO_A70 1.0f
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A71
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A71 0.0f
+#else
+#define FLOW_WIRDEF_IO_A71 0.0f
+#endif
+#endif
+
+#ifndef FLOW_WIRDEF_IO_A7P
+#if defined(FLOW_WOKWI_DEFAULT_OVERRIDES)
+#define FLOW_WIRDEF_IO_A7P 1
+#else
+#define FLOW_WIRDEF_IO_A7P 1
+#endif
+#endif

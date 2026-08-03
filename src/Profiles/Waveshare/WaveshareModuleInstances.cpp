@@ -39,8 +39,8 @@ ModuleInstances::ModuleInstances(const BoardSpec& board)
       hmiModule(board),
       hmiBuzzerModule(board),
       ioModule(board),
-      oneWireWater(oneWirePinForSignal(board, BoardSignal::TempProbe1, 3)),
-      oneWireAir(oneWirePinForSignal(board, BoardSignal::TempProbe2, 2))
+      oneWireBus1(oneWirePinForSignal(board, BoardSignal::TempProbe1, 3)),
+      oneWireBus2(oneWirePinForSignal(board, BoardSignal::TempProbe2, 2))
 {
 }
 

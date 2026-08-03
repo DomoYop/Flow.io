@@ -1669,6 +1669,31 @@ void sendMicronovaLocalRuntimeValuesResponse_(AsyncWebServerRequest* request,
 #endif
 
 #if defined(FLOW_PROFILE_WAVESHARE)
+/**
+ * IoId de la sonde affectee au role metier eau ou air. Le rattachement vit
+ * dans PoolLogic (poollogic/sensors), pas dans la couche IO : c'est ce qui
+ * permet de corriger une inversion sans toucher au cablage ni aux slots.
+ */
+IoId waveshareLoadPoolTempIoId_(ConfigStore* cfgStore, bool water)
+{
+    const IoSlotId fallback = water ? analogInputSlot(4) : analogInputSlot(5);
+    if (!cfgStore) return ioIdFromSlot(fallback);
+
+    char moduleJson[512] = {0};
+    bool truncated = false;
+    if (!cfgStore->toJsonModule("poollogic/sensors", moduleJson, sizeof(moduleJson), &truncated, true)) {
+        return ioIdFromSlot(fallback);
+    }
+
+    StaticJsonDocument<640> doc;
+    if (deserializeJson(doc, moduleJson)) return ioIdFromSlot(fallback);
+    JsonObjectConst root = doc.as<JsonObjectConst>();
+    if (root.isNull()) return ioIdFromSlot(fallback);
+
+    const uint16_t raw = root[water ? "wat_temp_io_id" : "air_temp_io_id"] | (uint16_t)ioIdFromSlot(fallback);
+    return (IoId)raw;
+}
+
 bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
                                 bool& hasMode,
                                 bool& autoMode,
@@ -2031,48 +2056,59 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2106:
             printRuntimeU32_(out, firstValue, id, "mqtt.oversize_drop", mqttOversizeDrop(*dataStore));
             return true;
-        case 2201:
-        case 2202:
         case 2203:
         case 2204:
         case 2206: {
-            uint8_t runtimeIndex = 4;
-            const char* key = "pool.water_temp";
-            const char* unit = "\xC2\xB0""C";
-            if (id == 2202) {
-                runtimeIndex = 5;
-                key = "pool.air_temp";
-            } else if (id == 2203) {
-                runtimeIndex = 1;
-                key = "pool.ph";
-                unit = nullptr;
-            } else if (id == 2204) {
-                runtimeIndex = 0;
+            // Numeros de slot analogique (a00, a01...) : le DataStore est
+            // indexe par ordre d'insertion dans le registre, donc la lecture
+            // passe par l'IoId du slot et jamais par une position figee.
+            uint8_t analogSlotIdx = 1;
+            const char* key = "pool.ph";
+            const char* unit = nullptr;
+            if (id == 2204) {
+                analogSlotIdx = 0;
                 key = "pool.orp";
                 unit = "mV";
             } else if (id == 2206) {
-                runtimeIndex = 2;
+                analogSlotIdx = 2;
                 key = "pool.pressure";
                 unit = "bar";
             }
 
             float value = 0.0f;
-            if (!ioEndpointFloat(*dataStore, runtimeIndex, value)) {
+            if (!ioEndpointFloatByIoId(*dataStore, ioIdFromSlot(analogInputSlot(analogSlotIdx)), value)) {
                 wavesharePrintUnavailableByManifestType_(out, firstValue, id);
             } else {
                 printRuntimeF32_(out, firstValue, id, key, value, unit);
             }
             return true;
         }
-        case 2205: {
-            const uint8_t runtimeIndex = 9;
+        case 2406:
+        case 2407: {
+            // Temperatures metier : la sonde lue est celle designee par
+            // PoolLogic, pas un slot IO fige.
+            const bool water = (id == 2406);
+            const IoId ioId = waveshareLoadPoolTempIoId_(cfgStore, water);
             float value = 0.0f;
-            if (ioEndpointFloat(*dataStore, runtimeIndex, value)) {
+            if (!ioEndpointFloatByIoId(*dataStore, ioId, value)) {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            } else {
+                printRuntimeF32_(out, firstValue, id,
+                                 water ? "pool.water_temp" : "pool.air_temp",
+                                 value, "\xC2\xB0""C");
+            }
+            return true;
+        }
+        case 2205: {
+            // Compteur d'eau : 4e entree TOR du domaine.
+            const IoId counterIoId = ioIdFromSlot(digitalInputSlot(3));
+            float value = 0.0f;
+            if (ioEndpointFloatByIoId(*dataStore, counterIoId, value)) {
                 printRuntimeF32_(out, firstValue, id, "pool.water_counter", value, "L");
                 return true;
             }
             int32_t counterInt = 0;
-            if (ioEndpointInt(*dataStore, runtimeIndex, counterInt)) {
+            if (ioEndpointIntByIoId(*dataStore, counterIoId, counterInt)) {
                 printRuntimeF32_(out, firstValue, id, "pool.water_counter", (float)counterInt, "L");
                 return true;
             }
@@ -2314,9 +2350,11 @@ bool waveshareBuildStatusDomainJson_(FlowStatusDomain domain,
         pool["pha"] = phAutoMode;
         pool["ora"] = orpAutoMode;
 
-        auto setFloat = [&](const char* key, uint8_t runtimeIndex, uint8_t decimals) {
+        // Lecture par IoId : l'index d'une case du DataStore est un index de
+        // registre et n'est pas stable.
+        auto setFloatByIoId = [&](const char* key, IoId ioId, uint8_t decimals) {
             float value = 0.0f;
-            if (!dataStore || !ioEndpointFloat(*dataStore, runtimeIndex, value)) {
+            if (!dataStore || !ioEndpointFloatByIoId(*dataStore, ioId, value)) {
                 pool[key] = nullptr;
                 return;
             }
@@ -2324,10 +2362,11 @@ bool waveshareBuildStatusDomainJson_(FlowStatusDomain domain,
             const float rounded = (decimals == 0U) ? roundf(value) : (roundf(value * scale) / scale);
             pool[key] = rounded;
         };
-        setFloat("wat", 4, 1U);
-        setFloat("air", 5, 1U);
-        setFloat("ph", 1, 2U);
-        setFloat("orp", 0, 0U);
+        // Temperatures : la sonde lue est celle designee par PoolLogic.
+        setFloatByIoId("wat", waveshareLoadPoolTempIoId_(cfgStore, true), 1U);
+        setFloatByIoId("air", waveshareLoadPoolTempIoId_(cfgStore, false), 1U);
+        setFloatByIoId("ph", ioIdFromSlot(analogInputSlot(1)), 2U);
+        setFloatByIoId("orp", ioIdFromSlot(analogInputSlot(0)), 0U);
 
         auto setDevice = [&](const char* key, uint8_t slot) {
             PoolDeviceRuntimeStateEntry state{};
@@ -2722,23 +2761,25 @@ bool waveshareReadDashboardPoolSensorDataStore_(DataStore* dataStore,
 {
     if (!dataStore) return false;
 
-    uint8_t runtimeIndex = 4;
-    if (valueId == 2U) {
-        runtimeIndex = 5;
-    } else if (valueId == 3U) {
-        runtimeIndex = 1;
+    // Slot du domaine, resolu en IoId : l'index d'une case du DataStore est un
+    // index de registre et n'est pas stable. Les valueId 1 et 2 (temperatures
+    // eau/air) ont migre vers PoolLogic.
+    IoSlotId slot = IO_SLOT_INVALID;
+    if (valueId == 3U) {
+        slot = analogInputSlot(1);
     } else if (valueId == 4U) {
-        runtimeIndex = 0;
+        slot = analogInputSlot(0);
     } else if (valueId == 5U) {
-        runtimeIndex = 9;
+        slot = digitalInputSlot(3);
     } else if (valueId == 6U) {
-        runtimeIndex = 2;
-    } else if (valueId != 1U) {
+        slot = analogInputSlot(2);
+    } else {
         return false;
     }
+    const IoId ioId = ioIdFromSlot(slot);
 
     float value = 0.0f;
-    if (ioEndpointFloat(*dataStore, runtimeIndex, value)) {
+    if (ioEndpointFloatByIoId(*dataStore, ioId, value)) {
         out.available = true;
         out.wireType = RuntimeUiWireType::Float32;
         out.f32Value = value;
@@ -2746,7 +2787,7 @@ bool waveshareReadDashboardPoolSensorDataStore_(DataStore* dataStore,
     }
     if (valueId == 5U) {
         int32_t counterInt = 0;
-        if (ioEndpointInt(*dataStore, runtimeIndex, counterInt)) {
+        if (ioEndpointIntByIoId(*dataStore, ioId, counterInt)) {
             out.available = true;
             out.wireType = RuntimeUiWireType::Float32;
             out.f32Value = (float)counterInt;
@@ -2780,6 +2821,17 @@ bool waveshareReadDashboardRuntimeValue_(DataStore* dataStore,
             return true;
 
         case ModuleId::PoolLogic:
+            // Temperatures metier : la sonde lue suit le reglage PoolLogic.
+            if (valueId == 6U || valueId == 7U) {
+                if (!dataStore) return false;
+                const IoId tempIoId = waveshareLoadPoolTempIoId_(cfgStore, valueId == 6U);
+                float tempValue = 0.0f;
+                if (!ioEndpointFloatByIoId(*dataStore, tempIoId, tempValue)) return false;
+                out.available = true;
+                out.wireType = RuntimeUiWireType::Float32;
+                out.f32Value = tempValue;
+                return true;
+            }
             waveshareEnsurePoolMode_(ctx, cfgStore);
             if (!ctx.poolModeAvailable) return false;
             out.available = true;

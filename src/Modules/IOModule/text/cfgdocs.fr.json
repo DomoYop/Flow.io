@@ -61,15 +61,25 @@
       "help_t": "cfgdocs.io.drivers.bme680.poll_ms.help",
       "unit": "ms"
     },
-    "io/drivers/ds18b20/water_rom": {
+    "io/drivers/ds18b20/rom1": {
       "type": "CharArray",
-      "label_t": "cfgdocs.io.drivers.ds18b20.water_rom.label",
-      "help_t": "cfgdocs.io.drivers.ds18b20.water_rom.help"
+      "label_t": "cfgdocs.io.drivers.ds18b20.rom1.label",
+      "help_t": "cfgdocs.io.drivers.ds18b20.rom1.help"
     },
-    "io/drivers/ds18b20/air_rom": {
+    "io/drivers/ds18b20/rom2": {
       "type": "CharArray",
-      "label_t": "cfgdocs.io.drivers.ds18b20.air_rom.label",
-      "help_t": "cfgdocs.io.drivers.ds18b20.air_rom.help"
+      "label_t": "cfgdocs.io.drivers.ds18b20.rom2.label",
+      "help_t": "cfgdocs.io.drivers.ds18b20.rom2.help"
+    },
+    "io/drivers/ds18b20/rom3": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.drivers.ds18b20.rom3.label",
+      "help_t": "cfgdocs.io.drivers.ds18b20.rom3.help"
+    },
+    "io/drivers/ds18b20/rom4": {
+      "type": "CharArray",
+      "label_t": "cfgdocs.io.drivers.ds18b20.rom4.label",
+      "help_t": "cfgdocs.io.drivers.ds18b20.rom4.help"
     },
     "io/drivers/ds2484/address": {
       "type": "UInt8",

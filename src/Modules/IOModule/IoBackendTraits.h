@@ -29,7 +29,7 @@ inline constexpr IoBackendTraits kBackendTraits[] = {
     {IO_BACKEND_PCF8574,          "PCF8574",     "pcf8574_output",        IO_PORT_DIR_OUT,                  false, 7U,  true},
     {IO_BACKEND_ADS1115_INT,      "ADS1115 int", "ads1115_internal",      IO_PORT_DIR_IN,                   true,  3U,  false},
     {IO_BACKEND_ADS1115_EXT_DIFF, "ADS1115 ext", "ads1115_external_diff", IO_PORT_DIR_IN,                   true,  1U,  false},
-    {IO_BACKEND_DS18B20,          "DS18B20",     "ds18b20",               IO_PORT_DIR_IN,                   true,  1U,  true},
+    {IO_BACKEND_DS18B20,          "DS18B20",     "ds18b20",               IO_PORT_DIR_IN,                   true,  3U,  true},
     {IO_BACKEND_SHT40,            "SHT40",       "sht40",                 IO_PORT_DIR_IN,                   true,  1U,  true},
     {IO_BACKEND_BMP280,           "BMP280",      "bmp280",                IO_PORT_DIR_IN,                   true,  1U,  true},
     {IO_BACKEND_BME680,           "BME680",      "bme680",                IO_PORT_DIR_IN,                   true,  3U,  true},
@@ -53,16 +53,15 @@ constexpr const char* ioBackendLabel(uint8_t backend)
 }
 
 /**
- * Per-port kind identifier for the web API. GPIO and DS18B20 keep their
- * historical direction/bus-specific labels; every other backend has one label.
+ * Per-port kind identifier for the web API. GPIO keeps its historical
+ * direction-specific labels; every other backend has one label. Les sondes
+ * DS18B20 sont generiques (temperature 1..4) : le role metier eau/air est
+ * decide par PoolLogic, pas par le canal du port.
  */
 constexpr const char* ioPortKindLabel(const IOBindingPortSpec& spec)
 {
     if (spec.backend == IO_BACKEND_GPIO) {
         return (spec.flags & IO_PORT_DIR_OUT) ? "gpio_output" : "gpio_input";
-    }
-    if (spec.backend == IO_BACKEND_DS18B20) {
-        return (spec.channel == 0U) ? "ds18b20_water" : "ds18b20_air";
     }
     const IoBackendTraits* traits = backendTraits(spec.backend);
     return traits ? traits->kindLabel : "none";

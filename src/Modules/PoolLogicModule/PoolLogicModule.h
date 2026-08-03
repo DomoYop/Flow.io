@@ -79,6 +79,10 @@ private:
         RuntimeUiPhAutoMode = 3,
         RuntimeUiOrpAutoMode = 4,
         RuntimeUiHeaterAutoMode = 5,
+        // Temperatures metier : le slot IO lu suit wat_temp_io_id /
+        // air_temp_io_id, pas une position figee dans la couche IO.
+        RuntimeUiWaterTemp = 6,
+        RuntimeUiAirTemp = 7,
     };
 
     enum DisinfectionType : uint8_t {

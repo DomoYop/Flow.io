@@ -16,8 +16,12 @@ inline constexpr PoolRoleSpec kPoolRoles[] = {
     {PoolIds::SensorPh, analogInputSlot(1), "pH", "pH", "io_ph", nullptr, "mdi:ph", ""},
     {PoolIds::SensorPressure, analogInputSlot(2), "Pressure", "Pressure", "io_pressure", nullptr, "mdi:gauge", "bar"},
     {PoolIds::SensorSpareAnalog, analogInputSlot(3), "Spare", "Spare", "io_spare", nullptr, "mdi:sine-wave", nullptr},
-    {PoolIds::SensorWaterTemp, analogInputSlot(4), "Water Temperature", "Water Temperature", "io_wat_tmp", nullptr, "mdi:water-thermometer", "\xC2\xB0""C"},
-    {PoolIds::SensorAirTemp, analogInputSlot(5), "Air Temperature", "Air Temperature", "io_air_tmp", nullptr, "mdi:thermometer", "\xC2\xB0""C"},
+    // Sondes 1-Wire generiques. Les entites metier eau/air sont publiees a part
+    // par PoolLogic, d'apres wat_temp_io_id / air_temp_io_id.
+    {PoolIds::SensorTemperature1, analogInputSlot(4), "Temperature 1", "Temperature 1", "io_temp1", nullptr, "mdi:thermometer", "\xC2\xB0""C"},
+    {PoolIds::SensorTemperature2, analogInputSlot(5), "Temperature 2", "Temperature 2", "io_temp2", nullptr, "mdi:thermometer", "\xC2\xB0""C"},
+    {PoolIds::SensorTemperature3, analogInputSlot(6), "Temperature 3", "Temperature 3", "io_temp3", nullptr, "mdi:thermometer", "\xC2\xB0""C"},
+    {PoolIds::SensorTemperature4, analogInputSlot(7), "Temperature 4", "Temperature 4", "io_temp4", nullptr, "mdi:thermometer", "\xC2\xB0""C"},
 #if defined(FLOW_BOARD_WAVESHARE_ESP32_S3)
     {PoolIds::SensorPoolLevel, digitalInputSlot(2), "Pool Level", "Pool Level", "io_pool_lvl", nullptr, "mdi:waves-arrow-up", nullptr},
     {PoolIds::SensorPhLevel, digitalInputSlot(0), "pH Level", "pH Level", "io_ph_lvl", nullptr, "mdi:flask-outline", nullptr},

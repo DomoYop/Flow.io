@@ -32,8 +32,9 @@ private:
     uint8_t address_[8] = {0};
     Ds18b20DriverConfig cfg_{};
 
-    uint32_t lastRequestMs_ = 0;
-    bool requested_ = false;
+    // Numero de la conversion deja lue : une seule lecture par conversion, et
+    // sert de sequence d'echantillon aux consommateurs.
+    uint32_t readSeq_ = 0;
     bool valid_ = false;
     float celsius_ = 0.0f;
 };

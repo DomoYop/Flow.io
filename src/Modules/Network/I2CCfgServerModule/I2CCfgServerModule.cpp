@@ -401,6 +401,36 @@ void I2CCfgServerModule::resetPatchState_()
     patchBuf_[0] = '\0';
 }
 
+IoId I2CCfgServerModule::poolTempIoId_(bool water)
+{
+    const IoId fallback = ioIdFromSlot(water ? analogInputSlot(4) : analogInputSlot(5));
+
+    memset(poolModeJsonScratch_, 0, sizeof(poolModeJsonScratch_));
+    bool truncated = false;
+    bool ok = false;
+    if (cfgStore_) {
+        ok = cfgStore_->toJsonModule("poollogic/sensors",
+                                     poolModeJsonScratch_,
+                                     sizeof(poolModeJsonScratch_),
+                                     &truncated,
+                                     true);
+    } else if (cfgSvc_ && cfgSvc_->toJsonModule) {
+        ok = cfgSvc_->toJsonModule(cfgSvc_->ctx,
+                                   "poollogic/sensors",
+                                   poolModeJsonScratch_,
+                                   sizeof(poolModeJsonScratch_),
+                                   &truncated);
+    }
+    if (!ok || truncated) return fallback;
+
+    int32_t parsed = 0;
+    if (!parseJsonIntField_(poolModeJsonScratch_, water ? "wat_temp_io_id" : "air_temp_io_id", parsed)) {
+        return fallback;
+    }
+    if (parsed < 0 || parsed >= (int32_t)IO_ID_INVALID) return fallback;
+    return (IoId)parsed;
+}
+
 bool I2CCfgServerModule::collectPoolModeFlags_(bool& hasModeOut,
                                                bool& autoModeOut,
                                                bool& winterModeOut,
@@ -742,14 +772,17 @@ bool I2CCfgServerModule::buildRuntimeStatusPoolJson_(bool& truncatedOut)
     bool robotOn = false;
     (void)collectPoolModeFlags_(poolHasMode, poolAutoMode, poolWinterMode, poolPhAutoMode, poolOrpAutoMode);
 
+    // Lecture par IoId : l'index d'une case du DataStore est un index de
+    // registre, il glisse des qu'un slot amont perd son binding. Les
+    // temperatures suivent en plus le role metier choisi dans PoolLogic.
     const bool haveWaterTemp =
-        dataStore_ && ioEndpointFloat(*dataStore_, 4U, waterTemp);
+        dataStore_ && ioEndpointFloatByIoId(*dataStore_, poolTempIoId_(true), waterTemp);
     const bool haveAirTemp =
-        dataStore_ && ioEndpointFloat(*dataStore_, 5U, airTemp);
+        dataStore_ && ioEndpointFloatByIoId(*dataStore_, poolTempIoId_(false), airTemp);
     const bool havePh =
-        dataStore_ && ioEndpointFloat(*dataStore_, 1U, phValue);
+        dataStore_ && ioEndpointFloatByIoId(*dataStore_, ioIdFromSlot(analogInputSlot(1)), phValue);
     const bool haveOrp =
-        dataStore_ && ioEndpointFloat(*dataStore_, 0U, orpValue);
+        dataStore_ && ioEndpointFloatByIoId(*dataStore_, ioIdFromSlot(analogInputSlot(0)), orpValue);
 
     PoolDeviceRuntimeStateEntry deviceState{};
     const bool haveFiltration =

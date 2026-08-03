@@ -119,10 +119,12 @@ constexpr char IO_OW1PL[] = "io_ow1pl"; // GPIO 1-Wire bus #1 poll period (ms).
 constexpr char IO_OW2EN[] = "io_ow2en"; // GPIO 1-Wire bus #2 enabled.
 constexpr char IO_OW2GP[] = "io_ow2gp"; // GPIO 1-Wire bus #2 GPIO pin.
 constexpr char IO_OW2PL[] = "io_ow2pl"; // GPIO 1-Wire bus #2 poll period (ms).
-constexpr char IO_DSWR[] = "io_dswr"; // DS18B20 water sensor ROM selection.
-constexpr char IO_DSAR[] = "io_dsar"; // DS18B20 air sensor ROM selection.
-constexpr char DsRomWater[] = "io_dswrm"; // IO module runtime DS18 water ROM blob.
-constexpr char DsRomAir[] = "io_dsarm"; // IO module runtime DS18 air ROM blob.
+// Selection de la sonde DS18B20 affectee a chaque slot de temperature. Le
+// role metier (eau, air...) est decide par PoolLogic, pas ici.
+constexpr char IO_DSR1[] = "io_dsr1"; // DS18B20 temperature slot 1 ROM selection.
+constexpr char IO_DSR2[] = "io_dsr2"; // DS18B20 temperature slot 2 ROM selection.
+constexpr char IO_DSR3[] = "io_dsr3"; // DS18B20 temperature slot 3 ROM selection.
+constexpr char IO_DSR4[] = "io_dsr4"; // DS18B20 temperature slot 4 ROM selection.
 }  // namespace Io
 
 namespace I2cCfg {
