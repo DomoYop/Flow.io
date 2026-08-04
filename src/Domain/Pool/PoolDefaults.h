@@ -72,6 +72,31 @@ constexpr int32_t PidWindowMs = 3600000;
 constexpr int32_t PidMinOnMs = 30000;
 constexpr int32_t PidSampleMs = 30000;
 
+// Dosage volumetrique par lots (pH). Le gain est un ordre de grandeur usuel :
+// ~10 mL d'acide chlorhydrique 33 % par m3 pour -0,1 pH a TAC ~100 mg/L. Il est
+// ensuite auto-calibre a partir de l'effet reellement obtenu.
+constexpr float PhDoseMlPerM3 = 10.0f;
+constexpr float PhDoseUnitStep = 0.1f;
+constexpr float PhDeadband = 0.05f;
+constexpr float PhDoseFactor = 0.5f;  // viser la moitie de l'ecart par lot
+constexpr uint16_t PhMixWaitMin = 0;  // 0 => duree de turnover calculee
+constexpr float PhDoseMaxBatchMl = 250.0f;
+constexpr float PhDoseMaxDayMl = 1500.0f;
+constexpr float PhValidMin = 6.0f;
+constexpr float PhValidMax = 8.5f;
+constexpr uint16_t PhSampleMaxAgeSec = 300;
+constexpr uint8_t PhNoEffectBatches = 3;
+constexpr float PhNoEffectDelta = 0.02f;
+
+// Bornes internes du controleur de dosage.
+constexpr uint32_t DosingMixWaitMinMs = 10UL * 60UL * 1000UL;
+constexpr uint32_t DosingMixWaitMaxMs = 8UL * 3600UL * 1000UL;
+constexpr uint16_t DosingMinBatchSec = 10;      // granularite minimale d'un lot
+constexpr float DosingMinTankMl = 5.0f;         // sous ce reste, bidon considere vide
+constexpr float DosingGainMinBatchMl = 50.0f;   // sous ce volume, gain non exploitable
+constexpr float DosingGainBandPct = 0.5f;      // bornage +/-50 % du gain de reference
+constexpr uint8_t DosingGainWindow = 8;        // fenetre de la moyenne glissante
+
 constexpr uint8_t PressureStartupDelaySec = 60;
 constexpr uint8_t DelayPidsMin = 5;
 constexpr uint8_t DelayElectroMin = 10;
