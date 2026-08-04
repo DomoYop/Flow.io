@@ -8,7 +8,7 @@ flow.io est un firmware ESP32 (PlatformIO + Arduino-ESP32) pour l'automatisation
 
 Un même arbre de sources compile **plusieurs firmwares** distincts, chacun sélectionné par un environnement PlatformIO et une macro de profil. Le périmètre de chaque firmware est découpé à la compilation via `build_src_filter` dans `platformio.ini` (les modules non pertinents sont exclus du build, pas seulement désactivés au runtime).
 
-La branche de développement active (`flowio-waveshare-16mb-pioarduino`) cible principalement le profil **Waveshare ESP32-S3** (`[env:Waveshare-ESP32-S3]`), qui est la source de vérité runtime actuelle — voir [docs/core/module-quality-gates.md](docs/core/module-quality-gates.md).
+Le développement actif se fait sur `main`, qui cible principalement le profil **Waveshare ESP32-S3** (`[env:Waveshare-ESP32-S3]`), la source de vérité runtime actuelle — voir [docs/core/module-quality-gates.md](docs/core/module-quality-gates.md).
 
 ## Commandes
 
@@ -97,6 +97,8 @@ Sous `src/Modules/` (et `src/Modules/Network/` pour la connectivité). Chaque mo
   - `runtimeui.json` (7 modules) : descripteurs Runtime UI, tokens `*_t`.
 
   Les fichiers **générés** sont `data/wc/*.j` et `src/Core/Generated/RuntimeUi*_Generated.h`. Le marqueur `"_meta": {"source": "manual"}` en tête des cfgdocs/cfgmods rappelle leur statut de source (il valait `"generated": true`, ce qui était faux et trompeur).
+
+  **Conflits git sur les catalogues** : ne pas les résoudre ligne à ligne. Les `i18n.<locale>.json` sont des dictionnaires plats — git conflicte sur des lignes voisines alors que l'arbitrage se fait clé par clé, et `git checkout --theirs` prendrait le fichier **entier** de l'autre côté au lieu des seuls hunks en conflit. Lancer [scripts/resolve_i18n_conflicts.py](scripts/resolve_i18n_conflicts.py) (outil manuel, hors build) : il fait la fusion 3-way par clé depuis les stages de l'index et ne remonte que les désaccords réels. Vérifier ensuite avec `validate_i18n.py`, qui exige des clés triées et sans doublon.
 
 Fiches par module dans [docs/modules/](docs/modules/) ; le module métier principal est `PoolLogicModule` ([docs/modules/PoolLogicModule.md](docs/modules/PoolLogicModule.md)).
 
