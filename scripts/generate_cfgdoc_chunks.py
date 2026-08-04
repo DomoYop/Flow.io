@@ -9,8 +9,12 @@ Outputs (SPIFFS-short names):
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import io_port_labels  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WEB_DIR = PROJECT_ROOT / "data" / "webinterface"
@@ -206,6 +210,12 @@ def main() -> int:
         modules_index[module_key] = file_name
 
     i18n_by_locale = _collect_consolidated_i18n()
+    # Les libelles des ports de binding sont rendus par gabarit selon le profil
+    # compile : leurs tokens n'existent dans aucun catalogue de module, ils sont
+    # injectes ici pour que l'interface web puisse re-traduire cote client.
+    synthetic = io_port_labels.synthetic_translations(io_port_labels.detect_profile())
+    for locale, extra in synthetic.items():
+        i18n_by_locale.setdefault(locale, {}).update(extra)
     locales = sorted(i18n_by_locale.keys())
     for locale, translations in i18n_by_locale.items():
         i18n_payload = {

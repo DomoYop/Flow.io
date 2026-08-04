@@ -114,6 +114,8 @@ class Finding(object):
 
 
 def project_dir():
+    # Sous PlatformIO le script est exec() par SCons : __file__ n'y est pas
+    # defini, d'ou le passage par PROJECT_DIR puis le repli sur le cwd.
     if env is not None:
         try:
             value = env.get("PROJECT_DIR")
@@ -121,7 +123,10 @@ def project_dir():
                 return Path(value)
         except Exception:
             pass
-    return Path(__file__).resolve().parents[1]
+    try:
+        return Path(__file__).resolve().parents[1]
+    except NameError:
+        return Path(os.getcwd())
 
 
 def rel(root, path):
@@ -385,6 +390,55 @@ def check_web_catalog(root, findings):
                                     "residu francais : %s" % detail))
 
 
+def check_synthetic_ports(findings):
+    """Les libelles de ports doivent exister dans toutes les locales connues.
+
+    Ces tokens ne vivent dans aucun catalogue de module : ils sont rendus par
+    gabarit et injectes dans data/wc/ au build. Sans ce controle, un gabarit
+    oubliant une locale passerait inapercu jusqu'a l'affichage.
+    """
+    try:
+        sys.path.insert(0, str(project_dir() / "scripts"))
+        import io_port_labels
+    except Exception as exc:
+        findings.append(Finding(ERROR, "SYNTHETIC_MODULE_BROKEN", "scripts/io_port_labels.py",
+                                None, None, str(exc)))
+        return
+
+    # Completude des tables de langue. C'est l'invariant utile : render() retombe
+    # sur la cle brute quand une locale manque, donc le token existe quand meme et
+    # une comparaison d'ensembles de tokens ne verrait rien.
+    tables = [("DEVICES", io_port_labels.DEVICES), ("PATTERNS", io_port_labels.PATTERNS)]
+    for table_name, table in tables:
+        for key, per_locale in sorted(table.items()):
+            for locale in KNOWN_LOCALES:
+                if not per_locale.get(locale):
+                    findings.append(Finding(ERROR, "SYNTHETIC_LOCALE_MISSING",
+                                            "scripts/io_port_labels.py", None,
+                                            "%s.%s" % (table_name, key),
+                                            "locale %s absente" % locale))
+    for locale in KNOWN_LOCALES:
+        if not io_port_labels.NONE_LABEL.get(locale):
+            findings.append(Finding(ERROR, "SYNTHETIC_LOCALE_MISSING",
+                                    "scripts/io_port_labels.py", None, "NONE_LABEL",
+                                    "locale %s absente" % locale))
+
+    # Chaque port doit se rendre sans erreur de gabarit dans toutes les locales.
+    for profile in sorted(io_port_labels.PROFILE_PORTS):
+        try:
+            rendered = io_port_labels.synthetic_translations(profile)
+        except Exception as exc:
+            findings.append(Finding(ERROR, "SYNTHETIC_RENDER_FAILED", "scripts/io_port_labels.py",
+                                    None, None, "profil %s : %s" % (profile, exc)))
+            continue
+        reference = set(rendered.get(SOURCE_LOCALE, {}))
+        for locale in KNOWN_LOCALES:
+            for token in sorted(reference - set(rendered.get(locale, {}))):
+                findings.append(Finding(ERROR, "SYNTHETIC_TOKEN_MISSING",
+                                        "scripts/io_port_labels.py", None, token,
+                                        "profil %s, locale %s" % (profile, locale)))
+
+
 RATCHET_HEURISTIC_VERSION = 1
 
 
@@ -474,6 +528,7 @@ def main(argv=None):
 
     debt = evaluate(catalogs, referenced, findings)
     check_web_catalog(root, findings)
+    check_synthetic_ports(findings)
 
     if args.write_ratchet:
         write_ratchet(args.write_ratchet, debt)

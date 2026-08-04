@@ -5,8 +5,12 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import io_port_labels  # noqa: E402
 
 Import = type("Import", (), {})
 
@@ -164,42 +168,6 @@ def _resolve_meta_i18n(node: Any, translations: Dict[str, str]) -> Any:
     return out
 
 
-def _detect_pio_env() -> str:
-    if env is not None:
-        try:
-            value = str(env.subst("$PIOENV") or "").strip()
-            if value:
-                return value
-        except Exception:
-            pass
-    return str(os.getenv("PIOENV", "") or "").strip()
-
-
-def _profile_from_pio_env(pio_env: str) -> str:
-    name = str(pio_env or "").strip().lower()
-    if "waveshare" in name:
-        return "waveshare"
-    if name.startswith("flowio") or "flowio" in name:
-        return "flowio"
-    return "generic"
-
-
-def _profile_override_from_project_options() -> Optional[str]:
-    from_env = str(os.getenv("FLOW_CFGDOC_PROFILE", "") or "").strip().lower()
-    if from_env in ("flowio", "waveshare", "generic"):
-        return from_env
-
-    if env is None:
-        return None
-    try:
-        value = str(env.GetProjectOption("custom_cfgdocs_profile") or "").strip().lower()
-    except Exception:
-        return None
-    if value in ("flowio", "waveshare", "generic"):
-        return value
-    return None
-
-
 def _to_int(value: Any) -> Optional[int]:
     try:
         return int(value)
@@ -207,23 +175,50 @@ def _to_int(value: Any) -> Optional[int]:
         return None
 
 
-def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
+def _apply_profile_specific_io_enum_sets(meta: dict,
+                                         profile: str,
+                                         translations: Dict[str, str],
+                                         locale: str) -> dict:
+    """Reecrit les enum_sets de binding IO selon le profil compile.
+
+    Les libellés proviennent de io_port_labels (gabarits bilingues) et portent un
+    token synthetique : contrairement a la version precedente, cette fonction
+    n'efface plus label_t/label_i18n, donc l'interface web peut re-traduire.
+    """
     if not isinstance(meta, dict):
         return meta
     enum_sets = meta.get("enum_sets")
     if not isinstance(enum_sets, dict):
         return meta
 
-    def sanitize_enum_entry(entry: dict, label: str) -> dict:
+    def tokenized_entry(entry: dict, enum_set: str, value: int, label: io_port_labels.PortLabel) -> dict:
         out = dict(entry or {})
-        out["label"] = label
-        # Keep this label stable regardless of cfgdoc i18n token overlays.
-        out.pop("label_t", None)
-        out.pop("label_i18n", None)
+        token = io_port_labels.token_for(enum_set, value)
+        out["label_t"] = token
+        out["label_i18n"] = token
+        out["label"] = translations.get(token) or io_port_labels.render(label, value, locale)
+        return out
+
+    def relabel(enum_set: str, entries: List[dict], keep_unknown: bool) -> List[dict]:
+        """Applique les libellés du profil ; garde ou filtre les valeurs inconnues."""
+        known = io_port_labels.labels_for(profile, enum_set)
+        out: List[dict] = []
+        for entry in entries:
+            value = _to_int(entry.get("value"))
+            if value is not None and value in known:
+                out.append(tokenized_entry(entry, enum_set, value, known[value]))
+            elif keep_unknown:
+                out.append(dict(entry))
         return out
 
     def non_connected_entry() -> dict:
-        return {"value": 0, "label": "Non connecté"}
+        token = io_port_labels.NONE_TOKEN
+        return {
+            "value": 0,
+            "label_t": token,
+            "label_i18n": token,
+            "label": translations.get(token) or io_port_labels.render_none(locale),
+        }
 
     def binding_entries_with_non_connected(entries: List[dict]) -> List[dict]:
         filtered = []
@@ -245,80 +240,20 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
             if isinstance(entry, dict) and _to_int(entry.get("value")) != 2
         ]
         if profile == "waveshare":
-            analog_labels_waveshare = {
-                100: "ADSInt0 - ADS1115 interne canal 0 [100]",
-                101: "ADSInt1 - ADS1115 interne canal 1 [101]",
-                102: "ADSInt2 - ADS1115 interne canal 2 [102]",
-                103: "ADSInt3 - ADS1115 interne canal 3 [103]",
-                110: "ADSExt0 - ADS1115 externe paire diff 0 [110]",
-                111: "ADSExt1 - ADS1115 externe paire diff 1 [111]",
-                120: "OneWire1 - Sonde DS18B20 n°1 [120]",
-                121: "OneWire2 - Sonde DS18B20 n°2 [121]",
-                122: "OneWire3 - Sonde DS18B20 n°3 [122]",
-                123: "OneWire4 - Sonde DS18B20 n°4 [123]",
-                130: "SHT40Temp - SHT40 canal 0 [130]",
-                131: "SHT40Humidity - SHT40 canal 1 [131]",
-                132: "BMP280Temp - BMP280 canal 0 [132]",
-                133: "BMP280Pressure - BMP280 canal 1 [133]",
-                134: "BME680Temp - BME680 canal 0 [134]",
-                135: "BME680Humidity - BME680 canal 1 [135]",
-                136: "BME680Pressure - BME680 canal 2 [136]",
-                137: "BME680Gas - BME680 canal 3 [137]",
-                143: "PowermonShuntMv - Moniteur puissance canal 0 [143]",
-                144: "PowermonBusV - Moniteur puissance canal 1 [144]",
-                145: "PowermonCurrentMa - Moniteur puissance canal 2 [145]",
-                146: "PowermonPowerMw - Moniteur puissance canal 3 [146]",
-                147: "PowermonLoadV - Moniteur puissance canal 4 [147]",
-                148: "PowermonTemp - Moniteur puissance canal 5 (INA228) [148]",
-                149: "PowermonEnergy - Moniteur puissance canal 6 (INA228) [149]",
-                150: "PowermonCharge - Moniteur puissance canal 7 (INA228) [150]",
-            }
-            analog_filtered = [
-                sanitize_enum_entry(entry, analog_labels_waveshare[value])
-                for entry in analog_filtered
-                for value in [_to_int(entry.get("value"))]
-                if value in analog_labels_waveshare
-            ]
+            # Seuls les ports decrits par le profil sont exposes.
+            analog_filtered = relabel(analog_key, analog_filtered, keep_unknown=False)
         enum_sets[analog_key] = binding_entries_with_non_connected(analog_filtered)
 
     # Digital input bindings: pin labels differ across flow.io and Waveshare.
     din_key = "flowio_binding_port_digital_input"
     din_entries = enum_sets.get(din_key)
-    if isinstance(din_entries, list):
+    if isinstance(din_entries, list) and profile in ("flowio", "waveshare"):
         current = [item for item in din_entries if isinstance(item, dict)]
-        din_labels_flowio = {
-            200: "DIN0 - GPIO34 [200]",
-            201: "DIN1 - GPIO36 [201]",
-            202: "DIN2 - GPIO39 [202]",
-            203: "DIN3 - GPIO35 [203]",
-        }
-        din_labels_waveshare = {
-            200: "DIN0 - GPIO4 [200]",
-            201: "DIN1 - GPIO5 [201]",
-            202: "DIN2 - GPIO6 [202]",
-            203: "DIN3 - GPIO7 [203]",
-            204: "DIN4 - GPIO8 [204]",
-            205: "DIN5 - GPIO9 [205]",
-            206: "DIN6 - GPIO10 [206]",
-            207: "DIN7 - GPIO11 [207]",
-        }
+        enum_sets[din_key] = binding_entries_with_non_connected(
+            relabel(din_key, current, keep_unknown=False)
+        )
 
-        selected_labels = None
-        if profile == "flowio":
-            selected_labels = din_labels_flowio
-        elif profile == "waveshare":
-            selected_labels = din_labels_waveshare
-
-        if selected_labels is not None:
-            filtered: List[dict] = []
-            for entry in current:
-                value = _to_int(entry.get("value"))
-                if value is None or value not in selected_labels:
-                    continue
-                filtered.append(sanitize_enum_entry(entry, selected_labels[value]))
-            enum_sets[din_key] = binding_entries_with_non_connected(filtered)
-
-    # Digital output bindings: flow.io uses PCF8574 ports, Waveshare uses TCA9554/MCP23017 ports.
+    # Digital output bindings: flow.io uses PCF8574 ports, Waveshare uses TCA9554/MCP23017.
     dout_key = "flowio_binding_port_digital_output"
     dout_entries = enum_sets.get(dout_key)
     if isinstance(dout_entries, list):
@@ -329,7 +264,7 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
             if value is None:
                 continue
             keep = True
-            # Micronova aux_output must not be exposed on flow.io / flow.io profiles.
+            # Micronova aux_output must not be exposed on flow.io profiles.
             if profile in ("flowio", "waveshare") and value == 1:
                 keep = False
             if profile == "flowio":
@@ -338,51 +273,15 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
                 filtered.append(dict(entry))
 
         if profile == "waveshare":
-            dout_labels_waveshare = {
-                300: "EXIO1 - TCA9554 bit 0 [300]",
-                301: "EXIO2 - TCA9554 bit 1 [301]",
-                302: "EXIO3 - TCA9554 bit 2 [302]",
-                303: "EXIO4 - TCA9554 bit 3 [303]",
-                304: "EXIO5 - TCA9554 bit 4 [304]",
-                305: "EXIO6 - TCA9554 bit 5 [305]",
-                306: "EXIO7 - TCA9554 bit 6 [306]",
-                307: "EXIO8 - TCA9554 bit 7 [307]",
-                400: "MCPOut1 - MCP23017 bit 0 [400]",
-                401: "MCPOut2 - MCP23017 bit 1 [401]",
-                402: "MCPOut3 - MCP23017 bit 2 [402]",
-                403: "MCPOut4 - MCP23017 bit 3 [403]",
-                404: "MCPOut5 - MCP23017 bit 4 [404]",
-                405: "MCPOut6 - MCP23017 bit 5 [405]",
-                406: "MCPOut7 - MCP23017 bit 6 [406]",
-                407: "MCPOut8 - MCP23017 bit 7 [407]",
-                408: "MCPOut9 - MCP23017 bit 8 [408]",
-                409: "MCPOut10 - MCP23017 bit 9 [409]",
-                410: "MCPOut11 - MCP23017 bit 10 [410]",
-                411: "MCPOut12 - MCP23017 bit 11 [411]",
-                412: "MCPOut13 - MCP23017 bit 12 [412]",
-                413: "MCPOut14 - MCP23017 bit 13 [413]",
-                414: "MCPOut15 - MCP23017 bit 14 [414]",
-                415: "MCPOut16 - MCP23017 bit 15 [415]",
-            }
-            relabeled: List[dict] = []
-            for entry in filtered:
-                value = _to_int(entry.get("value"))
-                if value is not None and value in dout_labels_waveshare:
-                    relabeled.append(sanitize_enum_entry(entry, dout_labels_waveshare[value]))
-                else:
-                    relabeled.append(dict(entry))
-            filtered = relabeled
+            filtered = relabel(dout_key, filtered, keep_unknown=True)
 
         # Ensure flow.io exposes all 8 PCF bits (400..407) in UI bindings.
         if profile == "flowio":
             present_values = {_to_int(item.get("value")) for item in filtered}
-            if 407 not in present_values:
-                filtered.append(
-                    {
-                        "value": 407,
-                        "label": "PortPCF0Bit7 - Sortie PCF8574 - Bit 7 [407]",
-                    }
-                )
+            known = io_port_labels.labels_for(profile, dout_key)
+            for value, label in sorted(known.items()):
+                if value not in present_values:
+                    filtered.append(tokenized_entry({"value": value}, dout_key, value, label))
         enum_sets[dout_key] = binding_entries_with_non_connected(filtered)
 
     # PoolLogic device slots: keep generic labels by default, but expose
@@ -391,27 +290,24 @@ def _apply_profile_specific_io_enum_sets(meta: dict, profile: str) -> dict:
     slot_entries = enum_sets.get(slot_key)
     if profile == "waveshare" and isinstance(slot_entries, list):
         current = [item for item in slot_entries if isinstance(item, dict)]
-        slot_labels_waveshare = {slot: f"pd{slot} -> d{slot:02d} [{slot}]" for slot in range(16)}
-        current_by_value: Dict[int, dict] = {}
-        for entry in current:
-            value = _to_int(entry.get("value"))
-            if value is not None:
-                current_by_value[value] = entry
+        known = io_port_labels.labels_for(profile, slot_key)
         relabeled: List[dict] = []
         # Entrees hors plage (ex. 255 = "aucun PDM") : conservees telles quelles,
         # en tete, sinon la reconstruction les ferait disparaitre.
         for entry in current:
             value = _to_int(entry.get("value"))
-            if value is None or value in range(16):
+            if value is None or value in known:
                 continue
             relabeled.append(entry)
-        # Seuls les slots declares dans l'enum source sont exposes : le domaine
-        # decide combien d'appareils existent, MaxPoolDevices n'est qu'un
-        # plafond de capacite.
-        for value in sorted(v for v in current_by_value if v in range(16)):
-            relabeled.append(
-                sanitize_enum_entry(current_by_value[value], slot_labels_waveshare[value])
-            )
+        by_value = {}
+        for entry in current:
+            value = _to_int(entry.get("value"))
+            if value is not None:
+                by_value[value] = entry
+        # Le domaine decide combien d'appareils existent ; MaxPoolDevices n'est
+        # qu'un plafond de capacite.
+        for value in sorted(v for v in by_value if v in known):
+            relabeled.append(tokenized_entry(by_value[value], slot_key, value, known[value]))
         enum_sets[slot_key] = relabeled
 
     return meta
@@ -442,11 +338,10 @@ def main() -> None:
     cfgmods_docs, cfgmods_meta, cfgmods_files = _load_text_docs(src_root, stem="cfgmods", locale=locale)
     i18n, i18n_files = _load_text_translations(src_root, locale=locale)
 
-    pio_env = _detect_pio_env()
-    profile = _profile_override_from_project_options() or _profile_from_pio_env(pio_env)
+    profile = io_port_labels.detect_profile(env)
 
     combined_meta = _resolve_meta_i18n(_merge_meta_dict(cfgdocs_meta, cfgmods_meta), i18n)
-    combined_meta = _apply_profile_specific_io_enum_sets(combined_meta, profile)
+    combined_meta = _apply_profile_specific_io_enum_sets(combined_meta, profile, i18n, locale)
 
     merged_docs = _resolved_docs(dict(cfgdocs_docs), i18n)
 
@@ -478,7 +373,7 @@ def main() -> None:
         f"[generate_config_docs] wrote {out_path} "
         f"(docs={len(cfgdocs_payload['docs'])} cfgmods={len(cfgmods_payload['docs'])} "
         f"text_files={len(cfgdocs_files) + len(cfgmods_files)} i18n_files={len(i18n_files)} "
-        f"pio_env={pio_env or '-'} profile={profile})"
+        f"locale={locale} profile={profile})"
     )
 
 

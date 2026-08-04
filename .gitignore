@@ -10,3 +10,7 @@
 .pio-core-local
 data/**/*.gz
 binary/
+
+# Cache Python des scripts de build
+__pycache__/
+*.pyc
