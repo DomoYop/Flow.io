@@ -11,6 +11,15 @@
 
 namespace {
 
+// Le volume delivre est une somme de petits increments en float : l'arrondi la
+// laisse legerement sous la cible meme quand le compte y est (a 1,8 L/h, 90 mL
+// en 180 pas d'une seconde sont comptes 89,999992). Le deficit croit avec le
+// nombre de pas, jusqu'a ~1,5e-3 mL sur un lot de 250 mL a 1,2 L/h : la
+// tolerance doit donc etre relative. 100 ppm laissent 17x de marge sur le pire
+// cas mesure, soit 25 uL sur un lot de 250 mL -- sans commune mesure avec la
+// tolerance d'une pompe peristaltique (de l'ordre de 5 %).
+constexpr float kVolumeRelTolerance = 1e-4f;
+
 bool finitePositive_(float v)
 {
     return isfinite(v) && (v > 0.0f);
@@ -291,7 +300,7 @@ bool stepDosingController(DosingState& st, const DosingInput& in, DosingOutput& 
                 enterPhase_(st, DOSING_PHASE_BLOCKED, DOSING_BLOCK_TANK_EMPTY, in.nowMs);
                 break;
             }
-            if (st.batchDeliveredMl >= st.batchTargetMl) {
+            if (st.batchDeliveredMl + (st.batchTargetMl * kVolumeRelTolerance) >= st.batchTargetMl) {
                 st.batchCount++;
                 st.mixWaitMs = computeMixWaitMs(in);
                 st.mixElapsedMs = 0;
