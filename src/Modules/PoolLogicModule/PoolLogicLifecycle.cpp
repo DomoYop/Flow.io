@@ -168,18 +168,13 @@ void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
         phSetpoint_ = d->phSetpoint;
         orpSetpoint_ = d->orpSetpoint;
         heaterSetpoint_ = d->heaterSetpoint;
-        phKp_ = d->phKp;
-        phKi_ = d->phKi;
-        phKd_ = d->phKd;
         orpKp_ = d->orpKp;
         orpKi_ = d->orpKi;
         orpKd_ = d->orpKd;
-        phWindowMs_ = d->pidWindowMs;
+        // Le PID temporel ne concerne plus que la desinfection : le pH est passe
+        // au dosage volumetrique par lots, dont les defauts sont propres a
+        // l'installation et restent des initialiseurs de membre.
         orpWindowMs_ = d->pidWindowMs;
-        // Le defaut de domaine reste commun ; les deux boucles partent de la
-        // meme valeur puis se reglent independamment.
-        phMinOnMs_ = d->pidMinOnMs;
-        phSampleMs_ = d->pidSampleMs;
         disMinOnMs_ = d->pidMinOnMs;
         disSampleMs_ = d->pidSampleMs;
         pressureStartupDelaySec_ = d->pressureStartupDelaySec;
@@ -286,18 +281,26 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     freezeHoldVar_.moduleName = kCfgModuleSafety;
     secureElectroVar_.moduleName = kCfgModuleDisinfection;
     phSetpointVar_.moduleName = kCfgModulePh;
+    phDoseMlPerM3Var_.moduleName = kCfgModulePh;
+    phDeadbandVar_.moduleName = kCfgModulePh;
+    phDoseFactorVar_.moduleName = kCfgModulePh;
+    phDoseMaxBatchVar_.moduleName = kCfgModulePh;
+    phDoseMaxDayVar_.moduleName = kCfgModulePh;
+    phValidMinVar_.moduleName = kCfgModulePh;
+    phValidMaxVar_.moduleName = kCfgModulePh;
+    phNoEffectDeltaVar_.moduleName = kCfgModulePh;
+    phGainLearnedVar_.moduleName = kCfgModulePh;
+    phMixWaitMinVar_.moduleName = kCfgModulePh;
+    phSampleMaxAgeVar_.moduleName = kCfgModulePh;
+    phNoEffectLotsVar_.moduleName = kCfgModulePh;
+    phGainSamplesVar_.moduleName = kCfgModulePh;
+    phLastDoseTsVar_.moduleName = kCfgModulePh;
     orpSetpointVar_.moduleName = kCfgModuleDisinfection;
     heaterSetpointVar_.moduleName = kCfgModuleHeater;
-    phKpVar_.moduleName = kCfgModulePh;
-    phKiVar_.moduleName = kCfgModulePh;
-    phKdVar_.moduleName = kCfgModulePh;
     orpKpVar_.moduleName = kCfgModuleDisinfection;
     orpKiVar_.moduleName = kCfgModuleDisinfection;
     orpKdVar_.moduleName = kCfgModuleDisinfection;
-    phWindowMsVar_.moduleName = kCfgModulePh;
     orpWindowMsVar_.moduleName = kCfgModuleDisinfection;
-    phMinOnMsVar_.moduleName = kCfgModulePh;
-    phSampleMsVar_.moduleName = kCfgModulePh;
     disMinOnMsVar_.moduleName = kCfgModuleDisinfection;
     disSampleMsVar_.moduleName = kCfgModuleDisinfection;
 
@@ -379,17 +382,25 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(phSetpointVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phDoseMlPerM3Var_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phDeadbandVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phDoseFactorVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phDoseMaxBatchVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phDoseMaxDayVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phValidMinVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phValidMaxVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phNoEffectDeltaVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phGainLearnedVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phMixWaitMinVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phSampleMaxAgeVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phNoEffectLotsVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phGainSamplesVar_, kCfgModuleId, kCfgBranchPh);
+    cfg.registerVar(phLastDoseTsVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(heaterSetpointVar_, kCfgModuleId, kCfgBranchHeater);
-    cfg.registerVar(phKpVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(phKiVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(phKdVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(phWindowMsVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(phMinOnMsVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(phSampleMsVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(disMinOnMsVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(disSampleMsVar_, kCfgModuleId, kCfgBranchDisinfection);
@@ -1259,6 +1270,23 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &waterLevelLowAlarm, &PoolLogicModule::condWaterLevelLowStatic_, this)) {
             LOGW("PoolLogic failed to register AlarmId::PoolWaterLevelLow");
         }
+
+        // Latchee : la cause est materielle et demande une intervention. Aucun
+        // onDelay, la FSM a deja temporise N lots d'un turnover chacun.
+        const AlarmRegistration phDoseNoEffectAlarm{
+            AlarmId::PoolPhDoseNoEffect,
+            AlarmSeverity::Alarm,
+            true,
+            0,
+            60000,
+            3600000,
+            "ph_dose_no_effect",
+            "pH dosing has no effect",
+            "poollogic"
+        };
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &phDoseNoEffectAlarm, &PoolLogicModule::condPhDoseNoEffectStatic_, this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolPhDoseNoEffect");
+        }
     } else {
         LOGW("PoolLogic running without alarm service");
     }
@@ -1293,6 +1321,10 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
 
     startupActivityPending_ = true;
     startupActivitySinceMs_ = millis();
+
+    // Reamorce la copie de travail de la FSM avec le gain appris relu en NVS,
+    // pour que la calibration reprenne ou elle s'etait arretee.
+    resetPhDosingState_(startupActivitySinceMs_);
 
     if (!enabled_) return;
 
@@ -1546,6 +1578,9 @@ void PoolLogicModule::onEvent_(const Event& e)
                 portENTER_CRITICAL(&pendingMux_);
                 pendingDailyRecalc_ = true;
                 portEXIT_CRITICAL(&pendingMux_);
+                // Il conditionne aussi la dose : le gain appris sur l'ancien
+                // volume n'a plus de sens.
+                resetPhLearnedGain_("pool_volume_m3 changed");
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::AutoMode) == 0 && autoMode_) {
                 portENTER_CRITICAL(&pendingMux_);
                 pendingFiltrationReconcile_ = true;
@@ -1583,7 +1618,13 @@ void PoolLogicModule::onEvent_(const Event& e)
                     LOGW("PoolLogic failed to stop pH pump on ph_auto_mode enable (slot=%u)",
                          (unsigned)phPumpDeviceSlot_);
                 }
-                resetTemporalPidState_(phPidState_, millis());
+                // Repartir d'une FSM propre efface aussi le latch "dosage sans
+                // effet" : rebasculer le mode auto est la voie de deblocage.
+                resetPhDosingState_(millis());
+            } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::PhDoseMlPerM3) == 0) {
+                // Le gain appris est reference au gain configure : changer la
+                // reference invalide l'apprentissage precedent.
+                resetPhLearnedGain_("ph_dose_ml_m3 changed");
             }
             return;
         }

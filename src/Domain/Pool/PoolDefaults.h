@@ -61,9 +61,6 @@ constexpr float PhSetpoint = 7.4f;
 constexpr float OrpSetpoint = 700.0f;
 constexpr float HeaterSetpoint = 27.0f;
 
-constexpr float PhKp = 2000000.0f;
-constexpr float PhKi = 0.0f;
-constexpr float PhKd = 0.0f;
 constexpr float OrpKp = 4500.0f;
 constexpr float OrpKi = 0.0f;
 constexpr float OrpKd = 0.0f;
@@ -115,7 +112,10 @@ constexpr uint8_t O2MinFilterRunMin = 10;
 constexpr float PeristalticFlowLPerHour = 1.2f;
 constexpr float PeristalticTankCapacityMl = 20000.0f;
 constexpr float PeristalticTankInitialMl = 20000.0f;
-constexpr int32_t DosePumpMaxUptimeDaySec = 30 * 60;
+// Securite de dernier recours, pas limite de fonctionnement : a 1,8 L/h, 30 min
+// ne laissaient que 900 mL/jour (~0,18 pH), a peine plus que la derive naturelle
+// du bassin. La limite metier est desormais ph_dose_max_day, en millilitres.
+constexpr int32_t DosePumpMaxUptimeDaySec = 90 * 60;
 constexpr int32_t ChlorineGeneratorMaxUptimeDaySec = 600 * 60;
 constexpr int32_t FillPumpMaxUptimeDaySec = 30 * 60;
 
@@ -132,9 +132,6 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     PhSetpoint,
     OrpSetpoint,
     HeaterSetpoint,
-    PhKp,
-    PhKi,
-    PhKd,
     OrpKp,
     OrpKi,
     OrpKd,

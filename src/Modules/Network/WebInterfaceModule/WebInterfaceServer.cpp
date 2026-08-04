@@ -2560,7 +2560,7 @@ constexpr uint16_t kWaveshareAlarmDashboardDefaultIds[kWaveshareDashboardSlotCou
     (uint16_t)AlarmId::PoolPhPumpMaxUptime,
     (uint16_t)AlarmId::PoolChlorinePumpMaxUptime,
     (uint16_t)AlarmId::PoolWaterLevelLow,
-    (uint16_t)AlarmId::PoolWaterLevelLow,
+    (uint16_t)AlarmId::PoolPhDoseNoEffect,
 };
 constexpr bool kWaveshareAlarmDashboardDefaultEnabled[kWaveshareDashboardSlotCount] = {
     true,
@@ -2570,7 +2570,7 @@ constexpr bool kWaveshareAlarmDashboardDefaultEnabled[kWaveshareDashboardSlotCou
     true,
     true,
     true,
-    false,
+    true,
 };
 constexpr const char* kWaveshareAlarmDashboardDefaultLabels[kWaveshareDashboardSlotCount] = {
     "Pression basse",
@@ -2580,7 +2580,7 @@ constexpr const char* kWaveshareAlarmDashboardDefaultLabels[kWaveshareDashboardS
     "pH uptime",
     "ORP uptime",
     "Eau basse",
-    "",
+    "pH sans effet",
 };
 constexpr uint8_t kWaveshareAlarmDashboardDefaultColorIds[kWaveshareDashboardSlotCount] = {
     17U,
@@ -2619,6 +2619,7 @@ const char* waveshareAlarmDashboardLabel_(uint16_t alarmId)
         case AlarmId::PoolPhPumpMaxUptime: return "pH uptime";
         case AlarmId::PoolChlorinePumpMaxUptime: return "ORP uptime";
         case AlarmId::PoolWaterLevelLow: return "Eau basse";
+        case AlarmId::PoolPhDoseNoEffect: return "pH sans effet";
         case AlarmId::None:
         default: return "Alarme";
     }

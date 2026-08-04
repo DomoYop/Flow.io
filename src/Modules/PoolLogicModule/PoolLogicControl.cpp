@@ -301,6 +301,192 @@ bool PoolLogicModule::readPoolDeviceFlowLh_(uint8_t deviceSlot, float& flowLhOut
     return true;
 }
 
+// Metriques volumetriques de la pompe pH, relues a 1 Hz : elles ne bougent pas
+// plus vite cote PoolDevice, inutile de les interroger au tick 200 ms.
+void PoolLogicModule::refreshPhPumpMetrics_(uint32_t nowMs)
+{
+    if (phMetricsReadMs_ != 0U && (uint32_t)(nowMs - phMetricsReadMs_) < 1000UL) return;
+    phMetricsReadMs_ = nowMs;
+
+    if (!poolSvc_ || !poolSvc_->meta || phPumpDeviceSlot_ >= POOL_DEVICE_MAX) {
+        phPumpFlowLh_ = 0.0f;
+        phDosedTodayMl_ = 0.0f;
+        phTankRemainMl_ = 0.0f;
+        return;
+    }
+
+    PoolDeviceSvcMeta meta{};
+    if (poolSvc_->meta(poolSvc_->ctx, phPumpDeviceSlot_, &meta) != POOLDEV_SVC_OK) {
+        phPumpFlowLh_ = 0.0f;
+        phDosedTodayMl_ = 0.0f;
+        phTankRemainMl_ = 0.0f;
+        return;
+    }
+    phPumpFlowLh_ = meta.flowLPerHour;
+    // injectedMlDay est persiste dans le blob pdNrt : le quota journalier
+    // survit donc a un redemarrage dans la journee.
+    phDosedTodayMl_ = meta.injectedMlDay;
+    phTankRemainMl_ = meta.tankRemainingMl;
+}
+
+// Reprise apres redemarrage : la FSM n'est pas persistee (millis() repart a 0),
+// mais l'horodatage du dernier lot l'est. Sans cela, un reboot juste apres un
+// lot ferait redoser immediatement, alors que le turnover n'a pas eu lieu.
+void PoolLogicModule::resumePhDosingAfterBoot_(uint32_t nowMs)
+{
+    phDosingResumeChecked_ = true;
+    if (phLastDoseTs_ <= 0) return;
+    if (!timeSvc_ || !timeSvc_->isSynced || !timeSvc_->epoch) return;
+    if (!timeSvc_->isSynced(timeSvc_->ctx)) {
+        // Horloge non synchronisee : on ne peut pas dater le dernier lot, on
+        // repart en mesure. Degradation explicite et sure.
+        return;
+    }
+
+    const uint64_t epoch = timeSvc_->epoch(timeSvc_->ctx);
+    if (epoch <= (uint64_t)phLastDoseTs_) return;
+    const uint64_t elapsedSec = epoch - (uint64_t)phLastDoseTs_;
+
+    DosingInput probe{};
+    fillPhDosingInput_(probe, false, 0.0f, 0xFFFFFFFFU, nowMs);
+    const uint32_t mixWaitMs = computeMixWaitMs(probe);
+    const uint64_t elapsedMs = elapsedSec * 1000ULL;
+    if (elapsedMs >= (uint64_t)mixWaitMs) return;
+
+    phDosingState_.phase = DOSING_PHASE_MIXING;
+    phDosingState_.blockReason = DOSING_BLOCK_NONE;
+    phDosingState_.phaseSinceMs = nowMs;
+    phDosingState_.mixWaitMs = mixWaitMs;
+    phDosingState_.mixElapsedMs = (uint32_t)elapsedMs;
+    phDosingTsMs_ = nowMs;
+    LOGI("pH dosing resumed in mixing: %lu s elapsed of %lu s",
+         (unsigned long)elapsedSec,
+         (unsigned long)(mixWaitMs / 1000UL));
+}
+
+void PoolLogicModule::fillPhDosingInput_(DosingInput& in,
+                                         bool havePh,
+                                         float ph,
+                                         uint32_t phAgeMs,
+                                         uint32_t nowMs) const
+{
+    in.nowMs = nowMs;
+    // L'armement conserve la temporisation historique : filtration en marche
+    // depuis delayPidsMin, hors mode hiver.
+    in.regulationArmed = phPidEnabled_;
+    in.interlockBlocked = pressureError_ || noFlowError_;
+    in.tankLow = phTankLowError_;
+    in.circulating = filtrationFsm_.on;
+
+    in.haveSample = havePh;
+    in.measured = ph;
+    in.sampleAgeMs = phAgeMs;
+    in.sampleMaxAgeMs = (uint32_t)phSampleMaxAgeS_ * 1000UL;
+    in.setpoint = phSetpoint_;
+    in.validMin = phValidMin_;
+    in.validMax = phValidMax_;
+    in.deadband = phDeadband_;
+    in.dosePlus = phDosePlus_;
+
+    in.poolVolumeM3 = poolVolumeM3_;
+    in.filtrationFlowM3h = pumpFlowM3h_;
+    in.pumpFlowLPerHour = phPumpFlowLh_;
+
+    // Le gain appris prend le pas sur la valeur configuree une fois calibre.
+    in.gainMlPerM3PerStep = (phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_;
+    in.referenceGain = phDoseMlPerM3_;
+    in.unitStep = PoolDefaults::PhDoseUnitStep;
+    in.safetyFactor = phDoseFactor_;
+    in.maxBatchMl = phDoseMaxBatchMl_;
+    in.maxDayMl = phDoseMaxDayMl_;
+    in.dosedTodayMl = phDosedTodayMl_;
+    in.tankRemainingMl = phTankRemainMl_;
+    in.mixWaitMinCfg = phMixWaitMin_;
+
+    in.pumpActualOn = phPumpFsm_.on;
+    in.pumpWriteRejected = phPumpFsm_.writeRejected;
+    in.pumpBlockReason = phPumpFsm_.lastBlockReason;
+
+    in.noEffectThreshold = phNoEffectDelta_;
+    in.noEffectBatches = phNoEffectBatches_;
+}
+
+void PoolLogicModule::stepPhDosing_(bool havePh,
+                                    float ph,
+                                    uint32_t phAgeMs,
+                                    uint32_t nowMs,
+                                    bool& phPumpDesired)
+{
+    refreshPhPumpMetrics_(nowMs);
+    if (!phDosingResumeChecked_) resumePhDosingAfterBoot_(nowMs);
+
+    DosingInput in{};
+    fillPhDosingInput_(in, havePh, ph, phAgeMs, nowMs);
+
+    DosingOutput out{};
+    (void)stepDosingController(phDosingState_, in, out);
+    phPumpDesired = out.pumpOn;
+
+    if (out.phase != phDosingLast_.phase || out.blockReason != phDosingLast_.blockReason) {
+        phDosingTsMs_ = nowMs;
+    }
+    phDosingLast_ = out;
+
+    if (out.batchCompleted) persistPhDosingResult_(out, nowMs);
+}
+
+// Remet la FSM de dosage au repos sans perdre l'apprentissage : le gain vit
+// dans la config persistante, l'etat FSM n'en est qu'une copie de travail.
+void PoolLogicModule::resetPhDosingState_(uint32_t nowMs)
+{
+    phDosingState_ = DosingState{};
+    phDosingState_.learnedGain = phGainLearned_;
+    phDosingState_.gainSampleCount = phGainSamples_;
+    phDosingLast_ = DosingOutput{};
+    phDosingTsMs_ = nowMs;
+}
+
+// Le gain appris est exprime relativement au gain configure et au volume du
+// bassin : si l'un des deux change, l'apprentissage precedent n'est plus
+// reference au bon point et doit repartir de zero.
+void PoolLogicModule::resetPhLearnedGain_(const char* reason)
+{
+    if (phGainLearned_ == 0.0f && phGainSamples_ == 0U) return;
+    phGainLearned_ = 0.0f;
+    phGainSamples_ = 0;
+    phDosingState_.learnedGain = 0.0f;
+    phDosingState_.gainSampleCount = 0;
+    if (cfgStore_) {
+        (void)cfgStore_->set(phGainLearnedVar_, phGainLearned_);
+        (void)cfgStore_->set(phGainSamplesVar_, phGainSamples_);
+    }
+    LOGI("pH learned gain reset (%s)", reason ? reason : "");
+}
+
+// Ecrit une fois par lot termine, donc au plus toutes les quelques heures :
+// l'usure NVS est negligeable et le gain reste diagnosticable dans cfg/.
+void PoolLogicModule::persistPhDosingResult_(const DosingOutput& out, uint32_t nowMs)
+{
+    (void)nowMs;
+    if (!cfgStore_) return;
+
+    if (out.gainUpdated) {
+        phGainLearned_ = out.learnedGain;
+        phGainSamples_ = phDosingState_.gainSampleCount;
+        (void)cfgStore_->set(phGainLearnedVar_, phGainLearned_);
+        (void)cfgStore_->set(phGainSamplesVar_, phGainSamples_);
+    }
+
+    // Horodatage epoch de fin de lot : sert a reprendre le melange apres reboot.
+    if (timeSvc_ && timeSvc_->isSynced && timeSvc_->epoch && timeSvc_->isSynced(timeSvc_->ctx)) {
+        const uint64_t epoch = timeSvc_->epoch(timeSvc_->ctx);
+        if (epoch > 0ULL && epoch < 0x7FFFFFFFULL) {
+            phLastDoseTs_ = (int32_t)epoch;
+            (void)cfgStore_->set(phLastDoseTsVar_, phLastDoseTs_);
+        }
+    }
+}
+
 bool PoolLogicModule::currentO2LocalTime_(uint16_t& dayKeyOut,
                                           uint16_t& weekKeyOut,
                                           uint8_t& weekDayMon0Out,
@@ -608,6 +794,19 @@ AlarmCondState PoolLogicModule::condPhTankLowStatic_(void* ctx, uint32_t)
         return AlarmCondState::Unknown;
     }
     return low ? AlarmCondState::True : AlarmCondState::False;
+}
+
+// Le comptage des lots sans effet est fait par la FSM de dosage ; la condition
+// ne fait que refleter son latch.
+AlarmCondState PoolLogicModule::condPhDoseNoEffectStatic_(void* ctx, uint32_t)
+{
+    PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
+    if (!self || !self->enabled_) return AlarmCondState::False;
+    if (!self->phAutoMode_) return AlarmCondState::False;
+    if (self->phPumpDeviceSlot_ >= POOL_DEVICE_MAX) return AlarmCondState::False;
+    if (self->phNoEffectBatches_ == 0U) return AlarmCondState::False;
+    return (self->phDosingState_.noEffectCount >= self->phNoEffectBatches_) ? AlarmCondState::True
+                                                                           : AlarmCondState::False;
 }
 
 AlarmCondState PoolLogicModule::condChlorineTankLowStatic_(void* ctx, uint32_t)
@@ -1042,14 +1241,15 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     if (filtrationStarted) {
         phPidEnabled_ = false;
         orpPidEnabled_ = false;
-        resetTemporalPidState_(phPidState_, nowMs);
         resetTemporalPidState_(orpPidState_, nowMs);
     }
     if (filtrationStopped) {
         phPidEnabled_ = false;
         orpPidEnabled_ = false;
-        resetTemporalPidState_(phPidState_, nowMs);
         resetTemporalPidState_(orpPidState_, nowMs);
+        // Filtration arretee : un melange en cours n'a plus de sens, et un lot
+        // entame ne peut pas reprendre sur une eau non brassee.
+        resetPhDosingState_(nowMs);
         portENTER_CRITICAL(&pendingMux_);
         robotManualOverride_ = false;
         robotManualDesired_ = false;
@@ -1074,7 +1274,12 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     bool chlorineTankLow = false;
 
     const bool havePressure = loadAnalogSensor_(pressureIoId_, pressure);
-    const bool havePh = loadAnalogSensor_(phIoId_, ph);
+    // La mesure pH est datee : la FSM de dosage refuse de decider sur un
+    // echantillon perime (ph_sample_max_age).
+    uint32_t phTsMs = 0U;
+    const bool havePh = loadAnalogSensor_(phIoId_, ph, &phTsMs);
+    const uint32_t phAgeMs =
+        (havePh && phTsMs != 0U) ? (uint32_t)(nowMs - phTsMs) : 0xFFFFFFFFU;
     uint32_t waterTempTsMs = 0U;
     const bool haveWaterTemp = loadAnalogSensor_(waterTempIoId_, waterTemp, &waterTempTsMs);
     const bool waterTempFresh =
@@ -1089,6 +1294,7 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
 
     // Prefer centralized alarm state when available; otherwise fall back to a
     // local safety latch so standalone behavior remains conservative.
+    const bool phTankLowBefore = phTankLowError_;
     if (alarmSvc_ && alarmSvc_->isActive) {
         const bool pressureLow = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPressureLow);
         const bool pressureHigh = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPressureHigh);
@@ -1129,6 +1335,19 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                               "warning");
             }
         }
+    }
+
+    // Bidon pH reapprovisionne : c'est la cause n°1 d'un dosage sans effet et le
+    // geste naturel de l'utilisateur. Le front descendant leve donc le latch,
+    // sans exiger de commande dediee.
+    if (phTankLowBefore && !phTankLowError_ && phDosingState_.noEffectCount != 0U) {
+        if (phDosingState_.blockReason == DOSING_BLOCK_NO_EFFECT) {
+            resetPhDosingState_(nowMs);
+        } else {
+            phDosingState_.noEffectCount = 0;
+            phDosingTsMs_ = nowMs;
+        }
+        LOGI("pH dosing no-effect latch cleared (tank refilled)");
     }
 
     // PID regulation is armed only after filtration has been stable long enough
@@ -1453,36 +1672,59 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         }
     }
 
+    // --- Flowswitch : recopie temporisee, etat volet, et interlock securite ---
+    bool flowOn = false;
+    const bool haveFlow = loadDigitalSensor_(flowSwitchIoId_, flowOn);
+    if (flowOn && !flowSwitchLast_) {
+        // Front montant du debit : demarre le compte a rebours d'activation.
+        flowSwitchOnSinceMs_ = nowMs;
+    }
+    flowSwitchLast_ = flowOn;
+    // Recopie a l'activation temporisee (delai configurable), retombee immediate.
+    bool flowCopyOut = false;
+    if (flowOn) {
+        const uint32_t elapsedMs = (uint32_t)(nowMs - flowSwitchOnSinceMs_);
+        flowCopyOut = elapsedMs >= ((uint32_t)flowCopyDelaySec_ * 1000UL);
+    }
+    flowCopyOutState_ = flowCopyOut;
+
+    bool coverClosed = false;
+    const bool haveCover = loadDigitalSensor_(coverClosedIoId_, coverClosed);
+    coverClosedState_ = haveCover && coverClosed;
+
+    // Ecriture des 2 sorties indicatrices (no-op si non liees a un port).
+    if (ioSvc_ && ioSvc_->writeDigital) {
+        if (outFlowCopyIoId_ != IO_ID_INVALID) {
+            (void)ioSvc_->writeDigital(ioSvc_->ctx, outFlowCopyIoId_, flowCopyOutState_ ? 1U : 0U, nowMs);
+        }
+        if (outCoverIoId_ != IO_ID_INVALID) {
+            (void)ioSvc_->writeDigital(ioSvc_->ctx, outCoverIoId_, coverClosedState_ ? 1U : 0U, nowMs);
+        }
+    }
+
+    // Interlock securite : plus de debit => coupe dosage pH/chlore et electrolyse.
+    // N'agit que si un flowswitch est present (haveFlow) et l'interlock active.
+    const bool noFlow = haveFlow && !flowOn;
+    const bool interlockActive = flowInterlockEnabled_ && noFlow;
+    if (interlockActive && !noFlowError_) {
+        LOGW("Flow interlock: no flow detected, blocking pH/chlorine/electrolysis");
+    }
+    noFlowError_ = interlockActive;
     // Chemical dosing is computed last because it depends on the resolved
     // filtration state, alarm state, and sensor freshness.
     bool phPumpDesired = phPumpFsm_.on;
     bool orpPumpDesired = orpPumpFsm_.on;
+    // Le pH est regule par dosage volumetrique par lots : la FSM tourne des que
+    // le mode auto est actif, y compris filtration a l'arret, ou elle se met
+    // d'elle-meme au repos (regulationArmed) sans perdre un melange en cours.
+    if (phAutoMode_) {
+        stepPhDosing_(havePh, ph, phAgeMs, nowMs, phPumpDesired);
+    } else if (phDosingState_.phase != DOSING_PHASE_IDLE) {
+        resetPhDosingState_(nowMs);
+    }
+
     if (phAutoMode_ || orpAutoMode_) {
         if (filtrationDesired) {
-            if (phAutoMode_) {
-                const bool phAllowed = phPidEnabled_ && havePh && !pressureError_ && !phTankLowError_;
-                if (phAllowed) {
-                    uint32_t outMs = 0;
-                    stepTemporalPid_(phPidState_,
-                                     ph,
-                                     phSetpoint_,
-                                     phKp_,
-                                     phKi_,
-                                     phKd_,
-                                     phWindowMs_,
-                                     phMinOnMs_,
-                                     phSampleMs_,
-                                     !phDosePlus_,
-                                     nowMs,
-                                     phPumpDesired,
-                                     outMs);
-                } else if (phPidState_.initialized || phPidState_.outputOnMs != 0U || phPidState_.lastDemandOn) {
-                    resetTemporalPidState_(phPidState_, nowMs);
-                }
-            } else if (phPidState_.initialized || phPidState_.outputOnMs != 0U || phPidState_.lastDemandOn) {
-                resetTemporalPidState_(phPidState_, nowMs);
-            }
-
             if (orpAutoMode_) {
                 const bool orpAllowed =
                     orpPidEnabled_ && haveOrp && isDisinfectionType_(DisinfectionChlorineBromine) &&
@@ -1509,21 +1751,13 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                 resetTemporalPidState_(orpPidState_, nowMs);
             }
         } else {
-            if (phAutoMode_ && (phPidState_.initialized || phPidState_.outputOnMs != 0U || phPidState_.lastDemandOn)) {
-                resetTemporalPidState_(phPidState_, nowMs);
-            }
             if (orpAutoMode_ &&
                 (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn)) {
                 resetTemporalPidState_(orpPidState_, nowMs);
             }
         }
-    } else {
-        if (phPidState_.initialized || phPidState_.outputOnMs != 0U || phPidState_.lastDemandOn) {
-            resetTemporalPidState_(phPidState_, nowMs);
-        }
-        if (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn) {
-            resetTemporalPidState_(orpPidState_, nowMs);
-        }
+    } else if (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn) {
+        resetTemporalPidState_(orpPidState_, nowMs);
     }
 
     // Le protocole oxygene actif n'est evalue que dans son mode : hors O2, aucun
@@ -1565,48 +1799,26 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         filtrationFsm_.lastCmdMs = 0U;
     }
 
-    // --- Flowswitch : recopie temporisee, etat volet, et interlock securite ---
-    bool flowOn = false;
-    const bool haveFlow = loadDigitalSensor_(flowSwitchIoId_, flowOn);
-    if (flowOn && !flowSwitchLast_) {
-        // Front montant du debit : demarre le compte a rebours d'activation.
-        flowSwitchOnSinceMs_ = nowMs;
-    }
-    flowSwitchLast_ = flowOn;
-    // Recopie a l'activation temporisee (delai configurable), retombee immediate.
-    bool flowCopyOut = false;
-    if (flowOn) {
-        const uint32_t elapsedMs = (uint32_t)(nowMs - flowSwitchOnSinceMs_);
-        flowCopyOut = elapsedMs >= ((uint32_t)flowCopyDelaySec_ * 1000UL);
-    }
-    flowCopyOutState_ = flowCopyOut;
-
-    bool coverClosed = false;
-    const bool haveCover = loadDigitalSensor_(coverClosedIoId_, coverClosed);
-    coverClosedState_ = haveCover && coverClosed;
-
-    // Ecriture des 2 sorties indicatrices (no-op si non liees a un port).
-    if (ioSvc_ && ioSvc_->writeDigital) {
-        if (outFlowCopyIoId_ != IO_ID_INVALID) {
-            (void)ioSvc_->writeDigital(ioSvc_->ctx, outFlowCopyIoId_, flowCopyOutState_ ? 1U : 0U, nowMs);
-        }
-        if (outCoverIoId_ != IO_ID_INVALID) {
-            (void)ioSvc_->writeDigital(ioSvc_->ctx, outCoverIoId_, coverClosedState_ ? 1U : 0U, nowMs);
-        }
-    }
-
-    // Interlock securite : plus de debit => coupe dosage pH/chlore et electrolyse.
-    // N'agit que si un flowswitch est present (haveFlow) et l'interlock active.
-    const bool noFlow = haveFlow && !flowOn;
-    const bool interlockActive = flowInterlockEnabled_ && noFlow;
-    if (interlockActive && !noFlowError_) {
-        LOGW("Flow interlock: no flow detected, blocking pH/chlorine/electrolysis");
-    }
-    noFlowError_ = interlockActive;
-    if (interlockActive) {
+    // Ceinture-bretelles : l'interlock est deja une entree de la FSM de dosage,
+    // ce forcage garantit l'arret meme si une branche l'avait ignore.
+    if (noFlowError_) {
         phPumpDesired = false;
         orpPumpDesired = false;
         swgDesired = false;
+    }
+
+    // Non-simultaneite acide / chlore liquide : leur melange degage du chlore
+    // gazeux. Priorite au pH, dont depend l'efficacite du chlore, et dont le lot
+    // ne dure que quelques minutes par turnover.
+    if (phPumpDesired && orpPumpDesired && phPumpDeviceSlot_ != orpPumpDeviceSlot_ &&
+        isDisinfectionType_(DisinfectionChlorineBromine)) {
+        orpPumpDesired = false;
+        if (!dosingConflictLogged_) {
+            LOGW("Dosing conflict: chlorine pump held off while pH batch is running");
+            dosingConflictLogged_ = true;
+        }
+    } else {
+        dosingConflictLogged_ = false;
     }
 
     (void)applyDeviceControl_(filtrationDeviceSlot_, "Filtration Pump", filtrationFsm_, filtrationDesired, nowMs);

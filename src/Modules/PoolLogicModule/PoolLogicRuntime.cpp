@@ -9,6 +9,7 @@
 #include "Core/SystemLimits.h"
 
 #include <Arduino.h>
+#include <cmath>
 #include <cstring>
 #include <stdio.h>
 
@@ -16,6 +17,40 @@
 #include "Core/ModuleLog.h"
 
 namespace {
+/** Libelle de phase de la FSM de dosage, publie a cote du code numerique. */
+const char* dosingPhaseStr_(uint8_t phase)
+{
+    switch (phase) {
+        case DOSING_PHASE_IDLE: return "idle";
+        case DOSING_PHASE_MEASURE: return "measure";
+        case DOSING_PHASE_DOSING: return "dosing";
+        case DOSING_PHASE_MIXING: return "mixing";
+        case DOSING_PHASE_EVALUATE: return "evaluate";
+        case DOSING_PHASE_BLOCKED: return "blocked";
+        default: return "unknown";
+    }
+}
+
+const char* dosingBlockReasonStr_(uint8_t reason)
+{
+    switch (reason) {
+        case DOSING_BLOCK_NONE: return "none";
+        case DOSING_BLOCK_DISABLED: return "disabled";
+        case DOSING_BLOCK_NO_SAMPLE: return "no_sample";
+        case DOSING_BLOCK_SAMPLE_STALE: return "sample_stale";
+        case DOSING_BLOCK_SAMPLE_RANGE: return "sample_range";
+        case DOSING_BLOCK_IN_BAND: return "in_band";
+        case DOSING_BLOCK_WRONG_SIDE: return "wrong_side";
+        case DOSING_BLOCK_DAY_QUOTA: return "day_quota";
+        case DOSING_BLOCK_TANK_EMPTY: return "tank_empty";
+        case DOSING_BLOCK_PUMP: return "pump";
+        case DOSING_BLOCK_CONFIG: return "config";
+        case DOSING_BLOCK_NO_EFFECT: return "no_effect";
+        case DOSING_BLOCK_INTERLOCK: return "interlock";
+        default: return "unknown";
+    }
+}
+
 // The aggregated cfg payload republishes the same branch split used by the
 // config routes so MQTT consumers can fetch one coherent snapshot.
 static constexpr const char* kPoolLogicCfgTopicBase = "cfg/poollogic";
@@ -164,6 +199,12 @@ bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wri
             if (!loadAnalogSensor_(ioId, value)) return writer.writeUnavailable(runtimeId);
             return writer.writeF32(runtimeId, value);
         }
+        case RuntimeUiPhDosePhase:
+            return writer.writeEnum(runtimeId, phDosingLast_.phase);
+        case RuntimeUiPhDoseDayMl:
+            return writer.writeF32(runtimeId, phDosedTodayMl_);
+        case RuntimeUiPhGain:
+            return writer.writeF32(runtimeId, (phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_);
         default:
             return false;
     }
@@ -334,17 +375,86 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
         return true;
     }
 
-    const bool isPh = (idx == 0);
-    const bool isOrp = (idx == 1);
-    if (!isPh && !isOrp) return false;
+    // Le pH est regule par dosage volumetrique par lots : son snapshot decrit la
+    // FSM (phase, lot en cours, melange, gain appris) et non un PID temporel.
+    if (idx == 0) {
+        const DosingOutput& d = phDosingLast_;
+        const bool haveSample = phDosingState_.tickValid && std::isfinite(d.error);
+        int wrote = 0;
+        if (haveSample) {
+            wrote = snprintf(
+                out, len,
+                "{\"i\":\"ph\",\"in\":%.3f,\"sp\":%.3f,\"er\":%.3f,\"db\":%.3f,"
+                "\"en\":%s,\"dm\":%s,\"ac\":%s,"
+                "\"ph\":%u,\"phs\":\"%s\",\"blk\":%u,\"blks\":\"%s\","
+                "\"tgt_ml\":%.1f,\"del_ml\":%.1f,"
+                "\"mix_ms\":%lu,\"mix_rem_ms\":%lu,"
+                "\"gain\":%.2f,\"gn\":%u,\"noeff\":%u,"
+                "\"day_ml\":%.1f,\"tank_ml\":%.1f,\"flow_l_h\":%.2f,"
+                "\"dt\":%u,\"dts\":\"%s\",\"t\":%lu}",
+                (double)(phSetpoint_ + (phDosePlus_ ? -d.error : d.error)),
+                (double)phSetpoint_,
+                (double)d.error,
+                (double)phDeadband_,
+                phPidEnabled_ ? "true" : "false",
+                d.pumpOn ? "true" : "false",
+                phPumpFsm_.on ? "true" : "false",
+                (unsigned)d.phase,
+                dosingPhaseStr_(d.phase),
+                (unsigned)d.blockReason,
+                dosingBlockReasonStr_(d.blockReason),
+                (double)d.doseTargetMl,
+                (double)d.doseDeliveredMl,
+                (unsigned long)d.mixWaitMs,
+                (unsigned long)d.mixRemainMs,
+                (double)((phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_),
+                (unsigned)phGainSamples_,
+                (unsigned)phDosingState_.noEffectCount,
+                (double)phDosedTodayMl_,
+                (double)phTankRemainMl_,
+                (double)phPumpFlowLh_,
+                (unsigned)disinfectionType_,
+                disinfectionTypeStr_(disinfectionType_),
+                (unsigned long)nowMs
+            );
+        } else {
+            wrote = snprintf(
+                out, len,
+                "{\"i\":\"ph\",\"in\":null,\"sp\":%.3f,\"er\":null,\"db\":%.3f,"
+                "\"en\":%s,\"dm\":false,\"ac\":%s,"
+                "\"ph\":%u,\"phs\":\"%s\",\"blk\":%u,\"blks\":\"%s\","
+                "\"gain\":%.2f,\"gn\":%u,"
+                "\"day_ml\":%.1f,\"tank_ml\":%.1f,\"flow_l_h\":%.2f,"
+                "\"dt\":%u,\"dts\":\"%s\",\"t\":%lu}",
+                (double)phSetpoint_,
+                (double)phDeadband_,
+                phPidEnabled_ ? "true" : "false",
+                phPumpFsm_.on ? "true" : "false",
+                (unsigned)d.phase,
+                dosingPhaseStr_(d.phase),
+                (unsigned)d.blockReason,
+                dosingBlockReasonStr_(d.blockReason),
+                (double)((phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_),
+                (unsigned)phGainSamples_,
+                (double)phDosedTodayMl_,
+                (double)phTankRemainMl_,
+                (double)phPumpFlowLh_,
+                (unsigned)disinfectionType_,
+                disinfectionTypeStr_(disinfectionType_),
+                (unsigned long)nowMs
+            );
+        }
+        if (wrote < 0 || (size_t)wrote >= len) return false;
+        maxTsOut = phDosingTsMs_ ? phDosingTsMs_ : 1U;
+        return true;
+    }
 
-    const TemporalPidState& st = isPh ? phPidState_ : orpPidState_;
-    const DeviceFsm& pumpFsm = isPh ? phPumpFsm_ : orpPumpFsm_;
-    const float kp = isPh ? phKp_ : orpKp_;
-    const float ki = isPh ? phKi_ : orpKi_;
-    const float kd = isPh ? phKd_ : orpKd_;
-    const int32_t windowMsCfg = isPh ? phWindowMs_ : orpWindowMs_;
-    const uint32_t windowMs = (windowMsCfg > 1000) ? (uint32_t)windowMsCfg : 1000U;
+    if (idx != 1) return false;
+
+    // Desinfection liquide : PID temporel inchange.
+    const TemporalPidState& st = orpPidState_;
+    const DeviceFsm& pumpFsm = orpPumpFsm_;
+    const uint32_t windowMs = (orpWindowMs_ > 1000) ? (uint32_t)orpWindowMs_ : 1000U;
 
     uint32_t elapsedMs = 0;
     if (st.initialized) {
@@ -354,30 +464,28 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
 
     // Runtime snapshots expose the last PID sample plus the derived on-window
     // so MQTT/UI consumers can inspect why dosing is currently active or idle.
-    const bool regulationEnabled = isPh ? phPidEnabled_ : orpPidEnabled_;
     int wrote = 0;
     if (st.sampleValid) {
         wrote = snprintf(
             out, len,
-            "{\"i\":\"%s\",\"in\":%.3f,\"sp\":%.3f,\"er\":%.3f,"
+            "{\"i\":\"orp\",\"in\":%.3f,\"sp\":%.3f,\"er\":%.3f,"
             "\"en\":%s,\"dm\":%s,\"ac\":%s,"
             "\"kp\":%.6f,\"ki\":%.6f,\"kd\":%.6f,"
             "\"w\":%ld,\"sm\":%ld,\"mo\":%ld,"
             "\"on\":%lu,\"we\":%lu,\"ct\":%lu,"
             "\"dt\":%u,\"dts\":\"%s\",\"swgm\":%u,\"swgms\":\"%s\",\"t\":%lu}",
-            isPh ? "ph" : "orp",
             (double)st.sampleInput,
             (double)st.sampleSetpoint,
             (double)st.sampleError,
-            regulationEnabled ? "true" : "false",
+            orpPidEnabled_ ? "true" : "false",
             st.lastDemandOn ? "true" : "false",
             pumpFsm.on ? "true" : "false",
-            (double)kp,
-            (double)ki,
-            (double)kd,
-            (long)windowMsCfg,
-            (long)(isPh ? phSampleMs_ : disSampleMs_),
-            (long)(isPh ? phMinOnMs_ : disMinOnMs_),
+            (double)orpKp_,
+            (double)orpKi_,
+            (double)orpKd_,
+            (long)orpWindowMs_,
+            (long)disSampleMs_,
+            (long)disMinOnMs_,
             (unsigned long)st.outputOnMs,
             (unsigned long)elapsedMs,
             (unsigned long)st.sampleTsMs,
@@ -390,23 +498,22 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
     } else {
         wrote = snprintf(
             out, len,
-            "{\"i\":\"%s\",\"in\":null,\"sp\":%.3f,\"er\":null,"
+            "{\"i\":\"orp\",\"in\":null,\"sp\":%.3f,\"er\":null,"
             "\"en\":%s,\"dm\":%s,\"ac\":%s,"
             "\"kp\":%.6f,\"ki\":%.6f,\"kd\":%.6f,"
             "\"w\":%ld,\"sm\":%ld,\"mo\":%ld,"
             "\"on\":%lu,\"we\":%lu,\"ct\":0,"
             "\"dt\":%u,\"dts\":\"%s\",\"swgm\":%u,\"swgms\":\"%s\",\"t\":%lu}",
-            isPh ? "ph" : "orp",
-            (double)(isPh ? phSetpoint_ : orpSetpoint_),
-            regulationEnabled ? "true" : "false",
+            (double)orpSetpoint_,
+            orpPidEnabled_ ? "true" : "false",
             st.lastDemandOn ? "true" : "false",
             pumpFsm.on ? "true" : "false",
-            (double)kp,
-            (double)ki,
-            (double)kd,
-            (long)windowMsCfg,
-            (long)(isPh ? phSampleMs_ : disSampleMs_),
-            (long)(isPh ? phMinOnMs_ : disMinOnMs_),
+            (double)orpKp_,
+            (double)orpKi_,
+            (double)orpKd_,
+            (long)orpWindowMs_,
+            (long)disSampleMs_,
+            (long)disMinOnMs_,
             (unsigned long)st.outputOnMs,
             (unsigned long)elapsedMs,
             (unsigned)disinfectionType_,

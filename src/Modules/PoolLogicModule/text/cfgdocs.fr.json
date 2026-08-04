@@ -291,31 +291,72 @@
       "label_t": "cfgdocs.poollogic.ph.ph_auto_mode.label",
       "help_t": "cfgdocs.poollogic.ph.ph_auto_mode.help"
     },
+    "poollogic/ph/ph_deadband": {
+      "type": "Float",
+      "unit": "pH",
+      "label_t": "cfgdocs.poollogic.ph.ph_deadband.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_deadband.help"
+    },
+    "poollogic/ph/ph_dose_factor": {
+      "type": "Float",
+      "label_t": "cfgdocs.poollogic.ph.ph_dose_factor.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_dose_factor.help"
+    },
+    "poollogic/ph/ph_dose_max_batch": {
+      "type": "Float",
+      "unit": "mL",
+      "label_t": "cfgdocs.poollogic.ph.ph_dose_max_batch.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_dose_max_batch.help"
+    },
+    "poollogic/ph/ph_dose_max_day": {
+      "type": "Float",
+      "unit": "mL",
+      "label_t": "cfgdocs.poollogic.ph.ph_dose_max_day.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_dose_max_day.help"
+    },
+    "poollogic/ph/ph_dose_ml_m3": {
+      "type": "Float",
+      "unit": "mL/m³",
+      "label_t": "cfgdocs.poollogic.ph.ph_dose_ml_m3.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_dose_ml_m3.help"
+    },
     "poollogic/ph/ph_dose_plus": {
       "type": "Bool",
       "label_t": "cfgdocs.poollogic.ph.ph_dose_plus.label",
       "help_t": "cfgdocs.poollogic.ph.ph_dose_plus.help"
     },
-    "poollogic/ph/ph_kd": {
+    "poollogic/ph/ph_gain_learned": {
       "type": "Float",
-      "label_t": "cfgdocs.poollogic.ph.ph_kd.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_kd.help"
+      "unit": "mL/m³",
+      "label_t": "cfgdocs.poollogic.ph.ph_gain_learned.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_gain_learned.help"
     },
-    "poollogic/ph/ph_ki": {
-      "type": "Float",
-      "label_t": "cfgdocs.poollogic.ph.ph_ki.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_ki.help"
+    "poollogic/ph/ph_gain_samples": {
+      "type": "UInt8",
+      "label_t": "cfgdocs.poollogic.ph.ph_gain_samples.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_gain_samples.help"
     },
-    "poollogic/ph/ph_kp": {
-      "type": "Float",
-      "label_t": "cfgdocs.poollogic.ph.ph_kp.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_kp.help"
-    },
-    "poollogic/ph/ph_min_on_ms": {
+    "poollogic/ph/ph_last_dose_ts": {
       "type": "Int32",
-      "unit": "ms",
-      "label_t": "cfgdocs.poollogic.ph.ph_min_on_ms.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_min_on_ms.help"
+      "label_t": "cfgdocs.poollogic.ph.ph_last_dose_ts.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_last_dose_ts.help"
+    },
+    "poollogic/ph/ph_mix_wait_min": {
+      "type": "UInt16",
+      "unit": "min",
+      "label_t": "cfgdocs.poollogic.ph.ph_mix_wait_min.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_mix_wait_min.help"
+    },
+    "poollogic/ph/ph_no_effect_dph": {
+      "type": "Float",
+      "unit": "pH",
+      "label_t": "cfgdocs.poollogic.ph.ph_no_effect_dph.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_no_effect_dph.help"
+    },
+    "poollogic/ph/ph_no_effect_lots": {
+      "type": "UInt8",
+      "label_t": "cfgdocs.poollogic.ph.ph_no_effect_lots.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_no_effect_lots.help"
     },
     "poollogic/ph/ph_pump_slot": {
       "type": "UInt8",
@@ -323,22 +364,28 @@
       "help_t": "cfgdocs.poollogic.ph.ph_pump_slot.help",
       "enum_set": "poollogic_device_slot"
     },
-    "poollogic/ph/ph_sample_ms": {
-      "type": "Int32",
-      "unit": "ms",
-      "label_t": "cfgdocs.poollogic.ph.ph_sample_ms.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_sample_ms.help"
+    "poollogic/ph/ph_sample_max_age": {
+      "type": "UInt16",
+      "unit": "s",
+      "label_t": "cfgdocs.poollogic.ph.ph_sample_max_age.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_sample_max_age.help"
     },
     "poollogic/ph/ph_setpoint": {
       "type": "Float",
       "label_t": "cfgdocs.poollogic.ph.ph_setpoint.label",
       "help_t": "cfgdocs.poollogic.ph.ph_setpoint.help"
     },
-    "poollogic/ph/ph_window_ms": {
-      "type": "Int32",
-      "label_t": "cfgdocs.poollogic.ph.ph_window_ms.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_window_ms.help",
-      "unit": "ms"
+    "poollogic/ph/ph_valid_max": {
+      "type": "Float",
+      "unit": "pH",
+      "label_t": "cfgdocs.poollogic.ph.ph_valid_max.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_valid_max.help"
+    },
+    "poollogic/ph/ph_valid_min": {
+      "type": "Float",
+      "unit": "pH",
+      "label_t": "cfgdocs.poollogic.ph.ph_valid_min.label",
+      "help_t": "cfgdocs.poollogic.ph.ph_valid_min.help"
     },
     "poollogic/refill/fill_min_on_s": {
       "type": "UInt8",
