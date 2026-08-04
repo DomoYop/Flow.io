@@ -189,6 +189,30 @@ Reprendre en priorité la terminologie de `data/webinterface/i18n/en.json` (`Das
 | Date | Module | Dette avant → après |
 |---|---|---|
 | 2026-08-04 | `PoolLogicModule` (10 tokens manquants) | 134 → 124 |
+| 2026-08-04 | `PoolLogicModule` | 122 → 12 |
+| 2026-08-04 | `PoolDeviceModule` | 70 → 2 |
+| 2026-08-04 | `Network/WifiModule` | 10 → 3 |
+| 2026-08-04 | `System/SystemModule` | 8 → 4 |
+
+Total après ce lot : **546 sur 1942 (28,1 %)**, contre 735 avant.
+
+**Le reliquat de ces quatre modules (21 entrées) est un plancher, pas du travail restant.** Ce sont
+des entrées dont la forme anglaise est identique au français, que la note demande de laisser telles
+quelles et que l'heuristique compte quand même : `Dashboard`, `Signal`, `Firmware`, `Uptime`,
+`English (en)`, les clés `cfgmods.*.label` (`network`, `system`, `ethernet`) et les libellés
+`poollogic_device_slot.*` (`Filtration Pump [0]`…) qui sont **déjà en anglais côté FR** — c'est le
+catalogue français qu'il faudrait corriger, pas l'anglais. Les faire descendre à zéro supposerait
+soit de traduire ces clés FR, soit d'étendre `BILINGUAL_WORDS` dans le validateur ; les deux sont
+hors du périmètre d'un lot de traduction.
+
+Deux corrections de fond au passage, invisibles dans le compteur :
+
+- `poollogic_disinfection_type` affichait ses libellés **décalés d'un cran** en anglais : la valeur 2
+  (Électrolyse) s'affichait « Oxygène enabled » et la valeur 3 (Oxygène actif) « Désenabled ».
+  Corrigé en `Salt chlorination` / `Active oxygen`.
+- Terminologie arbitrée en faveur de `data/webinterface/i18n/en.json` là où il diverge du glossaire
+  ci-dessus : **`Salt chlorinator`** (et non « salt chlorine generator »), `Active oxygen`,
+  `Equipment`, `Refill`, `Window`.
 
 ---
 

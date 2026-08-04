@@ -14,11 +14,11 @@
     "Network/HmiUdpServerModule": 2,
     "Network/MQTTModule": 16,
     "Network/TimeModule": 25,
-    "Network/WifiModule": 10,
-    "PoolDeviceModule": 70,
-    "PoolLogicModule": 124,
+    "Network/WifiModule": 3,
+    "PoolDeviceModule": 2,
+    "PoolLogicModule": 12,
     "SupervisorHMIModule": 27,
-    "System/SystemModule": 8,
+    "System/SystemModule": 4,
     "System/SystemMonitorModule": 6,
     "TFTModuleS3": 106
   }
