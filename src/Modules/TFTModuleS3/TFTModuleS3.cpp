@@ -206,7 +206,7 @@ constexpr uint16_t kAlarmDefaultIds[TFTModuleS3::AlarmDashboardSlotCount] = {
     (uint16_t)AlarmId::PoolPhPumpMaxUptime,
     (uint16_t)AlarmId::PoolChlorinePumpMaxUptime,
     (uint16_t)AlarmId::PoolWaterLevelLow,
-    (uint16_t)AlarmId::PoolWaterLevelLow,
+    (uint16_t)AlarmId::PoolPhDoseNoEffect,
 };
 
 constexpr bool kAlarmDefaultEnabled[TFTModuleS3::AlarmDashboardSlotCount] = {
@@ -217,7 +217,7 @@ constexpr bool kAlarmDefaultEnabled[TFTModuleS3::AlarmDashboardSlotCount] = {
     true,
     true,
     true,
-    false,
+    true,
 };
 
 constexpr const char* kAlarmDefaultLabels[TFTModuleS3::AlarmDashboardSlotCount] = {
@@ -228,7 +228,7 @@ constexpr const char* kAlarmDefaultLabels[TFTModuleS3::AlarmDashboardSlotCount] 
     "pH uptime",
     "ORP uptime",
     "Eau basse",
-    "",
+    "pH sans effet",
 };
 
 constexpr uint8_t kAlarmDefaultColorIds[TFTModuleS3::AlarmDashboardSlotCount] = {
@@ -1653,6 +1653,7 @@ const char* TFTModuleS3::alarmIdLabel_(uint16_t alarmId) const
         case AlarmId::PoolPhPumpMaxUptime: return "pH uptime";
         case AlarmId::PoolChlorinePumpMaxUptime: return "ORP uptime";
         case AlarmId::PoolWaterLevelLow: return "Eau basse";
+        case AlarmId::PoolPhDoseNoEffect: return "pH sans effet";
         case AlarmId::None:
         default: return "Alarme";
     }

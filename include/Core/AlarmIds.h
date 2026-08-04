@@ -18,6 +18,8 @@ enum class AlarmId : uint16_t {
     PoolPhPumpMaxUptime = 1004,
     PoolChlorinePumpMaxUptime = 1005,
     PoolWaterLevelLow = 1006,
+    // Dosage pH sans effet mesurable : bidon vide, tuyau perce ou sonde figee.
+    PoolPhDoseNoEffect = 1007,
 
     // Log pipeline domain
     LogWarningSeen = 1100,

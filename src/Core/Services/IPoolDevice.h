@@ -29,6 +29,11 @@ struct PoolDeviceSvcMeta {
     IoId ioId = IO_ID_INVALID;
     char runtimeId[8] = {0};
     char label[24] = {0};
+    // Metriques volumetriques des pompes peristaltiques ; 0 si non applicable.
+    // Evite aux consommateurs de relire la config en JSON pour obtenir le debit.
+    float flowLPerHour = 0.0f;
+    float injectedMlDay = 0.0f;
+    float tankRemainingMl = 0.0f;
 };
 
 /** Service interface for slot-based pool device control. */

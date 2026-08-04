@@ -1,8 +1,12 @@
 # Régulation pH par pompe péristaltique — état de l'art et refonte proposée
 
-**Statut : analyse + proposition, non implémenté.** Rédigé le 2026-07-25 à partir des logs
-du 25/07 (blocage `max_uptime` de la pompe pH, slot device 1 / `pd1`) et de la relecture de
-`stepTemporalPid_` / `applyDeviceControl_`.
+**Statut : implémenté le 2026-08-04** sur la branche `ph-dosage-volumetrique`. Rédigé le
+2026-07-25 à partir des logs du 25/07 (blocage `max_uptime` de la pompe pH, slot device 1 /
+`pd1`) et de la relecture de `stepTemporalPid_` / `applyDeviceControl_`.
+
+Les sections 1 à 4 restent le constat d'origine, conservé tel quel pour mémoire. La §5 décrit la
+refonte telle qu'elle a été livrée ; les écarts par rapport à la proposition initiale sont
+regroupés en §5.8.
 
 **Installation de référence** : pompe doseuse pH **1,8 L/h** (= 30 mL/min = 0,5 mL/s).
 ⚠️ Le défaut d'usine du firmware est `PoolDefaults::PeristalticFlowLPerHour = 1.2f`
@@ -234,16 +238,23 @@ branche `io-refonte-unifiee`.
 - **Débit pompe** : exposer `flowLPerHour` dans `PoolDeviceSvcMeta` (point P2.4 du rapport
   domaine) plutôt que de le relire en JSON.
 
-### 5.6 Plan par étapes
+### 5.6 Plan par étapes — état de réalisation
 
-1. **Garde-fous immédiats, sans changer l'algo** : consommer le retour de `writeDesired`,
-   dédupliquer le log de blocage, ajouter le deadband, figer `outputOnMs` sur la fenêtre en
-   cours. Corrige les symptômes observés le 25/07. *Livrable indépendant.*
-2. **`DosingController` pur + env `native` + tests unitaires** : convergence, deadband, quota,
-   attente de mélange, absence d'effet, saturation.
-3. **Câblage dans `PoolLogicModule` derrière `ph_algo`**, legacy conservé.
-4. **Auto-calibration du gain + alarme « dosage sans effet »**.
-5. **Extension à la désinfection liquide** : même contrôleur, même FSM, gain en mL/m³ par 100 mV.
+1. ✅ **Garde-fous du chemin actionneur** — `applyDeviceControl_` renvoie un `DeviceWriteResult`
+   et ne latche `lastDesired` que sur succès ; le log de blocage est dédupliqué par raison, répété
+   au plus toutes les 30 min, avec une ligne `recovered` au retour à la normale (l'incident du
+   25/07 passe de ~184 lignes à ~7). `stepTemporalPid_` fige `outputOnMs` sur la fenêtre en cours
+   (bénéficie à l'ORP, seul utilisateur restant).
+2. ✅ **`DosingController` pur + env `native` + 36 tests Unity** — `[env:native]` a nécessité de
+   renommer `[env]` en `[esp32_base]` : une section `[env]` est héritée par *tous* les envs, et un
+   `board =` vide reste « défini » pour PlatformIO. Débloque au passage
+   `test_poollogic_filtration_window`, qui n'avait jamais pu s'exécuter.
+3. ✅ **Câblage dans `PoolLogicModule`** — sans `ph_algo` : voir §5.8.
+4. ✅ **Auto-calibration du gain + alarme « dosage sans effet »** (`AlarmId::PoolPhDoseNoEffect` = 1007).
+5. ⬜ **Extension à la désinfection liquide** — non fait. Le helper est déjà agnostique de la
+   grandeur régulée (`unitStep`, `batchStartValue`, `error`) ; il reste à instancier un second
+   `DosingState`, exposer un `dis_algo` et transformer l'arbitrage de non-simultanéité en
+   suspension de lot des deux côtés.
 
 ### 5.7 Vérifications préalables sur l'installation
 
@@ -251,3 +262,42 @@ branche `io-refonte-unifiee`.
 - [ ] `pool_volume_m3` conforme au bassin réel (sert au turnover *et* au dosage).
 - [ ] `pump_flow_m3h` conforme à la pompe de filtration réelle.
 - [ ] TAC mesuré une fois, pour valider l'ordre de grandeur du gain initial.
+
+### 5.8 Écarts par rapport à la proposition initiale
+
+**L'algorithme historique n'a pas été conservé.** La §5.4 prévoyait un `ph_algo` avec le PID masqué
+derrière `visible_if`, pour éviter une migration NVS. Décision inverse à l'implémentation : les clés
+`ph_kp`, `ph_ki`, `ph_kd`, `ph_window_ms`, `ph_min_on_ms`, `ph_sample_ms` sont **supprimées**, avec
+leurs constantes `PoolDefaults` et leurs champs de `PoolLogicDefaultsSpec`. Garder deux algorithmes
+aurait figé du code mort et une page de configuration à double lecture, pour un algo dont la §4
+démontre qu'il est structurellement inadapté. Un effacement NVS est recommandé (les anciennes clés
+sont simplement ignorées, pas migrées). Le PID temporel reste en place pour l'ORP.
+
+**Le décompte du mélange ne court que si l'eau circule** (`DosingInput::circulating`). Point non
+couvert par la note : sans cela, une filtration qui s'arrête pendant le `Mixing` fait « passer » le
+turnover sans qu'un seul m³ ait été brassé, et le lot suivant est décidé sur une mesure non
+homogénéisée.
+
+**La détection « sans effet » ignore le signe du delta.** La §5.3 rejetait implicitement les deltas
+du mauvais signe comme des perturbations. C'est juste pour l'*apprentissage du gain* (une observation
+aberrante fausserait durablement la calibration) et c'est ce qui a été implémenté. Mais c'est faux
+pour la *détection d'inefficacité* : avec un bidon vide, la dérive naturelle fait **remonter** le pH,
+donc le delta est négatif — un filtre sur le signe rendrait la détection aveugle à son cas principal.
+Le compteur s'incrémente donc dès que la correction attendue ne se produit pas, quel que soit le
+signe ; l'exigence de `ph_no_effect_lots` lots *consécutifs* suffit à écarter les perturbations
+ponctuelles.
+
+**Le garde-fou de timeout de lot a été retiré du plan.** Il était mathématiquement inatteignable :
+le volume délivré et le temps ON sont calculés depuis le *même* débit, donc `delivered >= target` se
+déclenche toujours avant `elapsedOn > 3 × nominal`. Les protections réelles contre une pompe bloquée
+sont le quota volumétrique journalier et le `max_uptime_day_s` du slot PoolDevice.
+
+**`unitStep` est un paramètre dès l'origine** (défaut 0,1) plutôt qu'un `0.1f` en dur, pour que
+l'extension ORP (§5.6-5) ne demande pas de migration.
+
+**`PoolDeviceSvcMeta` porte les métriques volumétriques** (`flowLPerHour`, `injectedMlDay`,
+`tankRemainingMl`) — voie A de la proposition. `readPoolDeviceFlowLh_`, qui re-sérialisait la config
+en JSON puis faisait un `strstr`, en devient supprimable.
+
+**Reprise après reboot** : variante horodatée retenue (`ph_last_dose_ts`), pas de `Mixing` forcé au
+démarrage à froid, qui aurait bloqué la régulation jusqu'à 5 h après chaque OTA.

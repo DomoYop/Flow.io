@@ -114,6 +114,48 @@
       "order": 20,
       "label_t": "runtimeui.poollogic.v07.label",
       "group_t": "runtimeui.poollogic.v07.group"
+    },
+    {
+      "valueId": 8,
+      "key": "pool.ph_dose_phase",
+      "type": "uint8",
+      "domain": "ph",
+      "display": "badge",
+      "order": 100,
+      "label_t": "runtimeui.poollogic.v08.label",
+      "group_t": "runtimeui.poollogic.v08.group"
+    },
+    {
+      "valueId": 9,
+      "key": "pool.ph_dose_day_ml",
+      "type": "float",
+      "domain": "ph",
+      "display": "horiz-gauge",
+      "displayConfig": {
+        "bands": {
+          "min": 0,
+          "warningHighStart": 1200,
+          "criticalHighStart": 1500,
+          "max": 1500
+        }
+      },
+      "unit": "mL",
+      "decimals": 0,
+      "order": 110,
+      "label_t": "runtimeui.poollogic.v09.label",
+      "group_t": "runtimeui.poollogic.v09.group"
+    },
+    {
+      "valueId": 10,
+      "key": "pool.ph_gain",
+      "type": "float",
+      "domain": "ph",
+      "display": "value",
+      "unit": "mL/m3",
+      "decimals": 1,
+      "order": 120,
+      "label_t": "runtimeui.poollogic.v10.label",
+      "group_t": "runtimeui.poollogic.v10.group"
     }
   ]
 }

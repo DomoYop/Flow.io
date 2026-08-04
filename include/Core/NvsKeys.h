@@ -200,20 +200,30 @@ constexpr char WinterStart[] = "pl_wstr"; // Pool logic module persisted key for
 constexpr char FreezeHold[] = "pl_whld"; // Pool logic module persisted key for field `pl_whld`.
 constexpr char SecureElectro[] = "pl_sect"; // Pool logic module persisted key for field `pl_sect`.
 constexpr char PhSetpoint[] = "pl_phsp"; // Pool logic module persisted key for field `pl_phsp`.
+// Dosage volumetrique par lots (pH). Remplace le PID temporel : les cles
+// pl_phkp / pl_phki / pl_phkd / pl_phwms / pl_phmon / pl_phsmp sont supprimees.
+constexpr char PhDoseMlPerM3[] = "pl_phgml"; // pH : gain de dosage (mL/m3 par 0,1 pH).
+constexpr char PhDeadband[] = "pl_phdb"; // pH : bande morte autour de la consigne.
+constexpr char PhDoseFactor[] = "pl_phdf"; // pH : facteur de prudence applique a la dose.
+constexpr char PhMixWaitMin[] = "pl_phmix"; // pH : attente de melange (min) ; 0 = turnover calcule.
+constexpr char PhDoseMaxBatchMl[] = "pl_phdmb"; // pH : volume maximal par lot (mL).
+constexpr char PhDoseMaxDayMl[] = "pl_phdmd"; // pH : volume maximal par jour (mL).
+constexpr char PhValidMin[] = "pl_phvmn"; // pH : borne basse de validite de la mesure.
+constexpr char PhValidMax[] = "pl_phvmx"; // pH : borne haute de validite de la mesure.
+constexpr char PhSampleMaxAge[] = "pl_phmage"; // pH : age maximal de la mesure (s).
+constexpr char PhNoEffectLots[] = "pl_phnel"; // pH : nombre de lots sans effet avant alarme.
+constexpr char PhNoEffectDelta[] = "pl_phned"; // pH : variation minimale consideree comme un effet.
+constexpr char PhLastDoseTs[] = "pl_phlts"; // pH : epoch de fin du dernier lot (reprise apres reboot).
+constexpr char PhGainLearned[] = "pl_phgl"; // pH : gain auto-calibre (0 = pas encore appris).
+constexpr char PhGainSamples[] = "pl_phgn"; // pH : nombre d'echantillons integres au gain appris.
 constexpr char DisSetpoint[] = "pl_dissp"; // Desinfection : consigne ORP (commune a tous les modes).
 constexpr char HeaterSetpoint[] = "pl_htsp"; // Pool logic module persisted key for field `pl_htsp`.
-constexpr char PhKp[] = "pl_phkp"; // Pool logic module persisted key for field `pl_phkp`.
-constexpr char PhKi[] = "pl_phki"; // Pool logic module persisted key for field `pl_phki`.
-constexpr char PhKd[] = "pl_phkd"; // Pool logic module persisted key for field `pl_phkd`.
 constexpr char DisKp[] = "pl_diskp"; // Desinfection : gain proportionnel du PID ORP.
 constexpr char DisKi[] = "pl_diski"; // Desinfection : gain integral du PID ORP.
 constexpr char DisKd[] = "pl_diskd"; // Desinfection : gain derive du PID ORP.
-constexpr char PhWindowMs[] = "pl_phwms"; // Pool logic module persisted key for field `pl_phwms`.
 constexpr char DisWindowMs[] = "pl_diswms"; // Desinfection : fenetre PWM du PID ORP.
 // Duree ON minimale et periode d'echantillonnage : propres a chaque boucle
 // (caracteristique de la pompe / du reglage), plus mutualisees.
-constexpr char PhMinOnMs[] = "pl_phmon"; // pH : duree ON minimale du PID.
-constexpr char PhSampleMs[] = "pl_phsmp"; // pH : periode d'echantillonnage du PID.
 constexpr char DisMinOnMs[] = "pl_dismon"; // Desinfection : duree ON minimale du PID.
 constexpr char DisSampleMs[] = "pl_dissmp"; // Desinfection : periode d'echantillonnage du PID.
 constexpr char PressureDelay[] = "pl_psdt"; // Pool logic module persisted key for field `pl_psdt`.

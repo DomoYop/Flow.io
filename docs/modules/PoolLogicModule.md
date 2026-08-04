@@ -7,7 +7,7 @@ Il:
 - calcule et maintient la fenêtre quotidienne de filtration à partir de la température d'eau
 - pilote les équipements via `PoolDeviceService` (filtration, pompe pH, pompe ORP/chlore liquide, robot, électrolyse, remplissage)
 - applique les règles automatiques (modes, seuils, délais, sécurités)
-- exécute la régulation pH/ORP en **PID temporel** (duty-cycle dans une fenêtre fixe)
+- exécute la régulation **pH en dosage volumétrique par lots** (batch + temps de mélange) et la **désinfection liquide en PID temporel** (duty-cycle dans une fenêtre fixe)
 - pilote l'oxygène actif liquide par volume calculé, sans sonde ORP, lorsque `disinfection_type=2`
 - pilote un protocole de **chauffage assisté** (`heat_assist`) quand la température d'eau dépend de la filtration
 - expose des snapshots runtime MQTT (`rt/poollogic/ph`, `rt/poollogic/orp`, `rt/poollogic/heat_assist`, `rt/poollogic/disinfection`)
@@ -320,12 +320,16 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 
 ### Régulation pH (`poollogic/ph`)
 
-- `ph_auto_mode`
-- `ph_dose_plus`
-- `ph_setpoint`
-- `ph_kp`, `ph_ki`, `ph_kd`
-- `ph_window_ms`
+- `ph_auto_mode`, `ph_dose_plus`, `ph_setpoint`
 - `ph_pump_slot` (slot PoolDevice de la pompe pH)
+- Dosage : `ph_dose_ml_m3` (gain mL/m³ par 0,1 pH), `ph_deadband`, `ph_dose_factor`,
+  `ph_mix_wait_min` (0 = turnover calculé), `ph_dose_max_batch`, `ph_dose_max_day`
+- Validité de la mesure : `ph_valid_min`, `ph_valid_max`, `ph_sample_max_age`
+- Détection d'inefficacité : `ph_no_effect_lots`, `ph_no_effect_dph`
+- Auto-calibration (masqués / diagnostic) : `ph_gain_learned`, `ph_gain_samples`, `ph_last_dose_ts`
+
+> Les paramètres PID `ph_kp` / `ph_ki` / `ph_kd` / `ph_window_ms` / `ph_min_on_ms` /
+> `ph_sample_ms` **n'existent plus** : le pH n'est plus régulé par PID temporel.
 
 ### Désinfection chlore/brome liquide (`poollogic/chlorine`)
 
@@ -622,9 +626,106 @@ Si le service alarmes est indisponible, `PoolLogic` applique un latch local PSI 
 - `psiError_` passe à vrai
 - pas de clear automatique local (mode dégradé conservatif)
 
-## Régulation PID temporelle (pH / ORP)
+## Régulation pH : dosage volumétrique par lots
 
-La régulation est implémentée dans `PoolLogicModule` avec deux états internes (`TemporalPidState`), un pour pH, un pour ORP.
+Le dosage d'un bassin est un procédé à **grand retard pur** : une dose n'est visible par la sonde
+qu'après un brassage complet (1 turnover = 3 à 8 h). Un régulateur proportionnel dont la fenêtre est
+plus courte que ce retard redose plusieurs fois avant de voir l'effet de la première dose, donc
+surdose structurellement. Le pH utilise donc un contrôleur par lots : calculer un **volume**,
+l'injecter, puis **attendre** avant de re-mesurer.
+
+La logique est isolée dans le helper pur
+[DosingController.h](../../src/Modules/PoolLogicModule/DosingController.h) (aucune dépendance
+Arduino/ESP, aucune horloge interne), testé en natif par `test/test_poollogic_dosing_controller`.
+`PoolLogicModule` ne fait que remplir la structure d'entrée et appliquer la sortie.
+
+### Machine à états
+
+| Phase | Pompe | Sortie |
+|---|---|---|
+| `idle` | OFF | régulation non armée |
+| `measure` | OFF | attend une mesure valide et fraîche, puis calcule la dose du lot |
+| `dosing` | **ON** | injecte jusqu'au millilitre visé |
+| `mixing` | OFF | **rien ne se décide** ; un écart même important ne redémarre pas la pompe |
+| `evaluate` | OFF | compare le ΔpH obtenu à la dose injectée, recale le gain |
+| `blocked` | OFF | refus device, interlock, bidon, quota, ou dosage sans effet |
+
+L'armement reprend la temporisation historique : filtration en marche depuis `dly_pid_min`, hors mode
+hiver, `ph_auto_mode` actif. Les autres conditions (mesure disponible, pression, niveau de bidon,
+interlock débit) sont des **entrées du contrôleur** et produisent une phase et une raison observables
+plutôt qu'un arrêt silencieux.
+
+### Calcul de la dose
+
+```
+effectif = |écart| - ph_deadband
+dose_ml  = gain × volume_m3 × (effectif / 0,1) × ph_dose_factor
+plafonds : ph_dose_max_batch, (ph_dose_max_day - injecté du jour), niveau du bidon
+plancher : 10 s de pompe (granularité) — en dessous, aucune dose
+```
+
+`ph_dose_factor` = 0,5 vise la moitié de l'écart par lot : combiné à l'attente de mélange, la
+convergence est géométrique et **sans dépassement** — ce qu'un intégrateur ne sait pas produire sur un
+procédé à retard pur.
+
+Exemple (50 m³, gain 10, pompe 1,8 L/h, plafond 250 mL) : écart 0,10 pH → 125 mL ≈ 4 min de pompe ;
+écart 0,20 pH → 250 mL (plafonné) ≈ 8 min, suivies de 5 h de mélange.
+
+### Temps de mélange
+
+```
+mix_wait = clamp(max(ph_mix_wait_min, volume_m3 / débit_filtration_m3h), 10 min, 8 h)
+```
+
+`ph_mix_wait_min = 0` donne le turnover pur ; une valeur non nulle sert de **plancher**. Le décompte
+n'avance **que si la filtration tourne réellement** : sinon un arrêt ferait « passer » le turnover
+sans qu'un seul m³ ait été brassé, et le lot suivant serait décidé sur une eau non homogène.
+
+### Auto-calibration du gain
+
+À la fin de chaque cycle :
+
+```
+gain_observé = dose_injectée_ml / (ΔpH × volume_m3 / 0,1)
+```
+
+L'échantillon est rejeté si la dose est inférieure à 50 mL, si le ΔpH est sous le bruit de sonde, ou
+s'il est **du mauvais signe** (une perturbation — orage, fréquentation — fausserait la calibration).
+Les échantillons retenus alimentent une moyenne glissante bornée à ±50 % de `ph_dose_ml_m3`, sur une
+fenêtre de 8 lots. Le résultat est persisté dans `ph_gain_learned`, remis à zéro si `ph_dose_ml_m3` ou
+`pool_volume_m3` change.
+
+Un lot dont la dose est significative mais sans correction mesurable incrémente un compteur ; après
+`ph_no_effect_lots` lots consécutifs, l'alarme **`ph_dose_no_effect`** (`AlarmId` 1007, latchée) est
+levée et la FSM passe en `blocked`. Le latch est levé par le réapprovisionnement du bidon (front
+descendant du niveau bas) ou une bascule de `ph_auto_mode`.
+
+### Reprise après redémarrage
+
+La FSM n'est **pas** persistée : `millis()` repart à zéro, et un blocage persisté serait plus dangereux
+qu'un redémarrage en mesure. Ce qui doit survivre survit ailleurs — `injectedMlDay` et le niveau de
+bidon sont dans le blob `pdNrt` de `PoolDeviceModule`, donc un reboot ne contourne ni le quota
+journalier ni le bidon vide.
+
+Seule exception : `ph_last_dose_ts` (epoch, masqué), écrit à chaque fin de lot. Au premier armement
+après un boot, si l'horloge est synchronisée et que le turnover n'est pas écoulé, la FSM redémarre
+directement en `mixing` avec le temps déjà passé. Sans cela, un reboot juste après un lot ferait
+redoser sur une eau non brassée.
+
+### Sécurités
+
+- **Bande morte** `ph_deadband` : jamais de dosage sur le bruit de sonde.
+- **Plage de validité** `ph_valid_min` / `ph_valid_max` : hors plage, la sonde est suspecte et le
+  dosage est **interdit**, jamais maximal.
+- **Fraîcheur** `ph_sample_max_age` : une mesure périmée suspend le dosage.
+- **Quota volumétrique** `ph_dose_max_day`, adossé au compteur persistant de la pompe.
+- **Non-simultanéité acide / chlore liquide** : leur mélange dégage du chlore gazeux ; priorité au pH,
+  dont dépend l'efficacité du chlore.
+- `max_uptime_day_s` du slot PoolDevice reste une sécurité de dernier recours (défaut 90 min).
+
+## Régulation PID temporelle (désinfection liquide)
+
+La désinfection liquide conserve un PID temporel (`TemporalPidState`), inchangé.
 
 ### Activation
 
@@ -632,26 +733,22 @@ Le mode PID est autorisé seulement si:
 - filtration en marche
 - pas de mode hiver
 - délai de stabilisation atteint (`dly_pid_min`)
-- mode auto de la boucle activé (`ph_auto_mode` / `dis_auto_mode`)
+- mode auto de la boucle activé (`dis_auto_mode`)
 
 Le calcul et la commande sont ensuite conditionnés par:
-- capteur disponible (`ph_io_id` / `dis_io_id`)
-- pas de défaut PSI latched (`psiError_==false`)
-- pas de niveau bas cuve actif:
-  - pH: `phTankLowError_==false`
-  - ORP/chlore/O2: `chlorineTankLowError_==false`
-- pour ORP péristaltique: `disinfection_type == 0` (en mode électrolyse ou oxygène actif, la régulation ORP liquide est inhibée)
+- capteur disponible (`dis_io_id`)
+- pas de défaut pression latched (`pressureError_==false`)
+- pas de niveau bas cuve actif (`chlorineTankLowError_==false`)
+- `disinfection_type == 1` (en mode électrolyse ou oxygène actif, la régulation ORP liquide est inhibée)
 
 ### Convention d'erreur
 
-- pH: `error = ph_input - ph_setpoint`
-  - injection acide seulement si `error > 0`
-- désinfection liquide: `error = dis_setpoint - orp_input`
-  - injection chlore liquide seulement si `error > 0`
+- `error = dis_setpoint - orp_input`
+- injection chlore liquide seulement si `error > 0`
 
 ### Calcul périodique
 
-À chaque `pid_sample_ms` (par défaut `30000 ms`):
+À chaque `dis_sample_ms` (par défaut `30000 ms`):
 - intégrale:
   - accumulée si `Ki != 0`
   - remise à zéro si `Ki == 0` ou `error <= 0`
@@ -660,13 +757,15 @@ Le calcul et la commande sont ensuite conditionnés par:
 - sortie:
   - `u = Kp*e + Ki*I + Kd*D`
   - clampée sur `[0, window_ms]`
-  - filtrée par seuil minimal: si `u < pid_min_on_ms`, alors `0`
+  - filtrée par seuil minimal: si `u < dis_min_on_ms`, alors `0`
 
 ### Fenêtre temporelle (PWM temporel)
 
-Chaque boucle a une fenêtre cyclique fixe (`ph_window_ms` / `dis_window_ms`):
+La boucle a une fenêtre cyclique fixe (`dis_window_ms`):
 - la fenêtre est avancée par pas de `window_ms`
-- `output_on_ms` représente la durée ON au début de la fenêtre
+- `output_on_ms` est **figé pour toute la fenêtre en cours** : une consigne recalculée en cours de
+  route n'entre en vigueur qu'au début de la fenêtre suivante, sinon la pompe pourrait se rallumer en
+  milieu de fenêtre après s'être arrêtée
 - demande pompe:
   - ON si `elapsed_in_window < output_on_ms`
   - OFF sinon

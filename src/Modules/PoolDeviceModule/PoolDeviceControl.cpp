@@ -76,6 +76,11 @@ PoolDeviceSvcStatus PoolDeviceModule::svcMetaImpl_(uint8_t slot, PoolDeviceSvcMe
     outMeta->runtimeId[sizeof(outMeta->runtimeId) - 1] = '\0';
     strncpy(outMeta->label, s.def.label, sizeof(outMeta->label) - 1);
     outMeta->label[sizeof(outMeta->label) - 1] = '\0';
+    if (s.def.type == POOL_DEVICE_PERISTALTIC) {
+        outMeta->flowLPerHour = s.def.flowLPerHour;
+        outMeta->injectedMlDay = s.injectedMlDay;
+        outMeta->tankRemainingMl = s.tankRemainingMl;
+    }
     unlockState_();
     return POOLDEV_SVC_OK;
 }

@@ -103,9 +103,6 @@ struct PoolLogicDefaultsSpec {
     float phSetpoint;
     float orpSetpoint;
     float heaterSetpoint;
-    float phKp;
-    float phKi;
-    float phKd;
     float orpKp;
     float orpKi;
     float orpKd;

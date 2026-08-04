@@ -25,14 +25,15 @@ pio run -e Supervisor             # ESP32 de supervision (web, provisioning, OTA
 pio run -e Waveshare-ESP32-S3 -t upload
 pio device monitor -b 115200
 
-# Tests unitaires host (Unity) — voir test/
-pio test
+# Tests unitaires hote (Unity) — voir test/ ; l'env `native` n'a pas de board ni de framework
+pio test -e native
 ```
 
 Note Windows : le shell par défaut est PowerShell ; le tool Bash exécute du POSIX sh. `pio` peut nécessiter d'être appelé via le venv PlatformIO (`~/.platformio/penv/Scripts/pio` sous Windows, `~/.platformio/penv/bin/pio` sous Linux).
 
 - **Lancer `pio` depuis PowerShell natif, pas depuis le Bash/MSys** : `esptool` rejette l'environnement MSys/Mingw (« MSys/Mingw is not supported »), ce qui casse notamment le flash/upload.
 - **`pio run -e FlowIO` ne linke pas actuellement**, pour une raison préexistante et indépendante du code métier (dérive du core Arduino-ESP32 : `ledcAttach`, `xTaskCreatePinnedToCoreWithCaps`, `driver/rmt_encoder.h`). Utiliser `Waveshare-ESP32-S3` comme cible de référence pour valider un build.
+- **`pio test` sans `-e native` ne fonctionne pas** : `default_envs = FlowIO` ferait cibler l'ESP32. L'env `native` compile uniquement les helpers purs (`FiltrationWindow`, `DosingController`) et demande un `g++` hôte sur le PATH — absent de la machine de dev Windows, le job GitHub Actions `native-tests` s'en charge. Corollaire : la section commune des firmwares ESP32 s'appelle **`[esp32_base]`** et non `[env]`, car une section `[env]` serait héritée par tous les envs, y compris `native`.
 - **`pio run -e Supervisor` échoue de la même manière** (mêmes symboles Arduino-ESP32 manquants, plus `NetworkEvents.h` et `RuntimeData::pool` — `PoolDeviceRuntime.h` est compilé alors que `PoolDeviceModuleDataModel.h` est hors `build_src_filter`). Préexistant, vérifié sur commit de référence : ne pas l'attribuer à une modification en cours.
 
 ## Code généré — ne pas éditer à la main
@@ -122,4 +123,4 @@ Notes personnelles hors doc officielle — utiles pour l'état d'avancement et l
 - [audit-config-defaut-piscine-waveshare.md](docs/notes/audit-config-defaut-piscine-waveshare.md) — matrice des défauts métier injectés par `applyDomainDefaults` (DomainSpec).
 - [audit-configstore-ui-poollogic.md](docs/notes/audit-configstore-ui-poollogic.md) — audit ConfigStore + chaîne cfgdocs/UI, refonte UX « équipements actifs » (**implémentée**) et backlog des chantiers de fond.
 - [filtration-turnover-fenetres.md](docs/notes/filtration-turnover-fenetres.md) — filtration par renouvellement volumique (volume × cycles(T) ÷ débit) répartie sur 3 fenêtres priorisées, heures creuses incluses (**implémenté**, remplace « température/2 »).
-- [regulation-ph-etat-art-et-refonte.md](docs/notes/regulation-ph-etat-art-et-refonte.md) — état de l'art du dosage pH par pompe péristaltique, constat chiffré sur le PID temporel actuel (quota 30 min/j = limite de fonctionnement, pas sécurité) et refonte proposée en dosage volumétrique par lots avec temps de mélange (**analyse + proposition, non implémenté**).
+- [regulation-ph-etat-art-et-refonte.md](docs/notes/regulation-ph-etat-art-et-refonte.md) — état de l'art du dosage pH par pompe péristaltique, constat chiffré sur l'ancien PID temporel, et refonte en dosage volumétrique par lots avec temps de mélange (**implémenté**). Le PID pH est **supprimé**, pas conservé derrière un switch : `ph_kp/ki/kd`, `ph_window_ms`, `ph_min_on_ms`, `ph_sample_ms` n'existent plus (effacement NVS recommandé) ; l'ORP garde son PID. `DosePumpMaxUptimeDaySec` passe à 90 min. Écarts par rapport à la proposition en §5.8.

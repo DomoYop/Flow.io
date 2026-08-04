@@ -244,6 +244,7 @@ static uint32_t alarmMaskFromId_(AlarmId id)
         case AlarmId::PoolPhPumpMaxUptime: return 16UL;
         case AlarmId::PoolChlorinePumpMaxUptime: return 32UL;
         case AlarmId::PoolWaterLevelLow: return 64UL;
+        case AlarmId::PoolPhDoseNoEffect: return 128UL;
         default: return 0UL;
     }
 }
@@ -2561,6 +2562,7 @@ const char* HMIModule::alarmLabelShortForId_(AlarmId id) const
         case AlarmId::PoolPhPumpMaxUptime: return en ? "pH uptime" : "pH uptime";
         case AlarmId::PoolChlorinePumpMaxUptime: return en ? "ORP uptime" : "ORP uptime";
         case AlarmId::PoolWaterLevelLow: return en ? "Low water" : "Eau basse";
+        case AlarmId::PoolPhDoseNoEffect: return en ? "pH no effect" : "pH sans effet";
         default: return "";
     }
 }

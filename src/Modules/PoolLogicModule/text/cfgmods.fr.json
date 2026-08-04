@@ -199,6 +199,18 @@
     "poollogic/filtration/filtr_stop_clc": {
       "enum_set": "hours_of_day"
     },
+    "poollogic/ph/ph_gain_learned": {
+      "visible_if": {
+        "path": "poollogic/ph/ph_auto_mode",
+        "eq": true
+      }
+    },
+    "poollogic/ph/ph_gain_samples": {
+      "hidden": true
+    },
+    "poollogic/ph/ph_last_dose_ts": {
+      "hidden": true
+    },
     "poollogic/sensors/dis_io_id": {
       "visible_if": {
         "path": "poollogic/bassin/disinfection_type",

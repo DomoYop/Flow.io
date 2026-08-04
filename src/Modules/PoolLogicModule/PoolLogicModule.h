@@ -16,6 +16,7 @@
 #include "Core/Services/Services.h"
 #include "Domain/Pool/PoolDefaults.h"
 #include "Domain/Pool/PoolIds.h"
+#include "Modules/PoolLogicModule/DosingController.h"
 #include "Modules/PoolLogicModule/FiltrationWindow.h"
 
 /** @brief Event ids owned by PoolLogicModule. */
@@ -83,6 +84,10 @@ private:
         // air_temp_io_id, pas une position figee dans la couche IO.
         RuntimeUiWaterTemp = 6,
         RuntimeUiAirTemp = 7,
+        // Dosage pH volumetrique par lots.
+        RuntimeUiPhDosePhase = 8,
+        RuntimeUiPhDoseDayMl = 9,
+        RuntimeUiPhGain = 10,
     };
 
     enum DisinfectionType : uint8_t {
@@ -123,16 +128,33 @@ private:
         bool lastDesired = false;
         uint32_t stateSinceMs = 0;
         uint32_t lastCmdMs = 0;
+        // Suivi du refus d'ecriture : la consigne n'est latchee que lorsqu'elle
+        // est acceptee, et le log de blocage est deduplique par raison.
+        bool writeRejected = false;
+        uint8_t lastBlockReason = 0;
+        uint8_t loggedBlockReason = 0xFFU;  // 0xFF = aucune raison tracee
+        uint32_t blockLoggedMs = 0;
+    };
+
+    // Resultat d'une commande d'equipement : distingue le refus d'un simple
+    // "rien a faire", pour que la logique metier puisse suspendre son action.
+    enum class DeviceWriteResult : uint8_t {
+        NoDevice = 0,   // slot >= POOL_DEVICE_MAX : role sans appareil associe
+        Unchanged = 1,  // aucune ecriture necessaire ce tour
+        Written = 2,    // ecriture acceptee par PoolDeviceService
+        Rejected = 3,   // ecriture refusee, voir fsm.lastBlockReason
     };
 
     struct TemporalPidState {
         bool initialized = false;
         bool sampleValid = false;
         bool lastDemandOn = false;
+        bool windowLatched = false;  // outputOnMs fige pour la fenetre en cours
         uint32_t windowStartMs = 0;
         uint32_t lastComputeMs = 0;
         uint32_t sampleTsMs = 0;
         uint32_t outputOnMs = 0;
+        uint32_t pendingOnMs = 0;  // consigne calculee, appliquee au debut de fenetre
         uint32_t runtimeTsMs = 0;
         float sampleInput = 0.0f;
         float sampleSetpoint = 0.0f;
@@ -228,20 +250,32 @@ private:
     float phSetpoint_ = PoolDefaults::PhSetpoint;
     float orpSetpoint_ = PoolDefaults::OrpSetpoint;
     float heaterSetpoint_ = PoolDefaults::HeaterSetpoint;
-    float phKp_ = PoolDefaults::PhKp;
-    float phKi_ = PoolDefaults::PhKi;
-    float phKd_ = PoolDefaults::PhKd;
     float orpKp_ = PoolDefaults::OrpKp;
     float orpKi_ = PoolDefaults::OrpKi;
     float orpKd_ = PoolDefaults::OrpKd;
-    int32_t phWindowMs_ = PoolDefaults::PidWindowMs;
     int32_t orpWindowMs_ = PoolDefaults::PidWindowMs;
-    // Duree ON minimale et periode d'echantillonnage par boucle : la duree ON
-    // depend de la pompe pilotee, l'echantillonnage se regle avec les gains.
-    int32_t phMinOnMs_ = PoolDefaults::PidMinOnMs;
-    int32_t phSampleMs_ = PoolDefaults::PidSampleMs;
+    // Duree ON minimale et periode d'echantillonnage de la boucle ORP, qui reste
+    // un PID temporel (le pH est passe au dosage volumetrique par lots).
     int32_t disMinOnMs_ = PoolDefaults::PidMinOnMs;
     int32_t disSampleMs_ = PoolDefaults::PidSampleMs;
+
+    // Dosage pH volumetrique par lots. Le gain, la bande morte et les plafonds
+    // sont exprimes dans les unites que l'utilisateur comprend (mL, pH), et
+    // relies au volume du bassin et au debit reel de la pompe.
+    float phDoseMlPerM3_ = PoolDefaults::PhDoseMlPerM3;
+    float phDeadband_ = PoolDefaults::PhDeadband;
+    float phDoseFactor_ = PoolDefaults::PhDoseFactor;
+    float phDoseMaxBatchMl_ = PoolDefaults::PhDoseMaxBatchMl;
+    float phDoseMaxDayMl_ = PoolDefaults::PhDoseMaxDayMl;
+    float phValidMin_ = PoolDefaults::PhValidMin;
+    float phValidMax_ = PoolDefaults::PhValidMax;
+    float phNoEffectDelta_ = PoolDefaults::PhNoEffectDelta;
+    float phGainLearned_ = 0.0f;
+    uint16_t phMixWaitMin_ = PoolDefaults::PhMixWaitMin;
+    uint16_t phSampleMaxAgeS_ = PoolDefaults::PhSampleMaxAgeSec;
+    uint8_t phNoEffectBatches_ = PoolDefaults::PhNoEffectBatches;
+    uint8_t phGainSamples_ = 0;
+    int32_t phLastDoseTs_ = 0;  // epoch de fin du dernier lot, masque dans l'UI
     uint8_t pressureStartupDelaySec_ = PoolDefaults::PressureStartupDelaySec;
     uint8_t delayPidsMin_ = PoolDefaults::DelayPidsMin;
     uint8_t delayElectroMin_ = PoolDefaults::DelayElectroMin;
@@ -296,8 +330,19 @@ private:
     uint32_t heatAssistTimingPacked_ = 0;
     uint8_t heatAssistFlags_ = 0;
     HeatAssistReason heatAssistReason_ = HeatAssistReason::Disabled;
-    TemporalPidState phPidState_{};
     TemporalPidState orpPidState_{};
+
+    // Dosage pH par lots : etat de la FSM (RAM seule, cf. reprise apres reboot
+    // par phLastDoseTs_) et dernier resultat, publie en runtime.
+    DosingState phDosingState_{};
+    DosingOutput phDosingLast_{};
+    uint32_t phDosingTsMs_ = 0;   // horodatage du dernier changement observable
+    uint32_t phMetricsReadMs_ = 0;  // cadence de relecture des metriques PoolDevice
+    float phPumpFlowLh_ = 0.0f;
+    float phDosedTodayMl_ = 0.0f;
+    float phTankRemainMl_ = 0.0f;
+    bool phDosingResumeChecked_ = false;  // reprise post-boot deja tentee
+    bool dosingConflictLogged_ = false;   // deduplication du log acide/chlore
 
     bool filtrationWindowActive_ = false;
     bool pendingDailyRecalc_ = false;
@@ -417,30 +462,47 @@ private:
                                               &secureElectroTempC_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> phSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::PhSetpoint), "ph_setpoint", "poollogic/ph", ConfigType::Float,
                                            &phSetpoint_, ConfigPersistence::Persistent, 0};
+    // Dosage pH volumetrique par lots.
+    ConfigVariable<float,0> phDoseMlPerM3Var_{NVS_KEY(NvsKeys::PoolLogic::PhDoseMlPerM3), "ph_dose_ml_m3", "poollogic/ph", ConfigType::Float,
+                                              &phDoseMlPerM3_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phDeadbandVar_{NVS_KEY(NvsKeys::PoolLogic::PhDeadband), "ph_deadband", "poollogic/ph", ConfigType::Float,
+                                           &phDeadband_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phDoseFactorVar_{NVS_KEY(NvsKeys::PoolLogic::PhDoseFactor), "ph_dose_factor", "poollogic/ph", ConfigType::Float,
+                                             &phDoseFactor_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phDoseMaxBatchVar_{NVS_KEY(NvsKeys::PoolLogic::PhDoseMaxBatchMl), "ph_dose_max_batch", "poollogic/ph", ConfigType::Float,
+                                               &phDoseMaxBatchMl_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phDoseMaxDayVar_{NVS_KEY(NvsKeys::PoolLogic::PhDoseMaxDayMl), "ph_dose_max_day", "poollogic/ph", ConfigType::Float,
+                                             &phDoseMaxDayMl_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phValidMinVar_{NVS_KEY(NvsKeys::PoolLogic::PhValidMin), "ph_valid_min", "poollogic/ph", ConfigType::Float,
+                                           &phValidMin_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phValidMaxVar_{NVS_KEY(NvsKeys::PoolLogic::PhValidMax), "ph_valid_max", "poollogic/ph", ConfigType::Float,
+                                           &phValidMax_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phNoEffectDeltaVar_{NVS_KEY(NvsKeys::PoolLogic::PhNoEffectDelta), "ph_no_effect_dph", "poollogic/ph", ConfigType::Float,
+                                                &phNoEffectDelta_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> phGainLearnedVar_{NVS_KEY(NvsKeys::PoolLogic::PhGainLearned), "ph_gain_learned", "poollogic/ph", ConfigType::Float,
+                                              &phGainLearned_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> phMixWaitMinVar_{NVS_KEY(NvsKeys::PoolLogic::PhMixWaitMin), "ph_mix_wait_min", "poollogic/ph", ConfigType::UInt16,
+                                                &phMixWaitMin_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> phSampleMaxAgeVar_{NVS_KEY(NvsKeys::PoolLogic::PhSampleMaxAge), "ph_sample_max_age", "poollogic/ph", ConfigType::UInt16,
+                                                  &phSampleMaxAgeS_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint8_t,0> phNoEffectLotsVar_{NVS_KEY(NvsKeys::PoolLogic::PhNoEffectLots), "ph_no_effect_lots", "poollogic/ph", ConfigType::UInt8,
+                                                 &phNoEffectBatches_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint8_t,0> phGainSamplesVar_{NVS_KEY(NvsKeys::PoolLogic::PhGainSamples), "ph_gain_samples", "poollogic/ph", ConfigType::UInt8,
+                                                &phGainSamples_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<int32_t,0> phLastDoseTsVar_{NVS_KEY(NvsKeys::PoolLogic::PhLastDoseTs), "ph_last_dose_ts", "poollogic/ph", ConfigType::Int32,
+                                               &phLastDoseTs_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> orpSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::DisSetpoint), "dis_setpoint", "poollogic/disinfection", ConfigType::Float,
                                             &orpSetpoint_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> heaterSetpointVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSetpoint), "heater_setpoint", "poollogic/heater", ConfigType::Float,
                                                &heaterSetpoint_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> phKpVar_{NVS_KEY(NvsKeys::PoolLogic::PhKp), "ph_kp", "poollogic/ph", ConfigType::Float,
-                                     &phKp_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> phKiVar_{NVS_KEY(NvsKeys::PoolLogic::PhKi), "ph_ki", "poollogic/ph", ConfigType::Float,
-                                     &phKi_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<float,0> phKdVar_{NVS_KEY(NvsKeys::PoolLogic::PhKd), "ph_kd", "poollogic/ph", ConfigType::Float,
-                                     &phKd_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> orpKpVar_{NVS_KEY(NvsKeys::PoolLogic::DisKp), "dis_kp", "poollogic/disinfection", ConfigType::Float,
                                       &orpKp_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> orpKiVar_{NVS_KEY(NvsKeys::PoolLogic::DisKi), "dis_ki", "poollogic/disinfection", ConfigType::Float,
                                       &orpKi_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> orpKdVar_{NVS_KEY(NvsKeys::PoolLogic::DisKd), "dis_kd", "poollogic/disinfection", ConfigType::Float,
                                       &orpKd_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<int32_t,0> phWindowMsVar_{NVS_KEY(NvsKeys::PoolLogic::PhWindowMs), "ph_window_ms", "poollogic/ph", ConfigType::Int32,
-                                             &phWindowMs_, ConfigPersistence::Persistent, 0};
     ConfigVariable<int32_t,0> orpWindowMsVar_{NVS_KEY(NvsKeys::PoolLogic::DisWindowMs), "dis_window_ms", "poollogic/disinfection", ConfigType::Int32,
                                               &orpWindowMs_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<int32_t,0> phMinOnMsVar_{NVS_KEY(NvsKeys::PoolLogic::PhMinOnMs), "ph_min_on_ms", "poollogic/ph", ConfigType::Int32,
-                                            &phMinOnMs_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<int32_t,0> phSampleMsVar_{NVS_KEY(NvsKeys::PoolLogic::PhSampleMs), "ph_sample_ms", "poollogic/ph", ConfigType::Int32,
-                                             &phSampleMs_, ConfigPersistence::Persistent, 0};
     ConfigVariable<int32_t,0> disMinOnMsVar_{NVS_KEY(NvsKeys::PoolLogic::DisMinOnMs), "dis_min_on_ms", "poollogic/disinfection", ConfigType::Int32,
                                              &disMinOnMs_, ConfigPersistence::Persistent, 0};
     ConfigVariable<int32_t,0> disSampleMsVar_{NVS_KEY(NvsKeys::PoolLogic::DisSampleMs), "dis_sample_ms", "poollogic/disinfection", ConfigType::Int32,
@@ -544,12 +606,17 @@ private:
     static AlarmCondState condPressureHighStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhTankLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorineTankLowStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condPhDoseNoEffectStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condWaterLevelLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhPumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorinePumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     AlarmCondState condPumpMaxUptime_(uint8_t deviceSlot) const;
     bool readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const;
-    bool writeDeviceDesired_(uint8_t deviceSlot, bool on);
+    bool writeDeviceDesired_(uint8_t deviceSlot,
+                             bool on,
+                             PoolDeviceSvcStatus& statusOut,
+                             uint8_t& blockReasonOut);
+    bool forceDeviceStop_(uint8_t deviceSlot);
     bool setPoolDeviceWritesEnabled_(bool enabled);
     void syncDeviceState_(uint8_t deviceSlot, DeviceFsm& fsm, uint32_t nowMs, bool& turnedOnOut, bool& turnedOffOut);
     void syncAllDeviceStates_(uint32_t nowMs);
@@ -558,7 +625,7 @@ private:
     bool loadAnalogSensor_(IoId ioId, float& out, uint32_t* tsMsOut = nullptr) const;
     bool loadDigitalSensor_(IoId ioId, bool& out) const;
     void resetTemporalPidState_(TemporalPidState& st, uint32_t nowMs);
-    bool stepTemporalPid_(TemporalPidState& st,
+    void stepTemporalPid_(TemporalPidState& st,
                           float input,
                           float setpoint,
                           float kp,
@@ -571,7 +638,24 @@ private:
                           uint32_t nowMs,
                           bool& demandOnOut,
                           uint32_t& outputOnMsOut);
-    void applyDeviceControl_(uint8_t deviceSlot, const char* label, DeviceFsm& fsm, bool desired, uint32_t nowMs);
+    // Dosage pH volumetrique par lots : adaptateurs minces autour du helper pur
+    // DosingController (aucune logique de regulation ici).
+    void refreshPhPumpMetrics_(uint32_t nowMs);
+    void resumePhDosingAfterBoot_(uint32_t nowMs);
+    void fillPhDosingInput_(DosingInput& in,
+                            bool havePh,
+                            float ph,
+                            uint32_t phAgeMs,
+                            uint32_t nowMs) const;
+    void stepPhDosing_(bool havePh, float ph, uint32_t phAgeMs, uint32_t nowMs, bool& phPumpDesired);
+    void persistPhDosingResult_(const DosingOutput& out, uint32_t nowMs);
+    void resetPhLearnedGain_(const char* reason);
+    void resetPhDosingState_(uint32_t nowMs);
+    DeviceWriteResult applyDeviceControl_(uint8_t deviceSlot,
+                                          const char* label,
+                                          DeviceFsm& fsm,
+                                          bool desired,
+                                          uint32_t nowMs);
     void runControlLoop_(uint32_t nowMs);
     ActivityRole activityRoleForDeviceSlot_(uint8_t deviceSlot) const;
     const char* activityRoleLabel_(ActivityRole role) const;
