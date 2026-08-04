@@ -1552,8 +1552,8 @@ void PoolLogicModule::onEvent_(const Event& e)
                 portEXIT_CRITICAL(&pendingMux_);
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisinfectionType) == 0) {
                 if (disinfectionType_ > DisinfectionActiveOxygen) disinfectionType_ = DisinfectionDisabled;
-                (void)writeDeviceDesired_(orpPumpDeviceSlot_, false);
-                (void)writeDeviceDesired_(swgDeviceSlot_, false);
+                (void)forceDeviceStop_(orpPumpDeviceSlot_);
+                (void)forceDeviceStop_(swgDeviceSlot_);
                 if (disinfectionType_ == DisinfectionChlorineBromine && !orpAutoMode_ && cfgStore_) {
                     (void)cfgStore_->set(orpAutoModeVar_, true);
                     orpAutoMode_ = true;
@@ -1579,7 +1579,7 @@ void PoolLogicModule::onEvent_(const Event& e)
             p->nvsKey) {
             if (strcmp(p->nvsKey, NvsKeys::PoolLogic::PhAutoMode) == 0 && phAutoMode_) {
                 // Global business rule: entering pH auto starts from a safe stopped pump.
-                if (!writeDeviceDesired_(phPumpDeviceSlot_, false)) {
+                if (!forceDeviceStop_(phPumpDeviceSlot_)) {
                     LOGW("PoolLogic failed to stop pH pump on ph_auto_mode enable (slot=%u)",
                          (unsigned)phPumpDeviceSlot_);
                 }
@@ -1592,14 +1592,14 @@ void PoolLogicModule::onEvent_(const Event& e)
             p->nvsKey) {
             if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisAutoMode) == 0 && orpAutoMode_) {
                 // Global business rule: entering disinfection auto starts from a safe stopped pump.
-                if (!writeDeviceDesired_(orpPumpDeviceSlot_, false)) {
+                if (!forceDeviceStop_(orpPumpDeviceSlot_)) {
                     LOGW("PoolLogic failed to stop disinfection pump on dis_auto_mode enable (slot=%u)",
                          (unsigned)orpPumpDeviceSlot_);
                 }
                 resetTemporalPidState_(orpPidState_, millis());
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::SwgControlMode) == 0) {
                 if (swgControlMode_ > SwgControlContinuous) swgControlMode_ = SwgControlContinuous;
-                (void)writeDeviceDesired_(swgDeviceSlot_, false);
+                (void)forceDeviceStop_(swgDeviceSlot_);
                 LOGI("PoolLogic SWG control changed: %s", swgControlModeStr_(swgControlMode_));
             }
             return;
@@ -1609,7 +1609,7 @@ void PoolLogicModule::onEvent_(const Event& e)
             p->nvsKey) {
             if (strcmp(p->nvsKey, NvsKeys::PoolLogic::HeaterAutoMode) == 0 && heaterAutoMode_) {
                 // Entering heater auto starts from a safe stopped heater relay.
-                if (!writeDeviceDesired_(heaterDeviceSlot_, false)) {
+                if (!forceDeviceStop_(heaterDeviceSlot_)) {
                     LOGW("PoolLogic failed to stop heater on heater_auto_mode enable (slot=%u)",
                          (unsigned)heaterDeviceSlot_);
                 }

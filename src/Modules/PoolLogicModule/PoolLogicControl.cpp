@@ -26,6 +26,12 @@ constexpr uint8_t kHeatAssistFlagHeatingActive = (1U << 1);
 constexpr uint8_t kHeatAssistFlagFastCycle = (1U << 2);
 constexpr uint32_t kO2PersistPeriodMs = 30000UL;
 constexpr float kO2DoseEpsilonMl = 0.5f;
+// Cadence de re-tentative d'une commande d'equipement non honoree.
+constexpr uint32_t kDeviceRetryPeriodMs = 5000UL;
+// Une cause de blocage dure typiquement des heures : on ne repete le log qu'a
+// intervalle long, sinon le retry 5 s inonde la console.
+constexpr uint32_t kBlockLogRepeatMs = 30UL * 60UL * 1000UL;
+constexpr uint8_t kNoLoggedBlockReason = 0xFFU;
 
 const char* poolDeviceSvcStatusStr_(PoolDeviceSvcStatus st)
 {
@@ -683,37 +689,43 @@ bool PoolLogicModule::readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const
     return true;
 }
 
-bool PoolLogicModule::writeDeviceDesired_(uint8_t deviceSlot, bool on)
+// N'emet aucun log : la deduplication appartient a applyDeviceControl_, seul
+// detenteur de l'etat de blocage par equipement.
+bool PoolLogicModule::writeDeviceDesired_(uint8_t deviceSlot,
+                                          bool on,
+                                          PoolDeviceSvcStatus& statusOut,
+                                          uint8_t& blockReasonOut)
 {
-    // Role sans appareil associe : commande ignoree silencieusement (pas de
-    // log repete toutes les 5 s via la relance de applyDeviceControl_).
-    if (deviceSlot >= POOL_DEVICE_MAX) return false;
-    if (!poolSvc_ || !poolSvc_->writeDesired) return false;
-    const PoolDeviceSvcStatus st = poolSvc_->writeDesired(poolSvc_->ctx, deviceSlot, on ? 1U : 0U);
-    if (st != POOLDEV_SVC_OK) {
-        PoolDeviceSvcMeta meta{};
-        const bool haveMeta = poolSvc_->meta &&
-                              (poolSvc_->meta(poolSvc_->ctx, deviceSlot, &meta) == POOLDEV_SVC_OK);
-        if (haveMeta) {
-            LOGW("pooldev.writeDesired failed slot=%u desired=%u st=%u(%s) block=%u(%s) enabled=%u io=%u",
-                 (unsigned)deviceSlot,
-                 on ? 1u : 0u,
-                 (unsigned)st,
-                 poolDeviceSvcStatusStr_(st),
-                 (unsigned)meta.blockReason,
-                 poolDeviceBlockReasonStr_(meta.blockReason),
-                 (unsigned)meta.enabled,
-                 (unsigned)meta.ioId);
-        } else {
-            LOGW("pooldev.writeDesired failed slot=%u desired=%u st=%u(%s)",
-                 (unsigned)deviceSlot,
-                 on ? 1u : 0u,
-                 (unsigned)st,
-                 poolDeviceSvcStatusStr_(st));
-        }
+    statusOut = POOLDEV_SVC_OK;
+    blockReasonOut = POOL_DEVICE_BLOCK_NONE;
+
+    // Role sans appareil associe : commande ignoree silencieusement.
+    if (deviceSlot >= POOL_DEVICE_MAX) {
+        statusOut = POOLDEV_SVC_ERR_UNKNOWN_SLOT;
         return false;
     }
-    return true;
+    if (!poolSvc_ || !poolSvc_->writeDesired) {
+        statusOut = POOLDEV_SVC_ERR_NOT_READY;
+        return false;
+    }
+
+    statusOut = poolSvc_->writeDesired(poolSvc_->ctx, deviceSlot, on ? 1U : 0U);
+    if (statusOut == POOLDEV_SVC_OK) return true;
+
+    PoolDeviceSvcMeta meta{};
+    if (poolSvc_->meta && (poolSvc_->meta(poolSvc_->ctx, deviceSlot, &meta) == POOLDEV_SVC_OK)) {
+        blockReasonOut = meta.blockReason;
+    }
+    return false;
+}
+
+// Arret immediat hors boucle de controle (changement de mode, de type de
+// desinfection...) : le statut detaille n'interesse pas l'appelant.
+bool PoolLogicModule::forceDeviceStop_(uint8_t deviceSlot)
+{
+    PoolDeviceSvcStatus st = POOLDEV_SVC_OK;
+    uint8_t block = POOL_DEVICE_BLOCK_NONE;
+    return writeDeviceDesired_(deviceSlot, false, st, block);
 }
 
 bool PoolLogicModule::setPoolDeviceWritesEnabled_(bool enabled)
@@ -820,10 +832,12 @@ void PoolLogicModule::resetTemporalPidState_(TemporalPidState& st, uint32_t nowM
     st.initialized = false;
     st.sampleValid = false;
     st.lastDemandOn = false;
+    st.windowLatched = false;
     st.windowStartMs = nowMs;
     st.lastComputeMs = nowMs;
     st.sampleTsMs = 0;
     st.outputOnMs = 0;
+    st.pendingOnMs = 0;
     st.sampleInput = 0.0f;
     st.sampleSetpoint = 0.0f;
     st.sampleError = 0.0f;
@@ -833,7 +847,7 @@ void PoolLogicModule::resetTemporalPidState_(TemporalPidState& st, uint32_t nowM
     st.runtimeTsMs = nowMs;
 }
 
-bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
+void PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
                                        float input,
                                        float setpoint,
                                        float kp,
@@ -857,7 +871,10 @@ bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
     if (!st.initialized) {
         st.initialized = true;
         st.windowStartMs = nowMs;
-        st.lastComputeMs = nowMs;
+        // Force un calcul des le premier tick : sans cela, la consigne ne
+        // deviendrait effective qu'a la fin de la premiere fenetre (jusqu'a 1 h
+        // de temps mort apres chaque demarrage de filtration).
+        st.lastComputeMs = nowMs - sampleMs;
         st.sampleValid = false;
         st.sampleTsMs = 0;
         st.sampleInput = 0.0f;
@@ -867,12 +884,10 @@ bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
         st.prevError = 0.0f;
         st.lastError = 0.0f;
         st.outputOnMs = 0;
+        st.pendingOnMs = 0;
+        st.windowLatched = false;
         st.lastDemandOn = false;
         st.runtimeTsMs = nowMs;
-    }
-
-    while ((uint32_t)(nowMs - st.windowStartMs) >= windowMs) {
-        st.windowStartMs += windowMs;
     }
 
     if ((uint32_t)(nowMs - st.lastComputeMs) >= sampleMs) {
@@ -909,7 +924,26 @@ bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
         uint32_t outMs = (uint32_t)(outputMs + 0.5f);
         if (outMs < minOnMs) outMs = 0U;
         if (outMs > windowMs) outMs = windowMs;
-        st.outputOnMs = outMs;
+        // La consigne calculee n'est pas appliquee immediatement : elle attend
+        // le prochain debut de fenetre (cf. latch ci-dessous).
+        st.pendingOnMs = outMs;
+    }
+
+    // Avance de fenetre par pas entiers : conserve la phase malgre les retards
+    // d'ordonnancement.
+    bool windowRolled = false;
+    while ((uint32_t)(nowMs - st.windowStartMs) >= windowMs) {
+        st.windowStartMs += windowMs;
+        windowRolled = true;
+    }
+
+    // Seul point ou outputOnMs change : la duree ON reste figee pour toute la
+    // fenetre en cours, sinon la pompe peut se rallumer en milieu de fenetre
+    // apres s'etre arretee.
+    if (windowRolled || !st.windowLatched) {
+        st.outputOnMs = st.pendingOnMs;
+        st.windowLatched = true;
+        st.runtimeTsMs = nowMs;
     }
 
     const uint32_t elapsedMs = nowMs - st.windowStartMs;
@@ -921,32 +955,70 @@ bool PoolLogicModule::stepTemporalPid_(TemporalPidState& st,
 
     demandOnOut = demandOn;
     outputOnMsOut = st.outputOnMs;
-    return true;
 }
 
-void PoolLogicModule::applyDeviceControl_(uint8_t deviceSlot,
-                                          const char* label,
-                                          DeviceFsm& fsm,
-                                          bool desired,
-                                          uint32_t nowMs)
+PoolLogicModule::DeviceWriteResult PoolLogicModule::applyDeviceControl_(uint8_t deviceSlot,
+                                                                       const char* label,
+                                                                       DeviceFsm& fsm,
+                                                                       bool desired,
+                                                                       uint32_t nowMs)
 {
-    if (deviceSlot >= POOL_DEVICE_MAX) return;  // role sans appareil associe
+    if (deviceSlot >= POOL_DEVICE_MAX) return DeviceWriteResult::NoDevice;  // role sans appareil
+
     const bool desiredChanged = (desired != fsm.lastDesired);
+    const bool retryDue = ((uint32_t)(nowMs - fsm.lastCmdMs) >= kDeviceRetryPeriodMs);
     // When the actual state does not follow the requested state, retry at a
     // bounded cadence instead of spamming the downstream pool-device service.
-    const bool needRetry = (fsm.known && (fsm.on != desired) && (uint32_t)(nowMs - fsm.lastCmdMs) >= 5000U);
+    const bool needRetry = (fsm.known && (fsm.on != desired) && retryDue);
+    // Sur refus, la consigne n'est pas latchee : desiredChanged resterait vrai a
+    // chaque tour. On borne donc la re-tentative a la meme cadence que le retry.
+    const bool attempt = (desiredChanged && (!fsm.writeRejected || retryDue)) || needRetry;
 
-    if (desiredChanged || needRetry) {
-        if (writeDeviceDesired_(deviceSlot, desired)) {
-            LOGI("%s %s", desired ? "Start" : "Stop", label ? label : "Pool Device");
-            if (desiredChanged) {
-                emitDeviceActivity_(true, desired, deviceSlot, label, ActivityReason::Auto);
-            }
-        }
-        fsm.lastCmdMs = nowMs;
+    if (!attempt) {
+        fsm.lastDesired = desired;
+        return DeviceWriteResult::Unchanged;
     }
 
-    fsm.lastDesired = desired;
+    PoolDeviceSvcStatus st = POOLDEV_SVC_OK;
+    uint8_t block = POOL_DEVICE_BLOCK_NONE;
+    const bool ok = writeDeviceDesired_(deviceSlot, desired, st, block);
+    fsm.lastCmdMs = nowMs;
+    fsm.lastBlockReason = block;
+
+    if (ok) {
+        LOGI("%s %s", desired ? "Start" : "Stop", label ? label : "Pool Device");
+        if (desiredChanged) {
+            emitDeviceActivity_(true, desired, deviceSlot, label, ActivityReason::Auto);
+        }
+        if (fsm.loggedBlockReason != kNoLoggedBlockReason) {
+            LOGI("pooldev.writeDesired recovered slot=%u prev_block=%u(%s)",
+                 (unsigned)deviceSlot,
+                 (unsigned)fsm.loggedBlockReason,
+                 poolDeviceBlockReasonStr_(fsm.loggedBlockReason));
+            fsm.loggedBlockReason = kNoLoggedBlockReason;
+        }
+        fsm.writeRejected = false;
+        fsm.lastDesired = desired;  // latch uniquement sur succes
+        return DeviceWriteResult::Written;
+    }
+
+    // Echec : la consigne reste "non honoree" pour la logique metier, et le log
+    // n'est reemis que si la raison change ou apres kBlockLogRepeatMs.
+    fsm.writeRejected = true;
+    const bool reasonChanged = (fsm.loggedBlockReason != block);
+    const bool repeatDue = ((uint32_t)(nowMs - fsm.blockLoggedMs) >= kBlockLogRepeatMs);
+    if (reasonChanged || repeatDue) {
+        LOGW("pooldev.writeDesired blocked slot=%u desired=%u st=%u(%s) block=%u(%s)",
+             (unsigned)deviceSlot,
+             desired ? 1u : 0u,
+             (unsigned)st,
+             poolDeviceSvcStatusStr_(st),
+             (unsigned)block,
+             poolDeviceBlockReasonStr_(block));
+        fsm.loggedBlockReason = block;
+        fsm.blockLoggedMs = nowMs;
+    }
+    return DeviceWriteResult::Rejected;
 }
 
 void PoolLogicModule::runControlLoop_(uint32_t nowMs)
@@ -1391,19 +1463,19 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                 const bool phAllowed = phPidEnabled_ && havePh && !pressureError_ && !phTankLowError_;
                 if (phAllowed) {
                     uint32_t outMs = 0;
-                    (void)stepTemporalPid_(phPidState_,
-                                           ph,
-                                           phSetpoint_,
-                                           phKp_,
-                                           phKi_,
-                                           phKd_,
-                                           phWindowMs_,
-                                           phMinOnMs_,
-                                           phSampleMs_,
-                                           !phDosePlus_,
-                                           nowMs,
-                                           phPumpDesired,
-                                           outMs);
+                    stepTemporalPid_(phPidState_,
+                                     ph,
+                                     phSetpoint_,
+                                     phKp_,
+                                     phKi_,
+                                     phKd_,
+                                     phWindowMs_,
+                                     phMinOnMs_,
+                                     phSampleMs_,
+                                     !phDosePlus_,
+                                     nowMs,
+                                     phPumpDesired,
+                                     outMs);
                 } else if (phPidState_.initialized || phPidState_.outputOnMs != 0U || phPidState_.lastDemandOn) {
                     resetTemporalPidState_(phPidState_, nowMs);
                 }
@@ -1417,19 +1489,19 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                     !pressureError_ && !chlorineTankLowError_;
                 if (orpAllowed) {
                     uint32_t outMs = 0;
-                    (void)stepTemporalPid_(orpPidState_,
-                                           orp,
-                                           orpSetpoint_,
-                                           orpKp_,
-                                           orpKi_,
-                                           orpKd_,
-                                           orpWindowMs_,
-                                           disMinOnMs_,
-                                           disSampleMs_,
-                                           false,
-                                           nowMs,
-                                           orpPumpDesired,
-                                           outMs);
+                    stepTemporalPid_(orpPidState_,
+                                     orp,
+                                     orpSetpoint_,
+                                     orpKp_,
+                                     orpKi_,
+                                     orpKd_,
+                                     orpWindowMs_,
+                                     disMinOnMs_,
+                                     disSampleMs_,
+                                     false,
+                                     nowMs,
+                                     orpPumpDesired,
+                                     outMs);
                 } else if (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn) {
                     resetTemporalPidState_(orpPidState_, nowMs);
                 }
@@ -1537,22 +1609,24 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         swgDesired = false;
     }
 
-    applyDeviceControl_(filtrationDeviceSlot_, "Filtration Pump", filtrationFsm_, filtrationDesired, nowMs);
-    applyDeviceControl_(phPumpDeviceSlot_, "pH Pump", phPumpFsm_, phPumpDesired, nowMs);
+    (void)applyDeviceControl_(filtrationDeviceSlot_, "Filtration Pump", filtrationFsm_, filtrationDesired, nowMs);
+    // Le resultat de la pompe pH est consomme au tour suivant par la FSM de
+    // dosage, via phPumpFsm_.writeRejected / lastBlockReason.
+    (void)applyDeviceControl_(phPumpDeviceSlot_, "pH Pump", phPumpFsm_, phPumpDesired, nowMs);
     // Un seul actionneur de desinfection est pilote selon le mode actif : la
     // pompe (chlore liquide / oxygene actif) OU l'electrolyseur. Le device du
     // mode non choisi n'est plus commande chaque tour ; il est deja mis OFF au
     // boot (defaut Desactive) et a chaque changement de mode (onEvent_).
     if (isDisinfectionType_(DisinfectionChlorineBromine) || isDisinfectionType_(DisinfectionActiveOxygen)) {
-        applyDeviceControl_(orpPumpDeviceSlot_,
-                            isDisinfectionType_(DisinfectionActiveOxygen) ? "O2 Pump" : "Chlorine Pump",
-                            orpPumpFsm_,
-                            orpPumpDesired,
-                            nowMs);
+        (void)applyDeviceControl_(orpPumpDeviceSlot_,
+                                  isDisinfectionType_(DisinfectionActiveOxygen) ? "O2 Pump" : "Chlorine Pump",
+                                  orpPumpFsm_,
+                                  orpPumpDesired,
+                                  nowMs);
     } else if (isDisinfectionType_(DisinfectionSwg)) {
-        applyDeviceControl_(swgDeviceSlot_, "SWG Pump", swgFsm_, swgDesired, nowMs);
+        (void)applyDeviceControl_(swgDeviceSlot_, "SWG Pump", swgFsm_, swgDesired, nowMs);
     }
-    applyDeviceControl_(robotDeviceSlot_, "Robot Pump", robotFsm_, robotDesired, nowMs);
-    applyDeviceControl_(heaterDeviceSlot_, "Water Heater", heaterFsm_, heaterDesired, nowMs);
-    applyDeviceControl_(fillingDeviceSlot_, "Filling Pump", fillingFsm_, fillingDesired, nowMs);
+    (void)applyDeviceControl_(robotDeviceSlot_, "Robot Pump", robotFsm_, robotDesired, nowMs);
+    (void)applyDeviceControl_(heaterDeviceSlot_, "Water Heater", heaterFsm_, heaterDesired, nowMs);
+    (void)applyDeviceControl_(fillingDeviceSlot_, "Filling Pump", fillingFsm_, fillingDesired, nowMs);
 }

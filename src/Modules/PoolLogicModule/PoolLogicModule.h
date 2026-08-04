@@ -123,16 +123,33 @@ private:
         bool lastDesired = false;
         uint32_t stateSinceMs = 0;
         uint32_t lastCmdMs = 0;
+        // Suivi du refus d'ecriture : la consigne n'est latchee que lorsqu'elle
+        // est acceptee, et le log de blocage est deduplique par raison.
+        bool writeRejected = false;
+        uint8_t lastBlockReason = 0;
+        uint8_t loggedBlockReason = 0xFFU;  // 0xFF = aucune raison tracee
+        uint32_t blockLoggedMs = 0;
+    };
+
+    // Resultat d'une commande d'equipement : distingue le refus d'un simple
+    // "rien a faire", pour que la logique metier puisse suspendre son action.
+    enum class DeviceWriteResult : uint8_t {
+        NoDevice = 0,   // slot >= POOL_DEVICE_MAX : role sans appareil associe
+        Unchanged = 1,  // aucune ecriture necessaire ce tour
+        Written = 2,    // ecriture acceptee par PoolDeviceService
+        Rejected = 3,   // ecriture refusee, voir fsm.lastBlockReason
     };
 
     struct TemporalPidState {
         bool initialized = false;
         bool sampleValid = false;
         bool lastDemandOn = false;
+        bool windowLatched = false;  // outputOnMs fige pour la fenetre en cours
         uint32_t windowStartMs = 0;
         uint32_t lastComputeMs = 0;
         uint32_t sampleTsMs = 0;
         uint32_t outputOnMs = 0;
+        uint32_t pendingOnMs = 0;  // consigne calculee, appliquee au debut de fenetre
         uint32_t runtimeTsMs = 0;
         float sampleInput = 0.0f;
         float sampleSetpoint = 0.0f;
@@ -549,7 +566,11 @@ private:
     static AlarmCondState condChlorinePumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     AlarmCondState condPumpMaxUptime_(uint8_t deviceSlot) const;
     bool readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const;
-    bool writeDeviceDesired_(uint8_t deviceSlot, bool on);
+    bool writeDeviceDesired_(uint8_t deviceSlot,
+                             bool on,
+                             PoolDeviceSvcStatus& statusOut,
+                             uint8_t& blockReasonOut);
+    bool forceDeviceStop_(uint8_t deviceSlot);
     bool setPoolDeviceWritesEnabled_(bool enabled);
     void syncDeviceState_(uint8_t deviceSlot, DeviceFsm& fsm, uint32_t nowMs, bool& turnedOnOut, bool& turnedOffOut);
     void syncAllDeviceStates_(uint32_t nowMs);
@@ -558,7 +579,7 @@ private:
     bool loadAnalogSensor_(IoId ioId, float& out, uint32_t* tsMsOut = nullptr) const;
     bool loadDigitalSensor_(IoId ioId, bool& out) const;
     void resetTemporalPidState_(TemporalPidState& st, uint32_t nowMs);
-    bool stepTemporalPid_(TemporalPidState& st,
+    void stepTemporalPid_(TemporalPidState& st,
                           float input,
                           float setpoint,
                           float kp,
@@ -571,7 +592,11 @@ private:
                           uint32_t nowMs,
                           bool& demandOnOut,
                           uint32_t& outputOnMsOut);
-    void applyDeviceControl_(uint8_t deviceSlot, const char* label, DeviceFsm& fsm, bool desired, uint32_t nowMs);
+    DeviceWriteResult applyDeviceControl_(uint8_t deviceSlot,
+                                          const char* label,
+                                          DeviceFsm& fsm,
+                                          bool desired,
+                                          uint32_t nowMs);
     void runControlLoop_(uint32_t nowMs);
     ActivityRole activityRoleForDeviceSlot_(uint8_t deviceSlot) const;
     const char* activityRoleLabel_(ActivityRole role) const;
