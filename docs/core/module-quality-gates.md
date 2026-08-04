@@ -99,7 +99,7 @@ Chaque module est noté sur 10 critères, 0 à 3 points par critère.
 | QG6 | Tâches/ressources | Cadence, stack, core, buffers explicites | Ressources explicites mais risque moyen | Risque ressource élevé | Non maîtrisé |
 | QG7 | Observabilité | Logs, compteurs, runtime UI ou diagnostic | Logs suffisants | Diagnostic limité | Aveugle |
 | QG8 | Résilience/sécurité | Timeouts, retries, clamps, états d'erreur | Protections principales présentes | Protections partielles | Fragile |
-| QG9 | Documentation/i18n | Fiche module + textes cfgdocs/i18n/runtime | Textes présents, fiche partielle | Textes ou fiche manquants | Non documenté |
+| QG9 | Documentation/i18n | Fiche module + textes cfgdocs/i18n/runtime, `validate_i18n.py` sans erreur | Textes présents et validateur vert, fiche partielle | Textes ou fiche manquants | Non documenté, ou validateur en erreur |
 | QG10 | Tests/validation | Tests automatisés dédiés ou scénario vérifié | Build + validation indirecte | Build seulement | Non vérifié |
 
 Niveaux:

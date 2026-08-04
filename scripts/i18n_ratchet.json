@@ -1,0 +1,25 @@
+{
+  "_comment": "Plafond de dette anglaise par module. Ne doit que decroitre. Genere par: python scripts/validate_i18n.py --write-ratchet",
+  "heuristic_version": 1,
+  "modules": {
+    "AlarmModule": 1,
+    "FlowConnectDisplay/FlowConnectDisplayUdpClientModule": 1,
+    "HMIBuzzerModule": 1,
+    "HMIModule": 7,
+    "IOModule": 289,
+    "Logs/LogHubModule": 29,
+    "Network/EthernetModule": 1,
+    "Network/FirmwareUpdateModule": 5,
+    "Network/HAModule": 9,
+    "Network/HmiUdpServerModule": 2,
+    "Network/MQTTModule": 16,
+    "Network/TimeModule": 25,
+    "Network/WifiModule": 10,
+    "PoolDeviceModule": 70,
+    "PoolLogicModule": 124,
+    "SupervisorHMIModule": 27,
+    "System/SystemModule": 8,
+    "System/SystemMonitorModule": 6,
+    "TFTModuleS3": 106
+  }
+}

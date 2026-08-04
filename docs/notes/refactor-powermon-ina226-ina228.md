@@ -67,7 +67,7 @@ le driver → endpoints inactifs.
 - `src/Modules/TFTModuleS3/text/i18n.fr.json`
 - `scripts/generate_config_docs.py` — map de labels de binding waveshare
   (retrait 138-142, ajout 143-150 POWERMON, annotation « (INA228) » sur les canaux 5-7)
-- `scripts/generate_module_i18n_en.py` — glossaire enrichi (« moniteur de puissance »
+- ~~`scripts/generate_module_i18n_en.py`~~ (script supprimé, voir [i18n-assainissement.md](i18n-assainissement.md) ; le glossaire FR→EN y est repris) — glossaire enrichi (« moniteur de puissance »
   → « power monitor », « Canal » → « Channel », grandeurs électriques)
 - `i18n.en.json` (tous modules) régénérés depuis les sources FR
 

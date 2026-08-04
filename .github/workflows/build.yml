@@ -5,9 +5,22 @@ on:
     branches:
       - "claude/**"
       - flowio-waveshare-16mb-pioarduino
+      - i18n-assainissement
   workflow_dispatch:
 
 jobs:
+  i18n:
+    # Valide les catalogues de textes. Aucune dependance externe (stdlib seule),
+    # donc pas de pip install platformio : le job tient en quelques secondes.
+    name: validate i18n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python scripts/validate_i18n.py --ratchet scripts/i18n_ratchet.json
+
   waveshare:
     name: pio run -e Waveshare-ESP32-S3
     runs-on: ubuntu-latest
