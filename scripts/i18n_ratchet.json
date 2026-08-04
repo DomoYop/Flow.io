@@ -16,7 +16,7 @@
     "Network/TimeModule": 25,
     "Network/WifiModule": 10,
     "PoolDeviceModule": 70,
-    "PoolLogicModule": 134,
+    "PoolLogicModule": 124,
     "SupervisorHMIModule": 27,
     "System/SystemModule": 8,
     "System/SystemMonitorModule": 6,
