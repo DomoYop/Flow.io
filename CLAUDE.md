@@ -41,8 +41,9 @@ Des scripts Python tournent **avant chaque build** (`extra_scripts` dans `platfo
 
 - `generate_build_version.py` → macros de version/build
 - `generate_datamodel.py` → `src/Core/Generated/ModuleDataModel_Generated.h` (agrège tous les `*ModuleDataModel.h` et `*Runtime.h` des modules **inclus** par le `build_src_filter` courant)
+- `validate_i18n.py` → **valide** les manifestes texte, n'écrit rien. Bloquant sur : JSON invalide (avec ligne et colonne), token `*_t` sans traduction FR, collision de token entre modules, locale de fichier inconnue, clés non triées. Avertissements chiffrés sur la dette anglaise, avec cliquet par module dans `scripts/i18n_ratchet.json` qui ne peut que décroître (`--write-ratchet` pour l'abaisser après un lot de traduction, `--strict` en CI).
 - `generate_runtimeui_manifest.py` → manifeste Runtime UI + lookup Supervisor dans `src/Core/Generated/`
-- `prepare_spiffs_data.py` → prépare l'image SPIFFS (`data/`), génère les cfgdocs segmentés (`data/wc/*.j`)
+- `prepare_spiffs_data.py` → prépare l'image SPIFFS (`data/`), génère les cfgdocs segmentés (`data/wc/*.j`). Les libellés des enum_sets de binding IO propres au profil viennent de `scripts/io_port_labels.py` (gabarits bilingues + tokens synthétiques injectés dans `i18n.<locale>.j`) : plus aucune chaîne française en dur dans le générateur.
 - `export_binaries.py` (post-build) → copie les `.bin`/`.tft` dans `binary/` et met à jour `binary/manifest.json`
 
 Conséquence : ajouter un champ runtime ou un texte de config implique de régénérer (recompiler) ; le contenu de `src/Core/Generated/` et de `data/wc/` reflète l'état d'un build précédent.
@@ -88,11 +89,19 @@ Seul le champ `bindingPort` de l'endpoint est **reconfigurable au runtime** (Con
 Sous `src/Modules/` (et `src/Modules/Network/` pour la connectivité). Chaque module possède en général :
 
 - son `.cpp`/`.h`, un `*ModuleDataModel.h` (champs runtime exposés) et/ou `*Runtime.h`,
-- un dossier `text/` : **`i18n.fr.json` est la source** ; `i18n.en.json`, `cfgdocs.fr.json`, `cfgmods.fr.json`, `runtimeui.json` en sont dérivés (scripts `generate_module_i18n_en.py`, `generate_config_docs.py`…).
+- un dossier `text/` : **cinq sources écrites à la main**, dont aucune n'est dérivée d'une autre.
+  - `i18n.fr.json` / `i18n.en.json` : catalogues de traduction (token → texte), clés triées.
+  - `cfgdocs.fr.json` : `type` et tokens `label_t`/`help_t` des variables de config.
+  - `cfgmods.fr.json` : `visible_if`, `hidden`, `enum_set`, `meta.enum_sets`.
+  - `runtimeui.json` (7 modules) : descripteurs Runtime UI, tokens `*_t`.
+
+  Les fichiers **générés** sont `data/wc/*.j` et `src/Core/Generated/RuntimeUi*_Generated.h`. Le marqueur `"_meta": {"source": "manual"}` en tête des cfgdocs/cfgmods rappelle leur statut de source (il valait `"generated": true`, ce qui était faux et trompeur).
 
 Fiches par module dans [docs/modules/](docs/modules/) ; le module métier principal est `PoolLogicModule` ([docs/modules/PoolLogicModule.md](docs/modules/PoolLogicModule.md)).
 
 ## Contraintes importantes
+
+- **Un token i18n manquant ne casse rien : il s'affiche brut à l'écran.** C'est le mode d'échec de `translations.get(token, token)` ([generate_config_docs.py](scripts/generate_config_docs.py), [generate_runtimeui_manifest.py](scripts/generate_runtimeui_manifest.py)), et les JSON invalides sont avalés par des `except Exception: return {}`. Le pré-build `validate_i18n.py` est le seul garde-fou : ne pas le retirer de `extra_scripts` pour « débloquer » un build.
 
 - **Marge flash confortable** : l'image Waveshare-ESP32-S3 occupe **~47 %** de sa partition applicative de **4 Mo** (relevé build à jour). La flash n'est **pas** un facteur limitant : l'ancienne mention « ~93 % » datait d'une partition de 2 Mo depuis agrandie (le binaire n'a pas rétréci, la partition a doublé). Rester néanmoins sobre et vérifier la taille binaire après un ajout important — mais les vraies contraintes dures sont les **capacités compile-time** (tableaux statiques bornés, voir ci-dessous), pas la flash.
 - **Capacités compile-time** (tableaux statiques bornés) : nombre d'endpoints IO, équipements `PoolDevice`, entités Home Assistant, routes runtime MQTT, variables de config… sont fixés à la compilation. Valeurs courantes dans [docs/README.md](docs/README.md) (« Capacités statiques »). Dépasser une capacité = troncature silencieuse, pas une erreur de build.

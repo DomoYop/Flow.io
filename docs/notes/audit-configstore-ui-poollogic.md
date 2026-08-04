@@ -28,8 +28,8 @@ Note d'audit (juillet 2026, branche `io-refonte-unifiee`, après le commit `a2c3
 2. **`hours_of_day` sur-tokenisé** : 24 entrées `label_t` → 48 entrées i18n (FR+EN) pour « 00:00 »…« 23:00 ».
 3. **`poollogic_device_slot` : 8 valeurs déclarées pour 16 PDM** — enum statique incohérent ; sur Waveshare l'UI reconstruit dynamiquement 16 options depuis les noms IO (`app.js` `dynamicPoolLogicDeviceSlotOptions`).
 4. **Bundles i18n = charge SPIFFS dominante** : `data/wc/` ≈ 1,1 Mo dont `i18n.fr.j` 172 Ko + `i18n.en.j` 168 Ko ; chaque libellé existe ≥ 3 fois (token, FR, EN).
-5. **EN fragile** : `generate_module_i18n_en.py` (glossaire + regex, hors build) produit du franglais ; l'oubli de relance est silencieux.
-6. Marqueur `"_meta": {"generated": true}` sur des fichiers en réalité édités à la main ; digest FNV1a des chunks implémenté en double (Python `generate_cfgdoc_chunks.py` / C++ `WebInterfaceServer.cpp:~5425`) sans test de cohérence (divergence = 404 silencieux).
+5. ~~**EN fragile** : `generate_module_i18n_en.py` (glossaire + regex, hors build) produit du franglais ; l'oubli de relance est silencieux.~~ → **corrigé** : script supprimé, catalogues EN devenus sources manuelles, validateur bloquant en pré-build. Voir [i18n-assainissement.md](i18n-assainissement.md).
+6. ~~Marqueur `"_meta": {"generated": true}` sur des fichiers en réalité édités à la main~~ (→ **corrigé** en `{"source": "manual"}`, voir [i18n-assainissement.md](i18n-assainissement.md)) ; digest FNV1a des chunks implémenté en double (Python `generate_cfgdoc_chunks.py` / C++ `WebInterfaceServer.cpp:~5425`) sans test de cohérence (divergence = 404 silencieux).
 7. Le nœud `poollogic/devices` et ses alias vivent dans `PoolDeviceModule/text/` alors qu'ils s'affichent sous poollogic (responsabilité éclatée, assumée).
 
 ## État des lieux équipements (avant refonte UX)
