@@ -43,7 +43,9 @@ Des scripts Python tournent **avant chaque build** (`extra_scripts` dans `platfo
 - `generate_build_version.py` → macros de version/build
 - `generate_datamodel.py` → `src/Core/Generated/ModuleDataModel_Generated.h` (agrège tous les `*ModuleDataModel.h` et `*Runtime.h` des modules **inclus** par le `build_src_filter` courant)
 - `generate_runtimeui_manifest.py` → manifeste Runtime UI + lookup Supervisor dans `src/Core/Generated/`
-- ⚠ `generate_module_i18n_en.py` (hors build, à lancer à la main) est **destructif** : il régénère intégralement les `i18n.en.json` et écrase les traductions anglaises correctes par du franglais. Éditer `i18n.en.json` à la main plutôt que de le lancer.
+- ⚠ Deux scripts **hors build** écrasent des sources écrites à la main. Ne pas les lancer :
+  - `generate_module_i18n_en.py` régénère les `i18n.en.json` et remplace les traductions anglaises correctes par du franglais. Éditer `i18n.en.json` à la main.
+  - `migrate_text_manifests.py` réécrit `cfgdocs.fr.json`, `cfgmods.fr.json` **et** `i18n.fr.json` de **tous** les modules, sans condition. Ses entrées (`data/webinterface/cfgdocs.fr.json`/`cfgmods.fr.json`) n'existent plus — le générateur produit `cfgdocs.json` sans locale — et `_load_json` renvoie `{}` sur fichier absent : le lancer aujourd'hui viderait les trois sources de chaque module. Il ignore par ailleurs les tokens `runtimeui.*`. Outil de migration one-shot ; c'est lui qui a posé le `_meta.generated: true` trompeur en tête des cfgdocs/cfgmods, qui sont bien des **sources éditées à la main**.
 - `prepare_spiffs_data.py` → prépare l'image SPIFFS (`data/`), génère les cfgdocs segmentés (`data/wc/*.j`)
 - `export_binaries.py` (post-build) → copie les `.bin`/`.tft` dans `binary/` et met à jour `binary/manifest.json`
 
