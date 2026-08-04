@@ -51,6 +51,23 @@ static void runToDosing_(DosingState& st, DosingInput& in, DosingOutput& out)
     advance_(st, in, out, 200U, false);       // Dosing : pompe demandee
 }
 
+// Les phases s'enchainent sur des durees derivees de la configuration : on
+// avance jusqu'a la transition plutot que sur un nombre de ticks fige, sinon un
+// tick de trop declenche l'evaluation avant que le test n'ait pose sa mesure.
+static void runUntilPhase_(DosingState& st,
+                           DosingInput& in,
+                           DosingOutput& out,
+                           uint8_t target,
+                           bool pumpFollowsDosing)
+{
+    for (long i = 0; i < 200000L; ++i) {
+        if (out.phase == target) return;
+        advance_(st, in, out, 1000U, pumpFollowsDosing && out.phase == DOSING_PHASE_DOSING);
+        if (out.phase == DOSING_PHASE_BLOCKED && target != DOSING_PHASE_BLOCKED) return;
+    }
+    TEST_FAIL_MESSAGE("phase cible jamais atteinte");
+}
+
 // --- Armement et robustesse ---------------------------------------------
 
 void test_idle_when_not_armed()
@@ -427,7 +444,7 @@ void test_evaluate_updates_gain()
     TEST_ASSERT_EQUAL_UINT8(DOSING_PHASE_MIXING, out.phase);
 
     // Fin du brassage, puis une mesure montrant l'effet obtenu.
-    for (int i = 0; i < 5 * 3600; ++i) advance_(st, in, out, 1000U, false);
+    runUntilPhase_(st, in, out, DOSING_PHASE_EVALUATE, false);
     in.measured = 7.75f;  // -0,05 pH pour 250 mL -> gain observe 10,0
     advance_(st, in, out, 1000U, false);
     TEST_ASSERT_TRUE(out.gainUpdated);
@@ -441,11 +458,11 @@ void test_evaluate_updates_gain()
 /** Joue un cycle complet lot + brassage, en imposant la mesure d'evaluation. */
 static void runFullBatch_(DosingState& st, DosingInput& in, DosingOutput& out, float measuredAfter)
 {
-    while (out.phase != DOSING_PHASE_MIXING) {
-        advance_(st, in, out, 1000U, out.phase == DOSING_PHASE_DOSING);
-        if (out.phase == DOSING_PHASE_BLOCKED) return;
-    }
-    for (int i = 0; i < 5 * 3600 + 10; ++i) advance_(st, in, out, 1000U, false);
+    runUntilPhase_(st, in, out, DOSING_PHASE_MIXING, true);
+    if (out.phase != DOSING_PHASE_MIXING) return;
+    runUntilPhase_(st, in, out, DOSING_PHASE_EVALUATE, false);
+    if (out.phase != DOSING_PHASE_EVALUATE) return;
+    // L'evaluation n'a pas encore eu lieu : c'est le moment de poser la mesure.
     in.measured = measuredAfter;
     advance_(st, in, out, 1000U, false);
 }
@@ -515,6 +532,12 @@ void test_convergence_geometric()
 {
     // Boucle fermee simulee : le bassin repond selon le gain reel (10 mL/m3 par
     // 0,1 pH). On verifie une convergence monotone et SANS depassement.
+    //
+    // Trajectoire attendue depuis 7,90 : tant que la dose theorique depasse le
+    // plafond de 250 mL, la correction est un pas fixe de 0,05 pH (7 lots pour
+    // atteindre 7,55) ; en dessous, l'ecart au-dela de la bande morte est divise
+    // par deux a chaque lot (facteur de prudence 0,5). Le point fixe est donc
+    // consigne + bande morte, atteint a la granularite de pompe pres.
     DosingState st{};
     DosingInput in = makeInput_(7.9f);
     DosingOutput out{};
@@ -522,7 +545,7 @@ void test_convergence_geometric()
 
     float ph = 7.9f;
     int batches = 0;
-    for (; batches < 12; ++batches) {
+    for (; batches < 20; ++batches) {
         in.measured = ph;
         while (out.phase != DOSING_PHASE_MIXING && out.phase != DOSING_PHASE_BLOCKED &&
                out.blockReason != DOSING_BLOCK_IN_BAND) {
@@ -538,12 +561,16 @@ void test_convergence_geometric()
         TEST_ASSERT_TRUE(next >= in.setpoint);  // jamais de depassement
         ph = next;
 
-        for (int i = 0; i < 5 * 3600 + 10; ++i) advance_(st, in, out, 1000U, false);
+        runUntilPhase_(st, in, out, DOSING_PHASE_EVALUATE, false);
         in.measured = ph;
         advance_(st, in, out, 1000U, false);
     }
-    TEST_ASSERT_TRUE(batches < 10);
-    TEST_ASSERT_TRUE(ph <= in.setpoint + in.deadband + 0.001f);
+    // Le dosage s'arrete de lui-meme (bande morte atteinte), sans epuiser la
+    // boucle, et sans jamais etre passe sous la consigne.
+    TEST_ASSERT_EQUAL_UINT8(DOSING_BLOCK_IN_BAND, out.blockReason);
+    TEST_ASSERT_TRUE(batches < 20);
+    TEST_ASSERT_TRUE(ph >= in.setpoint);
+    TEST_ASSERT_TRUE(ph <= in.setpoint + in.deadband + 0.01f);
 }
 
 void test_millis_wraparound()

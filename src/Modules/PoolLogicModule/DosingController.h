@@ -82,10 +82,10 @@ struct DosingInput {
 
     uint16_t mixWaitMinCfg = 0;  // minutes ; 0 => turnover pur
 
-    // Retour actionneur.
+    // Retour actionneur. La raison de refus detaillee reste cote module : ici
+    // seul compte le fait que la commande n'a pas ete honoree.
     bool pumpActualOn = false;
     bool pumpWriteRejected = false;
-    uint8_t pumpBlockReason = 0;
 
     // Auto-calibration du gain.
     float referenceGain = 10.0f;  // gain configure : borne le gain appris

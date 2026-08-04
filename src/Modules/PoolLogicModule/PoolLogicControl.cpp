@@ -405,7 +405,6 @@ void PoolLogicModule::fillPhDosingInput_(DosingInput& in,
 
     in.pumpActualOn = phPumpFsm_.on;
     in.pumpWriteRejected = phPumpFsm_.writeRejected;
-    in.pumpBlockReason = phPumpFsm_.lastBlockReason;
 
     in.noEffectThreshold = phNoEffectDelta_;
     in.noEffectBatches = phNoEffectBatches_;
