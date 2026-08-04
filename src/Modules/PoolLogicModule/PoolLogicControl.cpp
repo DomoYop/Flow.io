@@ -1710,6 +1710,7 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         LOGW("Flow interlock: no flow detected, blocking pH/chlorine/electrolysis");
     }
     noFlowError_ = interlockActive;
+
     // Chemical dosing is computed last because it depends on the resolved
     // filtration state, alarm state, and sensor freshness.
     bool phPumpDesired = phPumpFsm_.on;
@@ -1723,39 +1724,25 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
         resetPhDosingState_(nowMs);
     }
 
-    if (phAutoMode_ || orpAutoMode_) {
-        if (filtrationDesired) {
-            if (orpAutoMode_) {
-                const bool orpAllowed =
-                    orpPidEnabled_ && haveOrp && isDisinfectionType_(DisinfectionChlorineBromine) &&
-                    !pressureError_ && !chlorineTankLowError_;
-                if (orpAllowed) {
-                    uint32_t outMs = 0;
-                    stepTemporalPid_(orpPidState_,
-                                     orp,
-                                     orpSetpoint_,
-                                     orpKp_,
-                                     orpKi_,
-                                     orpKd_,
-                                     orpWindowMs_,
-                                     disMinOnMs_,
-                                     disSampleMs_,
-                                     false,
-                                     nowMs,
-                                     orpPumpDesired,
-                                     outMs);
-                } else if (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn) {
-                    resetTemporalPidState_(orpPidState_, nowMs);
-                }
-            } else if (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn) {
-                resetTemporalPidState_(orpPidState_, nowMs);
-            }
-        } else {
-            if (orpAutoMode_ &&
-                (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn)) {
-                resetTemporalPidState_(orpPidState_, nowMs);
-            }
-        }
+    // La desinfection liquide conserve le PID temporel par fenetre.
+    const bool orpAllowed = orpAutoMode_ && filtrationDesired && orpPidEnabled_ && haveOrp &&
+                            isDisinfectionType_(DisinfectionChlorineBromine) && !pressureError_ &&
+                            !chlorineTankLowError_;
+    if (orpAllowed) {
+        uint32_t outMs = 0;
+        stepTemporalPid_(orpPidState_,
+                         orp,
+                         orpSetpoint_,
+                         orpKp_,
+                         orpKi_,
+                         orpKd_,
+                         orpWindowMs_,
+                         disMinOnMs_,
+                         disSampleMs_,
+                         false,
+                         nowMs,
+                         orpPumpDesired,
+                         outMs);
     } else if (orpPidState_.initialized || orpPidState_.outputOnMs != 0U || orpPidState_.lastDemandOn) {
         resetTemporalPidState_(orpPidState_, nowMs);
     }
