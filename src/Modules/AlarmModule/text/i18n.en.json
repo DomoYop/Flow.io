@@ -1,10 +1,10 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.alarms.enabled.help": "Enable or disable evaluation of alarms.",
+    "cfgdocs.alarms.enabled.help": "Enables or disables alarm evaluation.",
     "cfgdocs.alarms.enabled.label": "Active alarms",
-    "cfgdocs.alarms.eval_period_ms.help": "Intervalle of evaluation of conditions of alarm.",
-    "cfgdocs.alarms.eval_period_ms.label": "Period of evaluation of alarms (ms)",
+    "cfgdocs.alarms.eval_period_ms.help": "Interval between two evaluations of the alarm conditions.",
+    "cfgdocs.alarms.eval_period_ms.label": "Alarm evaluation period (ms)",
     "runtimeui.alarms.v01.display.columnLabel": "Act.",
     "runtimeui.alarms.v01.group": "Alarms",
     "runtimeui.alarms.v01.label": "Active alarms",
@@ -13,6 +13,6 @@
     "runtimeui.alarms.v02.label": "Resettable alarms",
     "runtimeui.alarms.v03.display.columnLabel": "Cond.",
     "runtimeui.alarms.v03.group": "Alarms",
-    "runtimeui.alarms.v03.label": "Conditions alarms"
+    "runtimeui.alarms.v03.label": "Alarm conditions"
   }
 }

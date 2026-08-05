@@ -1,11 +1,11 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.fwupdate.spiffs_version.help": "Version of contenu SPIFFS réellement flashée (mise à jour uniquement après one flash SPIFFS réussi).",
-    "cfgdocs.fwupdate.spiffs_version.label": "Version SPIFFS installée",
+    "cfgdocs.fwupdate.spiffs_version.help": "Version of the SPIFFS content actually flashed (updated only after a successful SPIFFS flash).",
+    "cfgdocs.fwupdate.spiffs_version.label": "Installed SPIFFS version",
     "cfgdocs.fwupdate.update_host.help": "Address of the HTTP server hosting firmware files.",
-    "cfgdocs.fwupdate.update_host.label": "Hôte server MAJ",
-    "cfgdocs.fwupdate.update_path.help": "Chemin de base of manifest of mises à jour sur the server HTTP.",
-    "cfgdocs.fwupdate.update_path.label": "Répertoire MAJ"
+    "cfgdocs.fwupdate.update_host.label": "Update server host",
+    "cfgdocs.fwupdate.update_path.help": "Base path of the update manifest on the HTTP server.",
+    "cfgdocs.fwupdate.update_path.label": "Update directory"
   }
 }

@@ -1,16 +1,16 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.hmi.leds.enabled.help": "Active the bandeau de LEDs en façade certaines cartes flow.io/Poolmaster.",
-    "cfgdocs.hmi.leds.enabled.label": "Activation LEDs facade",
-    "cfgdocs.hmi.leds.waveshare_enabled.help": "Active the LED WS2812 Waveshare.",
-    "cfgdocs.hmi.leds.waveshare_enabled.label": "LED Waveshare active",
-    "cfgdocs.hmi.nextion.enabled.help": "Active the mise à jour de screen Nextion connecté au port série.",
+    "cfgdocs.hmi.leds.enabled.help": "Enables the front LED strip found on some flow.io / Poolmaster boards.",
+    "cfgdocs.hmi.leds.enabled.label": "Front LEDs enabled",
+    "cfgdocs.hmi.leds.waveshare_enabled.help": "Enables the Waveshare WS2812 LED.",
+    "cfgdocs.hmi.leds.waveshare_enabled.label": "Waveshare LED enabled",
+    "cfgdocs.hmi.nextion.enabled.help": "Enables updates of the Nextion screen connected to the serial port.",
     "cfgdocs.hmi.nextion.enabled.label": "Nextion enabled",
-    "cfgdocs.hmi.venice.enabled.help": "Active the mise à jour de the temperature of eau vers afficheur TFT Venice.",
+    "cfgdocs.hmi.venice.enabled.help": "Enables water temperature updates sent to the Venice TFT display.",
     "cfgdocs.hmi.venice.enabled.label": "Venice RF433 enabled",
-    "cfgdocs.hmi.venice.tx_gpio.help": "GPIO utilisé for émetteur RF433 of driver Venice.",
-    "cfgdocs.hmi.venice.tx_gpio.label": "GPIO émission Venice",
+    "cfgdocs.hmi.venice.tx_gpio.help": "GPIO used by the RF433 transmitter of the Venice driver.",
+    "cfgdocs.hmi.venice.tx_gpio.label": "Venice transmit GPIO",
     "cfgmods.hmi.label": "hmi"
   }
 }

@@ -1,7 +1,7 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.ethernet.enabled.help": "Enable or disable interface Ethernet W5500. Quand Ethernand is enabled, il est prioritaire; the WiFi station puis the portail AP servent de fallback si Ethernet n'obtient pas of IP.",
+    "cfgdocs.ethernet.enabled.help": "Enables or disables the W5500 Ethernet interface. When Ethernet is enabled it takes priority; the WiFi station, then the AP portal, act as fallbacks if Ethernet gets no IP.",
     "cfgdocs.ethernet.enabled.label": "Ethernet enabled"
   }
 }

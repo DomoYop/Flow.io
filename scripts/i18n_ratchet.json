@@ -4,21 +4,15 @@
   "modules": {
     "AlarmModule": 1,
     "FlowConnectDisplay/FlowConnectDisplayUdpClientModule": 1,
-    "HMIBuzzerModule": 1,
-    "HMIModule": 7,
     "IOModule": 289,
-    "Logs/LogHubModule": 29,
-    "Network/EthernetModule": 1,
-    "Network/FirmwareUpdateModule": 5,
-    "Network/HmiUdpServerModule": 2,
+    "Logs/LogHubModule": 26,
+    "Network/HmiUdpServerModule": 1,
     "Network/MQTTModule": 1,
     "Network/TimeModule": 4,
     "Network/WifiModule": 3,
     "PoolDeviceModule": 2,
     "PoolLogicModule": 12,
-    "SupervisorHMIModule": 27,
     "System/SystemModule": 4,
-    "System/SystemMonitorModule": 6,
     "TFTModuleS3": 106
   }
 }

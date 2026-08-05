@@ -1,7 +1,7 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.fcd.udp.token.help": "Token for appairage flow.io (optionnel).",
+    "cfgdocs.fcd.udp.token.help": "Token used for flow.io pairing (optional).",
     "cfgdocs.fcd.udp.token.label": "Token Flow Connect Display"
   }
 }

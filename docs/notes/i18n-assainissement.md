@@ -196,15 +196,29 @@ Reprendre en priorité la terminologie de `data/webinterface/i18n/en.json` (`Das
 | 2026-08-05 | `Network/TimeModule` | 25 → 4 |
 | 2026-08-05 | `Network/MQTTModule` | 16 → 1 |
 | 2026-08-05 | `Network/HAModule` | 9 → **0** |
+| 2026-08-05 | `SupervisorHMIModule` | 27 → **0** |
+| 2026-08-05 | `Logs/LogHubModule` | 29 → 26 |
+| 2026-08-05 | `HMIModule` | 7 → **0** |
+| 2026-08-05 | `System/SystemMonitorModule` | 6 → **0** |
+| 2026-08-05 | `Network/FirmwareUpdateModule` | 5 → **0** |
+| 2026-08-05 | `Network/HmiUdpServerModule` | 2 → 1 |
+| 2026-08-05 | `Network/EthernetModule`, `HMIBuzzerModule` | 1 → **0** (chacun) |
+| 2026-08-05 | `AlarmModule`, `FlowConnectDisplay/…UdpClient` | 1 → 1 |
 
-Total : **501 sur 1942 (25,8 %)**, contre 735 au départ de la campagne.
+Total : **450 sur 1942 (23,2 %)**, contre 735 au départ de la campagne. Il ne reste que deux
+chantiers réels : `IOModule` (289) et `TFTModuleS3` (106). Les 55 autres entrées sont du plancher.
 
-`Network/HAModule` est le premier module à zéro. Il disparaît alors du cliquet, ce qui le rend
+Sept modules sont désormais à zéro. Un module à zéro **disparaît du cliquet**, ce qui le rend
 **plus** protégé et non moins : `apply_ratchet` traite un module ayant de la dette sans plafond
 déclaré comme une erreur bloquante (`RATCHET_UNKNOWN_MODULE`), donc toute réapparition casse le
 build.
 
-**Le reliquat de ces modules (26 entrées) est un plancher, pas du travail restant.** Ce sont
+Deux lignes du tableau montrent une dette inchangée (`AlarmModule`, `FlowConnectDisplay`) alors que
+leurs entrées ont bien été reprises : ce qui subsiste y est du plancher (`Cond.`,
+`Token Flow Connect Display`). Le compteur ne mesure pas le travail fait, seulement ce qu'il sait
+voir.
+
+**Le reliquat (55 entrées) est un plancher, pas du travail restant.** Ce sont
 des entrées dont la forme anglaise est identique au français, que la note demande de laisser telles
 quelles et que l'heuristique compte quand même : `Dashboard`, `Signal`, `Firmware`, `Uptime`,
 `English (en)`, les clés `cfgmods.*.label` (`network`, `system`, `ethernet`) et les libellés
@@ -212,6 +226,11 @@ quelles et que l'heuristique compte quand même : `Dashboard`, `Signal`, `Firmwa
 catalogue français qu'il faudrait corriger, pas l'anglais. Les faire descendre à zéro supposerait
 soit de traduire ces clés FR, soit d'étendre `BILINGUAL_WORDS` dans le validateur ; les deux sont
 hors du périmètre d'un lot de traduction.
+
+`Logs/LogHubModule` en fournit à lui seul 26 sur 55 : ses `cfgmods.log.levels.m*_lvl.label` sont les
+**identifiants de service** eux-mêmes (`wifi`, `i2ccfg.client`, `webinterface`, `poollogic`…), soit
+les `toString(ServiceId)` du code. Les traduire n'aurait aucun sens — ce module ne descendra jamais
+sous 26 sans changer l'heuristique.
 
 Corrections de fond au passage, invisibles dans le compteur :
 
@@ -230,6 +249,11 @@ Corrections de fond au passage, invisibles dans le compteur :
   MQTT. Vide = auto`, `Enable or disable the client MQTT` et `auto-decouverte Home Assistant`. Au
   total 11 entrées corrigées **sans effet sur le compteur** — vérifier chaque catalogue à l'œil, pas
   seulement la liste du validateur.
+- Le script supprimé avait corrompu des mots **à l'intérieur** d'autres mots, sa cascade de
+  `str.replace` ne respectant aucune frontière : « détecte » était devenu `dDSTcte` (règle
+  « ete » → « DST ») et « Ethernet est » `Ethernand is` (règle « et » → « and »). Ces valeurs
+  n'étaient signalées que parce qu'il restait un accent ailleurs dans la phrase ; sans lui elles
+  seraient passées inaperçues.
 
 ---
 

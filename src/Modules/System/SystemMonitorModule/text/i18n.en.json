@@ -1,19 +1,19 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.sysmon.trace_period_ms.help": "Period between two traces system.",
-    "cfgdocs.sysmon.trace_period_ms.label": "Period trace system (ms)",
-    "cfgdocs.sysmon.web_watchdog_auto_reboot.help": "Allow automatic reboot quand the watchdog dDSTcte one blocage web persistant.",
-    "cfgdocs.sysmon.web_watchdog_auto_reboot.label": "Watchdog Web reboot auto",
-    "cfgdocs.sysmon.web_watchdog_boot_grace_ms.help": "Délai de grace après boot avant of activer the monitoring web.",
-    "cfgdocs.sysmon.web_watchdog_boot_grace_ms.label": "Watchdog Web grace boot (ms)",
-    "cfgdocs.sysmon.web_watchdog_check_period_ms.help": "Interval between two vérifications of server web.",
-    "cfgdocs.sysmon.web_watchdog_check_period_ms.label": "Watchdog Web période check (ms)",
-    "cfgdocs.sysmon.web_watchdog_enabled.help": "Enable of server web supervisor.",
-    "cfgdocs.sysmon.web_watchdog_enabled.label": "Watchdog Web enabled",
-    "cfgdocs.sysmon.web_watchdog_max_failures.help": "Nombre of consecutive failures avant action watchdog.",
-    "cfgdocs.sysmon.web_watchdog_max_failures.label": "Watchdog Web max failures",
-    "cfgdocs.sysmon.web_watchdog_stale_ms.help": "Âge max toléré of heartbeat web avant échec watchdog.",
-    "cfgdocs.sysmon.web_watchdog_stale_ms.label": "Watchdog Web stall threshold (ms)"
+    "cfgdocs.sysmon.trace_period_ms.help": "Period between two system traces.",
+    "cfgdocs.sysmon.trace_period_ms.label": "System trace period (ms)",
+    "cfgdocs.sysmon.web_watchdog_auto_reboot.help": "Allows an automatic reboot when the watchdog detects a persistent web stall.",
+    "cfgdocs.sysmon.web_watchdog_auto_reboot.label": "Web watchdog auto reboot",
+    "cfgdocs.sysmon.web_watchdog_boot_grace_ms.help": "Grace period after boot before web monitoring starts.",
+    "cfgdocs.sysmon.web_watchdog_boot_grace_ms.label": "Web watchdog boot grace (ms)",
+    "cfgdocs.sysmon.web_watchdog_check_period_ms.help": "Interval between two web server checks.",
+    "cfgdocs.sysmon.web_watchdog_check_period_ms.label": "Web watchdog check period (ms)",
+    "cfgdocs.sysmon.web_watchdog_enabled.help": "Enables monitoring of the supervisor web server.",
+    "cfgdocs.sysmon.web_watchdog_enabled.label": "Web watchdog enabled",
+    "cfgdocs.sysmon.web_watchdog_max_failures.help": "Number of consecutive failures before the watchdog acts.",
+    "cfgdocs.sysmon.web_watchdog_max_failures.label": "Web watchdog max failures",
+    "cfgdocs.sysmon.web_watchdog_stale_ms.help": "Maximum tolerated age of the web heartbeat before a watchdog failure.",
+    "cfgdocs.sysmon.web_watchdog_stale_ms.label": "Web watchdog stall threshold (ms)"
   }
 }

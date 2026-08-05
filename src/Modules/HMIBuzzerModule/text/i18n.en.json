@@ -1,7 +1,7 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.hmi.buzzer.enable.help": "Active the bip local de validation après application of a configuration dans the ConfigStore.",
+    "cfgdocs.hmi.buzzer.enable.help": "Enables the local confirmation beep once a configuration is applied in the ConfigStore.",
     "cfgdocs.hmi.buzzer.enable.label": "Buzzer enabled"
   }
 }
