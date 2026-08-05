@@ -148,8 +148,12 @@ Ordre proposé, par visibilité pour un utilisateur anglophone : `PoolLogicModul
 `TFTModuleS3` en dernier : l'écran lui-même est français en dur, son catalogue ne sert qu'à ses pages
 de configuration web.
 
-En fin de campagne : passer le validateur et la CI en `--strict`, ce qui rend toute régression
-impossible.
+**`--strict` n'est pas atteignable et ne le sera pas.** Cette note prévoyait d'y passer la CI en fin
+de campagne ; vérifié une fois la campagne terminée, le mode échoue sur **tout** avertissement, y
+compris les 114 `EN_UNTRANSLATED` du plancher et les 40 `FR_ORPHAN` — soit exactement ce qu'on a
+décidé de ne pas traduire. Il faudrait d'abord traduire les clés FR concernées ou étendre
+`BILINGUAL_WORDS`. Ce n'est pas une perte : **le cliquet remplit déjà ce rôle**, module par module et
+sans effet de seuil, et un module retombé à zéro devient bloquant via `RATCHET_UNKNOWN_MODULE`.
 
 ### Glossaire FR → EN
 
@@ -205,9 +209,13 @@ Reprendre en priorité la terminologie de `data/webinterface/i18n/en.json` (`Das
 | 2026-08-05 | `Network/EthernetModule`, `HMIBuzzerModule` | 1 → **0** (chacun) |
 | 2026-08-05 | `AlarmModule`, `FlowConnectDisplay/…UdpClient` | 1 → 1 |
 | 2026-08-05 | `IOModule` | 289 → 54 |
+| 2026-08-05 | `TFTModuleS3` | 106 → 6 |
 
-Total : **215 sur 1942 (11,1 %)**, contre 735 au départ de la campagne. Il ne reste qu'un chantier
-réel, `TFTModuleS3` (106) ; les 109 autres entrées sont du plancher.
+**Campagne terminée : 115 sur 1942 (5,9 %)**, contre 735 au départ. Il ne reste **aucun chantier de
+traduction** : les 115 entrées sont toutes du plancher, réparties sur 12 modules — `IOModule` 54
+(chemins de configuration et noms de ports matériels), `Logs/LogHubModule` 26 (identifiants de
+service), `PoolLogicModule` 12, `TFTModuleS3` 6 (`MQTT rx drop`, `Firmware`, `Uptime`…), et 17 sur
+les huit autres.
 
 `IOModule` a demandé **441 réécritures pour 289 entrées signalées** : 205 d'entre elles, soit 46 %,
 échappaient au compteur. C'est l'écart le plus large de la campagne, et il tient à la nature du
