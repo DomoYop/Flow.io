@@ -204,9 +204,23 @@ Reprendre en priorité la terminologie de `data/webinterface/i18n/en.json` (`Das
 | 2026-08-05 | `Network/HmiUdpServerModule` | 2 → 1 |
 | 2026-08-05 | `Network/EthernetModule`, `HMIBuzzerModule` | 1 → **0** (chacun) |
 | 2026-08-05 | `AlarmModule`, `FlowConnectDisplay/…UdpClient` | 1 → 1 |
+| 2026-08-05 | `IOModule` | 289 → 54 |
 
-Total : **450 sur 1942 (23,2 %)**, contre 735 au départ de la campagne. Il ne reste que deux
-chantiers réels : `IOModule` (289) et `TFTModuleS3` (106). Les 55 autres entrées sont du plancher.
+Total : **215 sur 1942 (11,1 %)**, contre 735 au départ de la campagne. Il ne reste qu'un chantier
+réel, `TFTModuleS3` (106) ; les 109 autres entrées sont du plancher.
+
+`IOModule` a demandé **441 réécritures pour 289 entrées signalées** : 205 d'entre elles, soit 46 %,
+échappaient au compteur. C'est l'écart le plus large de la campagne, et il tient à la nature du
+catalogue — 996 clés très gabaritées, où une phrase fautive se décline sur A00..A31, D00..D17 ou
+I00..I07. Le module a donc été traité **par règles appliquées au texte français** plutôt qu'entrée
+par entrée, avec un garde-fou refusant d'écrire tant qu'une entrée en dette n'est couverte par
+aucune règle. Deux variantes du même gabarit s'y cachaient d'ailleurs : le catalogue FR écrit
+`l'entrée analogique` pour A00..A15 et `l'entree` pour A16..A31, et termine la formule des
+compteurs par `* pulses` ou `* impulsions` selon l'entrée.
+
+Le reliquat de 54 est constitué d'identifiants : chemins de configuration (`io/input/a00 [192]`),
+noms de ports matériels (`PortOut1 - relay1 / TCA9554 bit 0 [300]`), références de composants et
+`Pull-up` / `Pull-down`.
 
 Sept modules sont désormais à zéro. Un module à zéro **disparaît du cliquet**, ce qui le rend
 **plus** protégé et non moins : `apply_ratchet` traite un module ayant de la dette sans plafond

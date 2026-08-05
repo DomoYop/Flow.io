@@ -4,7 +4,7 @@
   "modules": {
     "AlarmModule": 1,
     "FlowConnectDisplay/FlowConnectDisplayUdpClientModule": 1,
-    "IOModule": 289,
+    "IOModule": 54,
     "Logs/LogHubModule": 26,
     "Network/HmiUdpServerModule": 1,
     "Network/MQTTModule": 1,
