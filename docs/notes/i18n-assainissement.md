@@ -189,14 +189,22 @@ Reprendre en priorité la terminologie de `data/webinterface/i18n/en.json` (`Das
 | Date | Module | Dette avant → après |
 |---|---|---|
 | 2026-08-04 | `PoolLogicModule` (10 tokens manquants) | 134 → 124 |
-| 2026-08-04 | `PoolLogicModule` | 122 → 12 |
-| 2026-08-04 | `PoolDeviceModule` | 70 → 2 |
-| 2026-08-04 | `Network/WifiModule` | 10 → 3 |
-| 2026-08-04 | `System/SystemModule` | 8 → 4 |
+| 2026-08-05 | `PoolLogicModule` | 122 → 12 |
+| 2026-08-05 | `PoolDeviceModule` | 70 → 2 |
+| 2026-08-05 | `Network/WifiModule` | 10 → 3 |
+| 2026-08-05 | `System/SystemModule` | 8 → 4 |
+| 2026-08-05 | `Network/TimeModule` | 25 → 4 |
+| 2026-08-05 | `Network/MQTTModule` | 16 → 1 |
+| 2026-08-05 | `Network/HAModule` | 9 → **0** |
 
-Total après ce lot : **546 sur 1942 (28,1 %)**, contre 735 avant.
+Total : **501 sur 1942 (25,8 %)**, contre 735 au départ de la campagne.
 
-**Le reliquat de ces quatre modules (21 entrées) est un plancher, pas du travail restant.** Ce sont
+`Network/HAModule` est le premier module à zéro. Il disparaît alors du cliquet, ce qui le rend
+**plus** protégé et non moins : `apply_ratchet` traite un module ayant de la dette sans plafond
+déclaré comme une erreur bloquante (`RATCHET_UNKNOWN_MODULE`), donc toute réapparition casse le
+build.
+
+**Le reliquat de ces modules (26 entrées) est un plancher, pas du travail restant.** Ce sont
 des entrées dont la forme anglaise est identique au français, que la note demande de laisser telles
 quelles et que l'heuristique compte quand même : `Dashboard`, `Signal`, `Firmware`, `Uptime`,
 `English (en)`, les clés `cfgmods.*.label` (`network`, `system`, `ethernet`) et les libellés
@@ -205,14 +213,23 @@ catalogue français qu'il faudrait corriger, pas l'anglais. Les faire descendre 
 soit de traduire ces clés FR, soit d'étendre `BILINGUAL_WORDS` dans le validateur ; les deux sont
 hors du périmètre d'un lot de traduction.
 
-Deux corrections de fond au passage, invisibles dans le compteur :
+Corrections de fond au passage, invisibles dans le compteur :
 
 - `poollogic_disinfection_type` affichait ses libellés **décalés d'un cran** en anglais : la valeur 2
   (Électrolyse) s'affichait « Oxygène enabled » et la valeur 3 (Oxygène actif) « Désenabled ».
   Corrigé en `Salt chlorination` / `Active oxygen`.
 - Terminologie arbitrée en faveur de `data/webinterface/i18n/en.json` là où il diverge du glossaire
   ci-dessus : **`Salt chlorinator`** (et non « salt chlorine generator »), `Active oxygen`,
-  `Equipment`, `Refill`, `Window`.
+  `Equipment`, `Refill`, `Window`. Le projet écrit l'anglais **américain** (`Initialization`,
+  `Oversize messages` dans le catalogue web) : `synchronization`, pas `synchronisation`.
+- **L'heuristique sous-estime nettement la dette**, comme annoncé au §5. La table
+  `timezones_world` n'était signalée que sur 13 de ses 30 entrées, alors que `Royaume-Uni /
+  Portugal`, `Nouvelle-Zelande`, `Europe centrale`, `Singapour` ou `Pacifique west` sont du français
+  que rien ne détecte, faute d'accent et de mot-marqueur. Elle a été reprise en entier : traduire la
+  moitié d'une liste déroulante n'aurait aucun sens. Même cas pour `Segment <deviceId> of topics
+  MQTT. Vide = auto`, `Enable or disable the client MQTT` et `auto-decouverte Home Assistant`. Au
+  total 11 entrées corrigées **sans effet sur le compteur** — vérifier chaque catalogue à l'œil, pas
+  seulement la liste du validateur.
 
 ---
 
