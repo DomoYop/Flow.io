@@ -2070,7 +2070,6 @@
     const cfgTreeNodeTextNamePending = { supervisor: new Set(), flow: new Set() };
     const cfgCondBranchCache = { supervisor: {}, flow: {} };
     const cfgCondBranchPending = { supervisor: new Map(), flow: new Map() };
-    const poolLogicDeviceIoOutputNames = { supervisor: {}, flow: {} };
     // Cache io_id -> nom lisible pour les selects capteurs (entrees analogiques/digitales).
     // Alimente depuis /api/io/summary (une seule requete pour tous les endpoints).
     let poolLogicSensorIoNamesCache = null;
@@ -2081,18 +2080,6 @@
     let supCfgChildrenCache = {};
     let supCfgExpandedNodes = new Set();
     let supCfgRootExpanded = true;
-    const ioOutputPdmLabels = Object.freeze({
-      0: 'Filtration',
-      1: 'Pompe pH',
-      2: 'Pompe chlore',
-      3: 'Robot',
-      4: 'Pompe remplissage',
-      5: 'Electrolyse',
-      6: 'Eclairage',
-      7: 'Chauffage eau',
-      8: 'Recopie flowswitch',
-      9: 'Sortie etat volet'
-    });
     let wifiScanAutoRequested = false;
     let flowStatusReqSeq = 0;
     let ioSummaryReqSeq = 0;
@@ -9785,24 +9772,10 @@
       return resolved;
     }
 
-    function poolLogicDeviceSlotSource(source) {
-      return source === 'supervisor' ? 'supervisor' : 'flow';
-    }
-
     function poolLogicDeviceSlotRef(slot) {
       const n = Number.parseInt(slot, 10);
       if (!Number.isFinite(n) || n < 0 || n > 15) return '';
       return 'd' + String(n).padStart(2, '0');
-    }
-
-    function poolLogicDeviceIoOutputModule(slot) {
-      const ref = poolLogicDeviceSlotRef(slot);
-      return ref ? ('io/output/' + ref) : '';
-    }
-
-    function poolLogicDeviceIoOutputNameKey(slot) {
-      const ref = poolLogicDeviceSlotRef(slot);
-      return ref ? (ref + '_name') : '';
     }
 
     function isPoolLogicDeviceSlotField(moduleName, key, doc) {
@@ -9814,19 +9787,25 @@
       return !!doc && String(doc.enum_set || '').trim() === 'poollogic_device_slot';
     }
 
-    function poolLogicDeviceSlotLabel(source, slot, fallback) {
+    // "pd7 - Chauffage eau (d07)". Le nom vient du libelle de branche cfgmods
+    // (pdm/pd7), deja traduit FR/EN et charge avec le chunk pdm : il remplace
+    // les 16 requetes /api/flowcfg/module?name=io/output/dNN qui servaient
+    // seulement a lire dNN_name, et la table FR codee en dur qui les doublait.
+    function poolLogicDeviceSlotLabel(slot, fallback) {
       const n = Number.parseInt(slot, 10);
       const ref = poolLogicDeviceSlotRef(n);
       if (!ref) return String(fallback || slot);
-      const src = poolLogicDeviceSlotSource(source);
-      const cache = poolLogicDeviceIoOutputNames[src] || {};
-      const ioName = typeof cache[n] === 'string' ? cache[n].trim() : '';
-      const baseName = ioName || String(ioOutputPdmLabels[n] || '').trim();
-      const suffix = baseName ? (' [' + baseName + ']') : '';
-      return 'pd' + String(n) + ' - ' + ref + suffix;
+      const slotId = 'pd' + String(n);
+      const meta = configPathMeta('pdm/' + slotId);
+      const name = (meta && typeof meta.label === 'string') ? meta.label.trim() : '';
+      // Le libelle de branche porte deja "pdN - " en tete ; sans lui (chunk pdm
+      // pas encore charge), on se rabat sur le seul identifiant de slot.
+      if (!name) return slotId + ' (' + ref + ')';
+      const head = name.indexOf(slotId) === 0 ? name : (slotId + ' - ' + name);
+      return head + ' (' + ref + ')';
     }
 
-    function dynamicPoolLogicDeviceSlotOptions(source, enumOptions) {
+    function dynamicPoolLogicDeviceSlotOptions(enumOptions) {
       const byValue = {};
       if (Array.isArray(enumOptions)) {
         enumOptions.forEach((opt) => {
@@ -9852,7 +9831,7 @@
         if (!byValue[slot]) continue;
         const base = Object.assign({}, byValue[slot]);
         base.value = slot;
-        base.label = poolLogicDeviceSlotLabel(source, slot, base.label);
+        base.label = poolLogicDeviceSlotLabel(slot, base.label);
         out.push(base);
       }
       return out;
@@ -9930,7 +9909,7 @@
       }
       if (!options) return null;
       if (isWaveshareProfile() && isPoolLogicDeviceSlotField(moduleName, key, doc)) {
-        return dynamicPoolLogicDeviceSlotOptions(source, options);
+        return dynamicPoolLogicDeviceSlotOptions(options);
       }
       if (isWaveshareProfile() && isPoolLogicSensorIoField(doc)) {
         return dynamicPoolLogicSensorIoOptions(options);
@@ -9938,38 +9917,10 @@
       return options;
     }
 
-    async function loadPoolLogicDeviceSlotLabels(source, forceReload) {
-      const src = poolLogicDeviceSlotSource(source);
-      if (!poolLogicDeviceIoOutputNames[src]) poolLogicDeviceIoOutputNames[src] = {};
-      const cache = poolLogicDeviceIoOutputNames[src];
-      const fetchOne = async (slot) => {
-        if (!forceReload && Object.prototype.hasOwnProperty.call(cache, slot)) return;
-        const moduleName = poolLogicDeviceIoOutputModule(slot);
-        const nameKey = poolLogicDeviceIoOutputNameKey(slot);
-        if (!moduleName || !nameKey) return;
-        try {
-          const url = src === 'supervisor'
-            ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(moduleName))
-            : ('/api/flowcfg/module?name=' + encodeURIComponent(moduleName));
-          const res = src === 'supervisor'
-            ? await fetchWithBusyRetry(url, { cache: 'no-store' })
-            : await fetchFlowRemoteQueued(url, { cache: 'no-store' });
-          const payload = await res.json().catch(() => null);
-          if (!res.ok || !payload || payload.ok !== true || !payload.data || typeof payload.data !== 'object') {
-            cache[slot] = '';
-            return;
-          }
-          const raw = payload.data[nameKey];
-          cache[slot] = (typeof raw === 'string') ? raw.trim() : '';
-        } catch (err) {
-          cache[slot] = '';
-        }
-      };
-      const jobs = [];
-      for (let slot = 0; slot <= 15; slot += 1) {
-        jobs.push(fetchOne(slot));
-      }
-      await Promise.all(jobs);
+    // Les libelles de slot PDM viennent des docs cfgmods de la branche pdm : il
+    // suffit que son chunk soit charge, aucune valeur de config n'est lue.
+    async function loadPoolLogicDeviceSlotLabels() {
+      try { await ensureCfgDocsForModule('pdm'); } catch (err) {}
     }
 
     function closeColorPickerPopover() {
@@ -11300,7 +11251,7 @@
         }
         await ensureCfgDocsForModule(m);
         if (moduleHasDeviceSlotField(m, data.data)) {
-          await loadPoolLogicDeviceSlotLabels('flow', true);
+          await loadPoolLogicDeviceSlotLabels();
         }
         if (moduleHasSensorIoField(m, data.data)) {
           await loadPoolLogicSensorIoLabels(true);
@@ -11336,7 +11287,7 @@
         }
         await ensureCfgDocsForModule(m);
         if (moduleHasDeviceSlotField(m, data.data)) {
-          await loadPoolLogicDeviceSlotLabels('supervisor', true);
+          await loadPoolLogicDeviceSlotLabels();
         }
         if (moduleHasSensorIoField(m, data.data)) {
           await loadPoolLogicSensorIoLabels(true);
