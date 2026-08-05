@@ -80,6 +80,29 @@ FRENCH_MARKERS = {
     "reseau", "bassin", "eau", "heure", "jour", "semaine", "mois", "annee",
     "niveau", "capteur", "sonde", "pompe", "vanne", "chauffage", "desinfection",
     "consigne", "fenetre", "ecran", "libelle", "mesure", "reglage", "defaut",
+
+    # Ajouts issus de la campagne de traduction (2026-08-05). L'heuristique
+    # d'origine ne voyait qu'environ deux tiers du franglais : sur IOModule,
+    # 46 % des entrees reecrites n'etaient pas signalees, faute d'accent et de
+    # mot-marqueur -- "Readable name de input analogique A16" passait.
+    # Meme regle de selection : uniquement des mots sans homographe anglais.
+    # Sont volontairement exclus : temperature, filtration, impulsion, canal,
+    # resistance, debit, tension, active, activation, descendant, brut, fond,
+    # applique -- tous homographes de l'anglais, ils feraient des faux positifs.
+    "analogique", "digitale", "digitales", "numerique", "numero",
+    "interne", "externe", "lisible", "utilise", "utilisee", "utilises",
+    "utilisees", "appliquee", "appliques", "appliquees", "activee", "activees",
+    "desactivee", "conservee", "conservees", "consideree", "considerees",
+    "calculee", "cumulee", "publiee", "decalage", "decimales",
+    "broche", "carte", "couche", "masque", "relais", "sorties", "entrees",
+    "libelles", "valeurs", "periode", "frequence", "adresse", "couleur",
+    "choisit", "choix", "demarrage", "redemarrage", "comptage", "compteur",
+    "lecture", "lectures", "ecriture", "secondes", "moyenne", "vitesse",
+    "etat", "etats", "pret", "prete", "fenetres", "horaire", "horaires",
+    "physique", "logique", "autorise", "pont", "paire", "modele", "puce",
+    "convertisseur", "moniteur", "puissance", "intensite", "energie",
+    "supplementaires", "retroeclairage", "mouvement", "piscine", "remplissage",
+    "alarme", "alarmes", "chlore", "volet", "bidon", "cuve", "humidite",
 }
 
 # Lettres latines accentuees uniquement : U+00D7 (multiplie) et U+00F7 (divise)
@@ -208,8 +231,23 @@ def collect_tokens(node, out):
 
 
 def language_words(text):
-    """Mots porteurs de langue : suites alphabetiques de 3+ hors sigles."""
-    return [w for w in ALPHA_RUN.findall(text) if not w.isupper()]
+    """Mots porteurs de langue : suites alphabetiques de 3+ hors sigles.
+
+    Les fragments d'identifiants snake_case sont ecartes : "aux_output",
+    "object_id" ou "device_name" sont du code, pas de la langue. Sans ce
+    filtre, le "aux" de "Micronova aux_output - GPIO relay" etait signale
+    comme un mot francais.
+    """
+    words = []
+    for match in ALPHA_RUN.finditer(text):
+        before = text[match.start() - 1] if match.start() else ""
+        after = text[match.end()] if match.end() < len(text) else ""
+        if before == "_" or after == "_":
+            continue
+        word = match.group()
+        if not word.isupper():
+            words.append(word)
+    return words
 
 
 def is_language_bearing(text):
@@ -439,7 +477,11 @@ def check_synthetic_ports(findings):
                                         "profil %s, locale %s" % (profile, locale)))
 
 
-RATCHET_HEURISTIC_VERSION = 1
+# 2 : FRENCH_MARKERS elargi et fragments snake_case ecartes (2026-08-05).
+# Un changement de valeur invalide le cliquet existant jusqu'a sa regeneration
+# par --write-ratchet, sans quoi les plafonds compareraient deux mesures
+# differentes.
+RATCHET_HEURISTIC_VERSION = 2
 
 
 def load_ratchet(path, findings):

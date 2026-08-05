@@ -1,7 +1,9 @@
 # Assainissement de la gestion des traductions
 
-**Statut : outillage implémenté le 2026-08-04** sur la branche `i18n-assainissement`.
-La campagne de réécriture des catalogues anglais reste à mener (voir §6).
+**Statut : outillage implémenté le 2026-08-04** sur la branche `i18n-assainissement`,
+**campagne de réécriture terminée le 2026-08-05** — dette anglaise 735 → 114 sur 1942 (5,9 %), les
+114 restantes étant du plancher irréductible. Journal des lots en §6, renforcement de l'heuristique
+qui a suivi en §8.
 
 ---
 
@@ -256,9 +258,13 @@ sous 26 sans changer l'heuristique.
 
 Corrections de fond au passage, invisibles dans le compteur :
 
-- `poollogic_disinfection_type` affichait ses libellés **décalés d'un cran** en anglais : la valeur 2
-  (Électrolyse) s'affichait « Oxygène enabled » et la valeur 3 (Oxygène actif) « Désenabled ».
-  Corrigé en `Salt chlorination` / `Active oxygen`.
+- `poollogic_disinfection_type` affichait **toute sa table décalée d'un cran** en anglais — une
+  rotation circulaire : `EN[n]` valait `FR[n+1]`. La valeur 0 (Désactivé) affichait « Chlore/Brome »,
+  la 1 (Chlore/Brome) « Electrolyse », la 2 (Électrolyse) « Oxygène enabled » et la 3 (Oxygène actif)
+  « Désenabled ». Un anglophone qui sélectionnait « Disabled » activait donc le chlore. Corrigé en
+  `Disabled` / `Chlorine / Bromine` / `Salt chlorination` / `Active oxygen`. Les deux dernières
+  valeurs ont été reprises lors du lot 1 ; **les deux premières n'ont été vues qu'après le
+  renforcement de l'heuristique** (§8), ce qui montre bien ce que le compteur laissait passer.
 - Terminologie arbitrée en faveur de `data/webinterface/i18n/en.json` là où il diverge du glossaire
   ci-dessus : **`Salt chlorinator`** (et non « salt chlorine generator »), `Active oxygen`,
   `Equipment`, `Refill`, `Window`. Le projet écrit l'anglais **américain** (`Initialization`,
@@ -276,6 +282,8 @@ Corrections de fond au passage, invisibles dans le compteur :
   « ete » → « DST ») et « Ethernet est » `Ethernand is` (règle « et » → « and »). Ces valeurs
   n'étaient signalées que parce qu'il restait un accent ailleurs dans la phrase ; sans lui elles
   seraient passées inaperçues.
+
+---
 
 ---
 
@@ -300,3 +308,36 @@ les catalogues de modules ne les atteignent.
 dépendants du profil compilé). Un build Waveshare puis un build FlowIO se marchent dessus. Le diff
 reste proportionnel au changement, donc supportable, mais c'est à savoir avant de s'étonner d'un
 diff parasite.
+
+
+---
+
+## 8. Renforcement de l'heuristique (2026-08-05, après la campagne)
+
+La campagne a montré que `french_residue` ne voyait qu'environ **deux tiers** du franglais : sur
+`IOModule`, 205 des 441 entrées reprises n'étaient pas signalées. Le mode d'échec est toujours le
+même — une phrase sans accent, sans élision et sans mot de `FRENCH_MARKERS` passe, quelle que soit
+sa langue réelle : « Readable name de input analogique A16 », « Segment `<deviceId>` of topics MQTT.
+Vide = auto », « Royaume-Uni / Portugal ».
+
+Deux changements, `RATCHET_HEURISTIC_VERSION` passant de 1 à 2 :
+
+1. **`FRENCH_MARKERS` élargi** d'une soixantaine de mots relevés pendant la campagne (`analogique`,
+   `interne`, `lisible`, `conservees`, `masque`, `relais`, `alarme`, `chlore`…). Même règle de
+   sélection qu'à l'origine : uniquement des mots **sans homographe anglais**. Sont volontairement
+   exclus `temperature`, `filtration`, `impulsion`, `canal`, `resistance`, `debit`, `tension`,
+   `active`, `descendant`, `brut`, `fond`, `applique` — tous homographes, ils créeraient des faux
+   positifs sur des traductions correctes.
+2. **Les fragments d'identifiants `snake_case` sont écartés** de `language_words`. Sans ce filtre, le
+   « aux » de `Micronova aux_output - GPIO relay` était compté comme un mot français : c'était le
+   dernier `EN_FRENCH_RESIDUE` du dépôt, et un faux positif.
+
+Résultat mesuré : **7 vrais résidus trouvés, aucun faux positif**. Dont les deux premières valeurs de
+`poollogic_disinfection_type` (voir §6), un `dDSTcte` de plus dans `flow_io_id.help`, et
+`Chlore/Brome` resté tel quel. La dette finale s'établit à **114 sur 1942 (5,9 %)**, sans aucun
+`EN_FRENCH_RESIDUE`.
+
+Un changement de `RATCHET_HEURISTIC_VERSION` **invalide le cliquet** jusqu'à sa régénération par
+`--write-ratchet` (avertissement `RATCHET_STALE`, plafonds ignorés) : sans cela on comparerait des
+plafonds établis avec une règle à une dette mesurée avec une autre. Régénérer fait donc partie du
+même commit que toute modification de l'heuristique.
