@@ -126,6 +126,8 @@
     "cfgdocs.wildcard.tank_cap_ml.label": "Capacité cuve (mL)",
     "cfgdocs.wildcard.tank_init_ml.help": "Volume initial de cuve après configuration/reset.",
     "cfgdocs.wildcard.tank_init_ml.label": "Niveau initial cuve (mL)",
+    "cfgmods.pdm.help": "Appareils de la piscine. Cochez ceux qui sont réellement installés ; les pages métier choisissent ensuite lequel elles pilotent.",
+    "cfgmods.pdm.label": "Équipements",
     "cfgmods.pdm.pd0.label": "pd0 - Filtration",
     "cfgmods.pdm.pd1.label": "pd1 - Pompe pH",
     "cfgmods.pdm.pd2.label": "pd2 - Pompe désinfectant",

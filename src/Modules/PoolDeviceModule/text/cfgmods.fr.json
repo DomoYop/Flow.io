@@ -5,6 +5,68 @@
     "version": 1
   },
   "docs": {
+    "pdm": {
+      "label_t": "cfgmods.pdm.label",
+      "help_t": "cfgmods.pdm.help",
+      "compose": [
+        {
+          "module": "pdm/pd0",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd0.label"
+        },
+        {
+          "module": "pdm/pd1",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd1.label"
+        },
+        {
+          "module": "pdm/pd2",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd2.label"
+        },
+        {
+          "module": "pdm/pd3",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd3.label"
+        },
+        {
+          "module": "pdm/pd4",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd4.label"
+        },
+        {
+          "module": "pdm/pd5",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd5.label"
+        },
+        {
+          "module": "pdm/pd6",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd6.label"
+        },
+        {
+          "module": "pdm/pd7",
+          "fields": [
+            "enabled"
+          ],
+          "label_t": "cfgmods.pdm.pd7.label"
+        }
+      ]
+    },
     "pdm/pd0": {
       "label_t": "cfgmods.pdm.pd0.label"
     },

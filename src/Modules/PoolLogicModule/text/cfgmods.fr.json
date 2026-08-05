@@ -16,7 +16,32 @@
           2,
           3
         ]
-      }
+      },
+      "compose": [
+        {
+          "module_from_slot": "poollogic/disinfection/dis_pump_slot",
+          "fields": [
+            "enabled"
+          ],
+          "visible_if": {
+            "path": "poollogic/bassin/disinfection_type",
+            "in": [
+              1,
+              3
+            ]
+          }
+        },
+        {
+          "module_from_slot": "poollogic/disinfection/swg_slot",
+          "fields": [
+            "enabled"
+          ],
+          "visible_if": {
+            "path": "poollogic/bassin/disinfection_type",
+            "eq": 2
+          }
+        }
+      ]
     },
     "poollogic/disinfection/dis_auto_mode": {
       "visible_if": {
@@ -151,6 +176,16 @@
     "poollogic/disinfection/weekly_done_ml": {
       "hidden": true
     },
+    "poollogic/filtration": {
+      "compose": [
+        {
+          "module_from_slot": "poollogic/filtration/filtr_slot",
+          "fields": [
+            "enabled"
+          ]
+        }
+      ]
+    },
     "poollogic/filtration/fenetres/filtr_w2_prio": {
       "visible_if": {
         "path": "poollogic/filtration/fenetres/filtr_w2_en",
@@ -199,6 +234,26 @@
     "poollogic/filtration/filtr_stop_clc": {
       "enum_set": "hours_of_day"
     },
+    "poollogic/heater": {
+      "compose": [
+        {
+          "module_from_slot": "poollogic/heater/heater_slot",
+          "fields": [
+            "enabled"
+          ]
+        }
+      ]
+    },
+    "poollogic/ph": {
+      "compose": [
+        {
+          "module_from_slot": "poollogic/ph/ph_pump_slot",
+          "fields": [
+            "enabled"
+          ]
+        }
+      ]
+    },
     "poollogic/ph/ph_gain_learned": {
       "visible_if": {
         "path": "poollogic/ph/ph_auto_mode",
@@ -210,6 +265,26 @@
     },
     "poollogic/ph/ph_last_dose_ts": {
       "hidden": true
+    },
+    "poollogic/refill": {
+      "compose": [
+        {
+          "module_from_slot": "poollogic/refill/fill_slot",
+          "fields": [
+            "enabled"
+          ]
+        }
+      ]
+    },
+    "poollogic/robot": {
+      "compose": [
+        {
+          "module_from_slot": "poollogic/robot/robot_slot",
+          "fields": [
+            "enabled"
+          ]
+        }
+      ]
     },
     "poollogic/sensors/dis_io_id": {
       "visible_if": {

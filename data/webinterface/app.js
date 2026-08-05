@@ -11116,6 +11116,27 @@
       return buildPatchJsonFromFields(flowCfgFields, flowCfgCurrentModule);
     }
 
+    // Compose dont le module cible depend d'une valeur : "module_from_slot"
+    // designe un champ de slot PDM (0..15, 255 = aucun) et resout pdm/pdN. Le
+    // mapping page metier -> appareil n'est donc pas fige : il suit le slot que
+    // la page a reellement selectionne, y compris apres reconfiguration.
+    async function composeModuleFromSlot(source, slotPath) {
+      const cleanPath = nettoyerNomFlowCfg(slotPath);
+      if (!cleanPath) return '';
+      const branch = cfgCondBranchOfPath(cleanPath);
+      if (branch) await fetchCfgCondBranch(source, branch).catch(() => {});
+      const lookup = cfgCondLookup(source, cleanPath);
+      if (!lookup.resolved) return '';
+      const slot = Number.parseInt(lookup.value, 10);
+      // Hors 0..15 (255 = aucun appareil) : rien a composer, la fonction n'est
+      // rattachee a aucun PDM.
+      if (!Number.isFinite(slot) || slot < 0 || slot > 15) return '';
+      // Le libelle du noeud pdm/pdN vit dans le chunk du parent : sans lui, la
+      // section serait rendue sans titre et on ignorerait quel appareil elle vise.
+      try { await ensureCfgDocsForModule('pdm'); } catch (err) {}
+      return 'pdm/pd' + String(slot);
+    }
+
     // Sections composees : la meta cfgmods "compose" d'une branche declare des
     // champs d'autres branches store a afficher sur sa page (ex: le switch
     // pdm/pdN/enabled dans poollogic/heater). L'apply standard groupe deja le
@@ -11128,7 +11149,20 @@
       const sections = [];
       for (const rawEntry of entries) {
         if (!rawEntry || typeof rawEntry !== 'object') continue;
-        const entryModule = nettoyerNomFlowCfg(rawEntry.module);
+        // Une entree composee peut etre conditionnee comme un champ (ex. la
+        // page desinfection n'affiche que l'appareil du mode retenu). La branche
+        // conditionnante est chargee avant l'evaluation : sans elle la condition
+        // serait indeterminee et l'entree passerait en fail-open.
+        if (rawEntry.visible_if) {
+          for (const cond of visibleIfConds(rawEntry.visible_if)) {
+            const condBranch = cfgCondBranchOfPath(nettoyerNomFlowCfg(cond.path));
+            if (condBranch) await fetchCfgCondBranch(src, condBranch).catch(() => {});
+          }
+          if (evalVisibleIf(src, rawEntry.visible_if) === false) continue;
+        }
+        const entryModule = rawEntry.module_from_slot
+          ? await composeModuleFromSlot(src, rawEntry.module_from_slot)
+          : nettoyerNomFlowCfg(rawEntry.module);
         const fields = Array.isArray(rawEntry.fields) ? rawEntry.fields : [];
         if (!entryModule || fields.length === 0) continue;
         try { await ensureCfgDocsForModule(entryModule); } catch (err) {}
@@ -11154,10 +11188,17 @@
         });
         if (Object.keys(filtered).length === 0) continue;
         const localized = cfgDocApplyLocalizedText(rawEntry);
+        let title = (localized && typeof localized.label === 'string') ? localized.label : '';
+        if (!title) {
+          // Module resolu dynamiquement : le titre nomme l'appareil vise, sinon
+          // on ne saurait pas lequel des 8 slots le switch commande.
+          const entryMeta = configPathMeta(entryModule);
+          if (entryMeta && typeof entryMeta.label === 'string') title = entryMeta.label;
+        }
         sections.push({
           module: entryModule,
           data: filtered,
-          title: (localized && typeof localized.label === 'string') ? localized.label : ''
+          title: title
         });
       }
       return sections;

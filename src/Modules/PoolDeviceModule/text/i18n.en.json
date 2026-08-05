@@ -127,6 +127,8 @@
     "cfgdocs.wildcard.tank_cap_ml.label": "Tank capacity (mL)",
     "cfgdocs.wildcard.tank_init_ml.help": "Initial tank volume after configuration/reset.",
     "cfgdocs.wildcard.tank_init_ml.label": "Initial tank level (mL)",
+    "cfgmods.pdm.help": "Pool devices. Tick the ones actually installed; each function page then picks the device it drives.",
+    "cfgmods.pdm.label": "Devices",
     "cfgmods.pdm.pd0.label": "pd0 - Filtration",
     "cfgmods.pdm.pd1.label": "pd1 - pH pump",
     "cfgmods.pdm.pd2.label": "pd2 - Disinfectant pump",
