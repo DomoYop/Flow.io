@@ -210,11 +210,11 @@ Reprendre en priorité la terminologie de `data/webinterface/i18n/en.json` (`Das
 | 2026-08-05 | `Network/HmiUdpServerModule` | 2 → 1 |
 | 2026-08-05 | `Network/EthernetModule`, `HMIBuzzerModule` | 1 → **0** (chacun) |
 | 2026-08-05 | `AlarmModule`, `FlowConnectDisplay/…UdpClient` | 1 → 1 |
-| 2026-08-05 | `IOModule` | 289 → 54 |
+| 2026-08-05 | `IOModule` | 289 → 53 |
 | 2026-08-05 | `TFTModuleS3` | 106 → 6 |
 
-**Campagne terminée : 115 sur 1942 (5,9 %)**, contre 735 au départ. Il ne reste **aucun chantier de
-traduction** : les 115 entrées sont toutes du plancher, réparties sur 12 modules — `IOModule` 54
+**Campagne terminée : 114 sur 1942 (5,9 %)**, contre 735 au départ. Il ne reste **aucun chantier de
+traduction** : les 114 entrées sont toutes du plancher, réparties sur 12 modules — `IOModule` 53
 (chemins de configuration et noms de ports matériels), `Logs/LogHubModule` 26 (identifiants de
 service), `PoolLogicModule` 12, `TFTModuleS3` 6 (`MQTT rx drop`, `Firmware`, `Uptime`…), et 17 sur
 les huit autres.
@@ -228,7 +228,7 @@ aucune règle. Deux variantes du même gabarit s'y cachaient d'ailleurs : le cat
 `l'entrée analogique` pour A00..A15 et `l'entree` pour A16..A31, et termine la formule des
 compteurs par `* pulses` ou `* impulsions` selon l'entrée.
 
-Le reliquat de 54 est constitué d'identifiants : chemins de configuration (`io/input/a00 [192]`),
+Le reliquat de 53 est constitué d'identifiants : chemins de configuration (`io/input/a00 [192]`),
 noms de ports matériels (`PortOut1 - relay1 / TCA9554 bit 0 [300]`), références de composants et
 `Pull-up` / `Pull-down`.
 
@@ -242,7 +242,7 @@ leurs entrées ont bien été reprises : ce qui subsiste y est du plancher (`Con
 `Token Flow Connect Display`). Le compteur ne mesure pas le travail fait, seulement ce qu'il sait
 voir.
 
-**Le reliquat (55 entrées) est un plancher, pas du travail restant.** Ce sont
+**Le reliquat (114 entrées) est un plancher, pas du travail restant.** Ce sont
 des entrées dont la forme anglaise est identique au français, que la note demande de laisser telles
 quelles et que l'heuristique compte quand même : `Dashboard`, `Signal`, `Firmware`, `Uptime`,
 `English (en)`, les clés `cfgmods.*.label` (`network`, `system`, `ethernet`) et les libellés
@@ -251,7 +251,7 @@ catalogue français qu'il faudrait corriger, pas l'anglais. Les faire descendre 
 soit de traduire ces clés FR, soit d'étendre `BILINGUAL_WORDS` dans le validateur ; les deux sont
 hors du périmètre d'un lot de traduction.
 
-`Logs/LogHubModule` en fournit à lui seul 26 sur 55 : ses `cfgmods.log.levels.m*_lvl.label` sont les
+`Logs/LogHubModule` en fournit à lui seul 26 sur 114 : ses `cfgmods.log.levels.m*_lvl.label` sont les
 **identifiants de service** eux-mêmes (`wifi`, `i2ccfg.client`, `webinterface`, `poollogic`…), soit
 les `toString(ServiceId)` du code. Les traduire n'aurait aucun sens — ce module ne descendra jamais
 sous 26 sans changer l'heuristique.
@@ -341,3 +341,55 @@ Un changement de `RATCHET_HEURISTIC_VERSION` **invalide le cliquet** jusqu'à sa
 `--write-ratchet` (avertissement `RATCHET_STALE`, plafonds ignorés) : sans cela on comparerait des
 plafonds établis avec une règle à une dette mesurée avec une autre. Régénérer fait donc partie du
 même commit que toute modification de l'heuristique.
+
+---
+
+## 9. Deuxième passe : 28 résidus que la version 2 laissait passer (2026-08-05)
+
+Le §8 a renforcé le détecteur **sans repasser derrière lui sur les catalogues**. C'était l'erreur de
+méthode : le renforcement s'est jugé sur ce qu'il faisait remonter au moment où il a été écrit, pas
+sur ce qui restait. Une relecture des 1942 entrées EN, mot à mot contre le vocabulaire français, en a
+sorti **28 encore franglaises**, dont plusieurs à haute visibilité :
+
+- `runtimeui.poollogic.alarms.flag00/flag01` — « Pressure Filtration Basse / Haute ». Le commit qui a
+  traduit `flag02..flag06` a régénéré `RuntimeUiAlarmText_Generated.h` **en laissant les deux
+  premières lignes**, donc l'écran d'alarmes du ST7789 et le Nextion affichaient deux lignes
+  mi-françaises au milieu de cinq lignes anglaises.
+- `cfgdocs.system.lang.help` — « Langue of affichage de interface. » : l'aide du sélecteur de langue
+  elle-même, c'est-à-dire le premier texte que lit un anglophone qui cherche à passer en anglais.
+- `cfgdocs.wifi.pass.help` / `.label` — « Mot de passe network ».
+- `Network/I2CCfgClientModule` et `Network/I2CCfgServerModule` (5 entrées, « mode esclave », « cote
+  Supervisor for repondre ») : **jamais touchés par la campagne**, et invisibles au compteur, donc
+  absents du tableau du §6 comme du cliquet.
+- Deux listes déroulantes traduites à moitié, une option sur deux : `poollogic_swg_control_mode`
+  (« Suivi setpoint ORP » / « Continuous during filtration ») et `io_analog_source` (« Water
+  temperature probe » / « Sensor temperature air »).
+- `i05..i07_active_high.label` — « Enabled a 1 I05 ». La réécriture par règles d'`IOModule` (§6) n'a
+  couvert que `i00..i04` sur ce champ : **même chaîne FR en entrée, deux sorties EN différentes**.
+  C'est le contrôle qui manquait au garde-fou de l'époque, qui vérifiait la couverture des entrées
+  *en dette* et non la cohérence des sorties.
+- Un mot corrompu de plus par l'ancien script : `electrolysisur` (« électrolyseur » passé dans la
+  règle « ete » → …), dans `swg_control_mode.help`.
+
+`FRENCH_MARKERS` reçoit les 22 mots relevés sur ces 28 entrées (`basse`, `haute`, `hiver`, `mot`,
+`suivi`, `langue`, `affichage`, `esclave`, `serveur`, `pilotage`, `recopie`, `identifiant`…),
+`RATCHET_HEURISTIC_VERSION` passe à 3 et le cliquet est régénéré. Restent exclus pour cause
+d'homographe anglais : **`gel`** (silica gel, gel battery) et **`impulsions`** — les phrases
+concernées sont couvertes par un autre mot de la liste.
+
+**Vérification a posteriori, celle qui manquait au §8** : les 30 anciennes valeurs rejouées contre la
+version 3 déclenchent maintenant à 26 sur 30. Les quatre angles morts restants sont structurels et
+resteront tels quels, aucun marqueur ne pouvant les attraper sans faux positifs :
+
+| Ancienne valeur | Pourquoi elle passe |
+|---|---|
+| `Enabled a 1 I05` | que des mots anglais ; seul le « a » français trahit, sous le seuil de 3 lettres |
+| `Sensor temperature air` | `sensor` est dans `BILINGUAL_WORDS`, `temperature` volontairement exclu |
+| `1 \| counter of pulses` | uniquement de l'anglais — c'est l'**ordre des mots** qui est français |
+| `…compensation de dose O2 par temperature.` | `de` fait 2 lettres, `par` est un homographe (golf) |
+
+La dette mesurée reste à **114** : aucune de ces 28 entrées n'y était comptée, ce qui est exactement
+le point. Le cliquet mesure ce que l'heuristique sait voir, jamais l'état réel des catalogues — il
+protège contre les régressions, il ne certifie pas la propreté. Toute modification de l'heuristique
+doit donc être suivie d'une **relecture complète des catalogues**, pas seulement de la liste qu'elle
+fait remonter.

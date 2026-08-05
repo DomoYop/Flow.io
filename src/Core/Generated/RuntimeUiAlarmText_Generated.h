@@ -17,8 +17,8 @@ struct RuntimeUiAlarmFlagLabelItem {
 };
 
 inline constexpr RuntimeUiAlarmFlagLabelItem kRuntimeUiAlarmActiveFlagLabels[] = {
-    {1, "Pression Filtration Basse", "Pressure Filtration Basse"},
-    {2, "Pression Filtration Haute", "Pressure Filtration Haute"},
+    {1, "Pression Filtration Basse", "Low filtration pressure"},
+    {2, "Pression Filtration Haute", "High filtration pressure"},
     {4, "Bidon pH bas", "pH tank low"},
     {8, "Bidon chlore bas", "Chlorine tank low"},
     {16, "Pompe pH dur\303\251e max atteinte", "pH pump max runtime reached"},

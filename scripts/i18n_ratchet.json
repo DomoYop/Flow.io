@@ -1,6 +1,6 @@
 {
   "_comment": "Plafond de dette anglaise par module. Ne doit que decroitre. Genere par: python scripts/validate_i18n.py --write-ratchet",
-  "heuristic_version": 2,
+  "heuristic_version": 3,
   "modules": {
     "AlarmModule": 1,
     "FlowConnectDisplay/FlowConnectDisplayUdpClientModule": 1,

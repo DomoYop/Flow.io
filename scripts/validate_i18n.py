@@ -103,6 +103,19 @@ FRENCH_MARKERS = {
     "convertisseur", "moniteur", "puissance", "intensite", "energie",
     "supplementaires", "retroeclairage", "mouvement", "piscine", "remplissage",
     "alarme", "alarmes", "chlore", "volet", "bidon", "cuve", "humidite",
+
+    # Deuxieme passe (2026-08-05) : mots releves sur les 28 entrees encore
+    # franglaises APRES la campagne, que la version 2 ne voyait pas non plus
+    # -- "Pressure Filtration Basse", "Mot de passe network", "Suivi setpoint
+    # ORP", "Langue of affichage de interface". Le detecteur avait ete
+    # renforce sans repasser sur les catalogues, d'ou l'angle mort.
+    # Toujours la meme regle : aucun homographe anglais. Restent exclus pour
+    # cette raison "gel" (silica gel, gel battery) et "impulsions" -- les
+    # phrases concernees sont couvertes par un autre mot de la liste.
+    "analogiques", "automatismes", "affichage", "bas", "basse", "dialoguer",
+    "esclave", "fonctionnement", "haute", "hiver", "hors", "identifiant",
+    "langue", "maintien", "mot", "pilotage", "pilote", "recopie", "repondre",
+    "serveur", "suivi", "sur",
 }
 
 # Lettres latines accentuees uniquement : U+00D7 (multiplie) et U+00F7 (divise)
@@ -478,10 +491,12 @@ def check_synthetic_ports(findings):
 
 
 # 2 : FRENCH_MARKERS elargi et fragments snake_case ecartes (2026-08-05).
+# 3 : deuxieme passe de FRENCH_MARKERS apres correction des 28 residus que la
+#     version 2 laissait encore passer (2026-08-05).
 # Un changement de valeur invalide le cliquet existant jusqu'a sa regeneration
 # par --write-ratchet, sans quoi les plafonds compareraient deux mesures
 # differentes.
-RATCHET_HEURISTIC_VERSION = 2
+RATCHET_HEURISTIC_VERSION = 3
 
 
 def load_ratchet(path, findings):

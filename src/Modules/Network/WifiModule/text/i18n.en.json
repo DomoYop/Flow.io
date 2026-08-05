@@ -3,8 +3,8 @@
   "translations": {
     "cfgdocs.wifi.enabled.help": "Enables or disables the network connection in station mode.",
     "cfgdocs.wifi.enabled.label": "Network enabled",
-    "cfgdocs.wifi.pass.help": "Mot de passe WPA/WPA2 of network.",
-    "cfgdocs.wifi.pass.label": "Mot de passe network",
+    "cfgdocs.wifi.pass.help": "WPA/WPA2 password of the network.",
+    "cfgdocs.wifi.pass.label": "Network password",
     "cfgdocs.wifi.ssid.help": "Name of the network to connect to.",
     "cfgdocs.wifi.ssid.label": "SSID",
     "cfgmods.network.ethernet.label": "ethernet",

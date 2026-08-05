@@ -1,9 +1,9 @@
 {
   "locale": "en",
   "translations": {
-    "cfgdocs.elink.server.address.help": "Local I2C address of configuration server flow.io (mode esclave).",
+    "cfgdocs.elink.server.address.help": "Local I2C address of the flow.io configuration server (slave mode).",
     "cfgdocs.elink.server.address.label": "flow.io local address",
-    "cfgdocs.elink.server.enabled.help": "Enable eLink cote flow.io for repondre au Supervisor.",
-    "cfgdocs.elink.server.enabled.label": "Serveur eLink enabled"
+    "cfgdocs.elink.server.enabled.help": "Enables the eLink server on the flow.io side so it can answer the Supervisor.",
+    "cfgdocs.elink.server.enabled.label": "eLink server enabled"
   }
 }
