@@ -7530,10 +7530,11 @@
           poolConfigAppendMetric(metrics, tr('pool.metric.delay', 'Délai'), poolConfigFormatValue(selectedDef.module, 'dly_electro_min', data.dly_electro_min));
           poolConfigAppendMetric(metrics, tr('pool.metric.waterSafety', 'Sécurité eau'), poolConfigFormatValue(selectedDef.module, 'secure_elec_t', data.secure_elec_t));
         } else if (selectedDef.key === 'o2') {
-          // Le volume du bassin vit dans la branche filtration (partage avec le
-          // calcul de renouvellement volumique), pas dans la branche o2.
-          const filtrationData = modules['poollogic/filtration'] || {};
-          poolConfigAppendMetric(metrics, tr('pool.metric.poolVolume', 'Volume bassin'), poolConfigFormatValue('poollogic/filtration', 'pool_volume_m3', filtrationData.pool_volume_m3), { featured: true });
+          // Le volume du bassin est un parametre general (dosage O2 et calcul de
+          // renouvellement volumique) : le firmware l'enregistre sur
+          // poollogic/bassin, pas sur la branche o2 ni sur filtration.
+          const bassinData = modules['poollogic/bassin'] || {};
+          poolConfigAppendMetric(metrics, tr('pool.metric.poolVolume', 'Volume bassin'), poolConfigFormatValue('poollogic/bassin', 'pool_volume_m3', bassinData.pool_volume_m3), { featured: true });
           poolConfigAppendMetric(metrics, tr('pool.metric.weeklyDose', 'Dose hebdo'), poolConfigFormatValue(selectedDef.module, 'dose_ml_10m3_week', data.dose_ml_10m3_week));
           poolConfigAppendMetric(metrics, tr('pool.metric.injections', 'Injections'), poolConfigFormatValue(selectedDef.module, 'split_count', data.split_count));
           poolConfigAppendMetric(metrics, tr('pool.metric.pending', 'En attente'), poolConfigFormatValue(selectedDef.module, 'pending_ml', data.pending_ml));
@@ -7790,67 +7791,38 @@
       const sizing = document.createElement('div');
       sizing.className = 'pool-fwin-sizing';
 
-      // Le volume vit dans la branche filtration (source unique partagée avec le
-      // dosage O2) ; le firmware recalcule le plan quand il change.
-      const o2Data = modules['poollogic/filtration'] || {};
-      const volumeWrap = document.createElement('label');
-      volumeWrap.className = 'pool-fwin-flow';
-      const volumeLabel = document.createElement('span');
-      volumeLabel.textContent = tr('pool.filtration.poolVolume', 'Volume bassin (m³)');
-      const volumeInput = document.createElement('input');
-      volumeInput.type = 'number';
-      volumeInput.min = '1';
-      volumeInput.max = '500';
-      volumeInput.step = '1';
-      volumeInput.className = 'control-input pool-fwin-flow-input';
-      const volumeValue = Number(o2Data.pool_volume_m3);
-      volumeInput.value = Number.isFinite(volumeValue) ? String(volumeValue) : '';
-      volumeWrap.appendChild(volumeLabel);
-      volumeWrap.appendChild(volumeInput);
-      sizing.appendChild(volumeWrap);
-      fields.push({
-        key: 'pool_volume_m3',
-        branch: 'poollogic/filtration',
-        label: tr('pool.filtration.poolVolume', 'Volume bassin (m³)'),
-        initial: Number.isFinite(volumeValue) ? volumeValue : null,
-        read: () => {
-          const v = Number(volumeInput.value);
-          return (Number.isFinite(v) && v > 0) ? v : null;
-        }
-      });
+      // Volume et debit sont en lecture seule ici : ce sont des caracteristiques
+      // de l'installation, pas un reglage de la planification. Ils se modifient
+      // dans les pages de configuration (poollogic/bassin et pdm/pd0), qui sont
+      // aussi les seules branches ou le firmware les enregistre. Les rendre
+      // editables ici les envoyait sur poollogic/filtration, ou aucune des deux
+      // cles n'existe : le patch etait ignore et le champ revenait vide.
+      const appendSizingValue = (labelText, value, digits) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'pool-fwin-flow';
+        const label = document.createElement('span');
+        label.textContent = labelText;
+        const valueEl = document.createElement('strong');
+        valueEl.className = 'pool-fwin-flow-value';
+        valueEl.textContent = Number.isFinite(value)
+          ? value.toFixed(digits).replace(/\.0+$/, '')
+          : '—';
+        wrap.appendChild(label);
+        wrap.appendChild(valueEl);
+        sizing.appendChild(wrap);
+      };
 
-      const flowWrap = document.createElement('label');
-      flowWrap.className = 'pool-fwin-flow';
-      const flowLabel = document.createElement('span');
-      flowLabel.textContent = tr('pool.filtration.pumpFlow', 'Débit pompe (m³/h)');
-      const flowInput = document.createElement('input');
-      flowInput.type = 'number';
-      flowInput.min = '0.5';
-      flowInput.max = '60';
-      flowInput.step = '0.5';
-      flowInput.className = 'control-input pool-fwin-flow-input';
-      // Le debit est une caracteristique de la pompe : il vit sur pdm/pd0.
+      const bassinData = modules['poollogic/bassin'] || {};
       const pd0Data = modules['pdm/pd0'] || {};
-      const flowValue = Number(pd0Data.pump_flow_m3h);
-      flowInput.value = Number.isFinite(flowValue) ? String(flowValue) : '';
-      flowWrap.appendChild(flowLabel);
-      flowWrap.appendChild(flowInput);
-      sizing.appendChild(flowWrap);
+      appendSizingValue(tr('pool.filtration.poolVolume', 'Volume bassin (m³)'),
+        Number(bassinData.pool_volume_m3), 0);
+      appendSizingValue(tr('pool.filtration.pumpFlow', 'Débit pompe (m³/h)'),
+        Number(pd0Data.pump_flow_m3h), 1);
       footer.appendChild(sizing);
-      fields.push({
-        key: 'pump_flow_m3h',
-        branch: 'pdm/pd0',
-        label: tr('pool.filtration.pumpFlow', 'Débit pompe (m³/h)'),
-        initial: Number.isFinite(flowValue) ? flowValue : null,
-        read: () => {
-          const v = Number(flowInput.value);
-          return (Number.isFinite(v) && v > 0) ? v : null;
-        }
-      });
 
       const hint = document.createElement('p');
       hint.className = 'pool-fwin-hint';
-      hint.textContent = tr('pool.filtration.hint', 'Une fin avant le début fait traverser minuit (ex. heures creuses 23:30 → 07:30). Priorité 1 = fenêtre remplie en premier. Contrat HC : mettez vos plages creuses en priorité 1-2 et une fenêtre diurne en priorité 3 pour le débordement.');
+      hint.textContent = tr('pool.filtration.hint', "Une fin avant le début fait traverser minuit (ex. heures creuses 23:30 → 07:30). Priorité 1 = fenêtre remplie en premier. Contrat HC : mettez vos plages creuses en priorité 1-2 et une fenêtre diurne en priorité 3 pour le débordement. Volume du bassin et débit de la pompe sont en lecture seule ici : ils se règlent dans Configuration (Bassin, puis Équipements → pd0).");
       footer.appendChild(hint);
 
       const actions = document.createElement('div');

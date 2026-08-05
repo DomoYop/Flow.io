@@ -861,6 +861,7 @@ body.web-icons-disabled .control-field-apply{font-size:15px;font-weight:800;lett
 .pool-fwin-sizing{display:inline-flex;align-items:center;gap:18px;flex-wrap:wrap;}
 .pool-fwin-flow{display:inline-flex;align-items:center;gap:10px;color:#60758B;font-size:13px;font-weight:700;white-space:nowrap;}
 .pool-fwin-flow-input{max-width:96px;}
+.pool-fwin-flow-value{color:var(--text);font-size:15px;font-weight:800;}
 .pool-fwin-hint{margin:0;color:var(--text-muted);font-size:12px;line-height:1.45;}
 .pool-fwin-actions{display:inline-flex;align-items:center;gap:12px;justify-self:end;}
 .pool-filtration-status{color:var(--text-muted);font-size:12px;font-weight:700;}

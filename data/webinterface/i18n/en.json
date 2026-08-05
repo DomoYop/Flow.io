@@ -75,7 +75,7 @@
     "pool.filtration.window": "Window {n}",
     "pool.filtration.pumpFlow": "Pump flow (m³/h)",
     "pool.filtration.poolVolume": "Pool volume (m³)",
-    "pool.filtration.hint": "A stop earlier than the start crosses midnight (e.g. off-peak 23:30 → 07:30). Priority 1 = window filled first. Off-peak plan: set your cheap ranges to priority 1-2 and a daytime window to priority 3 for the overflow.",
+    "pool.filtration.hint": "A stop earlier than the start crosses midnight (e.g. off-peak 23:30 → 07:30). Priority 1 = window filled first. Off-peak plan: set your cheap ranges to priority 1-2 and a daytime window to priority 3 for the overflow. Pool volume and pump flow are read-only here: set them in Configuration (Pool, then Devices → pd0).",
     "pool.filtration.apply": "Apply",
     "pool.filtration.applyBusy": "Applying windows...",
     "pool.filtration.applied": "Windows applied, plan recomputed.",
