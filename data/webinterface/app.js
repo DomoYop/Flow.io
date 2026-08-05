@@ -2231,10 +2231,12 @@
       Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.' }),
       Object.freeze({ module: 'poollogic/robot', titleKey: 'pool.card.robot.title', title: 'Robot', icon: 'smart_toy', noteKey: 'pool.card.robot.note', note: 'Fenêtre de lancement et durée du nettoyage automatique.' })
     ]);
+    // typeValue = PoolLogicModule::DisinfectionType (0 = desactive, sans mode
+    // associe et donc absent de cette table).
     const poolDisinfectionModeDefs = Object.freeze([
       Object.freeze({
         key: 'chlorine',
-        typeValue: 0,
+        typeValue: 1,
         module: 'poollogic/disinfection',
         titleKey: 'pool.disinfection.chlorine.title',
         title: 'Chlore / Brome',
@@ -2245,7 +2247,7 @@
       }),
       Object.freeze({
         key: 'swg',
-        typeValue: 1,
+        typeValue: 2,
         module: 'poollogic/disinfection',
         titleKey: 'pool.disinfection.swg.title',
         title: 'Électrolyse',
@@ -2256,7 +2258,7 @@
       }),
       Object.freeze({
         key: 'o2',
-        typeValue: 2,
+        typeValue: 3,
         module: 'poollogic/disinfection',
         titleKey: 'pool.disinfection.o2.title',
         title: 'Oxygène actif',
@@ -5713,7 +5715,10 @@
       slots.forEach((slot) => {
         if (String((slot && slot.io_slot) || '').trim() !== 'digital_out') return;
         const idx = Number(slot && slot.io_slot_index);
-        const name = String(slot && slot.io_name ? slot.io_name : '').trim();
+        // port_name = le port physique ("EXIO1"). io_name porte le role metier
+        // ("io_flt_pmp") et ferait doublon avec le libelle de la tuile ; repli
+        // sur io_name pour un firmware anterieur a l'ajout de port_name.
+        const name = String(slot && (slot.port_name || slot.io_name) || '').trim();
         if (Number.isFinite(idx) && name) map[idx] = name;
       });
       return map;
@@ -7007,12 +7012,15 @@
       }
     }
 
+    // Numerotation de PoolLogicModule::DisinfectionType : 0 = desactive, puis
+    // les trois modes. Elle doit rester alignee sur le firmware et sur
+    // l'enum_set poollogic_disinfection_type des cfgmods.
     function poolConfigDisinfectionLabel(value) {
       const n = Number(value);
-      if (n === 0) return tr('pool.disinfection.chlorine.title', 'Chlore / Brome');
-      if (n === 1) return tr('pool.disinfection.swg.title', 'Électrolyse');
-      if (n === 2) return tr('pool.disinfection.o2.title', 'Oxygène actif');
-      if (n === 3) return tr('pool.disinfection.disabled', 'Désactivé');
+      if (n === 0) return tr('pool.disinfection.disabled', 'Désactivé');
+      if (n === 1) return tr('pool.disinfection.chlorine.title', 'Chlore / Brome');
+      if (n === 2) return tr('pool.disinfection.swg.title', 'Électrolyse');
+      if (n === 3) return tr('pool.disinfection.o2.title', 'Oxygène actif');
       return tr('pool.state.unknown', 'Inconnu');
     }
 
@@ -7461,7 +7469,10 @@
       poolDisinfectionModes.innerHTML = '';
       const modes = modules['poollogic/bassin'] || {};
       const selectedType = Number(modes.disinfection_type);
-      const selectedDef = poolDisinfectionModeDefs.find((def) => selectedType === def.typeValue) || poolDisinfectionModeDefs[0];
+      // Aucun mode retenu (type 0 ou valeur inconnue) : carte neutre, et surtout
+      // pas le premier mode de la liste, qui donnait un faux "Chlore / Brome".
+      const selectedDef = poolDisinfectionModeDefs.find((def) => selectedType === def.typeValue)
+        || { key: '', typeValue: -1, module: '', icon: 'do_not_disturb_on', accent: 'muted' };
       const selected = selectedType === selectedDef.typeValue;
       const data = selected ? (modules[selectedDef.module] || {}) : {};
 

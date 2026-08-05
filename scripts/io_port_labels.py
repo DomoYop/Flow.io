@@ -151,11 +151,13 @@ _DIN_WAVESHARE = {
     for i in range(8)
 }
 
+# Waveshare ne cable que les 8 bits du TCA9554. Les 16 ports MCP23017 (400-415)
+# etaient decrits ici alors que WaveshareIoLayout.h ne les declare pas : l'UI les
+# proposait au binding et le firmware repondait "unresolved binding_port" en
+# silence au boot. Les reintroduire le jour ou kBindingPorts[] les porte.
 _DOUT_WAVESHARE = {}
 for _i in range(8):
     _DOUT_WAVESHARE[300 + _i] = PortLabel("EXIO%d" % (_i + 1), "bit", device="tca9554", index=_i)
-for _i in range(16):
-    _DOUT_WAVESHARE[400 + _i] = PortLabel("MCPOut%d" % (_i + 1), "bit", device="mcp23017", index=_i)
 
 _DOUT_FLOWIO = {
     407: PortLabel("PortPCF0Bit7", "pcf_bit", device="pcf_out", index=7),

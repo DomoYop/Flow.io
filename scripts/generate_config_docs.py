@@ -273,7 +273,10 @@ def _apply_profile_specific_io_enum_sets(meta: dict,
                 filtered.append(dict(entry))
 
         if profile == "waveshare":
-            filtered = relabel(dout_key, filtered, keep_unknown=True)
+            # keep_unknown=False : ne proposer que les ports que le profil sait
+            # resoudre. Sinon l'UI offre un binding que le firmware refuse au
+            # boot ("unresolved binding_port"), sans erreur visible cote web.
+            filtered = relabel(dout_key, filtered, keep_unknown=False)
 
         # Ensure flow.io exposes all 8 PCF bits (400..407) in UI bindings.
         if profile == "flowio":
@@ -311,6 +314,28 @@ def _apply_profile_specific_io_enum_sets(meta: dict,
         enum_sets[slot_key] = relabeled
 
     return meta
+
+
+# Branches de configuration decrivant un composant que le profil ne porte pas :
+# masquees de l'arbre web plutot que d'exposer un reglage sans materiel derriere.
+# Le pendant firmware est le defaut du champ `enabled` correspondant.
+PROFILE_HIDDEN_BRANCHES: Dict[str, Tuple[str, ...]] = {
+    # Waveshare : pas de PCF8574 (un TCA9554 occupe deja 0x20) ni de MCP23017
+    # (aucun port 400-415 dans WaveshareIoLayout.h).
+    "waveshare": ("io/drivers/pcf857x", "io/drivers/mcp23017"),
+}
+
+
+def _apply_profile_hidden_branches(docs: Dict[str, dict], profile: str) -> Dict[str, dict]:
+    branches = PROFILE_HIDDEN_BRANCHES.get(profile)
+    if not branches:
+        return docs
+    out = dict(docs)
+    for branch in branches:
+        entry = dict(out.get(branch) or {})
+        entry["hidden"] = True
+        out[branch] = entry
+    return out
 
 
 def _resolved_docs(docs: Dict[str, dict], translations: Dict[str, str]) -> Dict[str, dict]:
@@ -365,7 +390,10 @@ def main() -> None:
             "source": "text",
         },
         "meta": combined_meta if isinstance(combined_meta, dict) else {},
-        "docs": dict(sorted(_resolved_docs(cfgmods_docs, i18n).items(), key=lambda kv: kv[0])),
+        "docs": dict(sorted(
+            _resolved_docs(_apply_profile_hidden_branches(cfgmods_docs, profile), i18n).items(),
+            key=lambda kv: kv[0],
+        )),
     }
     _write_json(cfgmods_out_path, cfgmods_payload)
 

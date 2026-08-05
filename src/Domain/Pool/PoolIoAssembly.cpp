@@ -77,7 +77,9 @@ bool configure(const DomainSpec& domain, IOModule& io, const PoolIoProfileSpec& 
             const DigitalInputRoleDefault* def = roleDefaultIn(spec.dinDefaults, spec.dinDefaultCount, role.id);
             if (!def) return fail_("unsupported digital input domain role");
             IOEndpointRegistration reg{};
-            setRegId_(reg, portName_(spec, def->bindingPort), role.endpointId);
+            // Le role metier nomme l'endpoint ; le port physique n'est qu'un
+            // repli pour un role sans identite (comme sur le chemin analogique).
+            setRegId_(reg, role.endpointId, portName_(spec, def->bindingPort));
             reg.ioId = ioId;
             IODigitalInputSlotConfig cfg{};
             cfg.bindingPort = def->bindingPort;
@@ -120,7 +122,10 @@ bool configure(const DomainSpec& domain, IOModule& io, const PoolIoProfileSpec& 
         const DigitalOutputRoleDefault* def = roleDefaultIn(spec.doutDefaults, spec.doutDefaultCount, role.id);
         if (!def) return fail_("missing output layout binding");
         IOEndpointRegistration reg{};
-        setRegId_(reg, portName_(spec, def->bindingPort), role.endpointId);
+        // Idem entrees digitales : "io_flt_pmp" et non "EXIO1". Un role non lie
+        // (bindingPort invalide) gardait deja son identite metier, un role lie
+        // la perdait au profit du nom de port : l'ordre etait inverse.
+        setRegId_(reg, role.endpointId, portName_(spec, def->bindingPort));
         reg.ioId = ioIdFromSlot(role.ioSlot);
         IODigitalOutputSlotConfig cfg{};
         cfg.bindingPort = def->bindingPort;

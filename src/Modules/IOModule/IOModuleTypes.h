@@ -52,7 +52,15 @@ struct IOModuleConfig {
     uint8_t powermonAddress = 0x40;
     int32_t powermonPollMs = 500;
     float powermonShuntOhms = 0.1f;
+    // PCF8574 : extension de sorties des cartes flow.io. La carte Waveshare ne
+    // la porte pas (aucun port IO_BACKEND_PCF8574 dans son IoLayout) et place un
+    // TCA9554 a la meme adresse 0x20 : l'activer par defaut n'y exposait qu'un
+    // reglage sans materiel derriere, avec un conflit d'adresse en embuscade.
+#if defined(FLOW_PROFILE_WAVESHARE)
+    bool pcfEnabled = false;
+#else
     bool pcfEnabled = FLOW_WIRDEF_IO_PCFEN;
+#endif
     uint8_t pcfAddress = FLOW_WIRDEF_IO_PCFAD;
     uint8_t pcfMaskDefault = FLOW_WIRDEF_IO_PCFMK;
     bool pcfActiveLow = FLOW_WIRDEF_IO_PCFAL;

@@ -3494,6 +3494,15 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
         printJsonEscaped_(response, preset.endpointId ? preset.endpointId : "");
         response.print(",\"io_name\":");
         printJsonEscaped_(response, state.hasMeta ? state.meta.name : "");
+        // Nom du port physique ("EXIO1"), distinct du nom d'endpoint qui porte
+        // desormais le role metier ("io_flt_pmp"). Le tableau de bord prefixe
+        // ses tuiles equipement avec ce champ.
+        {
+            const IOBindingPortSpec* portSpec =
+                state.hasMeta ? waveshareFindPortForMeta_(state.meta) : nullptr;
+            response.print(",\"port_name\":");
+            printJsonEscaped_(response, (portSpec && portSpec->name) ? portSpec->name : "");
+        }
         response.print(",\"display_name\":");
         printJsonEscaped_(response, preset.displayName ? preset.displayName : "");
         response.print(",\"slot_kind\":");

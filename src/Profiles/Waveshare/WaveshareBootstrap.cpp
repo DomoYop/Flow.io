@@ -22,8 +22,10 @@
 #include "Core/SystemStats.h"
 #include "Core/WokwiDefaultOverrides.h"
 #include "Core/Services/IFlowCfg.h"
+#include "Domain/IoRoleDefaults.h"
 #include "Domain/Pool/PoolBehaviors.h"
 #include "Domain/Pool/PoolIds.h"
+#include "Profiles/Waveshare/WaveshareIoLayout.h"
 
 #undef snprintf
 #define snprintf(OUT, LEN, FMT, ...) \
@@ -167,6 +169,20 @@ void registerModules(AppContext& ctx, ModuleInstances& modules)
     ctx.moduleManager.add(&modules.systemMonitorModule);
 }
 
+/**
+ * Un appareil nait active si, et seulement si, le brochage d'usine lui donne un
+ * relais. Les roles laisses volontairement non lies dans WaveshareIoLayout.h
+ * (pompe desinfectant, electrolyseur) sortaient d'usine "actifs" alors qu'aucune
+ * sortie ne les pilotait et que disinfection_type vaut Desactive : l'utilisateur
+ * les active en meme temps qu'il choisit son mode de traitement.
+ */
+bool poolDeviceEnabledByFactoryWiring(const PoolDevicePreset& preset)
+{
+    const DigitalOutputRoleDefault* def =
+        roleDefaultFor(Profiles::Waveshare::IoLayout::kDigitalOutputRoleDefaults, preset.commandSlot);
+    return def != nullptr && def->bindingPort != IO_PORT_INVALID;
+}
+
 uint8_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset& preset)
 {
     if (preset.dependsOnDevice == POOL_DEVICE_INVALID) return 0;
@@ -189,7 +205,7 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
         PoolDeviceDefinition def{};
         def.slot = i;
         def.ioSlot = digitalOutputSlot(i);
-        def.enabled = true;
+        def.enabled = poolDeviceEnabledByFactoryWiring(*preset);
 
         const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset->commandSlot);
         requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
