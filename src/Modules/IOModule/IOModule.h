@@ -413,6 +413,12 @@ private:
 
     IOModuleConfig cfgData_{};
     IOAnalogSlotConfig analogCfg_[ANALOG_CFG_SLOTS]{};
+    // Port que le layout du profil reserve a chaque slot analogique, fige au
+    // montage (defineAnalogInput / applyAnalogInputDefaults) et jamais recouvert
+    // par la NVS : c'est ce qui permet a l'auto-binding de reposer un port sur
+    // "son" slot plutot que sur le premier trou venu. IO_PORT_INVALID (= 0) pour
+    // les slots sans role, d'ou l'initialisation par defaut.
+    PhysicalPortId analogLayoutPort_[ANALOG_CFG_SLOTS]{};
     IODigitalInputSlotConfig digitalInCfg_[DIGITAL_INPUT_CFG_SLOTS]{};
     IODigitalOutputSlotConfig digitalCfg_[DIGITAL_CFG_SLOTS]{};
     const IOBindingPortSpec* bindingPorts_ = nullptr;

@@ -76,21 +76,65 @@ void IOModule::autoBindEnabledAnalogDrivers_()
             }
             if (alreadyBound) continue;
 
-            // Premier slot libre (non binde).
-            int freeIdx = -1;
-            for (uint8_t s = 0; s < ANALOG_CFG_SLOTS; ++s) {
-                if (analogCfg_[s].bindingPort == IO_PORT_INVALID) { freeIdx = (int)s; break; }
+            // Une sonde 1-Wire sans ROM ne mesure rien : l'auto-binder occuperait
+            // (et persisterait) un slot pour une sonde absente, qui resterait en
+            // erreur. La ROM d'un rang est renseignee par resolveDs18Sensors_ des
+            // que son slot est binde, donc ce filtre n'ecarte que les rangs vides.
+            if (traits.backend == IO_BACKEND_DS18B20) {
+                const bool romKnown = (ch < IO_DS18_SLOT_COUNT) && (cfgData_.dsRom[ch][0] != '\0');
+                if (!romKnown) {
+                    LOGI("io.autobind: DS18B20 ch%u sans ROM -> aucun slot occupe", (unsigned)ch);
+                    continue;
+                }
             }
+
+            // Slot d'accueil : celui que le layout reserve a ce port d'abord, le
+            // premier slot libre ensuite. Sans cette preference, un port devenu
+            // orphelin (binding NVS herite d'un firmware anterieur) se pose sur le
+            // premier trou venu : passer une entree a "Non connecte" suffisait a
+            // decaler toute la suite des slots.
+            int preferredIdx = -1;
+            int fallbackIdx = -1;
+            uint8_t reservedSkipped = 0;
+            for (uint8_t s = 0; s < ANALOG_CFG_SLOTS; ++s) {
+                if (analogCfg_[s].bindingPort != IO_PORT_INVALID) continue;  // Slot deja occupe.
+                const PhysicalPortId layoutPort = analogLayoutPort_[s];
+                if (layoutPort == port->portId) { preferredIdx = (int)s; break; }
+                if (fallbackIdx >= 0) continue;  // Repli deja retenu, on ne cherche plus que le slot reserve.
+                // Un slot que le layout reserve a un autre backend porte un role
+                // metier avec son entite Home Assistant (nom, icone, unite) : y
+                // poser une autre mesure publierait la mauvaise valeur sous le bon
+                // nom (INA sur le slot "Temperature 4" -> io_temp4 en degC).
+                const IOBindingPortSpec* layoutSpec = bindingPortSpec_(layoutPort);
+                if (layoutSpec && layoutSpec->backend != traits.backend) { ++reservedSkipped; continue; }
+                fallbackIdx = (int)s;
+            }
+
+            const int freeIdx = (preferredIdx >= 0) ? preferredIdx : fallbackIdx;
             if (freeIdx < 0) {
-                LOGW("io.autobind: plus de slot analogique libre pour %s ch%u (port %u)",
-                     ioBackendLabel(traits.backend), (unsigned)ch, (unsigned)port->portId);
+                LOGW("io.autobind: plus de slot analogique libre pour %s ch%u (port %u, %u reserve(s) ignore(s))",
+                     ioBackendLabel(traits.backend), (unsigned)ch, (unsigned)port->portId,
+                     (unsigned)reservedSkipped);
                 break;  // Inutile d'insister pour les canaux suivants de ce backend.
+            }
+            if (preferredIdx < 0 && reservedSkipped > 0) {
+                LOGW("io.autobind: %s ch%u pose hors layout, %u slot(s) reserve(s) a un autre backend ignore(s)",
+                     ioBackendLabel(traits.backend), (unsigned)ch, (unsigned)reservedSkipped);
             }
 
             const uint8_t idx = (uint8_t)freeIdx;
             IOAnalogSlotConfig& slot = analogCfg_[idx];
             const IoAnalogSlotDefault* def = analogSlotDefault(traits.backend, ch);
-            const char* name = (def && def->name) ? def->name : (port->name ? port->name : "");
+            // Sur son slot de layout, le port reprend le nom du role metier : un
+            // nom herite ("Puissance shunt mV" sur le slot Temperature 4) doit
+            // ceder, et deux orthographes du meme capteur ne peuvent pas coexister.
+            // ANALOG_CFG_SLOTS peut depasser MAX_ANALOG_ENDPOINTS (SystemLimits.h) :
+            // analogSlots_ n'est dimensionne que sur les endpoints runtime.
+            const bool hasRuntimeSlot = analogSlots_ && idx < MAX_ANALOG_ENDPOINTS && analogSlots_[idx].used;
+            const char* roleName = (preferredIdx >= 0 && hasRuntimeSlot) ? analogSlots_[idx].id : nullptr;
+            const char* name = (roleName && roleName[0] != '\0')
+                                   ? roleName
+                                   : ((def && def->name) ? def->name : (port->name ? port->name : ""));
             const float c0 = 1.0f;
             const float c1 = 0.0f;
             const int32_t precision = def ? def->precision : 1;

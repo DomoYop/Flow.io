@@ -461,6 +461,7 @@ bool IOModule::defineAnalogInput(const IOEndpointRegistration& reg, const IOAnal
 
     if (analogIdx < ANALOG_CFG_SLOTS) {
         analogCfg_[analogIdx] = defaults;
+        analogLayoutPort_[analogIdx] = defaults.bindingPort;
         strncpy(analogCfg_[analogIdx].name, reg.id, sizeof(analogCfg_[analogIdx].name) - 1);
         analogCfg_[analogIdx].name[sizeof(analogCfg_[analogIdx].name) - 1] = '\0';
     }
@@ -487,6 +488,7 @@ bool IOModule::applyAnalogInputDefaults(const IOEndpointRegistration& reg, const
 
     if (analogIdx < ANALOG_CFG_SLOTS) {
         analogCfg_[analogIdx] = defaults;
+        analogLayoutPort_[analogIdx] = defaults.bindingPort;
         strncpy(analogCfg_[analogIdx].name, reg.id, sizeof(analogCfg_[analogIdx].name) - 1);
         analogCfg_[analogIdx].name[sizeof(analogCfg_[analogIdx].name) - 1] = '\0';
     }
