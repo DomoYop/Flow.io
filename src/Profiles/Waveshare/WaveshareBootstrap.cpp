@@ -183,12 +183,12 @@ bool poolDeviceEnabledByFactoryWiring(const PoolDevicePreset& preset)
     return def != nullptr && def->bindingPort != IO_PORT_INVALID;
 }
 
-uint8_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset& preset)
+uint16_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset& preset)
 {
     if (preset.dependsOnDevice == POOL_DEVICE_INVALID) return 0;
     const PoolDevicePreset* dependency = findPoolPresetById(domain, preset.dependsOnDevice);
     if (!dependency) return 0;
-    return (uint8_t)(1u << dependency->id);
+    return (uint16_t)(1u << dependency->id);
 }
 
 void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
@@ -202,14 +202,13 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
         const PoolDevicePreset* preset = findPoolPresetById(*ctx.domain, i);
         if (!preset) continue;
 
+        // L'invariant pdN <-> dNN est verifie a la compilation par le
+        // static_assert de PoolDomain.h : inutile de risquer ici une boucle
+        // infinie de boot sur une table que le compilateur a deja validee.
         PoolDeviceDefinition def{};
         def.slot = i;
         def.ioSlot = digitalOutputSlot(i);
         def.enabled = poolDeviceEnabledByFactoryWiring(*preset);
-
-        const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset->commandSlot);
-        requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
-        requireSetup(ioSlot == def.ioSlot, "pool device IO slot must match pdXX/dXX");
 
         snprintf(def.label, sizeof(def.label), "%s", preset->displayName);
         def.commandSlot = preset->commandSlot;
@@ -219,6 +218,8 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
         def.tankInitialMl = preset->tankInitialMl;
         def.dependsOnMask = dependsOnMaskForPreset(*ctx.domain, *preset);
         def.maxUptimeDaySec = preset->maxUptimeDaySec;
+        def.exposeHaSwitch = preset->exposeHaSwitch;
+        def.externallyCommandable = preset->externallyCommandable;
 
         requireSetup(modules.poolDeviceModule.defineDevice(def), "define pool device");
     }

@@ -6,7 +6,8 @@
   },
   "docs": {
     "network": {
-      "label_t": "cfgmods.network.label"
+      "label_t": "cfgmods.network.label",
+      "order": 100
     },
     "network/ethernet": {
       "label_t": "cfgmods.network.ethernet.label"

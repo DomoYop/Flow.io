@@ -55,7 +55,7 @@ inline constexpr uint32_t kWaveshareESP32S3InterlinkI2cHz = 400000U;
  *   Not stored in NVS. These are compile-time sizing limits, so the compiled
  *   values always apply.
  */
-inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{32, 8, 10, 32, 8, 10};
+inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{32, 8, 12, 32, 8, 12};
 
 /*
  * MQTT task and queue capacities.
@@ -107,7 +107,7 @@ inline constexpr MqttBufferSpec kWaveshareESP32S3MqttBuffers{
  *   Home Assistant naming/identity options are handled by separate persistent
  *   module config, not by this capacity block.
  */
-inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 10, 16, 30, 24, 6};
+inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 10, 20, 30, 24, 6};
 
 /*
  * UART definitions.

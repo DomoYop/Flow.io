@@ -819,7 +819,7 @@ bool PoolDeviceModule::dependenciesSatisfied_(uint8_t slotIdx) const
     if (s.def.dependsOnMask == 0) return true;
 
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
-        if ((s.def.dependsOnMask & (uint8_t)(1u << i)) == 0) continue;
+        if ((s.def.dependsOnMask & (uint16_t)(1u << i)) == 0) continue;
         if (i == slotIdx) continue;
         const PoolDeviceSlot& dep = slots_[i];
         if (!dep.used || !dep.actualOn) return false;
@@ -833,7 +833,7 @@ void PoolDeviceModule::logStartInterlock_(uint8_t slotIdx, uint8_t reason) const
     const PoolDeviceSlot& s = slots_[slotIdx];
     if (!s.used) return;
 
-    LOGW("PoolDev start blk sl=%u id=%s rsn=%u(%s) dep=0x%02X en=%u a=%u d=%u dayS=%lu maxS=%ld",
+    LOGW("PoolDev start blk sl=%u id=%s rsn=%u(%s) dep=0x%04X en=%u a=%u d=%u dayS=%lu maxS=%ld",
          (unsigned)slotIdx,
          s.id,
          (unsigned)reason,
@@ -848,7 +848,7 @@ void PoolDeviceModule::logStartInterlock_(uint8_t slotIdx, uint8_t reason) const
     if (reason != POOL_DEVICE_BLOCK_INTERLOCK) return;
 
     for (uint8_t i = 0; i < POOL_DEVICE_MAX; ++i) {
-        if ((s.def.dependsOnMask & (uint8_t)(1u << i)) == 0) continue;
+        if ((s.def.dependsOnMask & (uint16_t)(1u << i)) == 0) continue;
         if (i == slotIdx) continue;
         const PoolDeviceSlot& dep = slots_[i];
         LOGW("PoolDev dep sl=%u used=%u id=%s en=%u a=%u d=%u blk=%u(%s)",

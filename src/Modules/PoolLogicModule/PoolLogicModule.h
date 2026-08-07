@@ -238,8 +238,6 @@ private:
     // leur port physique est reconfigurable via la page E/S (bindingPort).
     IoId flowSwitchIoId_ = IO_ID_INVALID;
     IoId coverClosedIoId_ = IO_ID_INVALID;
-    IoId outFlowCopyIoId_ = IO_ID_INVALID;
-    IoId outCoverIoId_ = IO_ID_INVALID;
 
     // Thresholds / delays
     float pressureLowThreshold_ = PoolDefaults::PressureLow;
@@ -310,14 +308,19 @@ private:
     uint32_t o2LastPersistMs_ = 0;
     mutable char o2PoolDeviceJsonBuf_[160] = {0};
 
-    // Controlled pool devices
-    uint8_t filtrationDeviceSlot_ = PoolIds::DeviceFiltrationPump;
-    uint8_t swgDeviceSlot_ = PoolIds::DeviceChlorineGenerator;
-    uint8_t robotDeviceSlot_ = PoolIds::DeviceRobot;
-    uint8_t fillingDeviceSlot_ = PoolIds::DeviceFillPump;
-    uint8_t phPumpDeviceSlot_ = PoolIds::DevicePhPump;
+    // Appareils pilotes. Une fonction piscine = un PoolDevice = une sortie
+    // logique de meme index : le lien n'est plus un reglage, il est porte par
+    // PoolIds::Device*. Ce que l'utilisateur choisit, c'est le relais physique
+    // (io/output/dNN/binding_port), pas l'appareil.
+    static constexpr uint8_t filtrationDeviceSlot_ = PoolIds::DeviceFiltrationPump;
+    static constexpr uint8_t swgDeviceSlot_ = PoolIds::DeviceChlorineGenerator;
+    static constexpr uint8_t robotDeviceSlot_ = PoolIds::DeviceRobot;
+    static constexpr uint8_t fillingDeviceSlot_ = PoolIds::DeviceFillPump;
+    static constexpr uint8_t phPumpDeviceSlot_ = PoolIds::DevicePhPump;
+    static constexpr uint8_t heaterDeviceSlot_ = PoolIds::DeviceWaterHeater;
+    // Seule exception : la pompe de desinfection depend du mode choisi
+    // (chlore/brome ou oxygene actif), qui sont deux appareils distincts.
     uint8_t orpPumpDeviceSlot_ = PoolIds::DeviceChlorinePump;
-    uint8_t heaterDeviceSlot_ = PoolIds::DeviceWaterHeater;
 
     // Runtime flags
     DeviceFsm filtrationFsm_{};
@@ -551,20 +554,6 @@ private:
 
     // Aiguillage role -> slot PoolDevice : chaque variable vit dans la branche
     // metier correspondante (les cles NVS pl_s* restent inchangees).
-    ConfigVariable<uint8_t,0> filtrationDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FiltrationSlot), "filtr_slot", "poollogic/filtration", ConfigType::UInt8,
-                                                   &filtrationDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> swgDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::SwgSlot), "swg_slot", "poollogic/disinfection", ConfigType::UInt8,
-                                            &swgDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> robotDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::RobotSlot), "robot_slot", "poollogic/robot", ConfigType::UInt8,
-                                              &robotDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> fillingDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::FillingSlot), "fill_slot", "poollogic/refill", ConfigType::UInt8,
-                                                &fillingDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> phPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::PhPumpSlot), "ph_pump_slot", "poollogic/ph", ConfigType::UInt8,
-                                               &phPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> orpPumpDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::DisPumpSlot), "dis_pump_slot", "poollogic/disinfection", ConfigType::UInt8,
-                                                &orpPumpDeviceSlot_, ConfigPersistence::Persistent, 0};
-    ConfigVariable<uint8_t,0> heaterDeviceVar_{NVS_KEY(NvsKeys::PoolLogic::HeaterSlot), "heater_slot", "poollogic/heater", ConfigType::UInt8,
-                                               &heaterDeviceSlot_, ConfigPersistence::Persistent, 0};
 
     ConfigVariable<uint8_t,0> flowCopyDelayVar_{NVS_KEY(NvsKeys::PoolLogic::FlowCopyDelay), "flow_copy_delay_s", "poollogic/safety", ConfigType::UInt8,
                                                 &flowCopyDelaySec_, ConfigPersistence::Persistent, 0};
@@ -586,7 +575,7 @@ private:
     // Lifecycle
     static void onEventStatic_(const Event& e, void* user);
     void onEvent_(const Event& e);
-    void normalizeDeviceSlots_();
+    void updateDisinfectionDeviceSlot_();
     void logDeviceSlotConfig_() const;
     void logDeviceSlotBinding_(const char* role, uint8_t slot, int8_t expectedType) const;
     bool activityTimeReady_() const;

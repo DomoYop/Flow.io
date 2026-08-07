@@ -8,7 +8,7 @@
     "cfgdocs.wifi.ssid.help": "Name of the network to connect to.",
     "cfgdocs.wifi.ssid.label": "SSID",
     "cfgmods.network.ethernet.label": "ethernet",
-    "cfgmods.network.label": "network",
+    "cfgmods.network.label": "Network",
     "cfgmods.network.wifi.label": "network",
     "runtimeui.wifi.v01.display.activeText": "Connected",
     "runtimeui.wifi.v01.display.inactiveText": "Disconnected",

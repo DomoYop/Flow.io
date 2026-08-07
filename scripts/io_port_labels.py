@@ -35,7 +35,6 @@ ENUM_SET_SLUGS = {
     "flowio_binding_port_analog": "analog",
     "flowio_binding_port_digital_input": "din",
     "flowio_binding_port_digital_output": "dout",
-    "poollogic_device_slot": "slot",
 }
 
 # --- Fragments de langue : les SEULES chaines traduisibles de ce fichier -----
@@ -163,14 +162,11 @@ _DOUT_FLOWIO = {
     407: PortLabel("PortPCF0Bit7", "pcf_bit", device="pcf_out", index=7),
 }
 
-_SLOT_WAVESHARE = {i: PortLabel("", "slot", index=i) for i in range(16)}
-
 PROFILE_PORTS: Dict[str, Dict[str, Dict[int, PortLabel]]] = {
     "waveshare": {
         "flowio_binding_port_analog": _ANALOG_WAVESHARE,
         "flowio_binding_port_digital_input": _DIN_WAVESHARE,
         "flowio_binding_port_digital_output": _DOUT_WAVESHARE,
-        "poollogic_device_slot": _SLOT_WAVESHARE,
     },
     "flowio": {
         "flowio_binding_port_digital_input": _DIN_FLOWIO,

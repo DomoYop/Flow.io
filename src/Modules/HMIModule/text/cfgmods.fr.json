@@ -6,7 +6,8 @@
   },
   "docs": {
     "hmi": {
-      "label_t": "cfgmods.hmi.label"
+      "label_t": "cfgmods.hmi.label",
+      "order": 200
     },
     "hmi/leds": {},
     "hmi/nextion": {},

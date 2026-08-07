@@ -4,5 +4,11 @@
     "locale": "fr",
     "version": 1
   },
-  "docs": {}
+  "docs": {
+    "ha": {
+      "order": 110,
+      "label_t": "cfgmods.ha.label",
+      "help_t": "cfgmods.ha.help"
+    }
+  }
 }

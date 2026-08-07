@@ -11,6 +11,6 @@
     "cfgdocs.hmi.venice.enabled.label": "Venice RF433 enabled",
     "cfgdocs.hmi.venice.tx_gpio.help": "GPIO used by the RF433 transmitter of the Venice driver.",
     "cfgdocs.hmi.venice.tx_gpio.label": "Venice transmit GPIO",
-    "cfgmods.hmi.label": "hmi"
+    "cfgmods.hmi.label": "Display"
   }
 }

@@ -150,20 +150,21 @@ void registerModules(AppContext& ctx, ModuleInstances& modules)
     ctx.moduleManager.add(&modules.systemMonitorModule);
 }
 
-uint8_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset& preset)
+uint16_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset& preset)
 {
     if (preset.dependsOnDevice == POOL_DEVICE_INVALID) return 0;
     const PoolDevicePreset* dependency = findPoolPresetById(domain, preset.dependsOnDevice);
     if (!dependency) return 0;
-    return (uint8_t)(1u << dependency->id);
+    return (uint16_t)(1u << dependency->id);
 }
 
 void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
 {
     for (uint8_t i = 0; i < ctx.domain->poolDeviceCount; ++i) {
+        // Voir le static_assert de PoolDomain.h : la correspondance role ->
+        // sortie logique est validee a la compilation.
         const PoolDevicePreset& preset = ctx.domain->poolDevices[i];
         const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset.commandSlot);
-        requireSetup(ioSlot != IO_SLOT_INVALID, "missing pool device IO slot binding");
 
         PoolDeviceDefinition def{};
         snprintf(def.label, sizeof(def.label), "%s", preset.displayName);
@@ -176,6 +177,8 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
         def.tankInitialMl = preset.tankInitialMl;
         def.dependsOnMask = dependsOnMaskForPreset(*ctx.domain, preset);
         def.maxUptimeDaySec = preset.maxUptimeDaySec;
+        def.exposeHaSwitch = preset.exposeHaSwitch;
+        def.externallyCommandable = preset.externallyCommandable;
         requireSetup(modules.poolDeviceModule.defineDevice(def), "define pool device");
     }
 }

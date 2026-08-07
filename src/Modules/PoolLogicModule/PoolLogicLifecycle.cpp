@@ -209,8 +209,8 @@ void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
         {PoolIds::SensorChlorineLevel, &chlorineLevelIoId_},
         {PoolIds::SensorFlowSwitch, &flowSwitchIoId_},
         {PoolIds::SensorCoverClosed, &coverClosedIoId_},
-        {PoolIds::ActuatorFlowCopy, &outFlowCopyIoId_},
-        {PoolIds::ActuatorCoverClosed, &outCoverIoId_},
+        // Les 2 sorties de report ne sont plus resolues ici : elles passent par
+        // leur PoolDevice (DeviceFlowCopy / DeviceCoverReport).
     };
     for (const auto& s : sensorSlots) {
         const IoSlotId ioSlot = domainIoSlotForRole(domain, s.slot);
@@ -321,13 +321,6 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     o2WeeklyDoneVar_.moduleName = kCfgModuleDisinfection;
     o2PendingVar_.moduleName = kCfgModuleDisinfection;
 
-    filtrationDeviceVar_.moduleName = kCfgModuleFiltration;
-    swgDeviceVar_.moduleName = kCfgModuleDisinfection;
-    robotDeviceVar_.moduleName = kCfgModuleRobot;
-    fillingDeviceVar_.moduleName = kCfgModuleRefill;
-    phPumpDeviceVar_.moduleName = kCfgModulePh;
-    orpPumpDeviceVar_.moduleName = kCfgModuleDisinfection;
-    heaterDeviceVar_.moduleName = kCfgModuleHeater;
 
     // Registration order mirrors the published config branches so init remains
     // easy to diff against the generated cfgdocs and MQTT routes.
@@ -421,16 +414,6 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(o2LastDoseDayVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchDisinfection);
-
-    // Slots role -> PDM enregistres apres les reglages de leur branche pour
-    // apparaitre en dernier dans chaque page (l'ordre UI suit l'enregistrement).
-    cfg.registerVar(filtrationDeviceVar_, kCfgModuleId, kCfgBranchFiltration);
-    cfg.registerVar(swgDeviceVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(robotDeviceVar_, kCfgModuleId, kCfgBranchRobot);
-    cfg.registerVar(fillingDeviceVar_, kCfgModuleId, kCfgBranchRefill);
-    cfg.registerVar(phPumpDeviceVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpPumpDeviceVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(heaterDeviceVar_, kCfgModuleId, kCfgBranchHeater);
 
     cfg.registerVar(flowCopyDelayVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(flowInterlockVar_, kCfgModuleId, kCfgBranchSafety);
@@ -1373,7 +1356,7 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
     LOGI("PoolLogic disinfection=%s swg_control=%s",
          disinfectionTypeStr_(disinfectionType_),
          swgControlModeStr_(swgControlMode_));
-    normalizeDeviceSlots_();
+    updateDisinfectionDeviceSlot_();
     logDeviceSlotConfig_();
 
     // Masquage Home Assistant selon le type de desinfection et la presence des
@@ -1587,8 +1570,13 @@ void PoolLogicModule::onEvent_(const Event& e)
                 portEXIT_CRITICAL(&pendingMux_);
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisinfectionType) == 0) {
                 if (disinfectionType_ > DisinfectionActiveOxygen) disinfectionType_ = DisinfectionDisabled;
+                // L'ancienne pompe est arretee avant la bascule : apres
+                // updateDisinfectionDeviceSlot_ elle n'aurait plus de pilote et
+                // resterait en marche.
                 (void)forceDeviceStop_(orpPumpDeviceSlot_);
                 (void)forceDeviceStop_(swgDeviceSlot_);
+                updateDisinfectionDeviceSlot_();
+                (void)forceDeviceStop_(orpPumpDeviceSlot_);
                 if (disinfectionType_ == DisinfectionChlorineBromine && !orpAutoMode_ && cfgStore_) {
                     (void)cfgStore_->set(orpAutoModeVar_, true);
                     orpAutoMode_ = true;
@@ -1700,33 +1688,23 @@ void PoolLogicModule::onEvent_(const Event& e)
     }
 }
 
-void PoolLogicModule::normalizeDeviceSlots_()
+/**
+ * La pompe de desinfection n'est pas la meme selon le mode : chlore liquide /
+ * brome et oxygene actif sont deux appareils, avec leur propre debit, leur
+ * propre bidon et leurs propres compteurs de consommation. Le slot est donc
+ * derive de disinfection_type et non configure.
+ */
+void PoolLogicModule::updateDisinfectionDeviceSlot_()
 {
-    // Persisting invalid slots back to defaults keeps future boots and cfg
-    // publications aligned with the effective runtime wiring. POOL_DEVICE_INVALID
-    // est un choix legitime ("aucun PDM") : le role n'est alors pas pilote.
-    auto normalize = [this](uint8_t& slot,
-                            uint8_t defSlot,
-                            ConfigVariable<uint8_t,0>& var,
-                            const char* role) {
-        if (slot < POOL_DEVICE_MAX || slot == POOL_DEVICE_INVALID) return;
-        LOGW("PoolLogic invalid device slot role=%s slot=%u -> default=%u",
-             role ? role : "?",
-             (unsigned)slot,
-             (unsigned)defSlot);
-        slot = defSlot;
-        if (cfgStore_) {
-            (void)cfgStore_->set(var, slot);
-        }
-    };
-
-    normalize(filtrationDeviceSlot_, PoolIds::DeviceFiltrationPump, filtrationDeviceVar_, "filtration");
-    normalize(swgDeviceSlot_, PoolIds::DeviceChlorineGenerator, swgDeviceVar_, "swg");
-    normalize(robotDeviceSlot_, PoolIds::DeviceRobot, robotDeviceVar_, "robot");
-    normalize(fillingDeviceSlot_, PoolIds::DeviceFillPump, fillingDeviceVar_, "filling");
-    normalize(phPumpDeviceSlot_, PoolIds::DevicePhPump, phPumpDeviceVar_, "ph_pump");
-    normalize(orpPumpDeviceSlot_, PoolIds::DeviceChlorinePump, orpPumpDeviceVar_, "dis_pump");
-    normalize(heaterDeviceSlot_, PoolIds::DeviceWaterHeater, heaterDeviceVar_, "heater");
+    const uint8_t previous = orpPumpDeviceSlot_;
+    orpPumpDeviceSlot_ = (disinfectionType_ == DisinfectionActiveOxygen)
+                             ? (uint8_t)PoolIds::DeviceO2Pump
+                             : (uint8_t)PoolIds::DeviceChlorinePump;
+    if (previous != orpPumpDeviceSlot_) {
+        LOGI("PoolLogic disinfection pump slot=%u (type=%s)",
+             (unsigned)orpPumpDeviceSlot_,
+             disinfectionTypeStr_(disinfectionType_));
+    }
 }
 
 void PoolLogicModule::logDeviceSlotConfig_() const

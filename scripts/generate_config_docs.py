@@ -287,31 +287,9 @@ def _apply_profile_specific_io_enum_sets(meta: dict,
                     filtered.append(tokenized_entry({"value": value}, dout_key, value, label))
         enum_sets[dout_key] = binding_entries_with_non_connected(filtered)
 
-    # PoolLogic device slots: keep generic labels by default, but expose
-    # profile wiring-specific mapping in UI for faster setup.
-    slot_key = "poollogic_device_slot"
-    slot_entries = enum_sets.get(slot_key)
-    if profile == "waveshare" and isinstance(slot_entries, list):
-        current = [item for item in slot_entries if isinstance(item, dict)]
-        known = io_port_labels.labels_for(profile, slot_key)
-        relabeled: List[dict] = []
-        # Entrees hors plage (ex. 255 = "aucun PDM") : conservees telles quelles,
-        # en tete, sinon la reconstruction les ferait disparaitre.
-        for entry in current:
-            value = _to_int(entry.get("value"))
-            if value is None or value in known:
-                continue
-            relabeled.append(entry)
-        by_value = {}
-        for entry in current:
-            value = _to_int(entry.get("value"))
-            if value is not None:
-                by_value[value] = entry
-        # Le domaine decide combien d'appareils existent ; MaxPoolDevices n'est
-        # qu'un plafond de capacite.
-        for value in sorted(v for v in by_value if v in known):
-            relabeled.append(tokenized_entry(by_value[value], slot_key, value, known[value]))
-        enum_sets[slot_key] = relabeled
+    # L'enum_set "poollogic_device_slot" a disparu avec les champs *_slot : une
+    # fonction piscine est liee a un appareil unique, et le seul choix offert a
+    # l'utilisateur est le relais physique (binding_port ci-dessus).
 
     return meta
 

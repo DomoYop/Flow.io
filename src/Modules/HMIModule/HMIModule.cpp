@@ -876,11 +876,6 @@ void HMIModule::refreshHomeBindings_()
         bool foundPhLevel = false;
         bool foundChlorineLevel = false;
         bool foundWaterCounter = false;
-        bool foundFiltrationSlot = false;
-        bool foundPhPumpSlot = false;
-        bool foundOrpPumpSlot = false;
-        bool foundRobotSlot = false;
-        bool foundFillingSlot = false;
 
         if (cfgSvc_->toJsonModule(cfgSvc_->ctx,
                                   kPoolLogicSensorsModule,
@@ -937,38 +932,13 @@ void HMIModule::refreshHomeBindings_()
             LOGW("HMI poollogic sensors export failed");
         }
 
-        // Les slots role->PDM vivent dans leur branche metier respective.
-        const struct {
-            const char* module;
-            const char* key;
-            uint8_t* target;
-            bool* found;
-        } slotReads[] = {
-            {kPoolLogicFiltrationModule, "filtr_slot", &filtrationDeviceSlot_, &foundFiltrationSlot},
-            {kPoolLogicPhModule, "ph_pump_slot", &phPumpDeviceSlot_, &foundPhPumpSlot},
-            {kPoolLogicChlorineModule, "dis_pump_slot", &orpPumpDeviceSlot_, &foundOrpPumpSlot},
-            {kPoolLogicRobotModule, "robot_slot", &robotDeviceSlot_, &foundRobotSlot},
-            {kPoolLogicRefillModule, "fill_slot", &fillingDeviceSlot_, &foundFillingSlot},
-        };
-        bool slotTruncated = false;
-        for (const auto& r : slotReads) {
-            truncated = false;
-            memset(jsonBuf, 0, sizeof(jsonBuf));
-            if (!cfgSvc_->toJsonModule(cfgSvc_->ctx, r.module, jsonBuf, sizeof(jsonBuf), &truncated)) {
-                LOGW("HMI poollogic %s export failed", r.module);
-                continue;
-            }
-            if (truncated) slotTruncated = true;
-            uint16_t slot = *r.target;
-            *r.found = findJsonUInt16_(jsonBuf, r.key, slot);
-            if (*r.found) {
-                *r.target = (uint8_t)slot;
-            }
-        }
+        // Les slots role->PDM ne sont plus configurables : une fonction piscine
+        // est liee a un PoolDevice unique par PoolIds::Device*. Les membres
+        // *DeviceSlot_ gardent donc leur valeur canonique et cette lecture
+        // distante (5 exports I2C par cycle) n'a plus d'objet.
 
-        LOGD("HMI poollogic cfg sensors_trunc=%u slot_trunc=%u keys lvl=%u ph=%u orp=%u pressure=%u wat=%u air=%u phlvl=%u chllvl=%u wc=%u filtr=%u php=%u orpp=%u robot=%u fill=%u",
+        LOGD("HMI poollogic cfg sensors_trunc=%u keys lvl=%u ph=%u orp=%u pressure=%u wat=%u air=%u phlvl=%u chllvl=%u wc=%u",
              sensorsTruncated ? 1U : 0U,
-             slotTruncated ? 1U : 0U,
              foundPoolLevel ? 1U : 0U,
              foundPh ? 1U : 0U,
              foundOrp ? 1U : 0U,
@@ -977,12 +947,7 @@ void HMIModule::refreshHomeBindings_()
              foundAirTemp ? 1U : 0U,
              foundPhLevel ? 1U : 0U,
              foundChlorineLevel ? 1U : 0U,
-             foundWaterCounter ? 1U : 0U,
-             foundFiltrationSlot ? 1U : 0U,
-             foundPhPumpSlot ? 1U : 0U,
-             foundOrpPumpSlot ? 1U : 0U,
-             foundRobotSlot ? 1U : 0U,
-             foundFillingSlot ? 1U : 0U);
+             foundWaterCounter ? 1U : 0U);
     }
 
     (void)resolveIoRuntimeIndex_(phIoId_, phRuntimeIndex_);

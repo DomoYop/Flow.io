@@ -219,7 +219,7 @@ constexpr uint8_t MaxDigitalOutputs = BoardCapacityProfile::kIoCapacity.digitalO
 constexpr uint8_t AnalogConfigSlots = BoardCapacityProfile::kIoCapacity.analogConfigSlots;
 constexpr uint8_t DigitalInputConfigSlots = BoardCapacityProfile::kIoCapacity.digitalInputConfigSlots;
 constexpr uint8_t DigitalOutputConfigSlots = BoardCapacityProfile::kIoCapacity.digitalOutputConfigSlots;
-constexpr uint8_t MaxDomainSlots = 24;
+constexpr uint8_t MaxDomainSlots = 28;
 constexpr uint8_t MaxPoolDevices = 16;
 
 static_assert(MaxAnalogEndpoints > 0, "IO analogEndpoints must be at least 1");

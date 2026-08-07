@@ -220,6 +220,10 @@ void syncSwitches(const PoolIoHaContext& ctx)
     const DomainSpec& domain = *ctx.domain;
     for (uint8_t i = 0; i < domain.poolDeviceCount; ++i) {
         const PoolDevicePreset& device = domain.poolDevices[i];
+        // Sorties de report (recopie debit, etat volet) : pilotees par
+        // PoolLogic a chaque tick. Un switch Home Assistant laisserait croire
+        // qu'on peut les forcer, alors que la commande serait ecrasee aussitot.
+        if (!device.exposeHaSwitch) continue;
         const PoolRoleSpec* commandRole = domainRoleById(domain, device.commandSlot);
         if (!commandRole) continue;
         const IoSlotId ioSlot = commandRole->ioSlot;

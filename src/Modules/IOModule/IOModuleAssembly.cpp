@@ -572,6 +572,35 @@ void IOModule::configureDigitalInputSlot_(DigitalSlot& s, uint8_t slotIdx)
     (void)processDigitalInputDefinition_(slotIdx, millis());
 }
 
+/**
+ * Deux sorties liees au meme relais : la premiere garde le port, la seconde est
+ * deliee. Sans ce controle les deux endpoints piloteraient le meme bit
+ * d'expandeur et se contrediraient en silence, l'etat affiche ne correspondant a
+ * aucune des deux. Le binding etant un reglage utilisateur
+ * (io/output/dNN/binding_port), le cas est atteignable depuis l'interface.
+ */
+void IOModule::dropDuplicateOutputBindings_()
+{
+    for (uint8_t i = 0; i < MAX_DIGITAL_SLOTS; ++i) {
+        DigitalSlot& first = digitalSlots_[i];
+        if (!first.used || first.kind != DIGITAL_SLOT_OUTPUT) continue;
+        if (first.outCfg.bindingPort == IO_PORT_INVALID) continue;
+
+        for (uint8_t j = (uint8_t)(i + 1); j < MAX_DIGITAL_SLOTS; ++j) {
+            DigitalSlot& other = digitalSlots_[j];
+            if (!other.used || other.kind != DIGITAL_SLOT_OUTPUT) continue;
+            if (other.outCfg.bindingPort != first.outCfg.bindingPort) continue;
+
+            LOGW("Digital output d%02u and d%02u share binding_port=%u; d%02u left unbound",
+                 (unsigned)first.logicalIdx,
+                 (unsigned)other.logicalIdx,
+                 (unsigned)first.outCfg.bindingPort,
+                 (unsigned)other.logicalIdx);
+            other.outCfg.bindingPort = IO_PORT_INVALID;
+        }
+    }
+}
+
 void IOModule::configureDigitalOutputSlot_(DigitalSlot& s, const ExpanderNeeds& needs, bool& mcpProbeFailed)
 {
     const bool needPcfOutput = needs.pcf;
@@ -1071,6 +1100,10 @@ bool IOModule::configureRuntime_()
 
     bool needAnalogSource[IO_SRC_COUNT] = {false};
     configureAnalogSlots_(needAnalogSource);
+
+    // Avant tout sondage d'expandeur : un port reclame par deux sorties doit
+    // etre arbitre ici, sinon scanExpanderNeeds_ le compterait deux fois.
+    dropDuplicateOutputBindings_();
 
     const ExpanderNeeds expanders = scanExpanderNeeds_();
     beginI2cIfNeeded_(needAnalogSource, expanders);

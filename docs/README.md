@@ -176,21 +176,30 @@ Ordre d'enregistrement dans `src/Profiles/Supervisor/SupervisorBootstrap.cpp`:
 
 ## Capacités statiques utiles à l'intégration
 
-Les valeurs ci-dessous correspondent à l'implémentation actuelle du profil `FlowIO`.
+Les capacités sont résolues par profil de carte (`src/Board/*Board.h`). `Waveshare` est
+la cible de référence actuelle ; `FlowIO` est conservé pour comparaison.
 
-| Domaine | Capacité compile-time | Implémentation |
-|---|---:|---|
-| Entrées analogiques IO | 17 | `IOModule::MAX_ANALOG_ENDPOINTS` |
-| Entrées digitales IO | 5 | `IOModule::MAX_DIGITAL_INPUTS` |
-| Sorties digitales IO | 10 | `IOModule::MAX_DIGITAL_OUTPUTS` |
-| Équipements `PoolDevice` | 8 | `POOL_DEVICE_MAX` |
-| Capteurs Home Assistant | 40 | `HAModule::MAX_HA_SENSORS` |
-| Binary sensors Home Assistant | 6 | `HAModule::MAX_HA_BINARY_SENSORS` |
-| Switches Home Assistant | 14 | `HAModule::MAX_HA_SWITCHES` |
-| Numbers Home Assistant | 14 | `HAModule::MAX_HA_NUMBERS` |
-| Buttons Home Assistant | 24 | `HAModule::MAX_HA_BUTTONS` |
-| Routes runtime MQTT* | 56 | `Limits::MaxRuntimeRoutes` |
-| EventBus queue | 40 | `Limits::EventQueueLen` |
-| Variables de configuration | 380 | `Limits::MaxConfigVars` |
+| Domaine | Waveshare | FlowIO | Implémentation |
+|---|---:|---:|---|
+| Entrées analogiques IO | 32 | 17 | `IOModule::MAX_ANALOG_ENDPOINTS` |
+| Entrées digitales IO | 8 | 5 | `IOModule::MAX_DIGITAL_INPUTS` |
+| Sorties digitales IO | 12 | 10 | `IOModule::MAX_DIGITAL_OUTPUTS` |
+| Équipements `PoolDevice` (plafond) | 16 | 16 | `POOL_DEVICE_MAX` |
+| Fonctions piscine déclarées | 12 | 8 | `PoolDomain::kPoolDevices` |
+| **Relais physiquement disponibles** | **8** | **8** | `kBindingPorts` (`*IoLayout.h`) |
+| Slots de domaine | 28 | 28 | `Limits::Io::MaxDomainSlots` |
+| Capteurs Home Assistant | 48 | 40 | `HAModule::MAX_HA_SENSORS` |
+| Binary sensors Home Assistant | 10 | 6 | `HAModule::MAX_HA_BINARY_SENSORS` |
+| Switches Home Assistant | 20 | 14 | `HAModule::MAX_HA_SWITCHES` |
+| Numbers Home Assistant | 30 | 14 | `HAModule::MAX_HA_NUMBERS` |
+| Buttons Home Assistant | 24 | 24 | `HAModule::MAX_HA_BUTTONS` |
+| Routes runtime MQTT* | 112 | 56 | `Limits::MaxRuntimeRoutes` |
+| EventBus queue | 40 | 40 | `Limits::EventQueueLen` |
+| Variables de configuration | 768 | 380 | `Limits::MaxConfigVars` |
+
+Le nombre de **relais** est la seule capacité que le logiciel ne peut pas relever : déclarer
+une fonction de plus coûte quelques variables de config, la brancher demande un port libre.
+Sur Waveshare, 12 fonctions sont déclarées pour 8 relais — les trois modes de désinfection
+étant exclusifs, la contrainte n'est pas atteinte en pratique.
 
 \* Une route runtime MQTT correspond à un canal de publication runtime déclaré dans le firmware. Chaque route relie une source d'état interne à un suffixe de topic MQTT, par exemple `rt/io/input/a0`, `rt/pdm/state/pd0` ou `rt/system/state`.

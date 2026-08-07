@@ -217,17 +217,31 @@ Entités créées:
 
 ## Initialisation des slots dans le profil
 
-Les slots `pd0..pd7` sont définis via `defineDevice()` dans `src/Profiles/FlowIO/FlowIOBootstrap.cpp`, à partir du domaine actif et des bindings `PoolBinding`:
+Les slots sont définis via `defineDevice()` dans `configurePoolDevices()`
+(`src/Profiles/Waveshare/WaveshareBootstrap.cpp`, `src/Profiles/FlowIO/FlowIOBootstrap.cpp`),
+à partir des presets `PoolDomain::kPoolDevices`.
 
-Le type métier est fixé par le profil et n'est plus exposé en configuration. Le mapping effectif passe par `pdN -> dN -> binding_port -> relais physique`.
+Une fonction piscine = un `PoolDevice` = la sortie logique `dNN` de **même index**. Cet
+invariant est vérifié à la compilation par le `static_assert` de `PoolDomain.h` ; le type
+métier vient du preset et n'est pas exposé en configuration. Le seul maillon reconfigurable
+est le dernier : `pdN -> dNN -> binding_port -> relais physique`.
 
-| Slot | Rôle métier | Sortie IO | Relais physique | Dépendances | Particularités |
+Table Waveshare (profil de référence). Sur FlowIO, `pd4` et `pd9..pd11` ne sont pas déclarés.
+
+| Slot | Fonction | Sortie IO | Port d'usine | Dépend de | Particularités |
 | --- | --- | --- | --- | --- | --- |
-| `pd0` | filtration | `d0` | `PortRelay1` / `relay1` | aucune | pompe de filtration pilotée par `PoolLogic` |
-| `pd1` | pH | `d1` | `PortRelay2` / `relay2` | `pd0` | pompe péristaltique, cuve suivie, débit nominal, uptime max `30 min/j` |
-| `pd2` | chlore | `d2` | `PortRelay3` / `relay3` | `pd0` | pompe péristaltique, cuve suivie, débit nominal, uptime max `30 min/j` |
-| `pd3` | robot | `d3` | `PortRelay5` / `relay5` | `pd0` | relais standard |
-| `pd4` | remplissage | `d4` | `PortRelay7` / `relay7` | aucune | relais standard, uptime max `30 min/j` |
-| `pd5` | électrolyse | `d5` | `PortRelay4` / `relay4` | `pd0` | relais standard, uptime max `600 min/j` |
-| `pd6` | lumières | `d6` | `PortRelay6` / `relay6` | aucune | relais standard |
-| `pd7` | chauffage eau | `d7` | `PortRelay8` / `relay8` | aucune | relais standard |
+| `pd0` | filtration | `d00` | `PortExio1` | aucune | pilotée par `PoolLogic` (turnover) |
+| `pd1` | régulation pH | `d01` | `PortExio2` | `pd0` | péristaltique, cuve suivie, uptime max `90 min/j` |
+| `pd2` | désinfection chlore/brome | `d02` | non lié | `pd0` | péristaltique, cuve suivie, uptime max `90 min/j` |
+| `pd3` | désinfection électrolyseur | `d03` | non lié | `pd0` | relais standard, uptime max `600 min/j` |
+| `pd4` | désinfection oxygène actif | `d04` | non lié | `pd0` | péristaltique, cuve et compteurs séparés du chlore |
+| `pd5` | remplissage automatique | `d05` | `PortExio5` | aucune | relais standard, uptime max borné |
+| `pd6` | éclairage | `d06` | `PortExio7` | aucune | relais standard |
+| `pd7` | chauffage | `d07` | `PortExio8` | aucune | relais standard |
+| `pd8` | robot de nettoyage | `d08` | `PortExio4` | `pd0` | relais standard |
+| `pd9` | recopie temporisée du débit | `d09` | non lié | aucune | sortie de report : pas de switch HA, non commandable |
+| `pd10` | report d'état du volet | `d10` | non lié | aucune | sortie de report : pas de switch HA, non commandable |
+| `pd11` | sortie auxiliaire 1 | `d11` | non lié | aucune | relais standard, sans automatisme |
+
+Seuls **8 relais physiques** existent (EXIO1..EXIO8) : les fonctions non liées sont inertes,
+ce qui est le comportement voulu pour les trois modes de désinfection, exclusifs entre eux.

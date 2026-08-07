@@ -6,7 +6,7 @@
   },
   "docs": {
     "*/depends_on_mask": {
-      "type": "uint8_t",
+      "type": "uint16_t",
       "label_t": "cfgdocs.wildcard.depends_on_mask.label",
       "help_t": "cfgdocs.wildcard.depends_on_mask.help"
     },
@@ -27,6 +27,12 @@
       "help_t": "cfgdocs.wildcard.max_uptime_day_s.help",
       "unit": "s"
     },
+    "*/on_delay_s": {
+      "type": "int32_t",
+      "label_t": "cfgdocs.wildcard.on_delay_s.label",
+      "help_t": "cfgdocs.wildcard.on_delay_s.help",
+      "unit": "s"
+    },
     "*/tank_cap_ml": {
       "type": "float",
       "label_t": "cfgdocs.wildcard.tank_cap_ml.label",
@@ -38,22 +44,6 @@
       "label_t": "cfgdocs.wildcard.tank_init_ml.label",
       "help_t": "cfgdocs.wildcard.tank_init_ml.help",
       "unit": "mL"
-    },
-    "pdm/pd0/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd0.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd0.depends_on_mask.help"
-    },
-    "pdm/pd0/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd0.enabled.label",
-      "help_t": "cfgdocs.pdm.pd0.enabled.help"
-    },
-    "pdm/pd0/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd0.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd0.max_uptime_day_s.help",
-      "unit": "s"
     },
     "pdm/pd0/pressure_high_th": {
       "type": "Float",
@@ -78,184 +68,6 @@
       "label_t": "cfgdocs.pdm.pd0.pump_flow_m3h.label",
       "help_t": "cfgdocs.pdm.pd0.pump_flow_m3h.help",
       "unit": "m3/h"
-    },
-    "pdm/pd1/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd1.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd1.depends_on_mask.help"
-    },
-    "pdm/pd1/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd1.enabled.label",
-      "help_t": "cfgdocs.pdm.pd1.enabled.help"
-    },
-    "pdm/pd1/flow_l_h": {
-      "type": "float",
-      "label_t": "cfgdocs.pdm.pd1.flow_l_h.label",
-      "help_t": "cfgdocs.pdm.pd1.flow_l_h.help",
-      "unit": "L/h"
-    },
-    "pdm/pd1/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd1.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd1.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd1/tank_cap_ml": {
-      "type": "float",
-      "label_t": "cfgdocs.pdm.pd1.tank_cap_ml.label",
-      "help_t": "cfgdocs.pdm.pd1.tank_cap_ml.help",
-      "unit": "mL"
-    },
-    "pdm/pd1/tank_init_ml": {
-      "type": "float",
-      "label_t": "cfgdocs.pdm.pd1.tank_init_ml.label",
-      "help_t": "cfgdocs.pdm.pd1.tank_init_ml.help",
-      "unit": "mL"
-    },
-    "pdm/pd2/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd2.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd2.depends_on_mask.help"
-    },
-    "pdm/pd2/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd2.enabled.label",
-      "help_t": "cfgdocs.pdm.pd2.enabled.help"
-    },
-    "pdm/pd2/flow_l_h": {
-      "type": "float",
-      "label_t": "cfgdocs.pdm.pd2.flow_l_h.label",
-      "help_t": "cfgdocs.pdm.pd2.flow_l_h.help",
-      "unit": "L/h"
-    },
-    "pdm/pd2/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd2.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd2.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd2/tank_cap_ml": {
-      "type": "float",
-      "label_t": "cfgdocs.pdm.pd2.tank_cap_ml.label",
-      "help_t": "cfgdocs.pdm.pd2.tank_cap_ml.help",
-      "unit": "mL"
-    },
-    "pdm/pd2/tank_init_ml": {
-      "type": "float",
-      "label_t": "cfgdocs.pdm.pd2.tank_init_ml.label",
-      "help_t": "cfgdocs.pdm.pd2.tank_init_ml.help",
-      "unit": "mL"
-    },
-    "pdm/pd3/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd3.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd3.depends_on_mask.help"
-    },
-    "pdm/pd3/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd3.enabled.label",
-      "help_t": "cfgdocs.pdm.pd3.enabled.help"
-    },
-    "pdm/pd3/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd3.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd3.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd3/on_delay_s": {
-      "type": "Int32",
-      "unit": "s",
-      "label_t": "cfgdocs.pdm.pd3.on_delay_s.label",
-      "help_t": "cfgdocs.pdm.pd3.on_delay_s.help"
-    },
-    "pdm/pd4/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd4.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd4.depends_on_mask.help"
-    },
-    "pdm/pd4/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd4.enabled.label",
-      "help_t": "cfgdocs.pdm.pd4.enabled.help"
-    },
-    "pdm/pd4/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd4.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd4.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd4/on_delay_s": {
-      "type": "Int32",
-      "unit": "s",
-      "label_t": "cfgdocs.pdm.pd4.on_delay_s.label",
-      "help_t": "cfgdocs.pdm.pd4.on_delay_s.help"
-    },
-    "pdm/pd5/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd5.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd5.depends_on_mask.help"
-    },
-    "pdm/pd5/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd5.enabled.label",
-      "help_t": "cfgdocs.pdm.pd5.enabled.help"
-    },
-    "pdm/pd5/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd5.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd5.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd5/on_delay_s": {
-      "type": "Int32",
-      "unit": "s",
-      "label_t": "cfgdocs.pdm.pd5.on_delay_s.label",
-      "help_t": "cfgdocs.pdm.pd5.on_delay_s.help"
-    },
-    "pdm/pd6/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd6.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd6.depends_on_mask.help"
-    },
-    "pdm/pd6/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd6.enabled.label",
-      "help_t": "cfgdocs.pdm.pd6.enabled.help"
-    },
-    "pdm/pd6/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd6.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd6.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd6/on_delay_s": {
-      "type": "Int32",
-      "unit": "s",
-      "label_t": "cfgdocs.pdm.pd6.on_delay_s.label",
-      "help_t": "cfgdocs.pdm.pd6.on_delay_s.help"
-    },
-    "pdm/pd7/depends_on_mask": {
-      "type": "uint8_t",
-      "label_t": "cfgdocs.pdm.pd7.depends_on_mask.label",
-      "help_t": "cfgdocs.pdm.pd7.depends_on_mask.help"
-    },
-    "pdm/pd7/enabled": {
-      "type": "bool",
-      "label_t": "cfgdocs.pdm.pd7.enabled.label",
-      "help_t": "cfgdocs.pdm.pd7.enabled.help"
-    },
-    "pdm/pd7/max_uptime_day_s": {
-      "type": "int32_t",
-      "label_t": "cfgdocs.pdm.pd7.max_uptime_day_s.label",
-      "help_t": "cfgdocs.pdm.pd7.max_uptime_day_s.help",
-      "unit": "s"
-    },
-    "pdm/pd7/on_delay_s": {
-      "type": "Int32",
-      "unit": "s",
-      "label_t": "cfgdocs.pdm.pd7.on_delay_s.label",
-      "help_t": "cfgdocs.pdm.pd7.on_delay_s.help"
     }
   }
 }

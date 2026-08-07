@@ -5,6 +5,10 @@
     "version": 1
   },
   "docs": {
+    "io": {
+      "order": 800,
+      "label_t": "cfgmods.io.label"
+    },
     "io/drivers/ads1115_ext/address": {
       "display_format": "hex"
     },
@@ -17,23 +21,23 @@
     "io/drivers/bmp280/address": {
       "display_format": "hex"
     },
-    "io/drivers/powermon/address": {
+    "io/drivers/mcp23017/address": {
       "display_format": "hex"
     },
     "io/drivers/pcf857x/address": {
       "display_format": "hex"
     },
+    "io/drivers/powermon/address": {
+      "display_format": "hex"
+    },
     "io/drivers/sht40/address": {
+      "display_format": "hex"
+    },
+    "io/drivers/tca9554/address": {
       "display_format": "hex"
     },
     "io/input": {
       "label_t": "cfgmods.io.input.label"
-    },
-    "io/input/analog": {
-      "label_t": "cfgmods.io.input.analog.label"
-    },
-    "io/input/digital": {
-      "label_t": "cfgmods.io.input.digital.label"
     },
     "io/input/a00/a00_source": {
       "enum_set": "io_analog_source"
@@ -52,6 +56,12 @@
     },
     "io/input/a05/a05_source": {
       "enum_set": "io_analog_source"
+    },
+    "io/input/analog": {
+      "label_t": "cfgmods.io.input.analog.label"
+    },
+    "io/input/digital": {
+      "label_t": "cfgmods.io.input.digital.label"
     },
     "io/input/i00/i00_pull_mode": {
       "enum_set": "io_digital_pull_mode"
@@ -133,12 +143,6 @@
       "label_t": "cfgmods.io.input.i07.mode.label",
       "help_t": "cfgmods.io.input.i07.mode.help",
       "enum_set": "flowio_digital_input_mode"
-    },
-    "io/drivers/mcp23017/address": {
-      "display_format": "hex"
-    },
-    "io/drivers/tca9554/address": {
-      "display_format": "hex"
     }
   },
   "meta": {

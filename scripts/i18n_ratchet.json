@@ -6,13 +6,13 @@
     "FlowConnectDisplay/FlowConnectDisplayUdpClientModule": 1,
     "IOModule": 53,
     "Logs/LogHubModule": 26,
+    "Network/HAModule": 1,
     "Network/HmiUdpServerModule": 1,
     "Network/MQTTModule": 1,
     "Network/TimeModule": 4,
-    "Network/WifiModule": 3,
-    "PoolDeviceModule": 2,
-    "PoolLogicModule": 12,
-    "System/SystemModule": 4,
+    "Network/WifiModule": 2,
+    "PoolLogicModule": 5,
+    "System/SystemModule": 3,
     "TFTModuleS3": 6
   }
 }

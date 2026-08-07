@@ -11,6 +11,8 @@
     "cfgdocs.ha.model.help": "Nom du modèle exposé dans Home Assistant.",
     "cfgdocs.ha.model.label": "Modèle",
     "cfgdocs.ha.vendor.help": "Nom du constructeur exposé dans Home Assistant.",
-    "cfgdocs.ha.vendor.label": "Constructeur"
+    "cfgdocs.ha.vendor.label": "Constructeur",
+    "cfgmods.ha.help": "Découverte automatique des entités et identité du périphérique publiée sur MQTT.",
+    "cfgmods.ha.label": "Home Assistant"
   }
 }

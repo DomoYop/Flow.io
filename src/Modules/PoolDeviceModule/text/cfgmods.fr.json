@@ -6,66 +6,7 @@
   },
   "docs": {
     "pdm": {
-      "label_t": "cfgmods.pdm.label",
-      "help_t": "cfgmods.pdm.help",
-      "compose": [
-        {
-          "module": "pdm/pd0",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd0.label"
-        },
-        {
-          "module": "pdm/pd1",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd1.label"
-        },
-        {
-          "module": "pdm/pd2",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd2.label"
-        },
-        {
-          "module": "pdm/pd3",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd3.label"
-        },
-        {
-          "module": "pdm/pd4",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd4.label"
-        },
-        {
-          "module": "pdm/pd5",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd5.label"
-        },
-        {
-          "module": "pdm/pd6",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd6.label"
-        },
-        {
-          "module": "pdm/pd7",
-          "fields": [
-            "enabled"
-          ],
-          "label_t": "cfgmods.pdm.pd7.label"
-        }
-      ]
+      "hidden": true
     },
     "pdm/pd0": {
       "label_t": "cfgmods.pdm.pd0.label"
@@ -139,6 +80,45 @@
         "eq": true
       }
     },
+    "pdm/pd10": {
+      "label_t": "cfgmods.pdm.pd10.label"
+    },
+    "pdm/pd10/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd10/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd10/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd10/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd10/on_delay_s": {
+      "hidden": true
+    },
+    "pdm/pd11": {
+      "label_t": "cfgmods.pdm.pd11.label"
+    },
+    "pdm/pd11/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd11/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd11/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd11/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd11/on_delay_s": {
+      "visible_if": {
+        "path": "pdm/pd11/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd2": {
       "label_t": "cfgmods.pdm.pd2.label"
     },
@@ -202,13 +182,25 @@
         "eq": true
       }
     },
+    "pdm/pd4/flow_l_h": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd4/max_uptime_day_s": {
       "visible_if": {
         "path": "pdm/pd4/enabled",
         "eq": true
       }
     },
-    "pdm/pd4/on_delay_s": {
+    "pdm/pd4/tank_cap_ml": {
+      "visible_if": {
+        "path": "pdm/pd4/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd4/tank_init_ml": {
       "visible_if": {
         "path": "pdm/pd4/enabled",
         "eq": true
@@ -276,6 +268,45 @@
         "path": "pdm/pd7/enabled",
         "eq": true
       }
+    },
+    "pdm/pd8": {
+      "label_t": "cfgmods.pdm.pd8.label"
+    },
+    "pdm/pd8/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd8/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd8/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd8/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd8/on_delay_s": {
+      "visible_if": {
+        "path": "pdm/pd8/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd9": {
+      "label_t": "cfgmods.pdm.pd9.label"
+    },
+    "pdm/pd9/depends_on_mask": {
+      "visible_if": {
+        "path": "pdm/pd9/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd9/max_uptime_day_s": {
+      "visible_if": {
+        "path": "pdm/pd9/enabled",
+        "eq": true
+      }
+    },
+    "pdm/pd9/on_delay_s": {
+      "hidden": true
     }
   },
   "meta": {}

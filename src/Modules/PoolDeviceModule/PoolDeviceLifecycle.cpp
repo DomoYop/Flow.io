@@ -66,7 +66,7 @@ bool PoolDeviceModule::ensureStorage_()
     }
     if (!slots_) slots_ = allocPsramArray_<PoolDeviceSlot>(POOL_DEVICE_MAX);
     if (!cfgEnabledVar_) cfgEnabledVar_ = allocPsramArray_<ConfigVariable<bool,0>>(POOL_DEVICE_MAX);
-    if (!cfgDependsVar_) cfgDependsVar_ = allocPsramArray_<ConfigVariable<uint8_t,0>>(POOL_DEVICE_MAX);
+    if (!cfgDependsVar_) cfgDependsVar_ = allocPsramArray_<ConfigVariable<uint16_t,0>>(POOL_DEVICE_MAX);
     if (!cfgFlowVar_) cfgFlowVar_ = allocPsramArray_<ConfigVariable<float,0>>(POOL_DEVICE_MAX);
     if (!cfgTankCapVar_) cfgTankCapVar_ = allocPsramArray_<ConfigVariable<float,0>>(POOL_DEVICE_MAX);
     if (!cfgTankInitVar_) cfgTankInitVar_ = allocPsramArray_<ConfigVariable<float,0>>(POOL_DEVICE_MAX);
@@ -210,7 +210,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         cfgDependsVar_[i].nvsKey = slot.dependsKey;
         cfgDependsVar_[i].jsonName = "depends_on_mask";
         cfgDependsVar_[i].moduleName = slot.configModuleName;
-        cfgDependsVar_[i].type = ConfigType::UInt8;
+        cfgDependsVar_[i].type = ConfigType::UInt16;
         cfgDependsVar_[i].value = &s.def.dependsOnMask;
         cfgDependsVar_[i].persistence = ConfigPersistence::Persistent;
         cfgDependsVar_[i].size = 0;

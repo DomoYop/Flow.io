@@ -64,12 +64,6 @@
       "label_t": "cfgdocs.poollogic.disinfection.dis_min_on_ms.label",
       "help_t": "cfgdocs.poollogic.disinfection.dis_min_on_ms.help"
     },
-    "poollogic/disinfection/dis_pump_slot": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.disinfection.dis_pump_slot.label",
-      "help_t": "cfgdocs.poollogic.disinfection.dis_pump_slot.help",
-      "enum_set": "poollogic_device_slot"
-    },
     "poollogic/disinfection/dis_sample_ms": {
       "type": "Int32",
       "unit": "ms",
@@ -148,12 +142,6 @@
       "label_t": "cfgdocs.poollogic.disinfection.swg_control_mode.label",
       "help_t": "cfgdocs.poollogic.disinfection.swg_control_mode.help",
       "enum_set": "poollogic_swg_control_mode"
-    },
-    "poollogic/disinfection/swg_slot": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.disinfection.swg_slot.label",
-      "help_t": "cfgdocs.poollogic.disinfection.swg_slot.help",
-      "enum_set": "poollogic_device_slot"
     },
     "poollogic/disinfection/temp_comp": {
       "type": "Bool",
@@ -253,12 +241,6 @@
       "label_t": "cfgdocs.poollogic.filtration.filtr_segments.label",
       "help_t": "cfgdocs.poollogic.filtration.filtr_segments.help"
     },
-    "poollogic/filtration/filtr_slot": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.filtration.filtr_slot.label",
-      "help_t": "cfgdocs.poollogic.filtration.filtr_slot.help",
-      "enum_set": "poollogic_device_slot"
-    },
     "poollogic/filtration/filtr_start_clc": {
       "type": "UInt8",
       "label_t": "cfgdocs.poollogic.filtration.filtr_start_clc.label",
@@ -279,12 +261,6 @@
       "label_t": "cfgdocs.poollogic.heater.heater_setpoint.label",
       "help_t": "cfgdocs.poollogic.heater.heater_setpoint.help",
       "unit": "C"
-    },
-    "poollogic/heater/heater_slot": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.heater.heater_slot.label",
-      "help_t": "cfgdocs.poollogic.heater.heater_slot.help",
-      "enum_set": "poollogic_device_slot"
     },
     "poollogic/ph/ph_auto_mode": {
       "type": "Bool",
@@ -358,12 +334,6 @@
       "label_t": "cfgdocs.poollogic.ph.ph_no_effect_lots.label",
       "help_t": "cfgdocs.poollogic.ph.ph_no_effect_lots.help"
     },
-    "poollogic/ph/ph_pump_slot": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.ph.ph_pump_slot.label",
-      "help_t": "cfgdocs.poollogic.ph.ph_pump_slot.help",
-      "enum_set": "poollogic_device_slot"
-    },
     "poollogic/ph/ph_sample_max_age": {
       "type": "UInt16",
       "unit": "s",
@@ -393,12 +363,6 @@
       "help_t": "cfgdocs.poollogic.refill.fill_min_on_s.help",
       "unit": "s"
     },
-    "poollogic/refill/fill_slot": {
-      "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.refill.fill_slot.label",
-      "help_t": "cfgdocs.poollogic.refill.fill_slot.help",
-      "enum_set": "poollogic_device_slot"
-    },
     "poollogic/robot/robot_delay_min": {
       "type": "UInt8",
       "label_t": "cfgdocs.poollogic.robot.robot_delay_min.label",
@@ -411,11 +375,16 @@
       "help_t": "cfgdocs.poollogic.robot.robot_dur_min.help",
       "unit": "min"
     },
-    "poollogic/robot/robot_slot": {
+    "poollogic/safety/flow_copy_delay_s": {
       "type": "UInt8",
-      "label_t": "cfgdocs.poollogic.robot.robot_slot.label",
-      "help_t": "cfgdocs.poollogic.robot.robot_slot.help",
-      "enum_set": "poollogic_device_slot"
+      "unit": "s",
+      "label_t": "cfgdocs.poollogic.safety.flow_copy_delay_s.label",
+      "help_t": "cfgdocs.poollogic.safety.flow_copy_delay_s.help"
+    },
+    "poollogic/safety/flow_interlock": {
+      "type": "Bool",
+      "label_t": "cfgdocs.poollogic.safety.flow_interlock.label",
+      "help_t": "cfgdocs.poollogic.safety.flow_interlock.help"
     },
     "poollogic/safety/freeze_hold_t": {
       "type": "Float",

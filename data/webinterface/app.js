@@ -2036,6 +2036,10 @@
     let flowCfgCurrentModule = '';
     let flowCfgCurrentData = {};
     let flowCfgCurrentComposeSections = [];
+    // Page composee seule : flowCfgCurrentModule porte alors un chemin
+    // d'affichage sans branche store, que chargerFlowCfgModule ne sait pas
+    // relire. Le rechargement post-apply doit repasser par la page composee.
+    let flowCfgCurrentIsComposeOnly = false;
     let flowCfgChildrenCache = {};
     let flowCfgPath = [];
     let flowCfgExpandedNodes = new Set();
@@ -2076,6 +2080,7 @@
     let supCfgCurrentModule = '';
     let supCfgCurrentData = {};
     let supCfgCurrentComposeSections = [];
+    let supCfgCurrentIsComposeOnly = false;
     let supCfgTreePath = '';
     let supCfgChildrenCache = {};
     let supCfgExpandedNodes = new Set();
@@ -9744,71 +9749,6 @@
       return resolved;
     }
 
-    function poolLogicDeviceSlotRef(slot) {
-      const n = Number.parseInt(slot, 10);
-      if (!Number.isFinite(n) || n < 0 || n > 15) return '';
-      return 'd' + String(n).padStart(2, '0');
-    }
-
-    function isPoolLogicDeviceSlotField(moduleName, key, doc) {
-      // Detection par enum_set : les selects "slot PDM" vivent dans les
-      // branches metier poollogic (heater, ph, chlorine, ...), plus dans une
-      // branche devices dediee.
-      const cleanKey = String(key || '').trim().toLowerCase();
-      if (!cleanKey.endsWith('_slot')) return false;
-      return !!doc && String(doc.enum_set || '').trim() === 'poollogic_device_slot';
-    }
-
-    // "pd7 - Chauffage eau (d07)". Le nom vient du libelle de branche cfgmods
-    // (pdm/pd7), deja traduit FR/EN et charge avec le chunk pdm : il remplace
-    // les 16 requetes /api/flowcfg/module?name=io/output/dNN qui servaient
-    // seulement a lire dNN_name, et la table FR codee en dur qui les doublait.
-    function poolLogicDeviceSlotLabel(slot, fallback) {
-      const n = Number.parseInt(slot, 10);
-      const ref = poolLogicDeviceSlotRef(n);
-      if (!ref) return String(fallback || slot);
-      const slotId = 'pd' + String(n);
-      const meta = configPathMeta('pdm/' + slotId);
-      const name = (meta && typeof meta.label === 'string') ? meta.label.trim() : '';
-      // Le libelle de branche porte deja "pdN - " en tete ; sans lui (chunk pdm
-      // pas encore charge), on se rabat sur le seul identifiant de slot.
-      if (!name) return slotId + ' (' + ref + ')';
-      const head = name.indexOf(slotId) === 0 ? name : (slotId + ' - ' + name);
-      return head + ' (' + ref + ')';
-    }
-
-    function dynamicPoolLogicDeviceSlotOptions(enumOptions) {
-      const byValue = {};
-      if (Array.isArray(enumOptions)) {
-        enumOptions.forEach((opt) => {
-          if (!opt || typeof opt !== 'object') return;
-          const value = Number.parseInt(opt.value, 10);
-          if (Number.isFinite(value)) byValue[value] = opt;
-        });
-      }
-      const out = [];
-      // Entrees hors plage 0..15 (ex. 255 = "aucun PDM") : conservees telles
-      // quelles, en tete. Sans cela la reconstruction ci-dessous les perdrait.
-      if (Array.isArray(enumOptions)) {
-        enumOptions.forEach((opt) => {
-          if (!opt || typeof opt !== 'object') return;
-          const value = Number.parseInt(opt.value, 10);
-          if (!Number.isFinite(value) || (value >= 0 && value <= 15)) return;
-          out.push(Object.assign({}, opt));
-        });
-      }
-      // Seuls les slots reellement declares sont proposes : un slot sans
-      // appareil n'a pas de nom d'endpoint et ne sert a rien.
-      for (let slot = 0; slot <= 15; slot += 1) {
-        if (!byValue[slot]) continue;
-        const base = Object.assign({}, byValue[slot]);
-        base.value = slot;
-        base.label = poolLogicDeviceSlotLabel(slot, base.label);
-        out.push(base);
-      }
-      return out;
-    }
-
     // Selects "capteur -> entree IO" (poollogic/sensors). Les enum_sets statiques
     // affichent "io/input/a00 [192]" ; on les remplace par "a00 - <nom entree>" en
     // reutilisant le nom lisible configure sur l'endpoint (comme les slots PDM).
@@ -9880,19 +9820,10 @@
         }
       }
       if (!options) return null;
-      if (isWaveshareProfile() && isPoolLogicDeviceSlotField(moduleName, key, doc)) {
-        return dynamicPoolLogicDeviceSlotOptions(options);
-      }
       if (isWaveshareProfile() && isPoolLogicSensorIoField(doc)) {
         return dynamicPoolLogicSensorIoOptions(options);
       }
       return options;
-    }
-
-    // Les libelles de slot PDM viennent des docs cfgmods de la branche pdm : il
-    // suffit que son chunk soit charge, aucune valeur de config n'est lue.
-    async function loadPoolLogicDeviceSlotLabels() {
-      try { await ensureCfgDocsForModule('pdm'); } catch (err) {}
     }
 
     function closeColorPickerPopover() {
@@ -10486,6 +10417,10 @@
 
     function resetPrimaryCfgEditor(message) {
       supCfgCurrentComposeSections = [];
+      // Le panneau de detail est partage flow/supervisor : le vider annule la
+      // page composee des deux cotes.
+      supCfgCurrentIsComposeOnly = false;
+      flowCfgCurrentIsComposeOnly = false;
       flowCfgFields.innerHTML = '';
       flowCfgApplyBtn.hidden = false;
       flowCfgApplyBtn.disabled = true;
@@ -11011,9 +10946,9 @@
       updatePrimaryCfgApplyState();
     }
 
-    // Les pages E/S restent purement electriques (nom, port, polarite...) : la
-    // config PoolDevice vit dans la branche pdm de premier niveau, ou l'on
-    // choisit le slot depuis la page metier (ph_pump_slot, filtr_slot...).
+    // Les pages E/S (branche io) restent purement electriques : nom, polarite,
+    // impulsion, comportement au reboot. Le choix du relais d'une fonction se
+    // fait depuis sa page piscine/*, qui rapatrie le seul champ binding_port.
 
     function renderPrimarySupervisorCfgFields(dataObj) {
       renderConfigFields(flowCfgFields, supCfgCurrentModule, dataObj, {
@@ -11088,27 +11023,6 @@
       return buildPatchJsonFromFields(flowCfgFields, flowCfgCurrentModule);
     }
 
-    // Compose dont le module cible depend d'une valeur : "module_from_slot"
-    // designe un champ de slot PDM (0..15, 255 = aucun) et resout pdm/pdN. Le
-    // mapping page metier -> appareil n'est donc pas fige : il suit le slot que
-    // la page a reellement selectionne, y compris apres reconfiguration.
-    async function composeModuleFromSlot(source, slotPath) {
-      const cleanPath = nettoyerNomFlowCfg(slotPath);
-      if (!cleanPath) return '';
-      const branch = cfgCondBranchOfPath(cleanPath);
-      if (branch) await fetchCfgCondBranch(source, branch).catch(() => {});
-      const lookup = cfgCondLookup(source, cleanPath);
-      if (!lookup.resolved) return '';
-      const slot = Number.parseInt(lookup.value, 10);
-      // Hors 0..15 (255 = aucun appareil) : rien a composer, la fonction n'est
-      // rattachee a aucun PDM.
-      if (!Number.isFinite(slot) || slot < 0 || slot > 15) return '';
-      // Le libelle du noeud pdm/pdN vit dans le chunk du parent : sans lui, la
-      // section serait rendue sans titre et on ignorerait quel appareil elle vise.
-      try { await ensureCfgDocsForModule('pdm'); } catch (err) {}
-      return 'pdm/pd' + String(slot);
-    }
-
     // Sections composees : la meta cfgmods "compose" d'une branche declare des
     // champs d'autres branches store a afficher sur sa page (ex: le switch
     // pdm/pdN/enabled dans poollogic/heater). L'apply standard groupe deja le
@@ -11119,6 +11033,11 @@
       if (entries.length === 0) return [];
       const src = cfgCondSourceKey(source);
       const sections = [];
+      // Plusieurs sections d'une meme page visent souvent le meme module (le
+      // switch d'activation puis les parametres d'equipement, par exemple) :
+      // une seule lecture suffit. Un echec est memorise aussi, pour ne pas
+      // relancer la meme requete perdue a chaque section.
+      const moduleDataCache = new Map();
       for (const rawEntry of entries) {
         if (!rawEntry || typeof rawEntry !== 'object') continue;
         // Une entree composee peut etre conditionnee comme un champ (ex. la
@@ -11132,24 +11051,27 @@
           }
           if (evalVisibleIf(src, rawEntry.visible_if) === false) continue;
         }
-        const entryModule = rawEntry.module_from_slot
-          ? await composeModuleFromSlot(src, rawEntry.module_from_slot)
-          : nettoyerNomFlowCfg(rawEntry.module);
+        const entryModule = nettoyerNomFlowCfg(rawEntry.module);
         const fields = Array.isArray(rawEntry.fields) ? rawEntry.fields : [];
         if (!entryModule || fields.length === 0) continue;
         try { await ensureCfgDocsForModule(entryModule); } catch (err) {}
         let data = null;
-        try {
-          const url = (src === 'supervisor')
-            ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(entryModule))
-            : ('/api/flowcfg/module?name=' + encodeURIComponent(entryModule));
-          const fetchFn = (src === 'supervisor') ? fetchWithBusyRetry : fetchFlowRemoteQueued;
-          const res = await fetchFn(url, { cache: 'no-store' });
-          const payload = await res.json().catch(() => null);
-          if (res.ok && payload && payload.ok === true && typeof payload.data === 'object') {
-            data = payload.data;
-          }
-        } catch (err) {}
+        if (moduleDataCache.has(entryModule)) {
+          data = moduleDataCache.get(entryModule);
+        } else {
+          try {
+            const url = (src === 'supervisor')
+              ? ('/api/supervisorcfg/module?name=' + encodeURIComponent(entryModule))
+              : ('/api/flowcfg/module?name=' + encodeURIComponent(entryModule));
+            const fetchFn = (src === 'supervisor') ? fetchWithBusyRetry : fetchFlowRemoteQueued;
+            const res = await fetchFn(url, { cache: 'no-store' });
+            const payload = await res.json().catch(() => null);
+            if (res.ok && payload && payload.ok === true && typeof payload.data === 'object') {
+              data = payload.data;
+            }
+          } catch (err) {}
+          moduleDataCache.set(entryModule, data);
+        }
         if (!data) continue;
         const filtered = {};
         fields.forEach((field) => {
@@ -11213,11 +11135,13 @@
           supCfgCurrentModule = m;
           supCfgCurrentData = {};
           supCfgCurrentComposeSections = sections;
+          supCfgCurrentIsComposeOnly = true;
           renderCfgComposeSections(sections, 'supervisor', perFieldApply, appliquerPrimaryCfgField);
         } else {
           flowCfgCurrentModule = m;
           flowCfgCurrentData = {};
           flowCfgCurrentComposeSections = sections;
+          flowCfgCurrentIsComposeOnly = true;
           renderCfgComposeSections(sections, 'flow', perFieldApply, appliquerFlowCfgField);
         }
         updatePrimaryCfgApplyState();
@@ -11228,13 +11152,24 @@
       }
     }
 
-    // Detection generique des selects "slot PDM" (enum_set poollogic_device_slot)
-    // pour charger les libelles dynamiques quel que soit le module porteur.
-    function moduleHasDeviceSlotField(moduleName, dataObj) {
-      if (!isWaveshareProfile()) return false;
-      const data = (dataObj && typeof dataObj === 'object') ? dataObj : {};
-      return Object.keys(data).some((key) =>
-        isPoolLogicDeviceSlotField(moduleName, key, configDocFor(moduleName, key, [])));
+    // Rechargement de la page de configuration courante apres un apply. Une
+    // page composee seule n'a pas de branche store du meme nom : la relire par
+    // chargerFlowCfgModule renverrait "lecture module impossible" et effacerait
+    // la page au lieu de la rafraichir.
+    async function rechargerCfgPageCourante(source) {
+      if (source === 'supervisor') {
+        if (supCfgCurrentIsComposeOnly) {
+          await chargerCfgComposeOnlyPage('supervisor', supCfgCurrentModule);
+          return;
+        }
+        await chargerPrimarySupervisorCfgModule(supCfgCurrentModule);
+        return;
+      }
+      if (flowCfgCurrentIsComposeOnly) {
+        await chargerCfgComposeOnlyPage('flow', flowCfgCurrentModule);
+        return;
+      }
+      await chargerFlowCfgModule(flowCfgCurrentModule);
     }
 
     // Detection des selects "capteur -> entree IO" (enum_sets flowio_logical_input_*)
@@ -11263,14 +11198,12 @@
           throw new Error('lecture module impossible');
         }
         await ensureCfgDocsForModule(m);
-        if (moduleHasDeviceSlotField(m, data.data)) {
-          await loadPoolLogicDeviceSlotLabels();
-        }
         if (moduleHasSensorIoField(m, data.data)) {
           await loadPoolLogicSensorIoLabels(true);
         }
         flowCfgCurrentModule = m;
         flowCfgCurrentData = data.data;
+        flowCfgCurrentIsComposeOnly = false;
         flowCfgCurrentComposeSections = await loadCfgComposeSections('flow', m);
         renderFlowCfgFieldsWithExtensions(flowCfgCurrentData);
         flowCfgStatus.textContent = data.truncated
@@ -11299,14 +11232,12 @@
           throw new Error('lecture module supervisor impossible');
         }
         await ensureCfgDocsForModule(m);
-        if (moduleHasDeviceSlotField(m, data.data)) {
-          await loadPoolLogicDeviceSlotLabels();
-        }
         if (moduleHasSensorIoField(m, data.data)) {
           await loadPoolLogicSensorIoLabels(true);
         }
         supCfgCurrentModule = m;
         supCfgCurrentData = data.data;
+        supCfgCurrentIsComposeOnly = false;
         supCfgCurrentComposeSections = await loadCfgComposeSections('supervisor', m);
         renderPrimarySupervisorCfgFieldsWithExtensions(supCfgCurrentData);
         flowCfgStatus.textContent = data.truncated
@@ -11563,7 +11494,7 @@
         }
 
         mergeCfgCondPatch('flow', patch);
-        await chargerFlowCfgModule(flowCfgCurrentModule);
+        await rechargerCfgPageCourante('flow');
         await refreshWebUiLocale(true);
         flowCfgStatus.textContent = 'Champ "' + key + '" applique.';
       } catch (err) {
@@ -11601,7 +11532,7 @@
         }
 
         clearCfgTreeNodeTextNameCache('supervisor');
-        await chargerPrimarySupervisorCfgModule(supCfgCurrentModule);
+        await rechargerCfgPageCourante('supervisor');
         renderFlowCfgTree();
         await refreshWebUiLocale(true);
         flowCfgStatus.textContent = 'Champ local "' + key + '" applique.';
@@ -11630,7 +11561,7 @@
         }
         flowCfgStatus.textContent = 'Configuration appliquée sur flow.io.';
         mergeCfgCondPatch('flow', patch);
-        await chargerFlowCfgModule(flowCfgCurrentModule);
+        await rechargerCfgPageCourante('flow');
         await refreshWebUiLocale(true);
       } catch (err) {
         flowCfgStatus.textContent = 'Application cfg échouée: ' + err;
@@ -11655,7 +11586,7 @@
           }
           flowCfgStatus.textContent = 'Configuration locale appliquée.';
           clearCfgTreeNodeTextNameCache('supervisor');
-          await chargerPrimarySupervisorCfgModule(supCfgCurrentModule);
+          await rechargerCfgPageCourante('supervisor');
           renderFlowCfgTree();
           await refreshWebUiLocale(true);
         } catch (err) {

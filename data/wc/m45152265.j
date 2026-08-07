@@ -1,0 +1,1 @@
+{"ok":true,"module":"piscine/filtration","docs":{"piscine/filtration/fenetres":{"label_t":"cfgmods.piscine.fenetres.label","order":10,"label":"Fenêtres horaires","label_i18n":"cfgmods.piscine.fenetres.label"}},"meta":{}}

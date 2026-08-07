@@ -33,22 +33,33 @@ enum DomainSlot : DomainSlotId {
     ActuatorFlowCopy = 21,
     ActuatorCoverClosed = 22,
     SensorTemperature3 = 23,
-    SensorTemperature4 = 24
+    SensorTemperature4 = 24,
+    // Desinfection a l'oxygene actif : pompe distincte de la pompe chlore, car
+    // debit, bidon et compteurs de consommation ne sont pas les memes.
+    ActuatorO2Pump = 25,
+    ActuatorAux1 = 26
 };
 
+// Une fonction piscine = un Device = une sortie logique dNN de meme index.
+// L'ordre de cet enum est donc aussi l'ordre des sorties : le modifier deplace
+// les cles NVS pdN* et impose un effacement.
 enum Device : PoolDeviceId {
     DeviceFiltrationPump = 0,
     DevicePhPump = 1,
-    DeviceChlorinePump = 2,
-    DeviceRobot = 3,
-    DeviceFillPump = 4,
-    DeviceChlorineGenerator = 5,
+    DeviceChlorinePump = 2,        // Desinfection : chlore liquide / brome.
+    DeviceChlorineGenerator = 3,   // Desinfection : electrolyseur au sel.
+    DeviceO2Pump = 4,              // Desinfection : oxygene actif.
+    DeviceFillPump = 5,
     DeviceLights = 6,
-    DeviceWaterHeater = 7
+    DeviceWaterHeater = 7,
+    DeviceRobot = 8,
+    DeviceFlowCopy = 9,            // Recopie temporisee du debit (sortie de report).
+    DeviceCoverReport = 10,        // Report d'etat du volet (sortie de report).
+    DeviceAux1 = 11
 };
 
-constexpr uint8_t DeviceCount = 8;
+constexpr uint8_t DeviceCount = 12;
 constexpr uint8_t SensorCount = 14;
-constexpr uint8_t DomainSlotCount = 24;
+constexpr uint8_t DomainSlotCount = 26;
 
 }  // namespace PoolIds

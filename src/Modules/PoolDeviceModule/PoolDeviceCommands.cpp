@@ -127,7 +127,10 @@ ActivityRole PoolDeviceModule::activityRoleForSlot_(uint8_t slot) const
     if (slot == PoolIds::DeviceRobot) return ActivityRole::Robot;
     if (slot == PoolIds::DeviceFillPump) return ActivityRole::Filling;
     if (slot == PoolIds::DevicePhPump) return ActivityRole::Ph;
+    // Les trois modes de desinfection partagent le meme role d'activite : ils
+    // sont exclusifs, un seul appareil tourne a la fois.
     if (slot == PoolIds::DeviceChlorinePump) return ActivityRole::Disinfection;
+    if (slot == PoolIds::DeviceO2Pump) return ActivityRole::Disinfection;
     if (slot == PoolIds::DeviceWaterHeater) return ActivityRole::Heater;
     return ActivityRole::None;
 }
@@ -214,6 +217,13 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
     const uint8_t slot = args["slot"].as<uint8_t>();
     if (slot >= POOL_DEVICE_MAX) {
         writeCmdError_(reply, replyLen, "pooldevice.write", ErrorCode::BadSlot);
+        return false;
+    }
+    // Sorties de report : PoolLogic les reecrit a chaque tick, donc accepter une
+    // commande externe reviendrait a mentir sur l'effet obtenu. Le refus est
+    // explicite plutot que silencieux.
+    if (slots_[slot].used && !slots_[slot].def.externallyCommandable) {
+        writeCmdError_(reply, replyLen, "pooldevice.write", ErrorCode::ReservedSlot);
         return false;
     }
 

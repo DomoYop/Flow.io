@@ -232,13 +232,10 @@ constexpr char DelayElectro[] = "pl_delt"; // Pool logic module persisted key fo
 constexpr char RobotDelay[] = "pl_rdel"; // Pool logic module persisted key for field `pl_rdel`.
 constexpr char RobotDuration[] = "pl_rdur"; // Pool logic module persisted key for field `pl_rdur`.
 constexpr char FillingMinOn[] = "pl_fmin"; // Pool logic module persisted key for field `pl_fmin`.
-constexpr char FiltrationSlot[] = "pl_sfil"; // Pool logic module persisted key for field `pl_sfil`.
-constexpr char SwgSlot[] = "pl_sswg"; // Pool logic module persisted key for field `pl_sswg`.
-constexpr char RobotSlot[] = "pl_srob"; // Pool logic module persisted key for field `pl_srob`.
-constexpr char FillingSlot[] = "pl_sfill"; // Pool logic module persisted key for field `pl_sfill`.
-constexpr char PhPumpSlot[] = "pl_sphp"; // Pool logic module persisted key for field `pl_sphp`.
-constexpr char DisPumpSlot[] = "pl_sdis"; // Desinfection : slot PDM de la pompe de dosage (chlore / O2).
-constexpr char HeaterSlot[] = "pl_shea"; // Pool logic module persisted key for field `pl_shea`.
+// Les 7 cles pl_sfil / pl_sswg / pl_srob / pl_sfill / pl_sphp / pl_sdis /
+// pl_shea (role metier -> slot PDM) ont ete supprimees : une fonction piscine
+// est desormais liee a un PoolDevice unique par PoolIds::Device*, et ce que
+// l'utilisateur choisit est le relais physique. Ne pas reutiliser ces noms.
 constexpr char FiltrationCalcStart[] = "pl_fcst"; // Pool logic runtime key for calculated filtration start hour.
 constexpr char FiltrationCalcStop[] = "pl_fcen"; // Pool logic runtime key for calculated filtration stop hour.
 constexpr char FiltrSegments[] = "pl_fseg"; // Pool logic runtime key for calculated filtration segments string "HH:MM-HH:MM, ...".

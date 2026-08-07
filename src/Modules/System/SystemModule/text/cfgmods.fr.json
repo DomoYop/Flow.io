@@ -6,7 +6,8 @@
   },
   "docs": {
     "system": {
-      "label_t": "cfgmods.system.label"
+      "label_t": "cfgmods.system.label",
+      "order": 300
     },
     "system/lang": {
       "enum_set": "i18n_languages"

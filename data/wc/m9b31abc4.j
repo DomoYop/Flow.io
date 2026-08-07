@@ -1,0 +1,1 @@
+{"ok":true,"module":"pdm/pd10","docs":{"pdm/pd10/depends_on_mask":{"visible_if":{"path":"pdm/pd10/enabled","eq":true}},"pdm/pd10/max_uptime_day_s":{"visible_if":{"path":"pdm/pd10/enabled","eq":true}},"pdm/pd10/on_delay_s":{"hidden":true}},"meta":{}}

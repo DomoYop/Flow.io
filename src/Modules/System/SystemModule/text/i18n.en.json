@@ -5,7 +5,7 @@
     "cfgdocs.system.devicename.label": "Device name",
     "cfgdocs.system.lang.help": "Display language of the interface.",
     "cfgdocs.system.lang.label": "Language",
-    "cfgmods.system.label": "system",
+    "cfgmods.system.label": "System",
     "cfgmods_meta.system.systemmodule.enum_sets.i18n_languages.0.label": "French (fr)",
     "cfgmods_meta.system.systemmodule.enum_sets.i18n_languages.1.label": "English (en)",
     "runtimeui.system.v01.group": "System",

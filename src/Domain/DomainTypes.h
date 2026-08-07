@@ -88,6 +88,11 @@ struct PoolDevicePreset {
     float tankInitialMl;
     PoolDeviceId dependsOnDevice = POOL_DEVICE_INVALID;
     int32_t maxUptimeDaySec;
+    // Sorties de report (recopie debit, etat volet) : pilotees en interne par
+    // PoolLogic. Publier un switch Home Assistant inviterait a les forcer, et la
+    // commande serait ecrasee au tick suivant.
+    bool exposeHaSwitch = true;
+    bool externallyCommandable = true;
 };
 
 struct PoolLogicDefaultsSpec {

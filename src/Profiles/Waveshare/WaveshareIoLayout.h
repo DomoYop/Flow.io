@@ -135,14 +135,18 @@ inline constexpr DigitalOutputRoleDefault kDigitalOutputRoleDefaults[] = {
     // A la mise en service : lier l'actionneur du mode choisi a un relais libre
     // (EXIO3 et EXIO6 le sont), les autres restant non connectes. Un seul mode
     // etant actif a la fois. Rebinding pris en compte au prochain demarrage.
-    {PoolIds::ActuatorChlorinePump,     IO_PORT_INVALID, true, false, false, 0U}, // Pompe chlore/oxygene actif, non liee par defaut.
-    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur, non liee par defaut.
-    {PoolIds::ActuatorRobot,            PortExio4, true, false, false, 0U}, // Robot.
+    {PoolIds::ActuatorChlorinePump,     IO_PORT_INVALID, true, false, false, 0U}, // Pompe chlore liquide / brome, non liee par defaut.
+    {PoolIds::ActuatorChlorineGenerator,IO_PORT_INVALID, true, false, false, 0U}, // Electrolyseur, non lie par defaut.
+    {PoolIds::ActuatorO2Pump,           IO_PORT_INVALID, true, false, false, 0U}, // Pompe oxygene actif, non liee par defaut.
     {PoolIds::ActuatorFillPump,         PortExio5, true, false, false, 0U}, // Pompe de remplissage.
     {PoolIds::ActuatorLights,           PortExio7, true, false, false, 0U}, // Eclairage.
     {PoolIds::ActuatorWaterHeater,      PortExio8, true, false, false, 0U}, // Chauffage.
+    {PoolIds::ActuatorRobot,            PortExio4, true, false, false, 0U}, // Robot.
+    // Sorties de report et auxiliaire : non liees par defaut, il ne reste que
+    // EXIO3 et EXIO6 de libres et ils sont reserves au mode de desinfection.
     {PoolIds::ActuatorFlowCopy,         IO_PORT_INVALID, true, false, false, 0U}, // Recopie flowswitch (temporisee), non liee par defaut.
     {PoolIds::ActuatorCoverClosed,      IO_PORT_INVALID, true, false, false, 0U}, // Etat volet ferme, non lie par defaut.
+    {PoolIds::ActuatorAux1,             IO_PORT_INVALID, true, false, false, 0U}, // Sortie auxiliaire 1, non liee par defaut.
 };
 
 

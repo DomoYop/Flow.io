@@ -38,11 +38,15 @@ struct PoolDeviceDefinition {
     float flowLPerHour = 0.0f;     // used for dosing volumes
     float tankCapacityMl = 0.0f;   // 0 means "not tracked"
     float tankInitialMl = 0.0f;    // <=0 means "use capacity"
-    uint8_t dependsOnMask = 0;     // bit per pool-device slot
+    uint16_t dependsOnMask = 0;    // bit per pool-device slot (16 slots)
     int32_t maxUptimeDaySec = 0;   // 0 means "unlimited"
     // Relais uniquement : temporisation avant mise sous tension effective
     // apres une demande de marche. 0 = demarrage immediat.
     int32_t onDelaySec = 0;
+    // Voir PoolDevicePreset : les sorties de report ne sont ni publiees en
+    // switch Home Assistant, ni commandables depuis MQTT/HA.
+    bool exposeHaSwitch = true;
+    bool externallyCommandable = true;
 };
 
 class PoolDeviceModule : public Module, public IRuntimeSnapshotProvider, public IRuntimeUiValueProvider {
@@ -262,7 +266,7 @@ private:
     MqttConfigRouteProducer* cfgMqttPub_ = nullptr;
 
     ConfigVariable<bool,0>* cfgEnabledVar_ = nullptr;
-    ConfigVariable<uint8_t,0>* cfgDependsVar_ = nullptr;
+    ConfigVariable<uint16_t,0>* cfgDependsVar_ = nullptr;
     ConfigVariable<float,0>* cfgFlowVar_ = nullptr;
     ConfigVariable<float,0>* cfgTankCapVar_ = nullptr;
     ConfigVariable<float,0>* cfgTankInitVar_ = nullptr;

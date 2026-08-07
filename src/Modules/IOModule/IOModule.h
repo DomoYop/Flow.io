@@ -220,6 +220,7 @@ private:
     void configureAnalogSlots_(bool (&needAnalogSource)[IO_SRC_COUNT]);
     ExpanderNeeds scanExpanderNeeds_() const;
     void beginI2cIfNeeded_(const bool (&needAnalogSource)[IO_SRC_COUNT], const ExpanderNeeds& needs);
+    void dropDuplicateOutputBindings_();
     void configureDigitalInputSlot_(DigitalSlot& s, uint8_t slotIdx);
     void configureDigitalOutputSlot_(DigitalSlot& s, const ExpanderNeeds& needs, bool& mcpProbeFailed);
     void probeConfiguredI2cDevices_(const bool (&needAnalogSource)[IO_SRC_COUNT], const ExpanderNeeds& needs);

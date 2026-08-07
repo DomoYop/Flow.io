@@ -1691,14 +1691,15 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     const bool haveCover = loadDigitalSensor_(coverClosedIoId_, coverClosed);
     coverClosedState_ = haveCover && coverClosed;
 
-    // Ecriture des 2 sorties indicatrices (no-op si non liees a un port).
-    if (ioSvc_ && ioSvc_->writeDigital) {
-        if (outFlowCopyIoId_ != IO_ID_INVALID) {
-            (void)ioSvc_->writeDigital(ioSvc_->ctx, outFlowCopyIoId_, flowCopyOutState_ ? 1U : 0U, nowMs);
-        }
-        if (outCoverIoId_ != IO_ID_INVALID) {
-            (void)ioSvc_->writeDigital(ioSvc_->ctx, outCoverIoId_, coverClosedState_ ? 1U : 0U, nowMs);
-        }
+    // Ecriture des 2 sorties de report via leur PoolDevice, et non plus en
+    // direct sur l'IO : la fonction gagne ainsi son switch d'activation, son
+    // relais configurable et son comptage d'heures, comme les autres. La
+    // temporisation reste calculee ici (flowCopyDelaySec_), donc onDelaySec de
+    // ces deux appareils doit rester a 0 pour ne pas temporiser deux fois.
+    // Ecriture no-op si la fonction n'est liee a aucun relais.
+    if (poolSvc_ && poolSvc_->writeDesired) {
+        (void)poolSvc_->writeDesired(poolSvc_->ctx, PoolIds::DeviceFlowCopy, flowCopyOutState_ ? 1U : 0U);
+        (void)poolSvc_->writeDesired(poolSvc_->ctx, PoolIds::DeviceCoverReport, coverClosedState_ ? 1U : 0U);
     }
 
     // Interlock securite : plus de debit => coupe dosage pH/chlore et electrolyse.

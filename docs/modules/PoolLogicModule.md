@@ -321,7 +321,6 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 ### Régulation pH (`poollogic/ph`)
 
 - `ph_auto_mode`, `ph_dose_plus`, `ph_setpoint`
-- `ph_pump_slot` (slot PoolDevice de la pompe pH)
 - Dosage : `ph_dose_ml_m3` (gain mL/m³ par 0,1 pH), `ph_deadband`, `ph_dose_factor`,
   `ph_mix_wait_min` (0 = turnover calculé), `ph_dose_max_batch`, `ph_dose_max_day`
 - Validité de la mesure : `ph_valid_min`, `ph_valid_max`, `ph_sample_max_age`
@@ -337,7 +336,6 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 - `dis_setpoint`
 - `dis_kp`, `dis_ki`, `dis_kd`
 - `dis_window_ms`
-- `dis_pump_slot` (slot PoolDevice de la pompe chlore liquide)
 
 ### Régulation commune (`poollogic/regulation`)
 
@@ -350,7 +348,6 @@ Persistance: `ConfigStore` + `NvsKeys::PoolLogic::*`
 - `swg_control_mode`
 - `secure_elec_t`
 - `dly_electro_min`
-- `swg_slot` (slot PoolDevice de l'électrolyseur)
 
 ### Paramètres oxygène actif (`poollogic/o2`)
 
@@ -386,7 +383,6 @@ Les curseurs `protocol_state`, `last_dose_day`, `weekly_done_ml` et `pending_ml`
 Besoin journalier = `volume × cycles(T°) × ratio ÷ débit`, réparti dans les fenêtres priorisées — voir [filtration-turnover-fenetres.md](../notes/filtration-turnover-fenetres.md).
 
 - `filtr_cycle_ratio` (ratio sur les cycles de renouvellement, % ; défaut 100, plage 50–200)
-- `filtr_slot` (slot PoolDevice de la pompe de filtration)
 - `filtr_start_clc` (calculé : début du segment prioritaire)
 - `filtr_stop_clc` (calculé : fin du segment prioritaire)
 - `filtr_segments` (calculé, runtime : tous les créneaux « HH:MM-HH:MM, … »)
@@ -423,24 +419,23 @@ Pour `{i}` de 1 à 3 : `filtr_w{i}_en`, `filtr_w{i}_start`, `filtr_w{i}_stop` (m
 
 - `robot_delay_min`
 - `robot_dur_min`
-- `robot_slot` (slot PoolDevice du robot)
 
 ### Remplissage (`poollogic/refill`)
 
 - `fill_min_on_s`
-- `fill_slot` (slot PoolDevice de la pompe de remplissage)
 
 ### Chauffage (`poollogic/heater`)
 
 - `heater_auto_mode`
 - `heater_setpoint`
-- `heater_slot` (slot PoolDevice du chauffage)
 
-> Note : l'ancienne branche `poollogic/devices` (7 variables d'aiguillage rôle → slot)
-> a été supprimée ; chaque `*_slot` vit désormais dans sa branche métier (clés NVS
-> `pl_s*` inchangées). Dans l'arbre de config web, `poollogic/devices` est un nœud
-> virtuel qui liste les 16 PDM (`pdm/pd0..pd15`) via alias d'affichage. L'éclairage
-> (pd6) n'a pas de branche métier PoolLogic : son activation passe par cette liste.
+> Note : les 7 variables d'aiguillage rôle → slot (`filtr_slot`, `ph_pump_slot`,
+> `dis_pump_slot`, `swg_slot`, `robot_slot`, `fill_slot`, `heater_slot`) et leurs clés NVS
+> `pl_s*` ont été **supprimées**. Une fonction piscine est liée à un `PoolDevice` unique par
+> `PoolIds::Device*` ; ce que l'utilisateur choisit est le relais physique, depuis la page
+> `piscine/<fonction>`. Seul le slot de la pompe de désinfection reste dérivé, de
+> `disinfection_type` (chlore/brome ou oxygène actif). Voir
+> [refonte-fonctions-piscine-v2.md](../notes/refonte-fonctions-piscine-v2.md).
 
 ## Commandes
 
