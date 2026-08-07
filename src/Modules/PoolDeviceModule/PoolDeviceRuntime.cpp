@@ -122,35 +122,11 @@ bool PoolDeviceModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wr
 {
     if (!dataStore_) return writer.writeUnavailable(makeRuntimeUiId(moduleId(), valueId));
 
-    uint8_t slotIdx = 0xFF;
-    switch (valueId) {
-        case RuntimeUiFiltrationOn:
-            slotIdx = PoolIds::DeviceFiltrationPump;
-            break;
-        case RuntimeUiPhPumpOn:
-            slotIdx = PoolIds::DevicePhPump;
-            break;
-        case RuntimeUiChlorinePumpOn:
-            slotIdx = PoolIds::DeviceChlorinePump;
-            break;
-        case RuntimeUiRobotOn:
-            slotIdx = PoolIds::DeviceRobot;
-            break;
-        case RuntimeUiFillPumpOn:
-            slotIdx = PoolIds::DeviceFillPump;
-            break;
-        case RuntimeUiChlorineGeneratorOn:
-            slotIdx = PoolIds::DeviceChlorineGenerator;
-            break;
-        case RuntimeUiLightsOn:
-            slotIdx = PoolIds::DeviceLights;
-            break;
-        case RuntimeUiWaterHeaterOn:
-            slotIdx = PoolIds::DeviceWaterHeater;
-            break;
-        default:
-            return false;
-    }
+    // valueId = index pd + 1 : pas de table de correspondance a tenir a jour, donc
+    // pas de risque de decalage quand une fonction est inseree dans PoolIds::Device*.
+    if (valueId < kRuntimeUiDeviceValueIdBase) return false;
+    const uint8_t slotIdx = (uint8_t)(valueId - kRuntimeUiDeviceValueIdBase);
+    if (slotIdx >= PoolIds::DeviceCount) return false;
 
     const RuntimeUiId runtimeId = makeRuntimeUiId(moduleId(), valueId);
     PoolDeviceRuntimeStateEntry state{};

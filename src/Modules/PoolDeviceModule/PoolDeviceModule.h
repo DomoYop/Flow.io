@@ -98,16 +98,11 @@ public:
     bool writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) const override;
 
 private:
-    enum RuntimeUiValueId : uint8_t {
-        RuntimeUiFiltrationOn = 1,
-        RuntimeUiPhPumpOn = 2,
-        RuntimeUiChlorinePumpOn = 3,
-        RuntimeUiRobotOn = 4,
-        RuntimeUiFillPumpOn = 5,
-        RuntimeUiChlorineGeneratorOn = 6,
-        RuntimeUiLightsOn = 7,
-        RuntimeUiWaterHeaterOn = 8,
-    };
+    // Une valeur Runtime UI par fonction piscine, dans l'ordre de PoolIds::Device* :
+    // valueId = index pd + 1 (l'id 0 n'est pas adressable). L'invariant pdN <-> dNN
+    // de la refonte v2 remonte ainsi jusqu'au tableau de bord, qui deduit le port
+    // physique de la tuile en indexant les sorties avec valueId - 1.
+    static constexpr uint8_t kRuntimeUiDeviceValueIdBase = 1U;
 
     static constexpr uint8_t RESET_PENDING_DAY = (1u << 0);
     static constexpr uint8_t RESET_PENDING_WEEK = (1u << 1);

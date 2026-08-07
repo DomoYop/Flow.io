@@ -988,14 +988,6 @@
     "runtimeui.io.v22.display.activeText": "Fermé",
     "runtimeui.io.v22.display.inactiveText": "Ouvert",
     "runtimeui.io.v22.group": "Sondes",
-    "runtimeui.io.v22.label": "Volet fermé",
-    "runtimeui.io.v23.display.activeText": "Marche",
-    "runtimeui.io.v23.display.inactiveText": "Arrêt",
-    "runtimeui.io.v23.group": "Équipements",
-    "runtimeui.io.v23.label": "Sortie recopie flowswitch",
-    "runtimeui.io.v24.display.activeText": "Fermé",
-    "runtimeui.io.v24.display.inactiveText": "Ouvert",
-    "runtimeui.io.v24.group": "Équipements",
-    "runtimeui.io.v24.label": "Sortie état volet"
+    "runtimeui.io.v22.label": "Volet fermé"
   }
 }

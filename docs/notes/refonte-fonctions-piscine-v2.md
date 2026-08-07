@@ -133,6 +133,39 @@ relais sans une ligne de code supplémentaire.
   cassait. `rechargerCfgPageCourante()` route désormais vers `chargerCfgComposeOnlyPage`.
   Ce bug existait sur `main` et aurait frappé les 12 nouvelles pages.
 
+## Suite : le tableau de bord ne suivait pas la renumérotation
+
+Constaté après un reset usine, sur la carte « Équipements » du tableau de bord. Trois défauts
+distincts, tous nés du fait que la renumérotation `PoolIds::Device*` n'avait pas été propagée
+aux valeurs Runtime UI.
+
+- **Préfixe de port décalé.** `poolEquipmentPortPrefix` (`app.js`) indexe les sorties avec
+  `valueId - 1`, ce qui supposait que les `valueId` de `pooldev` suivaient l'ordre des
+  fonctions. Ils suivaient l'ordre historique (`Robot` = 4, `Électrolyseur` = 6). La tuile
+  Robot lisait donc le port du slot 3 — non relié, d'où le repli sur le nom d'endpoint et
+  l'affichage « io_chl_gen - Robot ». Filtration et pH tombaient juste par coïncidence.
+  Corrigé en **rétablissant l'invariant jusqu'à l'UI : `valueId = index pd + 1`**, les 12
+  fonctions étant désormais déclarées (les 4 nouvelles n'avaient aucune tuile). Le repli sur
+  `io_name` est supprimé : une fonction sans relais n'est pas préfixée.
+- **Deux cartes « Équipements ».** Le regroupement se fait sur le libellé traduit
+  (`cardKey = domaine + '::' + groupe`) : `pooldev` écrivait `Equipements` et `io`
+  `Équipements`, l'accent suffisait à créer une seconde carte. Au fond, `io.flow_copy_out` et
+  `io.cover_out` faisaient doublon avec pd9/pd10 depuis cette refonte : ces deux valeurs sont
+  supprimées de l'IOModule (ids 2223/2224 libérés) plutôt que renommées.
+- **Sorties de report décalées d'un cran.** Ces mêmes valeurs lisaient `digitalOutputSlot(8)`
+  et `(9)`, numéros d'avant la refonte. « Sortie recopie flowswitch » affichait donc l'état du
+  **robot**. Disparaît avec la suppression ci-dessus, pd9/pd10 lisant leur propre slot.
+
+Le mapping `valueId → slot` était recopié à trois endroits (`PoolDeviceRuntime.cpp`,
+`WebInterfaceServer.cpp`, `app.js`) ; seul celui du serveur web alimente réellement l'UI, ce
+qui explique qu'une correction partielle n'aurait rien changé à l'écran. Les trois sont
+maintenant des calculs sur l'index, sans table, et `static_assert(PoolIds::DeviceCount == 12)`
+garde le bloc `2301..2312`. Les libellés du tableau de bord reprennent la nomenclature des
+pages de config (« Régulation pH », « Éclairage », « Chauffage », « Robot de nettoyage »).
+
+Pas d'impact NVS : seuls les `RuntimeUiId` changent, et aucun n'est écrit en dur hors du
+manifeste généré.
+
 ## Écart assumé par rapport au plan initial
 
 La temporisation de la recopie du débit reste `flow_copy_delay_s` (`pl_fscdl`, branche

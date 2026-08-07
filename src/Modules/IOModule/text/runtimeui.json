@@ -263,34 +263,6 @@
       "order": 220,
       "label_t": "runtimeui.io.v22.label",
       "group_t": "runtimeui.io.v22.group"
-    },
-    {
-      "valueId": 23,
-      "key": "io.flow_copy_out",
-      "type": "bool",
-      "domain": "equipements",
-      "display": "boolean",
-      "displayConfig": {
-        "activeText_t": "runtimeui.io.v23.display.activeText",
-        "inactiveText_t": "runtimeui.io.v23.display.inactiveText"
-      },
-      "order": 230,
-      "label_t": "runtimeui.io.v23.label",
-      "group_t": "runtimeui.io.v23.group"
-    },
-    {
-      "valueId": 24,
-      "key": "io.cover_out",
-      "type": "bool",
-      "domain": "equipements",
-      "display": "boolean",
-      "displayConfig": {
-        "activeText_t": "runtimeui.io.v24.display.activeText",
-        "inactiveText_t": "runtimeui.io.v24.display.inactiveText"
-      },
-      "order": 240,
-      "label_t": "runtimeui.io.v24.label",
-      "group_t": "runtimeui.io.v24.group"
     }
   ]
 }

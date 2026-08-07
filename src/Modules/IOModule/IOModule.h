@@ -179,8 +179,8 @@ private:
         RuntimeUiPowermonCharge = 20,
         RuntimeUiFlowSwitch = 21,
         RuntimeUiCoverClosed = 22,
-        RuntimeUiFlowCopyOut = 23,
-        RuntimeUiCoverOut = 24,
+        // 23/24 (recopie debit, etat volet) supprimes : ces sorties sont les
+        // fonctions piscine pd9/pd10 depuis la refonte v2, publiees par pooldev.
     };
 
     static bool tickFastAds_(void* ctx, uint32_t nowMs);

@@ -1919,6 +1919,12 @@ bool waveshareReadIoBackendFloat_(const IOServiceV2* ioSvc, uint8_t backend, uin
     return false;
 }
 
+// Les fonctions piscine occupent les ids 2301..2312 (2301 + index pd). Une fonction
+// ajoutee a PoolIds::Device* sans etendre ce switch resterait muette sur le tableau
+// de bord, sans erreur visible : la borne est donc verifiee a la compilation.
+static_assert(PoolIds::DeviceCount == 12,
+              "etendre le bloc 2301..2312 (et pooldev/text/runtimeui.json) au nombre de fonctions piscine");
+
 bool appendWaveshareLocalRuntimeValue_(Print& out,
                                       DataStore* dataStore,
                                       ConfigStore* cfgStore,
@@ -1999,37 +2005,22 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2305:
         case 2306:
         case 2307:
-        case 2308: {
-            uint8_t slot = PoolIds::DeviceFiltrationPump;
-            const char* key = "pool.filtration_on";
-            if (id == 2302) {
-                slot = PoolIds::DevicePhPump;
-                key = "pool.ph_pump_on";
-            } else if (id == 2303) {
-                slot = PoolIds::DeviceChlorinePump;
-                key = "pool.chlorine_pump_on";
-            } else if (id == 2304) {
-                slot = PoolIds::DeviceRobot;
-                key = "pool.robot_on";
-            } else if (id == 2305) {
-                slot = PoolIds::DeviceFillPump;
-                key = "pool.fill_pump_on";
-            } else if (id == 2306) {
-                slot = PoolIds::DeviceChlorineGenerator;
-                key = "pool.chlorine_generator_on";
-            } else if (id == 2307) {
-                slot = PoolIds::DeviceLights;
-                key = "pool.lights_on";
-            } else if (id == 2308) {
-                slot = PoolIds::DeviceWaterHeater;
-                key = "pool.water_heater_on";
-            }
-
+        case 2308:
+        case 2309:
+        case 2310:
+        case 2311:
+        case 2312: {
+            // Une fonction piscine par valeur, dans l'ordre de PoolIds::Device* :
+            // valueId = index pd + 1, donc 2301 + pd. La cle JSON vient du manifeste
+            // genere, elle n'est pas recopiee ici.
+            const uint8_t slot = (uint8_t)(id - 2301);
+            const RuntimeUiManifestItem* item = findRuntimeUiManifestItem(id);
             PoolDeviceRuntimeStateEntry state{};
-            if (!poolDeviceRuntimeState(*dataStore, slot, state)) {
+            if (!item || slot >= PoolIds::DeviceCount ||
+                !poolDeviceRuntimeState(*dataStore, slot, state)) {
                 wavesharePrintUnavailableByManifestType_(out, firstValue, id);
             } else {
-                printRuntimeBool_(out, firstValue, id, key, state.actualOn);
+                printRuntimeBool_(out, firstValue, id, item->key, state.actualOn);
             }
             return true;
         }
@@ -2159,20 +2150,6 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
             // Entrees digitales flowswitch / volet, lues par IoId (robuste).
             const IoId ioId = ioIdFromSlot(digitalInputSlot((id == 2221) ? 4U : 5U));
             const char* key = (id == 2221) ? "io.flowswitch" : "io.cover_closed";
-            bool on = false;
-            if (waveshareReadIoBool_(ioSvc, ioId, on)) {
-                printRuntimeBool_(out, firstValue, id, key, on);
-            } else {
-                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
-            }
-            return true;
-        }
-        case 2223:
-        case 2224: {
-            // Sorties indicatrices (recopie flowswitch temporisee / etat volet),
-            // lues par IoId sur les endpoints digitalOutputSlot(8/9).
-            const IoId ioId = ioIdFromSlot(digitalOutputSlot((id == 2223) ? 8U : 9U));
-            const char* key = (id == 2223) ? "io.flow_copy_out" : "io.cover_out";
             bool on = false;
             if (waveshareReadIoBool_(ioSvc, ioId, on)) {
                 printRuntimeBool_(out, firstValue, id, key, on);

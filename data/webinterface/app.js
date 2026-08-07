@@ -5707,10 +5707,10 @@
       slots.forEach((slot) => {
         if (String((slot && slot.io_slot) || '').trim() !== 'digital_out') return;
         const idx = Number(slot && slot.io_slot_index);
-        // port_name = le port physique ("EXIO1"). io_name porte le role metier
-        // ("io_flt_pmp") et ferait doublon avec le libelle de la tuile ; repli
-        // sur io_name pour un firmware anterieur a l'ajout de port_name.
-        const name = String(slot && (slot.port_name || slot.io_name) || '').trim();
+        // port_name = le port physique ("EXIO1"), vide quand la fonction n'est reliee
+        // a aucun relais. Pas de repli sur io_name : ce champ porte le role metier
+        // ("io_flt_pmp") et afficherait un identifiant technique en guise de port.
+        const name = String((slot && slot.port_name) || '').trim();
         if (Number.isFinite(idx) && name) map[idx] = name;
       });
       return map;
@@ -6234,7 +6234,10 @@
     }
 
     // Prefixe le libelle d'un equipement PoolDevice par son port physique de sortie
-    // (ex. "EXIO1 - Filtration"). Vide si le port n'est pas connu ou l'entree n'est pas un equipement.
+    // (ex. "EXIO1 - Filtration"). Repose sur l'invariant de la refonte v2 : une fonction
+    // piscine = le PoolDevice pdN = la sortie logique dNN = la valeur runtime N+1, donc
+    // valueId - 1 est l'index de sortie a chercher dans /api/io/summary.
+    // Vide si la fonction n'est reliee a aucun relais ou si l'entree n'est pas un equipement.
     function poolEquipmentPortPrefix(entry, outputPorts) {
       if (!outputPorts) return '';
       if (String((entry && entry.domain) || '').trim().toLowerCase() !== 'equipements') return '';

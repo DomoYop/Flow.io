@@ -174,7 +174,7 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "label": "Filtration",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 70,
@@ -183,7 +183,7 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "display": "boolean",
       "displayConfig": {
         "activeText": "En marche",
-        "inactiveText": "Arret"
+        "inactiveText": "Arr\u00eat"
       }
     },
     {
@@ -193,17 +193,20 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "module": "pooldev",
       "valueId": 2,
       "key": "pool.ph_pump_on",
-      "label": "Pompe pH",
+      "label": "R\u00e9gulation pH",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 80,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
     },
     {
       "id": 2303,
@@ -212,17 +215,20 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "module": "pooldev",
       "valueId": 3,
       "key": "pool.chlorine_pump_on",
-      "label": "Pompe chlore",
+      "label": "D\u00e9sinfection - chlore / brome",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 90,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
     },
     {
       "id": 2304,
@@ -230,18 +236,21 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "moduleId": 23,
       "module": "pooldev",
       "valueId": 4,
-      "key": "pool.robot_on",
-      "label": "Robot",
+      "key": "pool.chlorine_generator_on",
+      "label": "D\u00e9sinfection - \u00e9lectrolyseur",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 100,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
     },
     {
       "id": 2305,
@@ -249,18 +258,21 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "moduleId": 23,
       "module": "pooldev",
       "valueId": 5,
-      "key": "pool.fill_pump_on",
-      "label": "Remplissage",
+      "key": "pool.o2_pump_on",
+      "label": "D\u00e9sinfection - oxyg\u00e8ne actif",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 110,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
     },
     {
       "id": 2306,
@@ -268,18 +280,21 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "moduleId": 23,
       "module": "pooldev",
       "valueId": 6,
-      "key": "pool.chlorine_generator_on",
-      "label": "Electrolyseur",
+      "key": "pool.fill_pump_on",
+      "label": "Remplissage automatique",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 120,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
     },
     {
       "id": 2307,
@@ -288,17 +303,20 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "module": "pooldev",
       "valueId": 7,
       "key": "pool.lights_on",
-      "label": "Lumiere",
+      "label": "\u00c9clairage",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 130,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
     },
     {
       "id": 2308,
@@ -307,60 +325,107 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "module": "pooldev",
       "valueId": 8,
       "key": "pool.water_heater_on",
-      "label": "Chauffe-eau",
+      "label": "Chauffage",
       "type": "bool",
       "domain": "equipements",
-      "group": "Equipements",
+      "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
       "order": 140,
       "enum": null,
       "flags": null,
       "display": "boolean",
-      "displayConfig": null
-    },
-    {
-      "id": 2223,
-      "runtimeId": 2223,
-      "moduleId": 22,
-      "module": "io",
-      "valueId": 23,
-      "key": "io.flow_copy_out",
-      "label": "Sortie recopie flowswitch",
-      "type": "bool",
-      "domain": "equipements",
-      "group": "\u00c9quipements",
-      "unit": null,
-      "decimals": null,
-      "order": 230,
-      "enum": null,
-      "flags": null,
-      "display": "boolean",
       "displayConfig": {
-        "activeText": "Marche",
+        "activeText": "En marche",
         "inactiveText": "Arr\u00eat"
       }
     },
     {
-      "id": 2224,
-      "runtimeId": 2224,
-      "moduleId": 22,
-      "module": "io",
-      "valueId": 24,
-      "key": "io.cover_out",
-      "label": "Sortie \u00e9tat volet",
+      "id": 2309,
+      "runtimeId": 2309,
+      "moduleId": 23,
+      "module": "pooldev",
+      "valueId": 9,
+      "key": "pool.robot_on",
+      "label": "Robot de nettoyage",
       "type": "bool",
       "domain": "equipements",
       "group": "\u00c9quipements",
       "unit": null,
       "decimals": null,
-      "order": 240,
+      "order": 150,
       "enum": null,
       "flags": null,
       "display": "boolean",
       "displayConfig": {
-        "activeText": "Ferm\u00e9",
-        "inactiveText": "Ouvert"
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
+    },
+    {
+      "id": 2310,
+      "runtimeId": 2310,
+      "moduleId": 23,
+      "module": "pooldev",
+      "valueId": 10,
+      "key": "pool.flow_copy_on",
+      "label": "Recopie temporis\u00e9e du d\u00e9bit",
+      "type": "bool",
+      "domain": "equipements",
+      "group": "\u00c9quipements",
+      "unit": null,
+      "decimals": null,
+      "order": 160,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
+    },
+    {
+      "id": 2311,
+      "runtimeId": 2311,
+      "moduleId": 23,
+      "module": "pooldev",
+      "valueId": 11,
+      "key": "pool.cover_report_on",
+      "label": "Report d'\u00e9tat du volet",
+      "type": "bool",
+      "domain": "equipements",
+      "group": "\u00c9quipements",
+      "unit": null,
+      "decimals": null,
+      "order": 170,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
+      }
+    },
+    {
+      "id": 2312,
+      "runtimeId": 2312,
+      "moduleId": 23,
+      "module": "pooldev",
+      "valueId": 12,
+      "key": "pool.aux1_on",
+      "label": "Sortie auxiliaire 1",
+      "type": "bool",
+      "domain": "equipements",
+      "group": "\u00c9quipements",
+      "unit": null,
+      "decimals": null,
+      "order": 180,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "En marche",
+        "inactiveText": "Arr\u00eat"
       }
     },
     {

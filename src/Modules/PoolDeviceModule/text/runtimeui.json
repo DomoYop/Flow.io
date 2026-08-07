@@ -21,6 +21,10 @@
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v02.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v02.display.inactiveText"
+      },
       "order": 80,
       "label_t": "runtimeui.pooldev.v02.label",
       "group_t": "runtimeui.pooldev.v02.group"
@@ -31,36 +35,52 @@
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v03.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v03.display.inactiveText"
+      },
       "order": 90,
       "label_t": "runtimeui.pooldev.v03.label",
       "group_t": "runtimeui.pooldev.v03.group"
     },
     {
       "valueId": 4,
-      "key": "pool.robot_on",
+      "key": "pool.chlorine_generator_on",
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v04.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v04.display.inactiveText"
+      },
       "order": 100,
       "label_t": "runtimeui.pooldev.v04.label",
       "group_t": "runtimeui.pooldev.v04.group"
     },
     {
       "valueId": 5,
-      "key": "pool.fill_pump_on",
+      "key": "pool.o2_pump_on",
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v05.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v05.display.inactiveText"
+      },
       "order": 110,
       "label_t": "runtimeui.pooldev.v05.label",
       "group_t": "runtimeui.pooldev.v05.group"
     },
     {
       "valueId": 6,
-      "key": "pool.chlorine_generator_on",
+      "key": "pool.fill_pump_on",
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v06.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v06.display.inactiveText"
+      },
       "order": 120,
       "label_t": "runtimeui.pooldev.v06.label",
       "group_t": "runtimeui.pooldev.v06.group"
@@ -71,6 +91,10 @@
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v07.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v07.display.inactiveText"
+      },
       "order": 130,
       "label_t": "runtimeui.pooldev.v07.label",
       "group_t": "runtimeui.pooldev.v07.group"
@@ -81,9 +105,69 @@
       "type": "bool",
       "domain": "equipements",
       "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v08.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v08.display.inactiveText"
+      },
       "order": 140,
       "label_t": "runtimeui.pooldev.v08.label",
       "group_t": "runtimeui.pooldev.v08.group"
+    },
+    {
+      "valueId": 9,
+      "key": "pool.robot_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v09.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v09.display.inactiveText"
+      },
+      "order": 150,
+      "label_t": "runtimeui.pooldev.v09.label",
+      "group_t": "runtimeui.pooldev.v09.group"
+    },
+    {
+      "valueId": 10,
+      "key": "pool.flow_copy_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v10.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v10.display.inactiveText"
+      },
+      "order": 160,
+      "label_t": "runtimeui.pooldev.v10.label",
+      "group_t": "runtimeui.pooldev.v10.group"
+    },
+    {
+      "valueId": 11,
+      "key": "pool.cover_report_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v11.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v11.display.inactiveText"
+      },
+      "order": 170,
+      "label_t": "runtimeui.pooldev.v11.label",
+      "group_t": "runtimeui.pooldev.v11.group"
+    },
+    {
+      "valueId": 12,
+      "key": "pool.aux1_on",
+      "type": "bool",
+      "domain": "equipements",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.pooldev.v12.display.activeText",
+        "inactiveText_t": "runtimeui.pooldev.v12.display.inactiveText"
+      },
+      "order": 180,
+      "label_t": "runtimeui.pooldev.v12.label",
+      "group_t": "runtimeui.pooldev.v12.group"
     }
   ]
 }

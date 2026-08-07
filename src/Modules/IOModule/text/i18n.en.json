@@ -989,14 +989,6 @@
     "runtimeui.io.v22.display.activeText": "Closed",
     "runtimeui.io.v22.display.inactiveText": "Open",
     "runtimeui.io.v22.group": "Sensors",
-    "runtimeui.io.v22.label": "Cover closed",
-    "runtimeui.io.v23.display.activeText": "Running",
-    "runtimeui.io.v23.display.inactiveText": "Off",
-    "runtimeui.io.v23.group": "Equipment",
-    "runtimeui.io.v23.label": "Flow switch repeat output",
-    "runtimeui.io.v24.display.activeText": "Closed",
-    "runtimeui.io.v24.display.inactiveText": "Open",
-    "runtimeui.io.v24.group": "Equipment",
-    "runtimeui.io.v24.label": "Cover state output"
+    "runtimeui.io.v22.label": "Cover closed"
   }
 }
