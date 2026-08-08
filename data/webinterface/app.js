@@ -3626,9 +3626,9 @@
         return splitUpgradeVersionStamp(formatDetectedNextionVersion(nextionDisplayVersion), '');
       }
       if (key === 'spiffs') {
-        // Le SPIFFS n'a pas de version embarquée lisible sur l'appareil : on affiche la
-        // version réellement persistée lors du dernier flash SPIFFS (spiffs_version), pas
-        // la version du firmware (qui peut avoir été mise à jour indépendamment).
+        // spiffs_version est lue dans l'image SPIFFS elle-même (/fsver.j) et non déduite
+        // du dernier OTA : elle décrit le contenu réellement présent, indépendamment de
+        // la version du firmware. Forme "4.1.2+20260808.143512", scindée plus bas.
         const spiffs = String(spiffsContentVersion || '').trim();
         return splitUpgradeVersionStamp(spiffs && spiffs !== '-' ? spiffs : '-', '');
       }

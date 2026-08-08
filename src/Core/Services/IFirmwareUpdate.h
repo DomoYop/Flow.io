@@ -27,6 +27,5 @@ struct FirmwareUpdateService {
                       const char* updatePath,
                       char* errOut,
                       size_t errOutLen);
-    bool (*getSpiffsVersion)(void* ctx, char* out, size_t outLen);
     void* ctx;
 };

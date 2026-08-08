@@ -14,11 +14,6 @@
       "type": "CharArray",
       "label_t": "cfgdocs.fwupdate.update_path.label",
       "help_t": "cfgdocs.fwupdate.update_path.help"
-    },
-    "fwupdate/spiffs_version": {
-      "type": "CharArray",
-      "label_t": "cfgdocs.fwupdate.spiffs_version.label",
-      "help_t": "cfgdocs.fwupdate.spiffs_version.help"
     }
   }
 }

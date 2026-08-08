@@ -163,40 +163,6 @@ static bool validateCfgDocsFile_(fs::FS& fs, const char* path, char* errOut, siz
     return true;
 }
 
-// Extrait la version d'un nom de fichier "<nom>-<version>.bin" (ex: "flowios3-spiffs-2.0.4.bin"
-// -> "2.0.4"), en cherchant le dernier '-' suivi d'un chiffre avant l'extension.
-static bool extractVersionFromUrl_(const char* url, char* out, size_t outLen)
-{
-    if (!out || outLen == 0) return false;
-    out[0] = '\0';
-    if (!url) return false;
-
-    const char* slash = strrchr(url, '/');
-    const char* base = slash ? (slash + 1) : url;
-
-    size_t len = strlen(base);
-    static const char* const kExts[] = {".bin", ".tft"};
-    for (size_t i = 0; i < sizeof(kExts) / sizeof(kExts[0]); ++i) {
-        const size_t extLen = strlen(kExts[i]);
-        if (len > extLen && strcmp(base + (len - extLen), kExts[i]) == 0) {
-            len -= extLen;
-            break;
-        }
-    }
-
-    for (size_t i = len; i > 0; --i) {
-        const size_t idx = i - 1;
-        if (base[idx] == '-' && (idx + 1) < len && base[idx + 1] >= '0' && base[idx + 1] <= '9') {
-            const size_t verLen = len - (idx + 1);
-            if (verLen == 0 || verLen >= outLen) return false;
-            memcpy(out, base + idx + 1, verLen);
-            out[verLen] = '\0';
-            return true;
-        }
-    }
-    return false;
-}
-
 static void configureDownloadHttp_(HTTPClient& http)
 {
     http.setReuse(false);
@@ -494,13 +460,6 @@ bool FirmwareUpdateModule::configJson_(char* out, size_t outLen) const
                            "{\"ok\":true,\"update_host\":\"%s\",\"update_path\":\"%s\"}",
                            host,
                            updatePath);
-    return n > 0 && (size_t)n < outLen;
-}
-
-bool FirmwareUpdateModule::getSpiffsVersion_(char* out, size_t outLen) const
-{
-    if (!out || outLen == 0) return false;
-    const int n = snprintf(out, outLen, "%s", cfgData_.spiffsVersion);
     return n > 0 && (size_t)n < outLen;
 }
 
@@ -1012,14 +971,8 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
         return false;
     }
 
-    // Le SPIFFS n'a pas de version embarquée lisible : on persiste la version tirée du
-    // nom de fichier téléchargé pour que l'UI n'affiche plus la version du firmware
-    // (potentiellement différente) comme si c'était celle du contenu SPIFFS réellement flashé.
-    char parsedVersion[sizeof(cfgData_.spiffsVersion)] = {0};
-    if (extractVersionFromUrl_(url, parsedVersion, sizeof(parsedVersion)) && cfgStore_) {
-        cfgStore_->set(spiffsVersionVar_, parsedVersion);
-    }
-
+    // Rien a persister : l'image qui vient d'etre ecrite porte sa propre version
+    // dans /fsver.j, lue au boot par FilesystemVersion.
     setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::Spiffs, 100, "rebooting");
     delay(1800);
     ESP.restart();
@@ -1173,7 +1126,6 @@ void FirmwareUpdateModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     cfg.registerVar(updateHostVar_);
     cfg.registerVar(updatePathVar_);
-    cfg.registerVar(spiffsVersionVar_);
 
     if (!services.add(ServiceId::FirmwareUpdate, &firmwareUpdateSvc_)) {
         LOGE("service registration failed: %s", toString(ServiceId::FirmwareUpdate));

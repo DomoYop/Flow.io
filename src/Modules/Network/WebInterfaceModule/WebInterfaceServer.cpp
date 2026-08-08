@@ -7,6 +7,7 @@
 
 #include "Board/BoardSpec.h"
 #include "App/BuildFlags.h"
+#include "Core/FilesystemVersion.h"
 #include "Core/FirmwareVersion.h"
 #include "Core/Generated/RuntimeUiManifest_Generated.h"
 #include "Core/Generated/RuntimeUiManifestJson_Generated.h"
@@ -5617,14 +5618,10 @@ void WebInterfaceModule::startServer_()
             hmiSvc_->getDisplayVersion(hmiSvc_->ctx, nextionDisplayVersion, sizeof(nextionDisplayVersion))) {
             doc["nextion_display_version"] = nextionDisplayVersion;
         }
-        if (!firmwareUpdateSvc_ && services_) {
-            firmwareUpdateSvc_ = services_->get<FirmwareUpdateService>(ServiceId::FirmwareUpdate);
-        }
-        char spiffsVersion[24]{};
-        if (firmwareUpdateSvc_ && firmwareUpdateSvc_->getSpiffsVersion &&
-            firmwareUpdateSvc_->getSpiffsVersion(firmwareUpdateSvc_->ctx, spiffsVersion, sizeof(spiffsVersion)) &&
-            spiffsVersion[0] != '\0') {
-            doc["spiffs_version"] = spiffsVersion;
+        // Version lue dans l'image SPIFFS elle-meme (/fsver.j), pas deduite de l'URL
+        // du dernier OTA : reste juste apres un uploadfs ou un flash usine.
+        if (FilesystemVersion::present()) {
+            doc["spiffs_version"] = FilesystemVersion::full();
         }
 #if defined(FLOW_PROFILE_MICRONOVA)
         doc["local_runtime"] = true;
