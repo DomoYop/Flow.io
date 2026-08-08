@@ -28,6 +28,14 @@ regexes = [
   '''"key"\s*:\s*"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+"''',
   # Meme identifiant cote C++ : const char* key = "io.bmp280_temp".
   '''\bkey = "[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*"''',
+  # Traces de diagnostic I2C (IOModule.cpp) : la ligne lit le *nom* d'une cle
+  # NVS et son repli "(null)", jamais une valeur.
+  #   const char* sdaKeyActive = i2cSdaVar_.nvsKey ? i2cSdaVar_.nvsKey : "(null)";
+  # Ne pas retirer cette entree en constatant qu'aucun finding ne la mentionne :
+  # c'est precisement le signe qu'elle fait son travail. Elle a ete supprimee
+  # une fois sur ce raisonnement, ce qui a rouvert 2 faux positifs
+  # (7b67552:src/Modules/IOModule/IOModule.cpp:37 et :38).
+  '''\w*KeyActive = \w+\.nvsKey''',
 ]
 
 # Ces deux motifs restent etroits : minuscules, chiffres, underscores et points
