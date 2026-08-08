@@ -88,6 +88,42 @@ Abonnements:
 Aucun accès direct au DataStore.
 MQTT consomme les événements alarmes via `MQTTModule`.
 
+Topics runtime publiés par `MQTTModule` (`MQTTProducers.cpp`) :
+
+| Topic | Contenu | Retain |
+|---|---|---|
+| `rt/alarms/id<AlarmId>` | `buildAlarmState()` : `a` (actif), `r` (réarmable), `c` (condition), `s` (sévérité) | oui |
+| `rt/alarms/m` | nombre d'alarmes actives et sévérité la plus haute | oui |
+| `rt/alarms/p` | `buildPacked()` : 5 bits par slot, 8 premiers slots | non |
+
+Les deux premiers sont retenus parce qu'ils alimentent des entités Home
+Assistant : ils ne sont republiés que sur événement d'alarme ou à la
+reconnexion MQTT (`enqueueAlarmFullSync_`), donc sans retain une entité reste
+`unknown` après un redémarrage de Home Assistant.
+
+## Home Assistant
+
+Le module déclare en MQTT Discovery :
+- un `binary_sensor` par alarme enregistrée (`alm_pressure_low`,
+  `alm_pressure_high`, `alm_ph_tank_low`, `alm_chlorine_tank_low`,
+  `alm_ph_pump_max_uptime`, `alm_chlorine_pump_max_uptime`,
+  `alm_water_level_low`, `alm_ph_dose_no_effect`), chacun lié au topic
+  `rt/alarms/id<AlarmId>` de son identifiant, `device_class: problem` ;
+- `alm_any`, agrégat lié à `rt/alarms/m` ;
+- `alm_pack`, capteur du champ packé ;
+- `alm_reset_all` et un bouton `alm_reset_slot_<0..7>`.
+
+Le suffixe de topic contient l'`AlarmId` en dur ; des `static_assert` dans
+`AlarmModule.cpp` cassent le build si un identifiant change sans que la table
+suive. `LogWarningSeen` (1100) et `LogErrorSeen` (1101) ne sont volontairement
+pas déclarées : `LogAlarmSinkModule` est hors du `build_src_filter` du profil
+Waveshare, donc ces alarmes ne sont jamais enregistrées.
+
+Côté Home Assistant, [home_assistant_alarm_helpers_fio53.yaml](../integration/home_assistant_alarm_helpers_fio53.yaml)
+n'aliase plus que ces entités pour l'état actif ; seuls les aspects `réarmable`
+et `condition`, non exposés en discovery, restent décodés depuis `alm_pack` et
+dépendent donc de l'ordre d'enregistrement des slots.
+
 ## Notifications et anti-spam
 
 Les transitions utiles sont publiées immédiatement sur l'EventBus:
@@ -102,12 +138,19 @@ périodiques `AlarmConditionChanged` tant qu'une alarme reste active avec
 
 ## Alarmes définies actuellement
 
-Le module est générique. Dans le projet actuel, `PoolLogicModule` enregistre:
-- `AlarmId::PoolPsiLow`
-- `AlarmId::PoolPsiHigh`
-- `AlarmId::PoolPhTankLow`
-- `AlarmId::PoolChlorineTankLow`
+Le module est générique. Dans le projet actuel, `PoolLogicModule` enregistre
+huit alarmes, dans cet ordre (qui fixe l'ordre des slots) :
+- `AlarmId::PoolPressureLow` (1000)
+- `AlarmId::PoolPressureHigh` (1001)
+- `AlarmId::PoolPhTankLow` (1002)
+- `AlarmId::PoolChlorineTankLow` (1003)
+- `AlarmId::PoolPhPumpMaxUptime` (1004)
+- `AlarmId::PoolChlorinePumpMaxUptime` (1005)
+- `AlarmId::PoolWaterLevelLow` (1006)
+- `AlarmId::PoolPhDoseNoEffect` (1007)
 
-Pour `PoolLogic`, ces alarmes servent d'interlock sécurité:
+Pour `PoolLogic`, quatre d'entre elles servent d'interlock sécurité
+(`PoolPressureLow`, `PoolPressureHigh`, `PoolPhTankLow`,
+`PoolChlorineTankLow`) :
 - `PoolLogic` lit `isActive()` sur ces IDs
 - si l'une est active, la filtration est forcée OFF (auto et manuel)

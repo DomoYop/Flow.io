@@ -23,6 +23,60 @@ static constexpr uint8_t kAlarmCfgBranch = 1;
 static constexpr MqttConfigRouteProducer::Route kAlarmCfgRoutes[] = {
     {1, {(uint8_t)ConfigModuleId::Alarms, kAlarmCfgBranch}, "alarms", "alarms", (uint8_t)MqttPublishPriority::Normal, nullptr},
 };
+// Etat d'une alarme vu de Home Assistant : le payload de buildAlarmState_()
+// porte "a" (active). Un binary_sensor par AlarmId remplace le decodage du
+// champ packe cote Home Assistant, qui dependait de l'ordre d'enregistrement
+// des slots.
+static constexpr const char* kAlarmActiveValueTemplate =
+    "{{ 'True' if value_json.a | int(0) == 1 else 'False' }}";
+
+// L'agregat s'appuie sur rt/alarms/m, qui porte le nombre d'alarmes actives.
+static constexpr HABinarySensorEntry kAlarmAnyActiveBinarySensor{
+    "alarms",
+    "alm_any",
+    "Any Active Alarm",
+    "rt/alarms/m",
+    "{{ 'True' if value_json.a | int(0) > 0 else 'False' }}",
+    "problem",
+    nullptr,
+    "mdi:alarm-multiple"
+};
+
+// Le suffixe de topic contient l'AlarmId en dur : les static_assert ci-dessous
+// cassent le build si un identifiant change sans que la table suive.
+static constexpr HABinarySensorEntry kAlarmBinarySensors[] = {
+    {"alarms", "alm_pressure_low", "Low Pressure", "rt/alarms/id1000",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:gauge-low"},
+    {"alarms", "alm_pressure_high", "High Pressure", "rt/alarms/id1001",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:gauge-full"},
+    {"alarms", "alm_ph_tank_low", "pH Tank Low", "rt/alarms/id1002",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:flask-empty-off-outline"},
+    {"alarms", "alm_chlorine_tank_low", "Chlorine Tank Low", "rt/alarms/id1003",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:beaker-alert-outline"},
+    {"alarms", "alm_ph_pump_max_uptime", "pH Pump Max Uptime", "rt/alarms/id1004",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:timer-alert-outline"},
+    {"alarms", "alm_chlorine_pump_max_uptime", "Chlorine Pump Max Uptime", "rt/alarms/id1005",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:timer-alert-outline"},
+    {"alarms", "alm_water_level_low", "Pool Water Level Low", "rt/alarms/id1006",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:waves-arrow-down"},
+    {"alarms", "alm_ph_dose_no_effect", "pH Dosing Has No Effect", "rt/alarms/id1007",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:water-alert-outline"},
+};
+
+static_assert((uint16_t)AlarmId::PoolPressureLow == 1000, "rt/alarms/id1000 must stay PoolPressureLow");
+static_assert((uint16_t)AlarmId::PoolPressureHigh == 1001, "rt/alarms/id1001 must stay PoolPressureHigh");
+static_assert((uint16_t)AlarmId::PoolPhTankLow == 1002, "rt/alarms/id1002 must stay PoolPhTankLow");
+static_assert((uint16_t)AlarmId::PoolChlorineTankLow == 1003, "rt/alarms/id1003 must stay PoolChlorineTankLow");
+static_assert((uint16_t)AlarmId::PoolPhPumpMaxUptime == 1004, "rt/alarms/id1004 must stay PoolPhPumpMaxUptime");
+static_assert((uint16_t)AlarmId::PoolChlorinePumpMaxUptime == 1005, "rt/alarms/id1005 must stay PoolChlorinePumpMaxUptime");
+static_assert((uint16_t)AlarmId::PoolWaterLevelLow == 1006, "rt/alarms/id1006 must stay PoolWaterLevelLow");
+static_assert((uint16_t)AlarmId::PoolPhDoseNoEffect == 1007, "rt/alarms/id1007 must stay PoolPhDoseNoEffect");
+
+// LogWarningSeen (1100) et LogErrorSeen (1101) ne sont volontairement pas
+// declarees : LogAlarmSinkModule est exclu du build_src_filter de ce profil,
+// donc ces alarmes ne sont jamais enregistrees et leur topic jamais publie.
+// Une entite HA sans publication resterait indefiniment "unknown".
+
 static constexpr HAButtonEntry kAlarmResetSlotButtons[] = {
     {"alarms", "alm_reset_slot_0", "Reset Alarm Slot 0", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":0}}", "diagnostic", "mdi:numeric-0-box-outline"},
     {"alarms", "alm_reset_slot_1", "Reset Alarm Slot 1", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":1}}", "diagnostic", "mdi:numeric-1-box-outline"},
@@ -657,6 +711,22 @@ void AlarmModule::registerHaEntities_(ServiceRegistry& services)
             registeredAny = true;
         } else {
             LOGW("HA registration failed: alm_pack");
+        }
+    }
+
+    if (haSvc_->addBinarySensor) {
+        if (haSvc_->addBinarySensor(haSvc_->ctx, &kAlarmAnyActiveBinarySensor)) {
+            registeredAny = true;
+        } else {
+            LOGW("HA registration failed: %s", kAlarmAnyActiveBinarySensor.objectSuffix);
+        }
+
+        for (uint8_t i = 0; i < (uint8_t)(sizeof(kAlarmBinarySensors) / sizeof(kAlarmBinarySensors[0])); ++i) {
+            if (haSvc_->addBinarySensor(haSvc_->ctx, &kAlarmBinarySensors[i])) {
+                registeredAny = true;
+            } else {
+                LOGW("HA registration failed: %s", kAlarmBinarySensors[i].objectSuffix);
+            }
         }
     }
 

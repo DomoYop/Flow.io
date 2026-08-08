@@ -189,7 +189,7 @@ la cible de référence actuelle ; `FlowIO` est conservé pour comparaison.
 | **Relais physiquement disponibles** | **8** | **8** | `kBindingPorts` (`*IoLayout.h`) |
 | Slots de domaine | 28 | 28 | `Limits::Io::MaxDomainSlots` |
 | Capteurs Home Assistant | 48 | 40 | `HAModule::MAX_HA_SENSORS` |
-| Binary sensors Home Assistant | 10 | 6 | `HAModule::MAX_HA_BINARY_SENSORS` |
+| Binary sensors Home Assistant | 24 | 6 | `HAModule::MAX_HA_BINARY_SENSORS` |
 | Switches Home Assistant | 20 | 14 | `HAModule::MAX_HA_SWITCHES` |
 | Numbers Home Assistant | 30 | 14 | `HAModule::MAX_HA_NUMBERS` |
 | Buttons Home Assistant | 24 | 24 | `HAModule::MAX_HA_BUTTONS` |

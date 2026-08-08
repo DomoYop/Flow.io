@@ -5,61 +5,80 @@
 # template: !include docs/integration/home_assistant_alarm_helpers_fio53.yaml
 #
 # Current firmware behavior for Flow.io:
+# - Flow.io auto-discovers one `binary_sensor.*` per registered alarm, fed by
+#   the retained MQTT topic `rt/alarms/id<AlarmId>` (field `a`):
+#     AlarmId 1000 -> binary_sensor.fio53_alm_pressure_low
+#     AlarmId 1001 -> binary_sensor.fio53_alm_pressure_high
+#     AlarmId 1002 -> binary_sensor.fio53_alm_ph_tank_low
+#     AlarmId 1003 -> binary_sensor.fio53_alm_chlorine_tank_low
+#     AlarmId 1004 -> binary_sensor.fio53_alm_ph_pump_max_uptime
+#     AlarmId 1005 -> binary_sensor.fio53_alm_chlorine_pump_max_uptime
+#     AlarmId 1006 -> binary_sensor.fio53_alm_water_level_low
+#     AlarmId 1007 -> binary_sensor.fio53_alm_ph_dose_no_effect
+# - Flow.io auto-discovers `binary_sensor.fio53_alm_any`, fed by the retained
+#   topic `rt/alarms/m` (field `a`, active alarm count).
 # - Flow.io auto-discovers `sensor.fio53_alm_pack` for alarm state packing.
 # - Flow.io auto-discovers one global `button.*` reset entity using
 #   the MQTT command path `{"cmd":"alarms.reset_all"}`.
 # - Flow.io auto-discovers one `button.*` per slot `0..7` using
 #   the MQTT command path `{"cmd":"alarms.reset_slot","args":{"slot":N}}`.
-# - The detailed MQTT payload still exists in firmware (`rt/alarms/id<id>`), but the
-#   current HA discovery layer does not expose one state entity per alarm.
 #
-# This helper file decodes `sensor.fio53_alm_pack`, which is built in
-# `AlarmModule::buildPacked_()` with 5 bits per slot:
+# The `fio53` part of every entity id above is the configured Home Assistant
+# entity prefix. Adjust it here if the device uses another prefix.
+#
+# The `*_active` helpers below are now plain aliases of those native entities.
+# They exist only to keep the entity ids used by the dashboard stable, and no
+# longer depend on the alarm registration order.
+#
+# `*_resettable` and `*_condition` are still decoded from
+# `sensor.fio53_alm_pack`, built in `AlarmModule::buildPacked_()` with 5 bits
+# per slot:
 # - bit 0: active
 # - bit 1: resettable
 # - bit 2: condition == true
 # - bits 3..4: severity
 #
-# Slot mapping for the current FlowIO profile, based on module init order:
-# - slot 0 -> AlarmId 1000 -> psi_low
-# - slot 1 -> AlarmId 1001 -> psi_high
+# Those two aspects are the only ones left depending on the slot order, which
+# follows the alarm registration order in `PoolLogicLifecycle.cpp`:
+# - slot 0 -> AlarmId 1000 -> pressure_low
+# - slot 1 -> AlarmId 1001 -> pressure_high
 # - slot 2 -> AlarmId 1002 -> ph_tank_low
 # - slot 3 -> AlarmId 1003 -> chlorine_tank_low
 # - slot 4 -> AlarmId 1004 -> ph_pump_max_uptime
 # - slot 5 -> AlarmId 1005 -> chlorine_pump_max_uptime
 # - slot 6 -> AlarmId 1006 -> pool_water_level_low
+# - slot 7 -> AlarmId 1007 -> ph_dose_no_effect
 #
-# `PoolPhPumpMaxUptime` and `PoolChlorinePumpMaxUptime` are latched alarms.
-# Their matching HA reset buttons are:
+# If that registration order changes, only the `*_resettable` and
+# `*_condition` divisors below must be updated. To remove that dependency as
+# well, expose fields `r` and `c` of `rt/alarms/id<AlarmId>` as manually
+# configured `mqtt:` binary sensors instead.
+#
+# `PoolPhPumpMaxUptime`, `PoolChlorinePumpMaxUptime`, `PoolPressureLow`,
+# `PoolPressureHigh` and `PoolPhDoseNoEffect` are latched alarms. Their
+# matching HA reset buttons are:
+# - slot 0 -> button.fio53_alm_reset_slot_0
+# - slot 1 -> button.fio53_alm_reset_slot_1
 # - slot 4 -> button.fio53_alm_reset_slot_4
 # - slot 5 -> button.fio53_alm_reset_slot_5
-#
-# If alarm registration order changes in firmware, this mapping must be updated.
+# - slot 7 -> button.fio53_alm_reset_slot_7
 
 - binary_sensor:
       - name: fio53_alarm_any_active
         unique_id: fio53_alarm_any_active
         icon: mdi:alarm-multiple
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_any') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {% set ns = namespace(active=false) %}
-          {% for slot in range(0, 8) %}
-            {% if ((pack // (32 ** slot)) % 2) == 1 %}
-              {% set ns.active = true %}
-            {% endif %}
-          {% endfor %}
-          {{ ns.active }}
+          {{ is_state('binary_sensor.fio53_alm_any', 'on') }}
 
       - name: fio53_psi_low_active
         unique_id: fio53_psi_low_active
         icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_pressure_low') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 1) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_pressure_low', 'on') }}
 
       - name: fio53_psi_low_resettable
         unique_id: fio53_psi_low_resettable
@@ -83,10 +102,9 @@
         unique_id: fio53_psi_high_active
         icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_pressure_high') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 32) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_pressure_high', 'on') }}
 
       - name: fio53_psi_high_resettable
         unique_id: fio53_psi_high_resettable
@@ -110,10 +128,9 @@
         unique_id: fio53_ph_tank_low_active
         icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_ph_tank_low') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 1024) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_ph_tank_low', 'on') }}
 
       - name: fio53_ph_tank_low_resettable
         unique_id: fio53_ph_tank_low_resettable
@@ -137,10 +154,9 @@
         unique_id: fio53_chlorine_tank_low_active
         icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_chlorine_tank_low') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 32768) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_chlorine_tank_low', 'on') }}
 
       - name: fio53_chlorine_tank_low_resettable
         unique_id: fio53_chlorine_tank_low_resettable
@@ -164,10 +180,9 @@
         unique_id: fio53_ph_pump_max_uptime_active
         icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_ph_pump_max_uptime') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 1048576) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_ph_pump_max_uptime', 'on') }}
 
       - name: fio53_ph_pump_max_uptime_resettable
         unique_id: fio53_ph_pump_max_uptime_resettable
@@ -191,10 +206,9 @@
         unique_id: fio53_chlorine_pump_max_uptime_active
         icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_chlorine_pump_max_uptime') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 33554432) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_chlorine_pump_max_uptime', 'on') }}
 
       - name: fio53_chlorine_pump_max_uptime_resettable
         unique_id: fio53_chlorine_pump_max_uptime_resettable
@@ -216,12 +230,11 @@
 
       - name: fio53_water_level_low_active
         unique_id: fio53_water_level_low_active
-        icon: mdi:waves-arrow-down
+        icon: mdi:alarm-light
         availability: >
-          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+          {{ states('binary_sensor.fio53_alm_water_level_low') in ['on', 'off'] }}
         state: >
-          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
-          {{ ((pack // 1073741824) % 2) == 1 }}
+          {{ is_state('binary_sensor.fio53_alm_water_level_low', 'on') }}
 
       - name: fio53_water_level_low_resettable
         unique_id: fio53_water_level_low_resettable
@@ -240,3 +253,29 @@
         state: >
           {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
           {{ ((pack // 4294967296) % 2) == 1 }}
+
+      - name: fio53_ph_dose_no_effect_active
+        unique_id: fio53_ph_dose_no_effect_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.fio53_alm_ph_dose_no_effect') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.fio53_alm_ph_dose_no_effect', 'on') }}
+
+      - name: fio53_ph_dose_no_effect_resettable
+        unique_id: fio53_ph_dose_no_effect_resettable
+        icon: mdi:restart-alert
+        availability: >
+          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
+          {{ ((pack // 68719476736) % 2) == 1 }}
+
+      - name: fio53_ph_dose_no_effect_condition
+        unique_id: fio53_ph_dose_no_effect_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ states('sensor.fio53_alm_pack') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
+          {{ ((pack // 137438953472) % 2) == 1 }}

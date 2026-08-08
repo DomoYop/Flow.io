@@ -252,7 +252,9 @@ MqttBuildResult MQTTModule::buildAlarm_(uint16_t messageId, MqttBuildContext& ct
         ctx.topicLen = (uint16_t)tw;
         ctx.payloadLen = (uint16_t)pw;
         ctx.qos = 0;
-        ctx.retain = false;
+        // Retenu : porte l'etat du binary_sensor agrege alm_any, qui doit etre
+        // connu de Home Assistant sans attendre le prochain evenement d'alarme.
+        ctx.retain = true;
         return MqttBuildResult::Ready;
     }
 
@@ -293,7 +295,9 @@ MqttBuildResult MQTTModule::buildAlarm_(uint16_t messageId, MqttBuildContext& ct
         ctx.topicLen = (uint16_t)tw;
         ctx.payloadLen = (uint16_t)strnlen(ctx.payload, ctx.payloadCapacity);
         ctx.qos = 0;
-        ctx.retain = false;
+        // Retenu : un binary_sensor Home Assistant est declare par AlarmId, et
+        // ces etats ne sont republies que sur evenement ou reconnexion MQTT.
+        ctx.retain = true;
         return MqttBuildResult::Ready;
     }
 

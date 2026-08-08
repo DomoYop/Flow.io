@@ -107,7 +107,11 @@ inline constexpr MqttBufferSpec kWaveshareESP32S3MqttBuffers{
  *   Home Assistant naming/identity options are handled by separate persistent
  *   module config, not by this capacity block.
  */
-inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 10, 20, 30, 24, 6};
+// binarySensors : 8 entrees digitales + 3 etats PoolLogic (flow copy, volet,
+// absence de debit) + 1 par alarme enregistree + l'agregat alm_any. L'ancienne
+// valeur de 10 etait deja depassee par le seul pire cas entrees + PoolLogic, et
+// addBinarySensorEntry() refuse en silence au-dela de la capacite.
+inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 24, 20, 30, 24, 6};
 
 /*
  * UART definitions.
