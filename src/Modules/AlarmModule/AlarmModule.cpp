@@ -61,6 +61,8 @@ static constexpr HABinarySensorEntry kAlarmBinarySensors[] = {
      kAlarmActiveValueTemplate, "problem", nullptr, "mdi:waves-arrow-down"},
     {"alarms", "alm_ph_dose_no_effect", "pH Dosing Has No Effect", "rt/alarms/id1007",
      kAlarmActiveValueTemplate, "problem", nullptr, "mdi:water-alert-outline"},
+    {"alarms", "alm_water_temp_unavailable", "Water Temperature Unavailable", "rt/alarms/id1008",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:thermometer-alert"},
 };
 
 static_assert((uint16_t)AlarmId::PoolPressureLow == 1000, "rt/alarms/id1000 must stay PoolPressureLow");
@@ -71,6 +73,8 @@ static_assert((uint16_t)AlarmId::PoolPhPumpMaxUptime == 1004, "rt/alarms/id1004 
 static_assert((uint16_t)AlarmId::PoolChlorinePumpMaxUptime == 1005, "rt/alarms/id1005 must stay PoolChlorinePumpMaxUptime");
 static_assert((uint16_t)AlarmId::PoolWaterLevelLow == 1006, "rt/alarms/id1006 must stay PoolWaterLevelLow");
 static_assert((uint16_t)AlarmId::PoolPhDoseNoEffect == 1007, "rt/alarms/id1007 must stay PoolPhDoseNoEffect");
+static_assert((uint16_t)AlarmId::PoolWaterTemperatureUnavailable == 1008,
+              "rt/alarms/id1008 must stay PoolWaterTemperatureUnavailable");
 
 // LogWarningSeen (1100) et LogErrorSeen (1101) ne sont volontairement pas
 // declarees : LogAlarmSinkModule est exclu du build_src_filter de ce profil,

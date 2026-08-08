@@ -20,6 +20,10 @@ enum class AlarmId : uint16_t {
     PoolWaterLevelLow = 1006,
     // Dosage pH sans effet mesurable : bidon vide, tuyau perce ou sonde figee.
     PoolPhDoseNoEffect = 1007,
+    // Sonde d'eau muette ou perimee : le chauffage se coupe et la filtration
+    // bascule sur son plan de repli. Sans cette alarme, la degradation n'est
+    // visible que dans les logs serie.
+    PoolWaterTemperatureUnavailable = 1008,
 
     // Log pipeline domain
     LogWarningSeen = 1100,

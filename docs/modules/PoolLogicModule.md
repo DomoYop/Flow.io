@@ -605,6 +605,32 @@ Logique principale:
   - délai ON `500 ms`, OFF `1000 ms`, répétition `60000 ms`
   - condition: entrée digitale `chl_lvl_io_id == true`
 
+### Alarme disponibilité de la sonde d'eau
+
+- `AlarmId::PoolWaterTemperatureUnavailable` (1008)
+  - non-latched (auto-clear dès que la mesure redevient exploitable)
+  - sévérité `Warning`, délai ON `60000 ms`, OFF `5000 ms`, répétition `600000 ms`
+  - condition: lecture de `water_temp_io_id` en échec, valeur non finie, horodatage
+    absent, ou mesure plus vieille que `kHeaterTempFreshMaxMs` (10 min)
+  - `Unknown` tant que `IOServiceV2` n'est pas résolu, pour ne pas armer les
+    temporisations au démarrage
+
+Cette alarme ne change aucun comportement : elle rend visible une dégradation qui
+existait déjà et n'apparaissait que dans les logs série.
+
+- le chauffage se coupe et publie `HeatAssistReason::TempUnavailable`
+  (`PoolLogicControl.cpp`, même fenêtre de fraîcheur de 10 min)
+- `FiltrationWindow` passe en `fallback` et planifie la capacité maximale des
+  fenêtres, faute de pouvoir calculer un renouvellement volumétrique
+
+Une installation sans sonde d'eau configurée verra donc cette alarme active en
+permanence : c'est volontaire, puisque la filtration y tourne en permanence sur
+son plan de repli.
+
+Ce neuvième slot d'alarme sort des 8 couverts par `buildPacked_` et par les
+boutons `alm_reset_slot_*` de Home Assistant. C'est sans conséquence ici :
+l'alarme n'est pas latched et n'a donc jamais besoin d'être acquittée.
+
 ### Réarmement PSI
 
 - source de vérité en nominal: `alarmSvc->isActive(PoolPsiLow|PoolPsiHigh)`

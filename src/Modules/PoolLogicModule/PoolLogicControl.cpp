@@ -841,6 +841,34 @@ AlarmCondState PoolLogicModule::condWaterLevelLowStatic_(void* ctx, uint32_t)
     return low ? AlarmCondState::True : AlarmCondState::False;
 }
 
+// Alignee sur kHeaterTempFreshMaxMs : la condition devient vraie exactement
+// quand la mesure cesse d'etre utilisable pour les deux consommateurs qui en
+// dependent -- le chauffage la coupe et pose HeatAssistReason::TempUnavailable,
+// FiltrationWindow bascule sur son plan de repli (capacite maximale des
+// fenetres). Ces deux replis existaient deja mais n'etaient traces que dans les
+// logs serie : l'alarme les rend visibles (Home Assistant, ecran, historique).
+//
+// Une lecture qui echoue, une valeur non finie ou un horodatage absent comptent
+// comme indisponibles : le but est de signaler une sonde d'eau muette, que la
+// cause soit une panne, un debranchement ou un endpoint mal configure.
+AlarmCondState PoolLogicModule::condWaterTempUnavailableStatic_(void* ctx, uint32_t nowMs)
+{
+    PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
+    if (!self || !self->enabled_) return AlarmCondState::False;
+    // Service IO pas encore resolu au demarrage : ni vrai ni faux, on ne
+    // declenche pas les temporisations de l'alarme.
+    if (!self->ioSvc_ || !self->ioSvc_->readAnalog) return AlarmCondState::Unknown;
+
+    float waterTemp = 0.0f;
+    uint32_t tsMs = 0U;
+    if (!self->loadAnalogSensor_(self->waterTempIoId_, waterTemp, &tsMs)) {
+        return AlarmCondState::True;
+    }
+    if (!std::isfinite(waterTemp) || tsMs == 0U) return AlarmCondState::True;
+    return ((uint32_t)(nowMs - tsMs) > kHeaterTempFreshMaxMs) ? AlarmCondState::True
+                                                              : AlarmCondState::False;
+}
+
 AlarmCondState PoolLogicModule::condPhPumpMaxUptimeStatic_(void* ctx, uint32_t)
 {
     PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);

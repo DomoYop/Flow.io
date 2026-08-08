@@ -107,7 +107,8 @@ Le module déclare en MQTT Discovery :
 - un `binary_sensor` par alarme enregistrée (`alm_pressure_low`,
   `alm_pressure_high`, `alm_ph_tank_low`, `alm_chlorine_tank_low`,
   `alm_ph_pump_max_uptime`, `alm_chlorine_pump_max_uptime`,
-  `alm_water_level_low`, `alm_ph_dose_no_effect`), chacun lié au topic
+  `alm_water_level_low`, `alm_ph_dose_no_effect`,
+  `alm_water_temp_unavailable`), chacun lié au topic
   `rt/alarms/id<AlarmId>` de son identifiant, `device_class: problem` ;
 - `alm_any`, agrégat lié à `rt/alarms/m` ;
 - `alm_pack`, capteur du champ packé ;
@@ -148,6 +149,13 @@ huit alarmes, dans cet ordre (qui fixe l'ordre des slots) :
 - `AlarmId::PoolChlorinePumpMaxUptime` (1005)
 - `AlarmId::PoolWaterLevelLow` (1006)
 - `AlarmId::PoolPhDoseNoEffect` (1007)
+- `AlarmId::PoolWaterTemperatureUnavailable` (1008)
+
+Attention : `buildPacked()` ne couvre que les **8 premiers slots**, et les boutons
+Home Assistant `alm_reset_slot_*` vont de 0 à 7. Une neuvième alarme est donc
+absente du champ packé et n'a pas de bouton de reset dédié ; elle ne doit pas
+être latched, sinon elle ne serait acquittable que par `alarms.reset` avec son
+identifiant.
 
 Pour `PoolLogic`, quatre d'entre elles servent d'interlock sécurité
 (`PoolPressureLow`, `PoolPressureHigh`, `PoolPhTankLow`,

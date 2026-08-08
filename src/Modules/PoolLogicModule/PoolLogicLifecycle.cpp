@@ -1270,6 +1270,28 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &phDoseNoEffectAlarm, &PoolLogicModule::condPhDoseNoEffectStatic_, this)) {
             LOGW("PoolLogic failed to register AlarmId::PoolPhDoseNoEffect");
         }
+
+        // Non latchee : la disponibilite d'une sonde est un etat, pas un defaut
+        // a acquitter. L'alarme retombe seule des que la mesure revient, ce qui
+        // evite aussi de dependre d'un bouton de reset : ce neuvieme slot sort
+        // des 8 couverts par buildPacked_ et par les boutons alm_reset_slot_*.
+        // onDelay de 60 s en plus de la fenetre de fraicheur de 10 min de la
+        // condition : une lecture 1-Wire qui rate ponctuellement, ou un premier
+        // demarrage avant la premiere conversion, n'alarment pas.
+        const AlarmRegistration waterTempUnavailableAlarm{
+            AlarmId::PoolWaterTemperatureUnavailable,
+            AlarmSeverity::Warning,
+            false,
+            60000,
+            5000,
+            600000,
+            "water_temp_unavailable",
+            "Water temperature unavailable",
+            "poollogic"
+        };
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &waterTempUnavailableAlarm, &PoolLogicModule::condWaterTempUnavailableStatic_, this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolWaterTemperatureUnavailable");
+        }
     } else {
         LOGW("PoolLogic running without alarm service");
     }

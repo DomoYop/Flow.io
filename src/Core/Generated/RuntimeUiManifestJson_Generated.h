@@ -54,6 +54,14 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
         {
           "mask": 64,
           "label": "Niveau d'eau bas dans le bassin"
+        },
+        {
+          "mask": 128,
+          "label": "Dosage pH sans effet"
+        },
+        {
+          "mask": 256,
+          "label": "Temp\u00e9rature d'eau indisponible"
         }
       ],
       "display": "flags",
@@ -105,6 +113,14 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
         {
           "mask": 64,
           "label": "Niveau d'eau bas dans le bassin"
+        },
+        {
+          "mask": 128,
+          "label": "Dosage pH sans effet"
+        },
+        {
+          "mask": 256,
+          "label": "Temp\u00e9rature d'eau indisponible"
         }
       ],
       "display": "flags",
@@ -156,6 +172,14 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
         {
           "mask": 64,
           "label": "Niveau d'eau bas dans le bassin"
+        },
+        {
+          "mask": 128,
+          "label": "Dosage pH sans effet"
+        },
+        {
+          "mask": 256,
+          "label": "Temp\u00e9rature d'eau indisponible"
         }
       ],
       "display": "flags",

@@ -235,6 +235,8 @@
     "runtimeui.poollogic.alarms.flag04.label": "pH pump max runtime reached",
     "runtimeui.poollogic.alarms.flag05.label": "ORP pump max runtime reached",
     "runtimeui.poollogic.alarms.flag06.label": "Low water level in the pool",
+    "runtimeui.poollogic.alarms.flag07.label": "pH dosing has no effect",
+    "runtimeui.poollogic.alarms.flag08.label": "Water temperature unavailable",
     "runtimeui.poollogic.v01.display.activeText": "Active",
     "runtimeui.poollogic.v01.display.inactiveText": "Manual",
     "runtimeui.poollogic.v01.group": "Mode",

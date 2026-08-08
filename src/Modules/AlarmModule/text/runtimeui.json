@@ -35,6 +35,14 @@
         {
           "mask": 64,
           "label_t": "runtimeui.poollogic.alarms.flag06.label"
+        },
+        {
+          "mask": 128,
+          "label_t": "runtimeui.poollogic.alarms.flag07.label"
+        },
+        {
+          "mask": 256,
+          "label_t": "runtimeui.poollogic.alarms.flag08.label"
         }
       ],
       "displayConfig": {
@@ -79,6 +87,14 @@
         {
           "mask": 64,
           "label_t": "runtimeui.poollogic.alarms.flag06.label"
+        },
+        {
+          "mask": 128,
+          "label_t": "runtimeui.poollogic.alarms.flag07.label"
+        },
+        {
+          "mask": 256,
+          "label_t": "runtimeui.poollogic.alarms.flag08.label"
         }
       ],
       "displayConfig": {
@@ -123,6 +139,14 @@
         {
           "mask": 64,
           "label_t": "runtimeui.poollogic.alarms.flag06.label"
+        },
+        {
+          "mask": 128,
+          "label_t": "runtimeui.poollogic.alarms.flag07.label"
+        },
+        {
+          "mask": 256,
+          "label_t": "runtimeui.poollogic.alarms.flag08.label"
         }
       ],
       "displayConfig": {

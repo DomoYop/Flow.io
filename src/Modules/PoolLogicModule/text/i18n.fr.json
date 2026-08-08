@@ -234,6 +234,8 @@
     "runtimeui.poollogic.alarms.flag04.label": "Pompe pH durée max atteinte",
     "runtimeui.poollogic.alarms.flag05.label": "Pompe Orp durée max atteinte",
     "runtimeui.poollogic.alarms.flag06.label": "Niveau d'eau bas dans le bassin",
+    "runtimeui.poollogic.alarms.flag07.label": "Dosage pH sans effet",
+    "runtimeui.poollogic.alarms.flag08.label": "Température d'eau indisponible",
     "runtimeui.poollogic.v01.display.activeText": "Actif",
     "runtimeui.poollogic.v01.display.inactiveText": "Manuel",
     "runtimeui.poollogic.v01.group": "Mode",

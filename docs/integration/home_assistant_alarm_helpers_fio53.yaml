@@ -15,6 +15,7 @@
 #     AlarmId 1005 -> binary_sensor.fio53_alm_chlorine_pump_max_uptime
 #     AlarmId 1006 -> binary_sensor.fio53_alm_water_level_low
 #     AlarmId 1007 -> binary_sensor.fio53_alm_ph_dose_no_effect
+#     AlarmId 1008 -> binary_sensor.fio53_alm_water_temp_unavailable
 # - Flow.io auto-discovers `binary_sensor.fio53_alm_any`, fed by the retained
 #   topic `rt/alarms/m` (field `a`, active alarm count).
 # - Flow.io auto-discovers `sensor.fio53_alm_pack` for alarm state packing.
@@ -279,3 +280,15 @@
         state: >
           {% set pack = states('sensor.fio53_alm_pack') | int(0) %}
           {{ ((pack // 137438953472) % 2) == 1 }}
+
+      # AlarmId 1008 occupe le neuvieme slot, hors des 8 couverts par
+      # buildPacked_ : pas de variante _resettable ni _condition possible depuis
+      # alm_pack. L'alarme n'est pas latched, donc rearmable n'a pas de sens, et
+      # l'etat de condition est confondu avec l'etat actif.
+      - name: fio53_water_temp_unavailable_active
+        unique_id: fio53_water_temp_unavailable_active
+        icon: mdi:thermometer-alert
+        availability: >
+          {{ states('binary_sensor.fio53_alm_water_temp_unavailable') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.fio53_alm_water_temp_unavailable', 'on') }}

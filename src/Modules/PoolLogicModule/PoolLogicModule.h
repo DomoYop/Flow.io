@@ -597,6 +597,7 @@ private:
     static AlarmCondState condChlorineTankLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhDoseNoEffectStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condWaterLevelLowStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condWaterTempUnavailableStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhPumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorinePumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     AlarmCondState condPumpMaxUptime_(uint8_t deviceSlot) const;
