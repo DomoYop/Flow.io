@@ -50,7 +50,11 @@ enum class ErrorCode : uint16_t {
     InvalidLabel,
     SetFailed,
     ClearFailed,
-    ClearAllFailed
+    ClearAllFailed,
+    // Commande valide, mais interdite sur le canal par lequel elle arrive.
+    // Ajoute en fin d'enum : les codes circulent en clair (errorCodeStr), donc
+    // l'ordre n'est pas un contrat, mais autant ne pas decaler l'existant.
+    CmdDeniedOnChannel
 };
 
 static inline const char* errorCodeStr(ErrorCode code)
@@ -97,6 +101,7 @@ static inline const char* errorCodeStr(ErrorCode code)
     case ErrorCode::SetFailed: return "SetFailed";
     case ErrorCode::ClearFailed: return "ClearFailed";
     case ErrorCode::ClearAllFailed: return "ClearAllFailed";
+    case ErrorCode::CmdDeniedOnChannel: return "CmdDeniedOnChannel";
     default: return "Unknown";
     }
 }

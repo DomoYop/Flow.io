@@ -78,7 +78,37 @@ Pipeline RX:
 1. callback IDF `MQTT_EVENT_DATA`
 2. copie vers queue RX bornée (`RxMsg`)
 3. traitement dans la task `mqtt`
-4. ACK/erreur sur `ack` ou `cfg/ack`
+4. filtrage des commandes interdites sur ce canal (voir ci-dessous)
+5. ACK/erreur sur `ack` ou `cfg/ack`
+
+### Commandes refusées sur le canal MQTT
+
+Le topic `cmd` exécute **n'importe quelle** commande enregistrée dans le
+`CommandRegistry` : il n'y a pas de liste blanche par canal. Or le broker est un
+point d'entrée partagé (Home Assistant, autres intégrations, et selon les ACL
+d'autres appareils). Une mise à jour de firmware demandée par MQTT ne coûte
+qu'un message, télécharge depuis une URL fournie dans la commande et n'est pas
+rattrapable.
+
+[MqttCommandPolicy.h](../../src/Modules/Network/MQTTModule/MqttCommandPolicy.h)
+refuse donc `fw.update` et ses sous-commandes, sauf `fw.update.status` qui est
+en lecture seule. La réponse est un ACK d'erreur `CmdDeniedOnChannel`, non
+retryable, accompagné d'un `LOGW` sans le payload (celui-ci peut contenir une
+URL et des identifiants). Le refus est compté dans `handlerFail`, donc visible
+dans les métriques RX.
+
+Les mises à jour restent disponibles par l'interface web. Aucune entité Home
+Assistant ne déclenchait ces commandes, et l'UI web passe par ses propres routes
+HTTP : ce filtrage ne retire donc aucun usage existant.
+
+Restent volontairement autorisés : `fw.nextion.reboot` (redémarre l'écran, sans
+écriture flash), `system.reboot`, `system.factory_reset` et l'import de
+configuration. Les deux derniers sont destructifs mais réversibles par
+reconfiguration, et Home Assistant peut légitimement vouloir les piloter — leur
+refus se discute séparément.
+
+La politique est une fonction pure, couverte par `test_mqtt_command_policy`
+(env `native`, exécuté en CI).
 
 Queue RX:
 - longueur: `Limits::Mqtt::Capacity::RxQueueLen` (`8`)

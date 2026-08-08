@@ -12,6 +12,11 @@
 #include <ArduinoJson.h>
 #include <string.h>
 
+#include "Modules/Network/MQTTModule/MqttCommandPolicy.h"
+
+#define LOG_MODULE_ID ((LogModuleId)LogModuleIdValue::MQTTModule)
+#include "Core/ModuleLog.h"
+
 void MQTTModule::processRx_(const RxMsg& msg)
 {
     if (strcmp(msg.topic, topicCmd_) == 0) {
@@ -96,6 +101,17 @@ void MQTTModule::processRxCmd_(const RxMsg& msg)
     if (cmdLen >= sizeof(cmd)) cmdLen = sizeof(cmd) - 1U;
     memcpy(cmd, cmdVal, cmdLen);
     cmd[cmdLen] = '\0';
+
+    // Filtrage sur le nom deja borne a Limits::Mqtt::Buffers::CmdName, celui qui
+    // sera passe a execute() : une troncature ne peut donc pas faire diverger la
+    // decision de filtrage et l'execution.
+    if (mqttCommandDenied(cmd)) {
+        // Trace sans le payload : la commande peut porter une URL et des
+        // identifiants de telechargement.
+        LOGW("cmd denied on mqtt channel: %s", cmd);
+        publishRxError_(MqttTopics::SuffixAck, ErrorCode::CmdDeniedOnChannel, "cmd", false);
+        return;
+    }
 
     const char* argsJson = nullptr;
     char argsBuf[Limits::Mqtt::Buffers::CmdArgs] = {0};
