@@ -1,0 +1,27 @@
+# Configuration gitleaks pour flow.io.
+#
+# Les regles par defaut sont conservees ; l'allowlist ne neutralise que des
+# identifiants de capteurs et des noms de cles NVS, qui ressemblent a des
+# secrets sans en etre.
+#
+# Si le job `secrets` echoue sur un faux positif, ajouter ici une regex ciblee
+# (regexTarget = "line", donc la regex s'applique a la ligne complete) plutot
+# que de desactiver la regle entiere ou le job.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Identifiants runtime de capteurs et noms de membres de cles NVS : ce ne sont pas des secrets"
+regexTarget = "line"
+regexes = [
+  # Cles RuntimeUI de capteurs environnementaux, dans les manifestes generes
+  # (src/Core/Generated/RuntimeUiManifestJson_Generated.h) et leurs sources.
+  '''(?i)"key"\s*:\s*"(?:io\.)?(?:bmp280|bme680|sht40)[._][a-z0-9_.-]+"''',
+  # Traces de diagnostic I2C : lecture du nom de cle NVS, pas d'une valeur.
+  '''(?:sda|scl)KeyActive = i2c(?:Sda|Scl)Var_\.nvsKey''',
+]
+
+# Pas d'allowlist de chemins : ni binary/ ni les assets .gz ne sont versionnes
+# ici (ils sont produits par export_binaries.py et prepare_spiffs_data.py au
+# build), donc rien a exclure du scan.

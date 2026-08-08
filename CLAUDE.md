@@ -36,6 +36,19 @@ Note Windows : le shell par défaut est PowerShell ; le tool Bash exécute du PO
 - **`pio test` sans `-e native` ne fonctionne pas** : `default_envs = FlowIO` ferait cibler l'ESP32. L'env `native` compile uniquement les helpers purs (`FiltrationWindow`, `DosingController`) et demande un `g++` hôte sur le PATH — absent de la machine de dev Windows, le job GitHub Actions `native-tests` s'en charge. Corollaire : la section commune des firmwares ESP32 s'appelle **`[esp32_base]`** et non `[env]`, car une section `[env]` serait héritée par tous les envs, y compris `native`.
 - **`pio run -e Supervisor` échoue de la même manière** (mêmes symboles Arduino-ESP32 manquants, plus `NetworkEvents.h` et `RuntimeData::pool` — `PoolDeviceRuntime.h` est compilé alors que `PoolDeviceModuleDataModel.h` est hors `build_src_filter`). Préexistant, vérifié sur commit de référence : ne pas l'attribuer à une modification en cours.
 
+### Gates CI reproductibles en local
+
+[.github/workflows/build.yml](.github/workflows/build.yml) applique cinq gates bloquants (`i18n`, `gitleaks`, `cppcheck`, `native-tests`, `waveshare` + budget de partition) et un job informatif (`flowio-compile`). Trois sont rejouables localement :
+
+```bash
+python scripts/validate_i18n.py --ratchet scripts/i18n_ratchet.json
+python scripts/check_firmware_size.py --env Waveshare-ESP32-S3 --max-percent 85
+```
+
+- **`check_firmware_size.py`** lit la taille de la partition `app` dans le CSV déclaré par l'env (résolu en suivant `extends`), jamais un chiffre en dur — c'est ce qui avait fait dériver la mention « ~93 % » quand la partition est passée de 2 à 4 Mo. Exige un `pio run` préalable.
+- **cppcheck** n'est pas installé sur la machine de dev, mais PlatformIO le fournit : `pio pkg install --global --tool platformio/tool-cppcheck` puis `~/.platformio/packages/tool-cppcheck/cppcheck.exe`. Rejouer **exactement** les options du workflow, `--platform=unix32` compris : sans elle, cppcheck prend la plateforme de l'hôte et les alertes de portabilité diffèrent entre Windows et la CI. L'arbre courant sort à **zéro alerte** ; le gate ne se déclenche donc que sur une régression.
+- **gitleaks** n'est pas rejouable en local (pas de binaire installé) ; son allowlist est dans [.gitleaks.toml](.gitleaks.toml), à étendre par une regex ciblée en cas de faux positif.
+
 ## Code généré — ne pas éditer à la main
 
 Des scripts Python tournent **avant chaque build** (`extra_scripts` dans `platformio.ini`) et régénèrent du code et des assets. Ne modifiez jamais les fichiers générés directement ; modifiez la source puis recompilez.

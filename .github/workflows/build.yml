@@ -20,6 +20,62 @@ jobs:
           python-version: "3.11"
       - run: python scripts/validate_i18n.py --ratchet scripts/i18n_ratchet.json
 
+  secrets:
+    # Scan de secrets sur l'historique pousse. L'allowlist est dans
+    # .gitleaks.toml : un faux positif se corrige par une regex ciblee, pas en
+    # rendant ce job non bloquant.
+    # gitleaks-action est gratuit pour un compte personnel ; un depot appartenant
+    # a une organisation exigerait un secret GITLEAKS_LICENSE.
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  static-analysis:
+    # cppcheck sans les headers du framework : l'analyse inter-procedurale reste
+    # partielle, mais le jeu warning/performance/portability sort a zero alerte
+    # sur l'arbre courant (133 fichiers), donc le job part d'un etat propre et ne
+    # se declenche que sur une regression. `style` reste desactive : trop bruyant
+    # pour un gate bloquant.
+    #
+    # --platform=unix32 : sans lui, cppcheck prend la plateforme de l'hote (64
+    # bits en CI, win64 en local sous Windows), ce qui change les tailles de
+    # types et donc les alertes de portabilite. unix32 est le modele ILP32 le
+    # plus proche de l'ESP32 et rend le resultat reproductible partout.
+    #
+    # Une version de cppcheck plus recente que celle de l'image peut introduire
+    # de nouvelles alertes : les traiter par une suppression ciblee (ou un
+    # commentaire // cppcheck-suppress grace a --inline-suppr), pas en retirant
+    # --error-exitcode.
+    name: cppcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+      - name: Version de cppcheck
+        run: cppcheck --version
+      - name: Analyse statique
+        run: >
+          cppcheck
+          --enable=warning,performance,portability
+          --std=c++17
+          --force
+          --inline-suppr
+          --suppress=missingIncludeSystem
+          --suppress=unmatchedSuppression
+          --platform=unix32
+          --error-exitcode=1
+          -j 4
+          src include
+
   native-tests:
     # Tests unitaires des helpers purs (FiltrationWindow, DosingController).
     # Rapides : pas de toolchain ESP32, juste le g++ de l'image Ubuntu.
@@ -55,8 +111,10 @@ jobs:
           restore-keys: pio-waveshare-${{ runner.os }}-
       - run: pip install platformio
       - run: pio run -e Waveshare-ESP32-S3
-      - name: Taille du binaire
-        run: ls -l .pio/build/Waveshare-ESP32-S3/*.bin || true
+      - name: Budget de partition applicative
+        # Plafond a 85 % de la partition app la plus petite du CSV de l'env.
+        # Occupation actuelle : ~47 %, la marge est confortable.
+        run: python scripts/check_firmware_size.py --env Waveshare-ESP32-S3 --max-percent 85
 
   flowio-compile:
     # L'env FlowIO ne linke plus (derive du core Arduino-ESP32, probleme
