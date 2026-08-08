@@ -1,26 +1,39 @@
 # Configuration gitleaks pour flow.io.
 #
 # Les regles par defaut sont conservees ; l'allowlist ne neutralise que des
-# identifiants de capteurs et des noms de cles NVS, qui ressemblent a des
-# secrets sans en etre.
+# identifiants de cles Runtime UI, qui declenchent `generic-api-key` sans etre
+# des secrets.
 #
-# Si le job `secrets` echoue sur un faux positif, ajouter ici une regex ciblee
-# (regexTarget = "line", donc la regex s'applique a la ligne complete) plutot
-# que de desactiver la regle entiere ou le job.
+# gitleaks scanne tout l'historique, pas seulement HEAD : ces motifs doivent
+# donc couvrir aussi des noms qui n'existent plus dans le code actuel. Les
+# 7 faux positifs constates au premier run complet (393 commits) :
+#   30e907c  "key": "ina226.voltage"   RuntimeUiManifestJson_Generated.h + IOModule/text/runtimeui.json
+#   37e96a1  "key": "ina228.voltage"   idem
+#   cf87929  key = "io.bmp280_temp"    WebInterfaceServer.cpp (3 lignes voisines)
+# `ina226` et `ina228` sont les anciens backends unifies depuis en POWERMON :
+# une allowlist qui enumere les capteurs actuels ne les couvrirait pas.
+#
+# Si le job `gitleaks` echoue sur un nouveau faux positif, verifier d'abord la
+# ligne au commit indique par le `Fingerprint:` du log, puis etendre une regex
+# ci-dessous. Ne pas desactiver la regle ni le job.
 
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Identifiants runtime de capteurs et noms de membres de cles NVS : ce ne sont pas des secrets"
+description = "Identifiants de cles Runtime UI (domaine.mesure) : ce ne sont pas des secrets"
 regexTarget = "line"
 regexes = [
-  # Cles RuntimeUI de capteurs environnementaux, dans les manifestes generes
-  # (src/Core/Generated/RuntimeUiManifestJson_Generated.h) et leurs sources.
-  '''(?i)"key"\s*:\s*"(?:io\.)?(?:bmp280|bme680|sht40)[._][a-z0-9_.-]+"''',
-  # Traces de diagnostic I2C : lecture du nom de cle NVS, pas d'une valeur.
-  '''(?:sda|scl)KeyActive = i2c(?:Sda|Scl)Var_\.nvsKey''',
+  # Manifestes Runtime UI et leurs sources : "key": "ina226.voltage".
+  '''"key"\s*:\s*"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+"''',
+  # Meme identifiant cote C++ : const char* key = "io.bmp280_temp".
+  '''\bkey = "[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*"''',
 ]
+
+# Ces deux motifs restent etroits : minuscules, chiffres, underscores et points
+# uniquement. Une vraie cle d'API (longue, majuscules melangees, base64 ou hex)
+# ne les satisfait pas, donc l'allowlist ne cree pas d'angle mort general sur
+# `generic-api-key`.
 
 # Pas d'allowlist de chemins : ni binary/ ni les assets .gz ne sont versionnes
 # ici (ils sont produits par export_binaries.py et prepare_spiffs_data.py au
