@@ -2214,14 +2214,37 @@
     let poolConfigReqSeq = 0;
     // Sous-branche Config Store regroupant les 3 fenetres de filtration.
     const poolFiltrationWindowsBranch = 'poollogic/filtration/fenetres';
+    // device = le PoolDevice qui porte la fonction (pdm/pdN/enabled = "Appareil
+    // installe"). Une carte dont l'appareil n'est pas installe est masquee : les
+    // reglages d'une fonction absente de l'installation n'ont rien a dire ici.
+    // Sans device, la carte est transversale (protections, pilotage) et reste
+    // toujours affichee. fields = liste explicite et ordonnee, pour les branches
+    // trop fournies pour une tuile (poollogic/ph compte 17 champs).
     const poolConfigModuleDefs = Object.freeze([
       Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
-      Object.freeze({ module: 'poollogic/filtration', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
-      Object.freeze({ module: 'poollogic/heater', titleKey: 'pool.card.heater.title', title: 'Chauffage', icon: 'thermostat', noteKey: 'pool.card.heater.note', note: 'Le chauffage suit sa consigne seulement quand le mode automatique le permet.' }),
-      Object.freeze({ module: 'poollogic/refill', titleKey: 'pool.card.refill.title', title: 'Remplissage', icon: 'water_drop', noteKey: 'pool.card.refill.note', note: 'Le remplissage garde une durée minimale pour éviter les cycles trop courts.' }),
+      Object.freeze({ module: 'poollogic/filtration', device: 'pdm/pd0', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
+      Object.freeze({
+        module: 'poollogic/ph',
+        device: 'pdm/pd1',
+        titleKey: 'pool.card.ph.title',
+        title: 'Régulation pH',
+        icon: 'opacity',
+        noteKey: 'pool.card.ph.note',
+        note: 'Dosage par lots : un volume calculé depuis celui du bassin, puis une attente de mélange avant la mesure suivante.',
+        // Etat de la FSM de dosage, lu dans le manifeste runtime : phase, cause
+        // d'inaction, lot en cours, effet attendu. Aucune liste d'ids ici -- une
+        // valeur ajoutee au manifeste apparait sans toucher a l'UI.
+        runtimeDomain: 'ph',
+        fields: Object.freeze(['ph_auto_mode', 'ph_setpoint', 'ph_deadband', 'ph_dose_max_day', 'ph_mix_wait_min']),
+        // ph_dose_plus n'est pas un interrupteur mais le produit charge : le
+        // rendre en "Actif / Arret" ne veut rien dire. Il qualifie le mode auto.
+        labelSuffix: (key, data) => (key === 'ph_auto_mode' ? ' (' + (toBool(data.ph_dose_plus) ? 'pH+' : 'pH−') + ')' : '')
+      }),
+      Object.freeze({ module: 'poollogic/heater', device: 'pdm/pd7', titleKey: 'pool.card.heater.title', title: 'Chauffage', icon: 'thermostat', noteKey: 'pool.card.heater.note', note: 'Le chauffage suit sa consigne seulement quand le mode automatique le permet.' }),
+      Object.freeze({ module: 'poollogic/refill', device: 'pdm/pd5', titleKey: 'pool.card.refill.title', title: 'Remplissage', icon: 'water_drop', noteKey: 'pool.card.refill.note', note: 'Le remplissage garde une durée minimale pour éviter les cycles trop courts.' }),
       Object.freeze({ module: 'poollogic/safety', titleKey: 'pool.card.safety.title', title: 'Protections', icon: 'health_and_safety', noteKey: 'pool.card.safety.note', note: 'Seuils de pression, hors gel et bascule hiver utilisés par les automatismes.' }),
       Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.' }),
-      Object.freeze({ module: 'poollogic/robot', titleKey: 'pool.card.robot.title', title: 'Robot', icon: 'smart_toy', noteKey: 'pool.card.robot.note', note: 'Fenêtre de lancement et durée du nettoyage automatique.' })
+      Object.freeze({ module: 'poollogic/robot', device: 'pdm/pd8', titleKey: 'pool.card.robot.title', title: 'Robot', icon: 'smart_toy', noteKey: 'pool.card.robot.note', note: 'Fenêtre de lancement et durée du nettoyage automatique.' })
     ]);
     // typeValue = PoolLogicModule::DisinfectionType (0 = desactive, sans mode
     // associe et donc absent de cette table).
@@ -5472,6 +5495,14 @@
       infoFlowDomainKeys.forEach((domainKey) => {
         if (!keys.includes(domainKey)) keys.push(domainKey);
       });
+      // Domaines lus par les cartes de la page Piscine. Ce ne sont pas des
+      // domaines de mesure du tableau de bord (pas d'onglet, pas de preference
+      // memorisee), mais registerRuntimeManifestEntry jette toute entree dont le
+      // domaine est absent d'ici : sans cette ligne, le manifeste est charge et
+      // les valeurs du domaine silencieusement perdues.
+      poolConfigModuleDefs.forEach((def) => {
+        if (def.runtimeDomain && !keys.includes(def.runtimeDomain)) keys.push(def.runtimeDomain);
+      });
       return keys;
     }
 
@@ -7299,14 +7330,27 @@
 
     function poolConfigFields(moduleName, data, options) {
       const opts = options || {};
-      const keys = Object.keys((data && typeof data === 'object') ? data : {})
-        .filter((key) => !opts.exclude || opts.exclude.indexOf(key) < 0)
-        .sort();
+      const source = (data && typeof data === 'object') ? data : {};
+      // opts.fields impose l'ordre d'affichage et laisse les reglages de detail a
+      // la page de configuration ; sans lui, on liste tout par ordre alphabetique.
+      const keys = Array.isArray(opts.fields)
+        ? opts.fields.filter((key) => Object.prototype.hasOwnProperty.call(source, key))
+        : Object.keys(source)
+          .filter((key) => !opts.exclude || opts.exclude.indexOf(key) < 0)
+          .sort();
       const picked = Number.isFinite(Number(opts.limit)) ? keys.slice(0, Number(opts.limit)) : keys;
+      const suffixFor = (key) => {
+        if (typeof opts.labelSuffix !== 'function') return '';
+        try {
+          return String(opts.labelSuffix(key, source) || '');
+        } catch (err) {
+          return '';
+        }
+      };
       return picked.map((key) => ({
         key,
-        label: poolConfigFieldLabel(moduleName, key),
-        value: poolConfigFormatValue(moduleName, key, data[key])
+        label: poolConfigFieldLabel(moduleName, key) + suffixFor(key),
+        value: poolConfigFormatValue(moduleName, key, source[key])
       }));
     }
 
@@ -7852,10 +7896,60 @@
       poolFiltrationPanel.appendChild(card);
     }
 
+    // Fonction reellement presente sur l'installation : pdm/pdN/enabled.
+    // L'absence de donnee (module non charge, lecture en echec) ne masque rien --
+    // une carte qui disparait sur une erreur reseau transitoire serait pire que
+    // le probleme resolu.
+    function poolConfigDeviceInstalled(modules, def) {
+      if (!def || !def.device) return true;
+      const deviceData = modules ? modules[def.device] : null;
+      if (!deviceData || typeof deviceData !== 'object') return true;
+      if (!Object.prototype.hasOwnProperty.call(deviceData, 'enabled')) return true;
+      return toBool(deviceData.enabled);
+    }
+
+    // Etat runtime d'un domaine du manifeste, rendu en metriques dans une carte de
+    // la page Piscine. Les entrees, leurs libelles, unites et decimales viennent
+    // du manifeste : rien a maintenir ici quand le firmware en publie une de plus.
+    async function poolConfigFillRuntimeMetrics(container, domainKey) {
+      if (!container) return;
+      const entries = await runtimeMeasureEntriesForDomain(domainKey, false);
+      const ids = (entries || []).map((entry) => Number(entry.id)).filter((id) => Number.isFinite(id));
+      if (!ids.length) return;
+      const values = await fetchRuntimeValues(ids);
+      const valueById = new Map();
+      (values || []).forEach((item) => {
+        const id = Number(item && item.id);
+        if (Number.isFinite(id)) valueById.set(id, item);
+      });
+
+      const rendered = document.createDocumentFragment();
+      entries
+        .slice()
+        .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+        .forEach((entry) => {
+          const runtimeValue = valueById.get(Number(entry.id));
+          // Le firmware publie "indisponible" quand la valeur n'a pas de sens a
+          // cet instant (pas de lot en cours, hors phase de melange) : la ligne
+          // n'a rien a dire, on l'omet plutot que d'afficher "Indisponible".
+          if (!runtimeValue) return;
+          const status = String(runtimeValue.status || '');
+          if (status === 'unavailable' || status === 'not_found') return;
+          poolConfigAppendMetric(
+            rendered,
+            String(entry.label || entry.key || ''),
+            formatRuntimeMeasureValue(entry, runtimeValue),
+            { featured: runtimeMeasureDisplayKind(entry) === 'badge' }
+          );
+        });
+      container.innerHTML = '';
+      container.appendChild(rendered);
+    }
+
     function poolConfigRenderGeneralCards(modules) {
       if (!poolConfigGrid) return;
       poolConfigGrid.innerHTML = '';
-      const order = ['poollogic/heater', 'poollogic/safety', 'poollogic/bassin', 'poollogic/robot'];
+      const order = ['poollogic/ph', 'poollogic/heater', 'poollogic/safety', 'poollogic/bassin', 'poollogic/robot'];
       const orderedDefs = poolConfigModuleDefs.slice().sort((a, b) => {
         const ai = order.indexOf(a.module);
         const bi = order.indexOf(b.module);
@@ -7863,6 +7957,7 @@
       });
       orderedDefs.forEach((def) => {
         if (def.module === 'poollogic/bassin' || def.module === 'poollogic/filtration' || def.module === 'poollogic/refill') return;
+        if (!poolConfigDeviceInstalled(modules, def)) return;
         const data = modules[def.module] || {};
         const card = document.createElement('article');
         card.className = 'pool-config-card pool-config-card-' + runtimeMeasureCssSlug(def.module);
@@ -7884,7 +7979,17 @@
         head.appendChild(icon);
         head.appendChild(copy);
         card.appendChild(head);
-        card.appendChild(poolConfigBuildFieldList(def.module, data));
+        if (def.runtimeDomain) {
+          // Rempli en differe : la carte s'affiche immediatement avec ses reglages,
+          // l'etat runtime arrive quand le manifeste et les valeurs sont la.
+          const metrics = document.createElement('div');
+          metrics.className = 'pool-metric-grid';
+          card.appendChild(metrics);
+          poolConfigFillRuntimeMetrics(metrics, def.runtimeDomain).catch(() => {});
+        }
+        card.appendChild(poolConfigBuildFieldList(def.module, data, (def.fields || def.labelSuffix)
+          ? { fields: def.fields, labelSuffix: def.labelSuffix }
+          : null));
         poolConfigGrid.appendChild(card);
       });
     }
@@ -8002,12 +8107,25 @@
       try {
         await poolConfigEnsureDocs().catch(() => {});
         const modules = {};
+        // Liste dedupliquee : poollogic/bassin porte deux cartes, et pdm/pd0 est a
+        // la fois le device de la filtration et la source du debit pompe.
+        const moduleNames = [];
+        const pushModuleName = (name) => {
+          const clean = String(name || '').trim();
+          if (clean && moduleNames.indexOf(clean) < 0) moduleNames.push(clean);
+        };
+        poolConfigModuleDefs.forEach((def) => {
+          pushModuleName(def.module);
+          // Branche du PoolDevice : lue pour son seul champ enabled, qui decide de
+          // l'affichage de la carte.
+          pushModuleName(def.device);
+        });
+        poolDisinfectionModeDefs.forEach((def) => pushModuleName(def.module));
         // pdm/pd0 : le debit de la pompe de filtration y vit desormais.
-        const allDefs = poolConfigModuleDefs
-          .concat(poolDisinfectionModeDefs)
-          .concat([{ module: 'pdm/pd0' }, { module: poolFiltrationWindowsBranch }]);
-        for (const def of allDefs) {
-          const payload = await poolConfigFetchModule(def.module);
+        pushModuleName('pdm/pd0');
+        pushModuleName(poolFiltrationWindowsBranch);
+        for (const moduleName of moduleNames) {
+          const payload = await poolConfigFetchModule(moduleName);
           if (reqSeq !== poolConfigReqSeq) return;
           modules[payload.module] = payload.data;
         }

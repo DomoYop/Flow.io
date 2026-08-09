@@ -13,3 +13,4 @@
 #include "Modules/Network/TimeModule/TimeRuntime.h"
 #include "Modules/Network/WifiModule/WifiRuntime.h"
 #include "Modules/PoolDeviceModule/PoolDeviceRuntime.h"
+#include "Modules/PoolLogicModule/PoolLogicRuntime.h"

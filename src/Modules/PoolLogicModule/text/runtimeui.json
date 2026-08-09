@@ -118,12 +118,93 @@
     {
       "valueId": 8,
       "key": "pool.ph_dose_phase",
-      "type": "uint8",
+      "type": "enum",
       "domain": "ph",
       "display": "badge",
+      "enum": {
+        "0_t": "runtimeui.poollogic.v08.enum.idle",
+        "1_t": "runtimeui.poollogic.v08.enum.measure",
+        "2_t": "runtimeui.poollogic.v08.enum.dosing",
+        "3_t": "runtimeui.poollogic.v08.enum.mixing",
+        "4_t": "runtimeui.poollogic.v08.enum.evaluate",
+        "5_t": "runtimeui.poollogic.v08.enum.blocked"
+      },
       "order": 100,
       "label_t": "runtimeui.poollogic.v08.label",
-      "group_t": "runtimeui.poollogic.v08.group"
+      "group_t": "runtimeui.poollogic.ph.group"
+    },
+    {
+      "valueId": 11,
+      "key": "pool.ph_block_reason",
+      "type": "enum",
+      "domain": "ph",
+      "display": "badge",
+      "enum": {
+        "0_t": "runtimeui.poollogic.v11.enum.none",
+        "1_t": "runtimeui.poollogic.v11.enum.disabled",
+        "2_t": "runtimeui.poollogic.v11.enum.noSample",
+        "3_t": "runtimeui.poollogic.v11.enum.sampleStale",
+        "4_t": "runtimeui.poollogic.v11.enum.sampleRange",
+        "5_t": "runtimeui.poollogic.v11.enum.inBand",
+        "6_t": "runtimeui.poollogic.v11.enum.wrongSide",
+        "7_t": "runtimeui.poollogic.v11.enum.dayQuota",
+        "8_t": "runtimeui.poollogic.v11.enum.tankEmpty",
+        "9_t": "runtimeui.poollogic.v11.enum.pump",
+        "10_t": "runtimeui.poollogic.v11.enum.config",
+        "11_t": "runtimeui.poollogic.v11.enum.noEffect",
+        "12_t": "runtimeui.poollogic.v11.enum.interlock"
+      },
+      "order": 101,
+      "label_t": "runtimeui.poollogic.v11.label",
+      "group_t": "runtimeui.poollogic.ph.group"
+    },
+    {
+      "valueId": 12,
+      "key": "pool.ph_mix_remain_min",
+      "type": "float",
+      "domain": "ph",
+      "display": "value",
+      "unit": "min",
+      "decimals": 0,
+      "order": 102,
+      "label_t": "runtimeui.poollogic.v12.label",
+      "group_t": "runtimeui.poollogic.ph.group"
+    },
+    {
+      "valueId": 13,
+      "key": "pool.ph_batch_target_ml",
+      "type": "float",
+      "domain": "ph",
+      "display": "value",
+      "unit": "mL",
+      "decimals": 0,
+      "order": 103,
+      "label_t": "runtimeui.poollogic.v13.label",
+      "group_t": "runtimeui.poollogic.ph.group"
+    },
+    {
+      "valueId": 14,
+      "key": "pool.ph_batch_delivered_ml",
+      "type": "float",
+      "domain": "ph",
+      "display": "value",
+      "unit": "mL",
+      "decimals": 0,
+      "order": 104,
+      "label_t": "runtimeui.poollogic.v14.label",
+      "group_t": "runtimeui.poollogic.ph.group"
+    },
+    {
+      "valueId": 15,
+      "key": "pool.ph_expected_delta",
+      "type": "float",
+      "domain": "ph",
+      "display": "value",
+      "unit": "pH",
+      "decimals": 2,
+      "order": 105,
+      "label_t": "runtimeui.poollogic.v15.label",
+      "group_t": "runtimeui.poollogic.ph.group"
     },
     {
       "valueId": 9,
@@ -143,7 +224,7 @@
       "decimals": 0,
       "order": 110,
       "label_t": "runtimeui.poollogic.v09.label",
-      "group_t": "runtimeui.poollogic.v09.group"
+      "group_t": "runtimeui.poollogic.ph.group"
     },
     {
       "valueId": 10,
@@ -155,7 +236,7 @@
       "decimals": 1,
       "order": 120,
       "label_t": "runtimeui.poollogic.v10.label",
-      "group_t": "runtimeui.poollogic.v10.group"
+      "group_t": "runtimeui.poollogic.ph.group"
     }
   ]
 }

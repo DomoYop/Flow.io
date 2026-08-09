@@ -34,7 +34,7 @@ public:
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
 
-    uint8_t dependencyCount() const override { return 7; }
+    uint8_t dependencyCount() const override { return 8; }
     ModuleId dependency(uint8_t i) const override {
         if (i == 0) return ModuleId::LogHub;
         if (i == 1) return ModuleId::EventBus;
@@ -43,6 +43,8 @@ public:
         if (i == 4) return ModuleId::PoolDevice;
         if (i == 5) return ModuleId::Command;
         if (i == 6) return ModuleId::Alarm;
+        // Publication de l'etat de dosage pH (PoolLogicRuntime).
+        if (i == 7) return ModuleId::DataStore;
         return ModuleId::Unknown;
     }
 
@@ -88,6 +90,13 @@ private:
         RuntimeUiPhDosePhase = 8,
         RuntimeUiPhDoseDayMl = 9,
         RuntimeUiPhGain = 10,
+        // Suivi du lot en cours : ce que la FSM a decide, ce qu'elle a deja
+        // injecte, ce qu'elle attend comme effet et pourquoi elle patiente.
+        RuntimeUiPhBlockReason = 11,
+        RuntimeUiPhMixRemainMin = 12,
+        RuntimeUiPhBatchTargetMl = 13,
+        RuntimeUiPhBatchDeliveredMl = 14,
+        RuntimeUiPhExpectedDelta = 15,
     };
 
     enum DisinfectionType : uint8_t {
@@ -566,6 +575,7 @@ private:
     const TimeService* timeSvc_ = nullptr;
     const TimeSchedulerService* schedSvc_ = nullptr;
     const IOServiceV2* ioSvc_ = nullptr;
+    DataStore* dataStore_ = nullptr;
     const PoolDeviceService* poolSvc_ = nullptr;
     const MqttService* mqttSvc_ = nullptr;
     const AlarmService* alarmSvc_ = nullptr;
@@ -638,6 +648,19 @@ private:
                             uint32_t phAgeMs,
                             uint32_t nowMs) const;
     void stepPhDosing_(bool havePh, float ph, uint32_t phAgeMs, uint32_t nowMs, bool& phPumpDesired);
+    /** @brief Gain retenu pour le dosage : appris s'il existe, configure sinon. */
+    float phEffectiveGainMlPerM3_() const;
+    /** @brief Publie l'etat du dosage pH dans le DataStore (no-op sans DataStore). */
+    void publishPhDosingRuntime_() const;
+    /**
+     * @brief Variation de pH attendue du lot en cours, signee selon le produit.
+     *
+     * Inverse de computeBatchDoseMl : le lot decide vaut gain x volume x
+     * (ecart / unitStep) x facteur, plafonne lot/jour/bidon. Repartir du volume
+     * reellement retenu -- et non de l'ecart mesure -- fait apparaitre l'effet
+     * d'un plafonnement. false = pas de lot en cours ou config inexploitable.
+     */
+    bool phExpectedBatchDelta_(float& deltaOut) const;
     void persistPhDosingResult_(const DosingOutput& out, uint32_t nowMs);
     void resetPhLearnedGain_(const char* reason);
     void resetPhDosingState_(uint32_t nowMs);

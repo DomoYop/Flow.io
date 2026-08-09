@@ -40,6 +40,9 @@ constexpr DataKey HaVendor = 11;
 /** @brief Home Assistant runtime key: configured device id (`HARuntime`). */
 constexpr DataKey HaDeviceId = 12;
 
+/** @brief PoolLogic runtime key: pH batch-dosing state (`PoolLogicRuntime`). */
+constexpr DataKey PoolPhDosing = 13;
+
 /** @brief Reserved base for IO endpoint runtime keys (`IORuntime`). */
 constexpr DataKey IoBase = 40;
 /** @brief Reserved IO runtime key count: supports endpoints `[0..39]`. */

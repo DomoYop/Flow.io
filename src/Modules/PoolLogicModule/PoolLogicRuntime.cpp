@@ -177,6 +177,51 @@ uint8_t PoolLogicModule::runtimeSnapshotCount() const
     return 6;
 }
 
+float PoolLogicModule::phEffectiveGainMlPerM3_() const
+{
+    return (phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_;
+}
+
+void PoolLogicModule::publishPhDosingRuntime_() const
+{
+    if (!dataStore_) return;
+
+    PoolLogicPhDosingRuntimeData out{};
+    out.valid = phDosingState_.tickValid;
+    out.phase = phDosingLast_.phase;
+    out.blockReason = phDosingLast_.blockReason;
+    // Hors phase de melange, le decompte n'a pas de sens : le consommateur doit
+    // pouvoir distinguer "0 minute restante" de "pas d'attente en cours".
+    out.mixing = (phDosingLast_.phase == DOSING_PHASE_MIXING);
+    out.mixRemainMs = out.mixing ? phDosingLast_.mixRemainMs : 0U;
+    out.batchTargetMl = phDosingLast_.doseTargetMl;
+    out.batchDeliveredMl = phDosingLast_.doseDeliveredMl;
+    out.haveExpectedDelta = phExpectedBatchDelta_(out.expectedDelta);
+    out.dosedTodayMl = phDosedTodayMl_;
+    out.gainMlPerM3 = phEffectiveGainMlPerM3_();
+    (void)setPoolPhDosingRuntime(*dataStore_, out);
+}
+
+bool PoolLogicModule::phExpectedBatchDelta_(float& deltaOut) const
+{
+    deltaOut = 0.0f;
+    const float target = phDosingLast_.doseTargetMl;
+    if (!std::isfinite(target) || target <= 0.0f) return false;
+
+    const float gain = phEffectiveGainMlPerM3_();
+    const float unitStep = PoolDefaults::PhDoseUnitStep;
+    if (!std::isfinite(gain) || gain <= 0.0f) return false;
+    if (!std::isfinite(poolVolumeM3_) || poolVolumeM3_ <= 0.0f) return false;
+    if (!std::isfinite(unitStep) || unitStep <= 0.0f) return false;
+
+    const float magnitude = (target / (gain * poolVolumeM3_)) * unitStep;
+    if (!std::isfinite(magnitude)) return false;
+    // pH+ remonte la mesure, pH- la fait baisser : le signe dit dans quel sens
+    // lire l'effet, sans avoir a connaitre le produit charge.
+    deltaOut = phDosePlus_ ? magnitude : -magnitude;
+    return true;
+}
+
 bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) const
 {
     const RuntimeUiId runtimeId = makeRuntimeUiId(moduleId(), valueId);
@@ -204,7 +249,23 @@ bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wri
         case RuntimeUiPhDoseDayMl:
             return writer.writeF32(runtimeId, phDosedTodayMl_);
         case RuntimeUiPhGain:
-            return writer.writeF32(runtimeId, (phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_);
+            return writer.writeF32(runtimeId, phEffectiveGainMlPerM3_());
+        case RuntimeUiPhBlockReason:
+            return writer.writeEnum(runtimeId, phDosingLast_.blockReason);
+        case RuntimeUiPhMixRemainMin:
+            // Le decompte n'avance que si la filtration brasse : hors phase de
+            // melange il n'y a pas d'attente a annoncer, donc rien a afficher.
+            if (phDosingLast_.phase != DOSING_PHASE_MIXING) return writer.writeUnavailable(runtimeId);
+            return writer.writeF32(runtimeId, (float)phDosingLast_.mixRemainMs / 60000.0f);
+        case RuntimeUiPhBatchTargetMl:
+            return writer.writeF32(runtimeId, phDosingLast_.doseTargetMl);
+        case RuntimeUiPhBatchDeliveredMl:
+            return writer.writeF32(runtimeId, phDosingLast_.doseDeliveredMl);
+        case RuntimeUiPhExpectedDelta: {
+            float delta = 0.0f;
+            if (!phExpectedBatchDelta_(delta)) return writer.writeUnavailable(runtimeId);
+            return writer.writeF32(runtimeId, delta);
+        }
         default:
             return false;
     }
@@ -407,7 +468,7 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
                 (double)d.doseDeliveredMl,
                 (unsigned long)d.mixWaitMs,
                 (unsigned long)d.mixRemainMs,
-                (double)((phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_),
+                (double)phEffectiveGainMlPerM3_(),
                 (unsigned)phGainSamples_,
                 (unsigned)phDosingState_.noEffectCount,
                 (double)phDosedTodayMl_,
@@ -434,7 +495,7 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
                 dosingPhaseStr_(d.phase),
                 (unsigned)d.blockReason,
                 dosingBlockReasonStr_(d.blockReason),
-                (double)((phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_),
+                (double)phEffectiveGainMlPerM3_(),
                 (unsigned)phGainSamples_,
                 (double)phDosedTodayMl_,
                 (double)phTankRemainMl_,

@@ -393,7 +393,7 @@ void PoolLogicModule::fillPhDosingInput_(DosingInput& in,
     in.pumpFlowLPerHour = phPumpFlowLh_;
 
     // Le gain appris prend le pas sur la valeur configuree une fois calibre.
-    in.gainMlPerM3PerStep = (phGainLearned_ > 0.0f) ? phGainLearned_ : phDoseMlPerM3_;
+    in.gainMlPerM3PerStep = phEffectiveGainMlPerM3_();
     in.referenceGain = phDoseMlPerM3_;
     in.unitStep = PoolDefaults::PhDoseUnitStep;
     in.safetyFactor = phDoseFactor_;
@@ -430,6 +430,7 @@ void PoolLogicModule::stepPhDosing_(bool havePh,
         phDosingTsMs_ = nowMs;
     }
     phDosingLast_ = out;
+    publishPhDosingRuntime_();
 
     if (out.batchCompleted) persistPhDosingResult_(out, nowMs);
 }
@@ -443,6 +444,7 @@ void PoolLogicModule::resetPhDosingState_(uint32_t nowMs)
     phDosingState_.gainSampleCount = phGainSamples_;
     phDosingLast_ = DosingOutput{};
     phDosingTsMs_ = nowMs;
+    publishPhDosingRuntime_();
 }
 
 // Le gain appris est exprime relativement au gain configure et au volume du

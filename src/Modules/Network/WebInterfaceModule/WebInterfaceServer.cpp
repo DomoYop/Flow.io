@@ -29,6 +29,7 @@
 #include "Modules/IOModule/IORuntime.h"
 #include "Modules/IOModule/IoBackendTraits.h"
 #include "Modules/PoolDeviceModule/PoolDeviceRuntime.h"
+#include "Modules/PoolLogicModule/PoolLogicRuntime.h"
 #include "Modules/Network/MQTTModule/MQTTRuntime.h"
 #include "Profiles/Waveshare/WaveshareIoLayout.h"
 #endif
@@ -1451,6 +1452,16 @@ void printRuntimeU32_(Print& out, bool& firstValue, RuntimeUiId id, const char* 
     out.print('}');
 }
 
+// Type "enum" : la valeur reste numerique sur le fil, le libelle vient de la
+// table `enum` du manifeste, resolue cote client.
+void printRuntimeEnum_(Print& out, bool& firstValue, RuntimeUiId id, const char* key, uint8_t value)
+{
+    printRuntimeValuePrefix_(out, firstValue, id, key, "enum", nullptr);
+    out.print(",\"value\":");
+    out.print((unsigned)value);
+    out.print('}');
+}
+
 void printRuntimeF32_(Print& out, bool& firstValue, RuntimeUiId id, const char* key, float value, const char* unit = nullptr)
 {
     printRuntimeValuePrefix_(out, firstValue, id, key, "float", unit);
@@ -1701,6 +1712,8 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
                                 bool& winterMode,
                                 bool& phAutoMode,
                                 bool& orpAutoMode,
+                                bool& phAvailable,
+                                bool& orpAvailable,
                                 uint8_t* disinfectionTypeOut = nullptr)
 {
     hasMode = false;
@@ -1708,16 +1721,24 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
     winterMode = false;
     phAutoMode = false;
     orpAutoMode = false;
+    phAvailable = false;
+    orpAvailable = false;
     if (disinfectionTypeOut) *disinfectionTypeOut = 0U;
     if (!cfgStore) return false;
 
-    char moduleJson[320] = {0};
+    // Les branches sont serialisees en entier pour un seul booleen : le buffer doit
+    // couvrir la plus grosse (poollogic/ph, 17 champs, ~430 octets ; disinfection,
+    // 21 champs). Sous-dimensionne, toJsonModule tronque, renvoie quand meme true,
+    // et le JSON incomplet fait echouer le parse en silence -- le mode auto etait
+    // alors rapporte "false", donc affiche "Arret" alors qu'il etait actif.
+    char moduleJson[768] = {0};
     bool truncated = false;
-    if (!cfgStore->toJsonModule("poollogic/bassin", moduleJson, sizeof(moduleJson), &truncated, true)) {
+    StaticJsonDocument<768> doc;
+    if (!cfgStore->toJsonModule("poollogic/bassin", moduleJson, sizeof(moduleJson), &truncated, true) ||
+        truncated) {
+        if (truncated) LOGW("runtime pool modes: branche poollogic/bassin tronquee (buffer %u)", (unsigned)sizeof(moduleJson));
         return false;
     }
-
-    StaticJsonDocument<384> doc;
     if (deserializeJson(doc, moduleJson)) return false;
     JsonObjectConst root = doc.as<JsonObjectConst>();
     if (root.isNull()) return false;
@@ -1727,25 +1748,28 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
     winterMode = root["winter_mode"] | false;
     if (disinfectionTypeOut) *disinfectionTypeOut = root["disinfection_type"] | 0U;
 
-    memset(moduleJson, 0, sizeof(moduleJson));
-    truncated = false;
-    if (cfgStore->toJsonModule("poollogic/ph", moduleJson, sizeof(moduleJson), &truncated, true)) {
-        StaticJsonDocument<128> phDoc;
-        if (!deserializeJson(phDoc, moduleJson)) {
-            JsonObjectConst phRoot = phDoc.as<JsonObjectConst>();
-            if (!phRoot.isNull()) phAutoMode = phRoot["ph_auto_mode"] | false;
+    // Le meme buffer et le meme document servent aux lectures suivantes : elles
+    // sont sequentielles, et trois documents distincts pesaient sur la pile de la
+    // tache HTTP. Une lecture qui echoue laisse son drapeau de disponibilite a
+    // false : mieux vaut "indisponible" a l'ecran qu'un faux "Arret".
+    auto readBranchFlag = [&](const char* branch, const char* key, bool& valueOut) -> bool {
+        memset(moduleJson, 0, sizeof(moduleJson));
+        bool branchTruncated = false;
+        if (!cfgStore->toJsonModule(branch, moduleJson, sizeof(moduleJson), &branchTruncated, true)) return false;
+        if (branchTruncated) {
+            LOGW("runtime pool modes: branche %s tronquee (buffer %u)", branch, (unsigned)sizeof(moduleJson));
+            return false;
         }
-    }
+        doc.clear();
+        if (deserializeJson(doc, moduleJson)) return false;
+        JsonObjectConst branchRoot = doc.as<JsonObjectConst>();
+        if (branchRoot.isNull() || !branchRoot.containsKey(key)) return false;
+        valueOut = branchRoot[key] | false;
+        return true;
+    };
 
-    memset(moduleJson, 0, sizeof(moduleJson));
-    truncated = false;
-    if (cfgStore->toJsonModule("poollogic/disinfection", moduleJson, sizeof(moduleJson), &truncated, true)) {
-        StaticJsonDocument<128> disDoc;
-        if (!deserializeJson(disDoc, moduleJson)) {
-            JsonObjectConst disRoot = disDoc.as<JsonObjectConst>();
-            if (!disRoot.isNull()) orpAutoMode = disRoot["dis_auto_mode"] | false;
-        }
-    }
+    phAvailable = readBranchFlag("poollogic/ph", "ph_auto_mode", phAutoMode);
+    orpAvailable = readBranchFlag("poollogic/disinfection", "dis_auto_mode", orpAutoMode);
     return true;
 }
 
@@ -1834,6 +1858,9 @@ struct WaveshareRuntimeContext {
     bool poolPhAutoMode = false;
     bool poolOrpAutoMode = false;
     bool poolHeaterAutoMode = false;
+    // Lecture reussie de la branche : distingue "mode a l'arret" de "valeur non lue".
+    bool poolPhAvailable = false;
+    bool poolOrpAvailable = false;
     // Disponibilite par mode : un mode dont le module associe est desactive est masque.
     bool poolDisAvailable = false;     // desinfection auto : masquee si disinfection_type == Disabled
     bool mqttServerLoaded = false;
@@ -1857,9 +1884,11 @@ void waveshareEnsurePoolMode_(WaveshareRuntimeContext& ctx, ConfigStore* cfgStor
                                                        ctx.poolWinterMode,
                                                        ctx.poolPhAutoMode,
                                                        ctx.poolOrpAutoMode,
+                                                       ctx.poolPhAvailable,
+                                                       ctx.poolOrpAvailable,
                                                        &disinfectionType);
     // Desinfection auto masquee quand la desinfection est desactivee (type == Disabled == 3).
-    ctx.poolDisAvailable = ctx.poolModeAvailable && disinfectionType != 3U;
+    ctx.poolDisAvailable = ctx.poolModeAvailable && ctx.poolOrpAvailable && disinfectionType != 3U;
     (void)waveshareLoadPoolHeaterMode_(cfgStore, ctx.poolHeaterAutoMode);
 }
 
@@ -1971,7 +2000,7 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
             return true;
         case 2403:
             waveshareEnsurePoolMode_(ctx, cfgStore);
-            if (!ctx.poolModeAvailable) {
+            if (!ctx.poolModeAvailable || !ctx.poolPhAvailable) {
                 wavesharePrintUnavailableByManifestType_(out, firstValue, id);
             } else {
                 printRuntimeBool_(out, firstValue, id, "pool.ph_auto_mode", ctx.poolPhAutoMode);
@@ -2074,6 +2103,58 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
                 printRuntimeF32_(out, firstValue, id, key, value, unit);
             }
             return true;
+        }
+        // Dosage pH : etat de la FSM publie par PoolLogic dans le DataStore. Une
+        // valeur qui n'a pas de sens a cet instant (attente hors melange, effet
+        // attendu sans lot decide) est rendue indisponible, pas mise a zero.
+        case 2408:
+        case 2409:
+        case 2410:
+        case 2411:
+        case 2412:
+        case 2413:
+        case 2414:
+        case 2415: {
+            const PoolLogicPhDosingRuntimeData& ph = poolPhDosingRuntime(*dataStore);
+            if (!ph.valid) {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+                return true;
+            }
+            switch (id) {
+                case 2408:
+                    printRuntimeEnum_(out, firstValue, id, "pool.ph_dose_phase", ph.phase);
+                    return true;
+                case 2409:
+                    printRuntimeF32_(out, firstValue, id, "pool.ph_dose_day_ml", ph.dosedTodayMl, "mL");
+                    return true;
+                case 2410:
+                    printRuntimeF32_(out, firstValue, id, "pool.ph_gain", ph.gainMlPerM3, "mL/m3");
+                    return true;
+                case 2411:
+                    printRuntimeEnum_(out, firstValue, id, "pool.ph_block_reason", ph.blockReason);
+                    return true;
+                case 2412:
+                    if (!ph.mixing) {
+                        wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+                        return true;
+                    }
+                    printRuntimeF32_(out, firstValue, id, "pool.ph_mix_remain_min",
+                                     (float)ph.mixRemainMs / 60000.0f, "min");
+                    return true;
+                case 2413:
+                    printRuntimeF32_(out, firstValue, id, "pool.ph_batch_target_ml", ph.batchTargetMl, "mL");
+                    return true;
+                case 2414:
+                    printRuntimeF32_(out, firstValue, id, "pool.ph_batch_delivered_ml", ph.batchDeliveredMl, "mL");
+                    return true;
+                default:
+                    if (!ph.haveExpectedDelta) {
+                        wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+                        return true;
+                    }
+                    printRuntimeF32_(out, firstValue, id, "pool.ph_expected_delta", ph.expectedDelta, "pH");
+                    return true;
+            }
         }
         case 2406:
         case 2407: {
@@ -2321,7 +2402,10 @@ bool waveshareBuildStatusDomainJson_(FlowStatusDomain domain,
         bool winterMode = false;
         bool phAutoMode = false;
         bool orpAutoMode = false;
-        (void)waveshareLoadPoolModeFlags_(cfgStore, hasMode, autoMode, winterMode, phAutoMode, orpAutoMode);
+        bool phAvailable = false;
+        bool orpAvailable = false;
+        (void)waveshareLoadPoolModeFlags_(cfgStore, hasMode, autoMode, winterMode, phAutoMode, orpAutoMode,
+                                          phAvailable, orpAvailable);
         pool["has"] = hasMode;
         pool["auto"] = autoMode;
         pool["wint"] = winterMode;

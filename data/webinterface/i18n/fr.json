@@ -83,6 +83,8 @@
     "pool.filtration.applyError": "application des fenêtres impossible",
     "pool.filtration.noChange": "Aucun changement à appliquer.",
     "pool.filtration.invalid": "Valeur invalide : {label}",
+    "pool.card.ph.title": "Régulation pH",
+    "pool.card.ph.note": "Dosage par lots : un volume calculé depuis celui du bassin, puis une attente de mélange avant la mesure suivante.",
     "pool.card.heater.title": "Chauffage",
     "pool.card.heater.note": "Le chauffage suit sa consigne seulement quand le mode automatique le permet.",
     "pool.card.refill.title": "Remplissage",

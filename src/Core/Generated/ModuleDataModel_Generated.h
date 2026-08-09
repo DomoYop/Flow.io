@@ -17,6 +17,7 @@
 #include "Modules/Network/TimeModule/TimeModuleDataModel.h"
 #include "Modules/Network/WifiModule/WifiModuleDataModel.h"
 #include "Modules/PoolDeviceModule/PoolDeviceModuleDataModel.h"
+#include "Modules/PoolLogicModule/PoolLogicModuleDataModel.h"
 
 struct RuntimeData {
     RUNTIME_DATA_CORE_FIELDS
@@ -26,4 +27,5 @@ struct RuntimeData {
     TimeRuntimeData time;
     WifiRuntimeData wifi;
     PoolDeviceRuntimeData pool;
+    PoolLogicPhDosingRuntimeData poolPhDosing;
 };

@@ -424,6 +424,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     schedSvc_ = services.get<TimeSchedulerService>(ServiceId::TimeScheduler);
     ioSvc_ = services.get<IOServiceV2>(ServiceId::Io);
     poolSvc_ = services.get<PoolDeviceService>(ServiceId::PoolDevice);
+    const DataStoreService* dsSvc = services.get<DataStoreService>(ServiceId::DataStore);
+    dataStore_ = dsSvc ? dsSvc->store : nullptr;
     const HAService* haSvc = services.get<HAService>(ServiceId::Ha);
     const CommandService* cmdSvc = services.get<CommandService>(ServiceId::Command);
     alarmSvc_ = services.get<AlarmService>(ServiceId::Alarm);

@@ -83,6 +83,8 @@
     "pool.filtration.applyError": "failed to apply filtration windows",
     "pool.filtration.noChange": "No change to apply.",
     "pool.filtration.invalid": "Invalid value: {label}",
+    "pool.card.ph.title": "pH regulation",
+    "pool.card.ph.note": "Batch dosing: a volume derived from the pool volume, then a mixing wait before the next reading.",
     "pool.card.heater.title": "Heater",
     "pool.card.heater.note": "The heater follows its setpoint only when automatic mode allows it.",
     "pool.card.refill.title": "Refill",
