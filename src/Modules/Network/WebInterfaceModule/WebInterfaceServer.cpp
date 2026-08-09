@@ -2198,7 +2198,10 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2214:
         case 2215:
         case 2216:
-        case 2217: {
+        case 2217:
+        case 2218:
+        case 2219:
+        case 2220: {
             // Capteurs I2C secondaires (BMP280/BME680/SHT40) + moniteur de puissance
             // POWERMON (INA226/INA228). Lecture reelle via (backend, channel) : une sonde
             // dont le driver est desactive renvoie "unavailable" et sera masquee cote UI.
@@ -2217,6 +2220,12 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
                 case 2215: backend = IO_BACKEND_POWERMON; channel = 1U; key = "powermon.voltage";   unit = "V"; break;
                 case 2216: backend = IO_BACKEND_POWERMON; channel = 2U; key = "powermon.current";   unit = "mA"; break;
                 case 2217: backend = IO_BACKEND_POWERMON; channel = 3U; key = "powermon.power";     unit = "mW"; break;
+                // Canaux 5 a 7 : accumulateurs propres a l'INA228. Sur un INA226 le
+                // port n'est pas assemble (IOModuleAssembly), la lecture echoue et la
+                // valeur ressort "unavailable" -- pas d'erreur, juste rien a afficher.
+                case 2218: backend = IO_BACKEND_POWERMON; channel = 5U; key = "powermon.temperature"; unit = "\xC2\xB0""C"; break;
+                case 2219: backend = IO_BACKEND_POWERMON; channel = 6U; key = "powermon.energy";    unit = "Wh"; break;
+                case 2220: backend = IO_BACKEND_POWERMON; channel = 7U; key = "powermon.charge";    unit = "mAh"; break;
                 default: break; // 2207 : BMP280 ch0 (valeurs par defaut)
             }
             float value = 0.0f;

@@ -2221,8 +2221,10 @@
     // toujours affichee. fields = liste explicite et ordonnee, pour les branches
     // trop fournies pour une tuile (poollogic/ph compte 17 champs).
     const poolConfigModuleDefs = Object.freeze([
-      Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
-      Object.freeze({ module: 'poollogic/filtration', device: 'pdm/pd0', titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
+      // renderedElsewhere : la branche est chargee pour d'autres rendus de la page
+      // (bandeau de modes, panneau de filtration) et n'a pas sa carte dans la grille.
+      Object.freeze({ module: 'poollogic/bassin', renderedElsewhere: true, titleKey: 'pool.card.modes.title', title: 'Pilotage général', icon: 'tune', noteKey: 'pool.card.modes.note', note: 'Ces interrupteurs définissent si PoolLogic pilote la piscine et quelle stratégie de traitement est retenue.' }),
+      Object.freeze({ module: 'poollogic/filtration', device: 'pdm/pd0', renderedElsewhere: true, titleKey: 'pool.card.filtration.title', title: 'Filtration', icon: 'waves', noteKey: 'pool.card.filtration.note', note: 'Le besoin journalier (volume × cycles(T°) ÷ débit pompe) est réparti dans les fenêtres actives par ordre de priorité.' }),
       Object.freeze({
         module: 'poollogic/ph',
         device: 'pdm/pd1',
@@ -2243,7 +2245,10 @@
       Object.freeze({ module: 'poollogic/heater', device: 'pdm/pd7', titleKey: 'pool.card.heater.title', title: 'Chauffage', icon: 'thermostat', noteKey: 'pool.card.heater.note', note: 'Le chauffage suit sa consigne seulement quand le mode automatique le permet.' }),
       Object.freeze({ module: 'poollogic/refill', device: 'pdm/pd5', titleKey: 'pool.card.refill.title', title: 'Remplissage', icon: 'water_drop', noteKey: 'pool.card.refill.note', note: 'Le remplissage garde une durée minimale pour éviter les cycles trop courts.' }),
       Object.freeze({ module: 'poollogic/safety', titleKey: 'pool.card.safety.title', title: 'Protections', icon: 'health_and_safety', noteKey: 'pool.card.safety.note', note: 'Seuils de pression, hors gel et bascule hiver utilisés par les automatismes.' }),
-      Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.' }),
+      // Seconde carte sur poollogic/bassin : les autres champs de la branche sont
+      // deja rendus ailleurs (bandeau de modes, selecteur de desinfection, volume
+      // dans le panneau de filtration). Ne reste que la temporisation commune.
+      Object.freeze({ module: 'poollogic/bassin', titleKey: 'pool.card.regulation.title', title: 'Régulation', icon: 'speed', noteKey: 'pool.card.regulation.note', note: 'Temporisations communes aux régulateurs pH et désinfection.', fields: Object.freeze(['dly_pid_min']) }),
       Object.freeze({ module: 'poollogic/robot', device: 'pdm/pd8', titleKey: 'pool.card.robot.title', title: 'Robot', icon: 'smart_toy', noteKey: 'pool.card.robot.note', note: 'Fenêtre de lancement et durée du nettoyage automatique.' })
     ]);
     // typeValue = PoolLogicModule::DisinfectionType (0 = desactive, sans mode
@@ -7949,14 +7954,14 @@
     function poolConfigRenderGeneralCards(modules) {
       if (!poolConfigGrid) return;
       poolConfigGrid.innerHTML = '';
-      const order = ['poollogic/ph', 'poollogic/heater', 'poollogic/safety', 'poollogic/bassin', 'poollogic/robot'];
+      const order = ['poollogic/ph', 'poollogic/heater', 'poollogic/refill', 'poollogic/safety', 'poollogic/bassin', 'poollogic/robot'];
       const orderedDefs = poolConfigModuleDefs.slice().sort((a, b) => {
         const ai = order.indexOf(a.module);
         const bi = order.indexOf(b.module);
         return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
       });
       orderedDefs.forEach((def) => {
-        if (def.module === 'poollogic/bassin' || def.module === 'poollogic/filtration' || def.module === 'poollogic/refill') return;
+        if (def.renderedElsewhere) return;
         if (!poolConfigDeviceInstalled(modules, def)) return;
         const data = modules[def.module] || {};
         const card = document.createElement('article');

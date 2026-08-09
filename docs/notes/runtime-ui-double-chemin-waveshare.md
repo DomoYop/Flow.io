@@ -35,10 +35,12 @@ aucun écran de l'interface web, depuis leur création.
 
 ### État après correction
 
-Le switch couvre désormais 60 des 63 entrées du manifeste. Restent orphelines :
-
-- `powermon.temperature` (2218), `powermon.energy` (2219), `powermon.charge` (2220)
-  — domaine `sondes`, affichées « Indisponible » dans le tableau de bord.
+**Le switch couvre les 63 entrées du manifeste ; il n'en reste aucune orpheline.**
+Outre le domaine `ph`, trois valeurs du moniteur de puissance ont été câblées :
+`powermon.temperature` (2218, canal 5), `powermon.energy` (2219, canal 6) et
+`powermon.charge` (2220, canal 7). Ce sont des accumulateurs propres à l'INA228 :
+sur un INA226 le port n'est pas assemblé, la lecture échoue et la valeur ressort
+« unavailable » — comportement voulu, pas une erreur.
 
 Asymétrie inverse, sans conséquence mais à connaître : le switch sert 4 ids absents du
 manifeste principal (1004, 1301-1303) ; l'UI ne les demande jamais, puisqu'elle ne
