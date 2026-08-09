@@ -307,9 +307,12 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
             (void)haSvc_->addSensor(haSvc_->ctx, &s1b);
         }
         if (slots_[PoolIds::DeviceFillPump].used) {
+            // Suffixes d'objet figes a l'ancienne numerotation (pd4 = remplissage
+            // avant la refonte v2) pour ne pas recreer les entites dans Home
+            // Assistant ; seuls les topics suivent PoolIds::Device*.
             const HASensorEntry s2{
                 "pooldev", "pd_fill_upt_mn", "Pump uptime Fill",
-                "rt/pdm/metrics/pd4", "{{ ((value_json.running.day_s | float(0)) / 60) | round(0) | int(0) }}",
+                "rt/pdm/metrics/pd5", "{{ ((value_json.running.day_s | float(0)) / 60) | round(0) | int(0) }}",
                 nullptr, "mdi:timer-outline", "mn"
             };
             (void)haSvc_->addSensor(haSvc_->ctx, &s2);
@@ -325,7 +328,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         if (slots_[PoolIds::DeviceChlorineGenerator].used) {
             const HASensorEntry s4{
                 "pooldev", "pd_chl_gen_upt", "Pump uptime Chlorine Generator",
-                "rt/pdm/metrics/pd5", "{{ ((value_json.running.day_s | float(0)) / 60) | round(0) | int(0) }}",
+                "rt/pdm/metrics/pd3", "{{ ((value_json.running.day_s | float(0)) / 60) | round(0) | int(0) }}",
                 nullptr, "mdi:timer-outline", "mn"
             };
             (void)haSvc_->addSensor(haSvc_->ctx, &s4);
@@ -333,14 +336,10 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
     }
 
     if (haSvc_ && haSvc_->addNumber) {
-        if (slots_[0].used) {
-            const HANumberEntry n0{
-                "pooldev", "pd0_flow", "Filtration Pump Flowrate",
-                "cfg/pdm/pd0", "{{ value_json.flow_l_h }}",
-                MqttTopics::SuffixCfgSet, "{\\\"pdm/pd0\\\":{\\\"flow_l_h\\\":{{ value | float(0) }}}}",
-                0.0f, 3.0f, 0.1f, "slider", "config", "mdi:water-sync", "L/h"
-            };
-            (void)haSvc_->addNumber(haSvc_->ctx, &n0);
+        // Pas d'entite de debit pour la filtration : flow_l_h n'est enregistre que
+        // pour les pompes peristaltiques (cf. registerVar plus haut), la filtration
+        // expose pump_flow_m3h via l'entite PoolLogic pl_pump_flow.
+        if (slots_[PoolIds::DeviceFiltrationPump].used) {
             const HANumberEntry n0b{
                 "pooldev", "pd0_max_upt", "Max Uptime Filtration Pump",
                 "cfg/pdm/pd0", "{{ ((value_json.max_uptime_day_s | float(0)) / 60) | round(0) | int(0) }}",
@@ -349,7 +348,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
             };
             (void)haSvc_->addNumber(haSvc_->ctx, &n0b);
         }
-        if (slots_[1].used) {
+        if (slots_[PoolIds::DevicePhPump].used) {
             const HANumberEntry n1{
                 "pooldev", "pd1_flow", "pH Pump Flowrate",
                 "cfg/pdm/pd1", "{{ value_json.flow_l_h }}",
@@ -358,7 +357,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
             };
             (void)haSvc_->addNumber(haSvc_->ctx, &n1);
         }
-        if (slots_[2].used) {
+        if (slots_[PoolIds::DeviceChlorinePump].used) {
             const HANumberEntry n2{
                 "pooldev", "pd2_flow", "Chlorine Pump Flowrate",
                 "cfg/pdm/pd2", "{{ value_json.flow_l_h }}",
@@ -388,8 +387,8 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         if (slots_[PoolIds::DeviceFillPump].used) {
             const HANumberEntry n4b{
                 "pooldev", "pd4_max_upt", "Max Uptime Fill Pump",
-                "cfg/pdm/pd4", "{{ ((value_json.max_uptime_day_s | float(0)) / 60) | round(0) | int(0) }}",
-                MqttTopics::SuffixCfgSet, "{\\\"pdm/pd4\\\":{\\\"max_uptime_day_s\\\":{{ (value | float(0) * 60) | round(0) | int(0) }}}}",
+                "cfg/pdm/pd5", "{{ ((value_json.max_uptime_day_s | float(0)) / 60) | round(0) | int(0) }}",
+                MqttTopics::SuffixCfgSet, "{\\\"pdm/pd5\\\":{\\\"max_uptime_day_s\\\":{{ (value | float(0) * 60) | round(0) | int(0) }}}}",
                 0.0f, 120.0f, 1.0f, "box", "config", "mdi:timer-cog-outline", "mn"
             };
             (void)haSvc_->addNumber(haSvc_->ctx, &n4b);
@@ -397,8 +396,8 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
         if (slots_[PoolIds::DeviceChlorineGenerator].used) {
             const HANumberEntry n5{
                 "pooldev", "pd5_max_upt", "Max Uptime Chlorine Generator",
-                "cfg/pdm/pd5", "{{ ((value_json.max_uptime_day_s | float(0)) / 60) | round(0) | int(0) }}",
-                MqttTopics::SuffixCfgSet, "{\\\"pdm/pd5\\\":{\\\"max_uptime_day_s\\\":{{ (value | float(0) * 60) | round(0) | int(0) }}}}",
+                "cfg/pdm/pd3", "{{ ((value_json.max_uptime_day_s | float(0)) / 60) | round(0) | int(0) }}",
+                MqttTopics::SuffixCfgSet, "{\\\"pdm/pd3\\\":{\\\"max_uptime_day_s\\\":{{ (value | float(0) * 60) | round(0) | int(0) }}}}",
                 0.0f, 1440.0f, 1.0f, "box", "config", "mdi:timer-cog-outline", "mn"
             };
             (void)haSvc_->addNumber(haSvc_->ctx, &n5);
@@ -471,7 +470,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
                 "pd_reset_upt_fill",
                 "Reset Uptime Fill Pump",
                 MqttTopics::SuffixCmd,
-                "{\\\"cmd\\\":\\\"pool.uptime.reset\\\",\\\"args\\\":{\\\"slot\\\":4}}",
+                "{\\\"cmd\\\":\\\"pool.uptime.reset\\\",\\\"args\\\":{\\\"slot\\\":5}}",
                 "diagnostic",
                 "mdi:timer-refresh-outline"
             };
@@ -483,7 +482,7 @@ void PoolDeviceModule::init(ConfigStore& cfg, ServiceRegistry& services)
                 "pd_reset_upt_chl_gen",
                 "Reset Uptime Chlorine Generator",
                 MqttTopics::SuffixCmd,
-                "{\\\"cmd\\\":\\\"pool.uptime.reset\\\",\\\"args\\\":{\\\"slot\\\":5}}",
+                "{\\\"cmd\\\":\\\"pool.uptime.reset\\\",\\\"args\\\":{\\\"slot\\\":3}}",
                 "diagnostic",
                 "mdi:timer-refresh-outline"
             };
@@ -577,7 +576,60 @@ void PoolDeviceModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
                                      runtimePersistBuf_[i]);
         }
     }
+
+    syncHaEntityVisibility_(services);
     requestPeriodReconcile_();
+}
+
+void PoolDeviceModule::syncHaEntityVisibility_(ServiceRegistry& services)
+{
+    // Masquage Home Assistant des entites d'un equipement desactive. Le test ne
+    // peut pas se faire dans init() : `enabled` vient de la NVS, chargee entre
+    // init() et onConfigLoaded(). C'est le meme patron que PoolLogic et que le
+    // tombstone des switchs dans PoolIoHaDiscovery. Le champ `used` seul ne
+    // convient pas : il vaut true pour les 12 fonctions declarees par le profil.
+    if (!haSvc_) haSvc_ = services.get<HAService>(ServiceId::Ha);
+    if (!haSvc_ || !haSvc_->setEntityAbsent) return;
+
+    struct HaSlotEntity {
+        uint8_t slot;
+        const char* objectSuffix;
+    };
+    // Les suffixes pd4_* / pd5_* datent de l'ancienne numerotation : ils sont
+    // conserves tels quels pour ne pas recreer les entites cote Home Assistant.
+    static constexpr HaSlotEntity kSlotEntities[] = {
+        {PoolIds::DeviceFiltrationPump, "pd_flt_upt_mn"},
+        {PoolIds::DeviceFiltrationPump, "pd0_max_upt"},
+        {PoolIds::DeviceFiltrationPump, "pd_reset_upt_flt"},
+        {PoolIds::DevicePhPump, "pd_ph_pmp_upt"},
+        {PoolIds::DevicePhPump, "pd_ph_tnk_rem"},
+        {PoolIds::DevicePhPump, "pd1_flow"},
+        {PoolIds::DevicePhPump, "pd1_max_upt"},
+        {PoolIds::DevicePhPump, "pd_refill_ph"},
+        {PoolIds::DevicePhPump, "pd_reset_upt_ph"},
+        {PoolIds::DeviceChlorinePump, "pd_chl_pmp_upt"},
+        {PoolIds::DeviceChlorinePump, "pd_chl_tnk_rem"},
+        {PoolIds::DeviceChlorinePump, "pd2_flow"},
+        {PoolIds::DeviceChlorinePump, "pd2_max_upt"},
+        {PoolIds::DeviceChlorinePump, "pd_refill_chl"},
+        {PoolIds::DeviceChlorinePump, "pd_reset_upt_chl"},
+        {PoolIds::DeviceChlorineGenerator, "pd_chl_gen_upt"},
+        {PoolIds::DeviceChlorineGenerator, "pd5_max_upt"},
+        {PoolIds::DeviceChlorineGenerator, "pd_reset_upt_chl_gen"},
+        {PoolIds::DeviceFillPump, "pd_fill_upt_mn"},
+        {PoolIds::DeviceFillPump, "pd4_max_upt"},
+        {PoolIds::DeviceFillPump, "pd_reset_upt_fill"},
+    };
+
+    uint8_t hidden = 0;
+    for (const HaSlotEntity& e : kSlotEntities) {
+        const bool absent = !deviceEnabled(e.slot);
+        if (absent) ++hidden;
+        (void)haSvc_->setEntityAbsent(haSvc_->ctx, "pooldev", e.objectSuffix, absent);
+    }
+    LOGI("PoolDevice HA entities hidden=%u/%u (disabled devices)",
+         (unsigned)hidden,
+         (unsigned)(sizeof(kSlotEntities) / sizeof(kSlotEntities[0])));
 }
 
 void PoolDeviceModule::loop()

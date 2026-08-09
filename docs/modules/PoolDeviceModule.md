@@ -192,28 +192,50 @@ Le module garde localement:
 
 ## Home Assistant
 
-Entités créées:
-- sensors uptime journalière (chlorine/ph/fill/filtration/chlorine_generator selon slots présents)
-  - sources `rt/pdm/metrics/pdN`
-- sensors niveau cuve restant:
-  - `chlorine_tank_remaining_l` (`rt/pdm/metrics/pd2`, conversion `remaining_ml -> L`)
-  - `ph_tank_remaining_l` (`rt/pdm/metrics/pd1`, conversion `remaining_ml -> L`)
-- number sliders `flow_l_h` pour `pd0`, `pd1`, `pd2`
-  - source `cfg/pdm/pdN`
-  - commande `cfg/set` patch JSON
-- number sliders max runtime journalier (exposés en minutes):
-  - `pd1_max_uptime_min`
-  - `pd2_max_uptime_min`
-  - `pd5_max_uptime_min`
-- buttons de service:
-  - `refill_ph_tank` (libellé HA: `Fill pH Tank`) -> `{"cmd":"pool.refill","args":{"slot":1}}`
-  - `refill_chlorine_tank` (libellé HA: `Fill Chlorine Tank`) -> `{"cmd":"pool.refill","args":{"slot":2}}`
-  - `reset_uptime_filtration` -> `{"cmd":"pool.uptime.reset","args":{"slot":0}}`
-  - `reset_uptime_ph` -> `{"cmd":"pool.uptime.reset","args":{"slot":1}}`
-  - `reset_uptime_chlorine` -> `{"cmd":"pool.uptime.reset","args":{"slot":2}}`
-  - `reset_uptime_fill` -> `{"cmd":"pool.uptime.reset","args":{"slot":4}}`
-  - `reset_uptime_chlorine_generator` -> `{"cmd":"pool.uptime.reset","args":{"slot":5}}`
-  - `reset_uptime_all` -> `{"cmd":"pool.uptime.reset_all"}`
+Entités créées (suffixe d'`object_id`, slot piloté) :
+
+| Suffixe | Slot | Type | Source / commande |
+|---|---|---|---|
+| `pd_flt_upt_mn` | `pd0` | sensor | `rt/pdm/metrics/pd0` |
+| `pd_ph_pmp_upt` | `pd1` | sensor | `rt/pdm/metrics/pd1` |
+| `pd_ph_tnk_rem` | `pd1` | sensor | `rt/pdm/metrics/pd1` (`remaining_ml -> L`) |
+| `pd_chl_pmp_upt` | `pd2` | sensor | `rt/pdm/metrics/pd2` |
+| `pd_chl_tnk_rem` | `pd2` | sensor | `rt/pdm/metrics/pd2` (`remaining_ml -> L`) |
+| `pd_chl_gen_upt` | `pd3` | sensor | `rt/pdm/metrics/pd3` |
+| `pd_fill_upt_mn` | `pd5` | sensor | `rt/pdm/metrics/pd5` |
+| `pd1_flow` / `pd2_flow` | `pd1` / `pd2` | number | `cfg/pdm/pdN` -> `cfg/set` |
+| `pd0_max_upt` | `pd0` | number (min) | `cfg/pdm/pd0` -> `cfg/set` |
+| `pd1_max_upt` / `pd2_max_upt` | `pd1` / `pd2` | number (min) | `cfg/pdm/pdN` -> `cfg/set` |
+| `pd4_max_upt` | `pd5` | number (min) | `cfg/pdm/pd5` -> `cfg/set` |
+| `pd5_max_upt` | `pd3` | number (min) | `cfg/pdm/pd3` -> `cfg/set` |
+| `pd_refill_ph` | `pd1` | button | `{"cmd":"pool.refill","args":{"slot":1}}` |
+| `pd_refill_chl` | `pd2` | button | `{"cmd":"pool.refill","args":{"slot":2}}` |
+| `pd_reset_upt_flt` | `pd0` | button | `{"cmd":"pool.uptime.reset","args":{"slot":0}}` |
+| `pd_reset_upt_ph` | `pd1` | button | `{"cmd":"pool.uptime.reset","args":{"slot":1}}` |
+| `pd_reset_upt_chl` | `pd2` | button | `{"cmd":"pool.uptime.reset","args":{"slot":2}}` |
+| `pd_reset_upt_chl_gen` | `pd3` | button | `{"cmd":"pool.uptime.reset","args":{"slot":3}}` |
+| `pd_reset_upt_fill` | `pd5` | button | `{"cmd":"pool.uptime.reset","args":{"slot":5}}` |
+| `pd_reset_upt_all` | — | button | `{"cmd":"pool.uptime.reset_all"}` |
+
+Les suffixes `pd4_max_upt` et `pd5_max_upt` datent de la numérotation d'avant
+[refonte-fonctions-piscine-v2](../notes/refonte-fonctions-piscine-v2.md) et ne correspondent
+plus au slot qu'ils pilotent. Ils sont conservés tels quels pour ne pas recréer les entités
+côté Home Assistant ; seuls les topics et les payloads ont été corrigés.
+
+Il n'y a pas d'entité de débit pour la filtration : `flow_l_h` n'est enregistré que pour les
+pompes péristaltiques, et la filtration expose `pump_flow_m3h` via l'entité PoolLogic
+`pl_pump_flow`.
+
+### Masquage selon les équipements activés
+
+`syncHaEntityVisibility_()` marque absentes (tombstone) toutes les entités du tableau
+ci-dessus dont le `pdN` est désactivé en configuration. L'appel a lieu dans
+`onConfigLoaded()` et non dans `init()` : `enabled` vient de la NVS, chargée entre les deux.
+Tester `slots_[i].used` ne suffit pas — ce champ vaut `true` pour les 12 fonctions déclarées
+par le profil, indépendamment de la configuration utilisateur.
+
+La reconfiguration est prise en compte au redémarrage suivant (discovery one-shot), comme
+pour le masquage PoolLogic et le tombstone des switchs dans `PoolIoHaDiscovery`.
 
 ## Initialisation des slots dans le profil
 

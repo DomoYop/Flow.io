@@ -219,6 +219,8 @@ private:
     void emitAutoModeDisabledByManualActivity_(ActivityRole role, uint8_t slot, const char* autoLabel) const;
     ActivityRole activityRoleForSlot_(uint8_t slot) const;
     bool ensureStorage_();
+    /** Tombstone the HA entities of devices disabled in config (post-NVS load). */
+    void syncHaEntityVisibility_(ServiceRegistry& services);
     bool lockState_(TickType_t timeoutTicks = pdMS_TO_TICKS(200)) const;
     void unlockState_() const;
     size_t runtimePersistUsage_() const;
