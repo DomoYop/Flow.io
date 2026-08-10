@@ -782,6 +782,11 @@ body.web-icons-disabled .control-field-apply{font-size:15px;font-weight:800;lett
 .pool-ribbon-now{position:absolute;top:-2px;bottom:-2px;width:2px;transform:translateX(-1px);background:var(--text);border-radius:2px;}
 .pool-ribbon-axis{position:relative;display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);}
 :root[data-theme="dark"] .pool-ribbon-window{background:rgba(45,200,150,0.30);}
+.pool-ph-track{margin-top:6px;height:30px;}
+.pool-ph-batch{position:absolute;bottom:0;width:4px;transform:translateX(-2px);min-height:4px;background:var(--flow-cyan);border-radius:2px 2px 0 0;}
+.pool-ph-batch.is-running{background:var(--warning);}
+.pool-ph-mix{position:absolute;top:0;bottom:0;background:rgba(43,183,198,0.22);}
+.pool-ph-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);}
 .pool-hero-side{position:relative;z-index:1;display:grid;grid-template-rows:auto 1fr;gap:18px;justify-items:end;align-self:stretch;min-width:260px;border-left:1px solid var(--border);padding-left:24px;}
 .pool-hero-refresh{justify-self:end;}
 .pool-mode-badges{display:flex;align-items:center;justify-content:flex-end;align-content:center;gap:10px;flex-wrap:wrap;min-width:220px;}

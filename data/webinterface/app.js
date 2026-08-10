@@ -1983,6 +1983,7 @@
     const poolConfigSummary = document.getElementById('poolConfigSummary');
     const poolHeroState = document.getElementById('poolHeroState');
     const poolRibbonTrack = document.getElementById('poolRibbonTrack');
+    const poolPhRibbonTrack = document.getElementById('poolPhRibbonTrack');
     const poolNextRunText = document.getElementById('poolNextRunText');
     const poolNextRun = document.getElementById('poolNextRun');
     const poolModeBadges = document.getElementById('poolModeBadges');
@@ -7159,6 +7160,184 @@
       return total;
     }
 
+    // Journal d'activite : valeurs de Core/Services/IActivityLog.h. Les evenements
+    // ne portent pas de nom de role, seulement son code -- d'ou ces constantes.
+    const ACTIVITY_ROLE_PH = 5;
+    const ACTIVITY_STATE_ON = 3;
+    const ACTIVITY_STATE_OFF = 4;
+    const PH_BATCH_MIN_HEIGHT_PCT = 12;
+
+    // Lots de la journee, reconstitues par appariement marche/arret de la pompe pH.
+    // Le volume n'est pas journalise : il se deduit de la duree reelle et du debit
+    // configure de la pompe (pdm/pd1), ce qui evite d'ajouter un stockage.
+    // Le journal se lit depuis sa tete, donc offset 0 est l'evenement le PLUS ANCIEN
+    // du tampon circulaire : pour la journee en cours il faut remonter depuis la fin.
+    // On s'arrete des qu'une page commence avant minuit, avec un plafond de pages.
+    async function poolPhFetchRecentEvents(midnightSec) {
+      const status = await fetchOkJson(
+        '/api/activity/status',
+        { cache: 'no-store' },
+        tr('pool.phTimeline.readFailed', 'lecture du journal impossible'),
+        fetchFlowRemoteQueued
+      );
+      let end = Number(status && status.entries);
+      if (!Number.isFinite(end) || end <= 0) return [];
+
+      const pages = [];
+      for (let page = 0; page < 3 && end > 0; page += 1) {
+        const size = Math.min(128, end);
+        const offset = end - size;
+        const data = await fetchOkJson(
+          '/api/activity/logs?offset=' + offset + '&limit=' + size,
+          { cache: 'no-store' },
+          tr('pool.phTimeline.readFailed', 'lecture du journal impossible'),
+          fetchFlowRemoteQueued
+        );
+        const events = Array.isArray(data && data.events) ? data.events : [];
+        if (!events.length) break;
+        pages.unshift(events);
+        const oldest = Number(events[0] && events[0].epoch_s);
+        if (Number.isFinite(oldest) && oldest > 0 && oldest < midnightSec) break;
+        end = offset;
+      }
+      return [].concat.apply([], pages);
+    }
+
+    async function poolPhFetchTodayBatches(flowLPerHour) {
+      const midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+      const midnightSec = Math.floor(midnight.getTime() / 1000);
+      const events = await poolPhFetchRecentEvents(midnightSec);
+
+      const phEvents = events
+        .filter((e) => e && Number(e.role) === ACTIVITY_ROLE_PH)
+        .filter((e) => Number(e.state) === ACTIVITY_STATE_ON || Number(e.state) === ACTIVITY_STATE_OFF)
+        // epoch_s vaut 0 tant que l'horloge n'est pas synchronisee : sans date, pas
+        // de position possible sur la journee.
+        .filter((e) => Number(e.epoch_s) >= midnightSec)
+        .sort((a, b) => Number(a.epoch_s) - Number(b.epoch_s));
+
+      const batches = [];
+      let openedAt = null;
+      phEvents.forEach((e) => {
+        const epoch = Number(e.epoch_s);
+        if (Number(e.state) === ACTIVITY_STATE_ON) {
+          openedAt = epoch;
+          return;
+        }
+        if (openedAt === null) return;
+        const seconds = Math.max(0, epoch - openedAt);
+        batches.push({
+          startSec: openedAt,
+          stopSec: epoch,
+          ml: (seconds / 3600) * flowLPerHour * 1000
+        });
+        openedAt = null;
+      });
+      // Un demarrage sans arret : lot en cours, son volume vient du runtime.
+      return { batches: batches, runningStartSec: openedAt };
+    }
+
+    function poolPhDayPercent(epochSec) {
+      const d = new Date(epochSec * 1000);
+      return (((d.getHours() * 60) + d.getMinutes() + (d.getSeconds() / 60)) / 1440) * 100;
+    }
+
+    async function poolPhRuntimeState() {
+      const entries = await runtimeMeasureEntriesForDomain('ph', false);
+      const byKey = {};
+      (entries || []).forEach((entry) => { byKey[String(entry.key || '')] = entry; });
+      const wanted = ['pool.ph_dose_phase', 'pool.ph_mix_remain_min', 'pool.ph_batch_delivered_ml'];
+      const ids = wanted.map((k) => Number(byKey[k] && byKey[k].id)).filter((id) => Number.isFinite(id));
+      if (!ids.length) return {};
+      const values = await fetchRuntimeValues(ids);
+      const out = {};
+      (values || []).forEach((v) => {
+        const entry = (entries || []).find((e) => Number(e.id) === Number(v.id));
+        if (!entry) return;
+        const status = String(v.status || '');
+        if (status === 'unavailable' || status === 'not_found') return;
+        out[String(entry.key)] = v.value;
+      });
+      return out;
+    }
+
+    async function poolConfigRenderPhTimeline(modules) {
+      if (!poolPhRibbonTrack) return;
+      poolPhRibbonTrack.hidden = true;
+      poolPhRibbonTrack.innerHTML = '';
+
+      const pd1 = (modules && modules['pdm/pd1']) || {};
+      // Pompe pH absente de l'installation : pas de piste, comme sa carte.
+      if (!toBool(pd1.enabled)) return;
+      const flowLPerHour = Number(pd1.flow_l_h);
+      if (!Number.isFinite(flowLPerHour) || flowLPerHour <= 0) return;
+
+      const [day, runtime] = await Promise.all([
+        poolPhFetchTodayBatches(flowLPerHour),
+        poolPhRuntimeState().catch(() => ({}))
+      ]);
+
+      poolPhRibbonTrack.hidden = false;
+      const runningMl = Number(runtime['pool.ph_batch_delivered_ml']);
+      const bars = day.batches.slice();
+      if (day.runningStartSec !== null && Number.isFinite(runningMl)) {
+        bars.push({ startSec: day.runningStartSec, stopSec: null, ml: runningMl, running: true });
+      }
+
+      if (!bars.length) {
+        const empty = document.createElement('span');
+        empty.className = 'pool-ph-empty';
+        empty.textContent = tr('pool.phTimeline.none', 'Aucune injection aujourd’hui');
+        poolPhRibbonTrack.appendChild(empty);
+      }
+
+      // Attente de melange : elle court depuis la fin du dernier lot et son reste
+      // est publie par le firmware, donc la bande est exacte -- contrairement a une
+      // reconstitution des melanges passes, qui dependrait de reglages depuis modifies.
+      const mixRemainMin = Number(runtime['pool.ph_mix_remain_min']);
+      const lastStopSec = day.batches.length ? day.batches[day.batches.length - 1].stopSec : null;
+      if (Number.isFinite(mixRemainMin) && mixRemainMin > 0 && lastStopSec !== null) {
+        const left = poolPhDayPercent(lastStopSec);
+        const nowPct = ((new Date().getHours() * 60) + new Date().getMinutes()) / 1440 * 100;
+        const right = Math.min(100, nowPct + ((mixRemainMin / 1440) * 100));
+        if (right > left) {
+          const mix = document.createElement('span');
+          mix.className = 'pool-ph-mix';
+          mix.style.left = left.toFixed(2) + '%';
+          mix.style.width = (right - left).toFixed(2) + '%';
+          mix.title = tr('pool.phTimeline.mixing', 'Mélange en cours, {min} min restantes')
+            .replace('{min}', String(Math.round(mixRemainMin)));
+          poolPhRibbonTrack.appendChild(mix);
+        }
+      }
+
+      const maxMl = bars.reduce((acc, b) => Math.max(acc, Number(b.ml) || 0), 0);
+      bars.forEach((b) => {
+        const ml = Number(b.ml) || 0;
+        const bar = document.createElement('span');
+        bar.className = 'pool-ph-batch' + (b.running ? ' is-running' : '');
+        bar.style.left = poolPhDayPercent(b.startSec).toFixed(2) + '%';
+        // Hauteur proportionnelle au volume, avec un plancher : un lot minuscule doit
+        // rester visible, sa position comptant autant que sa taille.
+        const pct = maxMl > 0 ? Math.max(PH_BATCH_MIN_HEIGHT_PCT, (ml / maxMl) * 100) : PH_BATCH_MIN_HEIGHT_PCT;
+        bar.style.height = pct.toFixed(1) + '%';
+        const hm = poolRibbonMinutesToHm(Math.round((poolPhDayPercent(b.startSec) / 100) * 1440));
+        bar.title = b.running
+          ? tr('pool.phTimeline.running', '{time} — injection en cours, {ml} mL')
+            .replace('{time}', hm).replace('{ml}', poolConfigFormatNumber(ml))
+          : tr('pool.phTimeline.batch', '{time} — {ml} mL')
+            .replace('{time}', hm).replace('{ml}', poolConfigFormatNumber(ml));
+        poolPhRibbonTrack.appendChild(bar);
+      });
+
+      const now = new Date();
+      const cursor = document.createElement('span');
+      cursor.className = 'pool-ribbon-now';
+      cursor.style.left = ((((now.getHours() * 60) + now.getMinutes()) / 1440) * 100).toFixed(2) + '%';
+      poolPhRibbonTrack.appendChild(cursor);
+    }
+
     function poolConfigRenderRibbon(filtration, startValue, stopValue) {
       if (!poolRibbonTrack) return;
       poolRibbonTrack.innerHTML = '';
@@ -8007,6 +8186,9 @@
       poolConfigRenderFiltrationPanel(source);
       poolConfigRenderAlarms([]);
       poolConfigRenderGeneralCards(source);
+      poolConfigRenderPhTimeline(source).catch(() => {
+        if (poolPhRibbonTrack) poolPhRibbonTrack.hidden = true;
+      });
     }
 
     // Carte de synthese "Sante de l'eau" (ph/orp/temperature) affichee sur la page Piscine.
@@ -8068,6 +8250,10 @@
         poolAlarmCard.hidden = true;
         poolAlarmCard.innerHTML = '';
       }
+      if (poolPhRibbonTrack) {
+        poolPhRibbonTrack.hidden = true;
+        poolPhRibbonTrack.innerHTML = '';
+      }
     }
 
     function poolConfigRenderError(err) {
@@ -8080,6 +8266,10 @@
       if (poolWaterHealth) {
         poolWaterHealth.hidden = true;
         poolWaterHealth.innerHTML = '';
+      }
+      if (poolPhRibbonTrack) {
+        poolPhRibbonTrack.hidden = true;
+        poolPhRibbonTrack.innerHTML = '';
       }
       if (!poolConfigGrid) return;
       poolConfigGrid.innerHTML = '';
