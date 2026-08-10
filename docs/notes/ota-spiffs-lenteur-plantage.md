@@ -44,24 +44,40 @@ d'un OTA firmware (aucune lecture concurrente de la partition app0/app1).
 Piste : vérifier si l'épinglage cœur 0 est réellement requis (UART Nextion ?) ou si
 la tâche peut tourner sur le cœur 1 comme les autres modules.
 
-### 3. Image SPIFFS transférée à taille pleine de partition, pas à taille réelle (non implémenté)
+### 3. Image SPIFFS transférée à taille pleine de partition (toujours ouvert)
 
-`board_build.filesystem = spiffs` + `partitions_flowios3_ota_16mb.csv`
-([platformio.ini:212-213](../../platformio.ini#L212)) : la partition `spiffs` fait
-`0x7E0000` (~7,87 Mo). L'outil `mkspiffs` de PlatformIO génère systématiquement un
-`.bin` à la taille de la partition (padding `0xFF`), même si le contenu réel de
-`data/` avoisine 1,4 Mo. Chaque mise à jour SPIFFS transfère et flashe donc
-4 à 6× plus de données que nécessaire, ce qui amplifie d'autant l'exposition aux
-points 1 et 2.
+`board_build.filesystem = spiffs` + `partitions_flowios3_ota_16mb.csv` : la partition
+`spiffs` fait `0x7E0000` (7,875 Mo). `mkspiffs` génère systématiquement un `.bin` à la
+taille de la partition (padding `0xFF`), alors que `data/` ne pèse que **324 338 o**
+(317 Ko, 171 fichiers, relevé du 2026-08-10 via `fsver.j`). Chaque mise à jour
+transfère et écrit donc **25×** ce qui est utile.
 
-Piste : générer/transférer une image de taille réelle (pas paddée à la partition
-entière) — nécessiterait d'adapter `scripts/prepare_spiffs_data.py` ou la commande
-de build de l'image SPIFFS.
+Deux voies ont été explorées le 2026-08-10, aucune n'est active à ce jour.
+
+**Réduire la partition — chiffré, puis écarté.** Ramener `spiffs` à `0x100000` (1 Mo,
+31 % d'occupation) fait tomber l'image à 1 048 576 o, soit 7,9× moins à transférer
+*et* à écrire. `spiffs` étant l'avant-dernière partition, la rétrécir ne déplace ni
+`app0` ni `app1` : l'OTA firmware resterait compatible. Mais **l'OTA ne met pas à jour
+la table de partitions** : chaque appareil en service exigerait un flash USB complet,
+impossible dans le contexte d'exploitation actuel. Le CSV a donc été remis à
+`0x7E0000`. À reconsidérer pour une future série d'appareils neufs.
+
+Un garde-fou issu de cette étude est conservé, et il est utile en soi :
+`runSpiffsUpdate_` refuse une image dont la taille diffère de celle de sa partition,
+**avant toute écriture**. Sans lui, une image bâtie pour une autre table donnerait un
+système de fichiers illisible, donc une interface web perdue jusqu'au prochain flash
+USB. Le cas inverse était déjà rejeté par `Update.begin`.
+
+**Transférer l'image compressée — implémenté, non fonctionnel sur cible.** Le padding
+se compresse à presque rien : le `.gz` pèse 4 % du `.bin`. Le code est en place mais
+désactivé par défaut, faute d'avoir abouti. Détail, hypothèses testées et ce qu'il
+reste à mesurer : [ota-spiffs-transfert-gzip.md](ota-spiffs-transfert-gzip.md).
 
 ## Reste à faire
 
 - [x] Yield périodique dans `runSpiffsUpdate_()`.
 - [ ] Étudier le déplacement de la tâche `FirmwareUpdateModule` hors du cœur 0.
-- [ ] Étudier la génération d'une image SPIFFS de taille réelle (hors padding).
+      Redevenu prioritaire : c'est l'hypothèse encore ouverte du blocage gzip.
+- [ ] Réduire le volume transféré : partition écartée (flash USB), gzip non abouti.
 - [ ] Test terrain après le correctif n°1 : vérifier qu'un flash SPIFFS complet
       passe désormais sans reset, y compris sur une liaison WiFi rapide.

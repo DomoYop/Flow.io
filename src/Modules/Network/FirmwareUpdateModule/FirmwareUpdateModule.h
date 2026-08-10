@@ -11,6 +11,7 @@
 #include "Core/CommandRegistry.h"
 
 struct BoardSpec;
+class NetworkClient;  // flux TCP rendu par HTTPClient::getStreamPtr()
 
 class FirmwareUpdateModule : public Module {
 public:
@@ -136,6 +137,21 @@ private:
     bool runNextionUpdate_(const char* url, char* errOut, size_t errOutLen);
     bool runNextionReboot_(char* errOut, size_t errOutLen);
     bool runSpiffsUpdate_(const char* url, char* errOut, size_t errOutLen);
+    /**
+     * @brief Ecrit dans la partition SPIFFS un flux gzip decompresse a la volee.
+     *
+     * L'image est padee jusqu'a la taille de la partition, donc massivement
+     * compressible : le .gz vaut ~4 % du .bin. Decompresser ici evite de
+     * transferer 7,9 Mo pour ~320 Ko de contenu utile.
+     *
+     * @param expectedOut Taille attendue en sortie (taille de la partition).
+     * @return false et failMsg renseigne si le flux est invalide ou incomplet.
+     */
+    bool runSpiffsInflate_(NetworkClient* stream,
+                           int32_t contentLength,
+                           uint32_t expectedOut,
+                           char* failMsg,
+                           size_t failMsgLen);
     bool resolveUrl_(FirmwareUpdateTarget target,
                      const char* explicitUrl,
                      char* out,

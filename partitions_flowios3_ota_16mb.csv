@@ -1,4 +1,11 @@
 # Name,   Type, SubType, Offset,   Size,     Flags
+# spiffs reste a 0x7E0000 alors que data/ n'occupe que ~320 Ko : mkspiffs pade
+# l'image jusqu'a la taille de la partition, donc chaque mise a jour du contenu web
+# transfere 7,9 Mo pour 317 Ko utiles. La retrecir a 1 Mo diviserait le transfert
+# par 7,9, mais l'OTA ne met pas a jour la table de partitions : il faudrait un
+# flash USB complet sur chaque appareil deja en service. Tant que ce n'est pas
+# possible, la taille reste inchangee et le volume se traite ailleurs.
+# Voir docs/notes/ota-spiffs-lenteur-plantage.md
 nvs,      data, nvs,     0x9000,   0x5000,
 otadata,  data, ota,     0xe000,   0x2000,
 app0,     app,  ota_0,   0x10000,  0x400000,

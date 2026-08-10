@@ -1,4 +1,5 @@
 from datetime import datetime
+import gzip
 import json
 from pathlib import Path
 import re
@@ -160,12 +161,38 @@ def _export_program_bin(source, target, env):
         _copy_if_exists(build_dir / "firmware.bin", f"flow-connect-display-{fw_version}.bin")
 
 
+def _gzip_spiffs_image(bin_name):
+    """Variante compressee de l'image SPIFFS, servie a cote du .bin.
+
+    mkspiffs pade l'image jusqu'a la taille de la partition (7,9 Mo pour ~320 Ko de
+    contenu) : le remplissage 0xFF se compresse a presque rien, ce qui divise le
+    transfert OTA d'un facteur ~25. Le firmware demande d'abord ce .gz et retombe
+    sur le .bin s'il est absent, donc rien a declarer dans le manifeste.
+
+    mtime=0 et filename vide : l'en-tete gzip fait alors exactement 10 octets avec
+    FLG=0, ce dont depend le decodeur embarque (il saute une taille fixe).
+    """
+    src = _binary_dir() / bin_name
+    if not src.exists():
+        return
+    dst = src.with_suffix(src.suffix + ".gz")
+    payload = src.read_bytes()
+    with dst.open("wb") as out_file:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=out_file, mtime=0) as gz:
+            gz.write(payload)
+    ratio = (dst.stat().st_size / len(payload) * 100.0) if payload else 0.0
+    print(f"[export_binaries] gzip {bin_name} -> {dst.name} "
+          f"({dst.stat().st_size} o, {ratio:.1f} % de l'original)")
+
+
 def _export_spiffs_bin(source, target, env):
     build_dir = Path(env.subst("$BUILD_DIR"))
     env_name = env.subst("$PIOENV")
     fw_version = _resolve_firmware_version()
     if env_name == "Waveshare-ESP32-S3" or env_name == "WaveshareWokwi":
-        _copy_if_exists(build_dir / "spiffs.bin", f"flowios3-spiffs-{fw_version}.bin")
+        name = f"flowios3-spiffs-{fw_version}.bin"
+        _copy_if_exists(build_dir / "spiffs.bin", name)
+        _gzip_spiffs_image(name)
         return
 
 

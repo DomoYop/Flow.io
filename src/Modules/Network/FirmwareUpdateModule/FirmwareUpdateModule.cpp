@@ -13,6 +13,15 @@
 #include <Update.h>
 #include <string.h>
 #include <esp_ota_ops.h>
+#include <esp_partition.h>
+#include <esp_heap_caps.h>
+#include <miniz.h>
+
+// Transfert SPIFFS compresse : voir runSpiffsUpdate_. Desactive par defaut tant que
+// le chemin compresse n'a pas ete valide sur cible.
+#ifndef FLOW_OTA_SPIFFS_GZIP
+#define FLOW_OTA_SPIFFS_GZIP 0
+#endif
 
 #include "App/BuildFlags.h"
 #include "Board/BoardSpec.h"
@@ -865,21 +874,220 @@ bool FirmwareUpdateModule::runNextionReboot_(char* errOut, size_t errOutLen)
     return true;
 }
 
+bool FirmwareUpdateModule::runSpiffsInflate_(NetworkClient* stream,
+                                             int32_t contentLength,
+                                             uint32_t expectedOut,
+                                             char* failMsg,
+                                             size_t failMsgLen)
+{
+    if (!stream) {
+        snprintf(failMsg, failMsgLen, "spiffs inflate: no stream");
+        return false;
+    }
+
+    // Fenetre deflate de 32 Ko, en PSRAM quand elle est disponible : c'est aussi le
+    // tampon de sortie, tinfl y ecrit de maniere circulaire.
+    uint8_t* dict = (uint8_t*)heap_caps_malloc(TINFL_LZ_DICT_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!dict) dict = (uint8_t*)malloc(TINFL_LZ_DICT_SIZE);
+    if (!dict) {
+        snprintf(failMsg, failMsgLen, "spiffs inflate: no memory for window");
+        return false;
+    }
+
+    tinfl_decompressor decomp;
+    tinfl_init(&decomp);
+
+    uint8_t in[Limits::FirmwareUpdate::Http::StreamChunkBytes];
+    size_t inFill = 0U;   // octets valides dans `in`
+    size_t inPos = 0U;    // position de lecture dans `in`
+    size_t dictOfs = 0U;
+    uint32_t totalOut = 0U;
+    uint32_t chunkCount = 0U;
+    size_t headerLeft = 10U;  // en-tete gzip fixe : mtime=0 et FLG=0 cote generateur
+    bool headerChecked = false;
+    int32_t remaining = contentLength;
+    uint32_t lastReadMs = millis();
+    bool inputDone = false;  // plus rien a attendre du reseau
+    bool ok = true;
+    bool done = false;
+
+    // tinfl doit encore etre appele une fois l'entree epuisee : c'est ce dernier
+    // appel, avec HAS_MORE_INPUT retire, qui vide sa fenetre et rend DONE. Une boucle
+    // qui ne l'appelle que tant qu'il reste des octets a consommer attend donc
+    // indefiniment des donnees qui ne viendront plus.
+    while (ok && !done) {
+        if (inPos >= inFill && !inputDone) {
+            const size_t avail = stream->available();
+            if (avail == 0U) {
+                const bool noMoreExpected = (contentLength > 0) ? (remaining <= 0) : !stream->connected();
+                if (noMoreExpected) {
+                    inputDone = true;
+                } else if ((millis() - lastReadMs) > Limits::FirmwareUpdate::Http::StreamReadTimeoutMs) {
+                    snprintf(failMsg, failMsgLen, "spiffs stream timeout");
+                    ok = false;
+                    break;
+                } else {
+                    delay(1);
+                    continue;
+                }
+            } else {
+                const size_t toRead = (avail > sizeof(in)) ? sizeof(in) : avail;
+                const int rd = stream->readBytes((char*)in, toRead);
+                if (rd <= 0) {
+                    delay(1);
+                    continue;
+                }
+                lastReadMs = millis();
+                inFill = (size_t)rd;
+                inPos = 0U;
+                if (contentLength > 0) remaining -= rd;
+                onProgressChunk_((uint32_t)rd);
+
+                if (!headerChecked && inFill >= 3U) {
+                    headerChecked = true;
+                    // Le generateur produit un gzip minimal ; tout autre en-tete
+                    // signalerait une image d'une autre provenance, que ce decodeur
+                    // lirait de travers.
+                    if (in[0] != 0x1FU || in[1] != 0x8BU || in[2] != 0x08U) {
+                        snprintf(failMsg, failMsgLen, "spiffs inflate: not a gzip stream");
+                        ok = false;
+                        break;
+                    }
+                }
+                if (headerLeft > 0U) {
+                    const size_t skip = (headerLeft < inFill) ? headerLeft : inFill;
+                    inPos += skip;
+                    headerLeft -= skip;
+                }
+            }
+        }
+
+        size_t inBytes = inFill - inPos;
+        size_t outBytes = TINFL_LZ_DICT_SIZE - dictOfs;
+        const mz_uint32 flags = inputDone ? 0U : TINFL_FLAG_HAS_MORE_INPUT;
+        const tinfl_status status =
+            tinfl_decompress(&decomp, in + inPos, &inBytes, dict, dict + dictOfs, &outBytes, flags);
+        inPos += inBytes;
+
+        if (outBytes > 0U) {
+            if (Update.write(dict + dictOfs, outBytes) != outBytes) {
+                snprintf(failMsg, failMsgLen, "spiffs write failed (%u)", (unsigned)Update.getError());
+                ok = false;
+                break;
+            }
+            totalOut += (uint32_t)outBytes;
+            dictOfs = (dictOfs + outBytes) & (TINFL_LZ_DICT_SIZE - 1U);
+        }
+
+        if (status == TINFL_STATUS_DONE) {
+            done = true;
+            break;
+        }
+        if (status < TINFL_STATUS_DONE) {
+            snprintf(failMsg, failMsgLen, "spiffs inflate failed (%d)", (int)status);
+            ok = false;
+            break;
+        }
+        // Entree epuisee et plus rien a lire, sans que le flux se soit termine :
+        // l'image est tronquee. Sans ce garde-fou, la boucle tournerait a vide.
+        if (inputDone && inBytes == 0U && outBytes == 0U) {
+            snprintf(failMsg, failMsgLen, "spiffs inflate: truncated stream");
+            ok = false;
+            break;
+        }
+
+        // Le yield doit suivre le travail produit, pas les lectures reseau : 329 Ko
+        // d'entree rendent 7,9 Mo, donc la decompression ecrit des megaoctets entre
+        // deux lectures. Indexe sur le reseau, ce yield laisserait la tache monopoliser
+        // son coeur assez longtemps pour reveiller le Task Watchdog -- le plantage
+        // corrige en juillet, reintroduit par une autre porte. 8 tours = ~256 Ko.
+        if ((++chunkCount % 8U) == 0U) vTaskDelay(1);
+    }
+
+    free(dict);
+
+    if (ok && totalOut != expectedOut) {
+        snprintf(failMsg,
+                 failMsgLen,
+                 "spiffs inflate: %lu o produits, %lu attendus",
+                 (unsigned long)totalOut,
+                 (unsigned long)expectedOut);
+        ok = false;
+    }
+    return ok;
+}
+
 bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_t errOutLen)
 {
     setStatus_(UpdateState::Downloading, FirmwareUpdateTarget::Spiffs, 0, "downloading");
 
-    HTTPClient http;
-    configureDownloadHttp_(http);
-    if (!http.begin(url)) {
-        writeHttpBeginFailedError_("fichier de mise a jour", url, errOut, errOutLen);
+    const esp_partition_t* spiffsPart =
+        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+    if (!spiffsPart) {
+        writeSimpleError_(errOut, errOutLen, "spiffs partition not found");
         return false;
     }
 
-    const int code = http.GET();
+    // L'image est padee jusqu'a la taille de la partition : son .gz pese ~4 % du
+    // .bin. On le demande d'abord et on retombe sur le .bin s'il est absent, ce qui
+    // evite de declarer une seconde entree dans le manifeste et garde les serveurs
+    // de mise a jour existants utilisables tels quels.
+    //
+    // Desactive par defaut : le transfert compresse n'a pas encore abouti sur cible
+    // (l'OTA reste bloque sans que le firmware soit en train de flasher, cause non
+    // identifiee a ce jour). Le chemin non compresse, lui, fonctionne. Repasser
+    // FLOW_OTA_SPIFFS_GZIP a 1 pour reprendre le diagnostic.
+    HTTPClient http;
+    configureDownloadHttp_(http);
+    bool compressed = false;
+    int code = 0;
+#if FLOW_OTA_SPIFFS_GZIP
+    char gzUrl[kUrlLen] = {0};
+    const int gzWritten = snprintf(gzUrl, sizeof(gzUrl), "%s.gz", url);
+    if (gzWritten > 0 && (size_t)gzWritten < sizeof(gzUrl)) {
+        if (http.begin(gzUrl)) {
+            code = http.GET();
+            if (code == HTTP_CODE_OK) {
+                compressed = true;
+                LOGI("SPIFFS update: variante compressee retenue (%s)", gzUrl);
+            } else {
+                LOGI("SPIFFS update: pas de variante compressee (HTTP %d), image brute", code);
+                http.end();
+            }
+        }
+    }
+#endif
+
+    if (!compressed) {
+        configureDownloadHttp_(http);
+        if (!http.begin(url)) {
+            writeHttpBeginFailedError_("fichier de mise a jour", url, errOut, errOutLen);
+            return false;
+        }
+        code = http.GET();
+        if (code != HTTP_CODE_OK) {
+            writeHttpCodeFailedError_("fichier de mise a jour", url, http, code, errOut, errOutLen);
+            http.end();
+            return false;
+        }
+    }
+
     const int32_t contentLength = http.getSize();
-    if (code != HTTP_CODE_OK) {
-        writeHttpCodeFailedError_("fichier de mise a jour", url, http, code, errOut, errOutLen);
+
+    // Une image SPIFFS couvre toujours toute sa partition (mkspiffs pade le reste).
+    // Une taille differente signifie que l'image a ete produite pour une autre table
+    // de partitions : l'ecrire donnerait un systeme de fichiers illisible, donc une
+    // interface web perdue jusqu'au prochain flash USB. On refuse avant d'ecrire.
+    // Comprime, c'est le total decompresse qui est verifie, en fin de flux.
+    if (!compressed && contentLength > 0 && (uint32_t)contentLength != spiffsPart->size) {
+        char sizeMsg[128] = {0};
+        snprintf(sizeMsg,
+                 sizeof(sizeMsg),
+                 "spiffs size mismatch: image %lu o, partition %lu o",
+                 (unsigned long)contentLength,
+                 (unsigned long)spiffsPart->size);
+        LOGE("%s", sizeMsg);
+        writeSimpleError_(errOut, errOutLen, sizeMsg);
         http.end();
         return false;
     }
@@ -896,17 +1104,24 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     }
 
     char failMsg[128] = {0};
-    const size_t beginSize = (contentLength > 0) ? (size_t)contentLength : (size_t)UPDATE_SIZE_UNKNOWN;
+    // Comprime, la taille ecrite est celle de la partition, pas celle du telechargement.
+    const size_t beginSize = compressed
+                                 ? (size_t)spiffsPart->size
+                                 : ((contentLength > 0) ? (size_t)contentLength : (size_t)UPDATE_SIZE_UNKNOWN);
     if (!Update.begin(beginSize, U_SPIFFS)) {
         snprintf(failMsg, sizeof(failMsg), "spiffs begin failed (%u)", (unsigned)Update.getError());
     }
 
     auto* stream = http.getStreamPtr();
+    if (failMsg[0] == '\0' && compressed) {
+        (void)runSpiffsInflate_(stream, contentLength, spiffsPart->size, failMsg, sizeof(failMsg));
+    }
+
     uint8_t buf[Limits::FirmwareUpdate::Http::StreamChunkBytes];
     int32_t remaining = contentLength;
     uint32_t lastReadMs = millis();
     uint32_t chunkCount = 0;
-    if (failMsg[0] == '\0') {
+    if (failMsg[0] == '\0' && !compressed) {
         while (http.connected() && (contentLength <= 0 || remaining > 0)) {
             const size_t avail = stream ? stream->available() : 0;
             if (avail == 0U) {
@@ -952,7 +1167,9 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     }
     http.end();
 
-    if (failMsg[0] == '\0' && contentLength > 0 && remaining > 0) {
+    // Le controle de completude du mode compresse porte sur le total decompresse,
+    // deja verifie par runSpiffsInflate_ contre la taille de la partition.
+    if (failMsg[0] == '\0' && !compressed && contentLength > 0 && remaining > 0) {
         snprintf(failMsg, sizeof(failMsg), "incomplete download");
     }
     if (failMsg[0] == '\0' && !Update.end()) {
