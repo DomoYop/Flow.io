@@ -1,8 +1,9 @@
 # Note de travail — versionnage du firmware, du SPIFFS et du Nextion
 
-> Statut : **étape 1 implémentée** (version embarquée dans l'image SPIFFS),
-> étapes 2 et 3 proposées, non implémentées.
-> Date : 2026-08-08
+> Statut : **étapes 1 et 1bis implémentées** (version embarquée dans l'image
+> SPIFFS ; manifeste alimenté par le build), étapes 2 à 4 proposées, non
+> implémentées.
+> Date : 2026-08-08, complétée le 2026-08-11
 > Contexte : la version du contenu SPIFFS était déduite du nom de fichier de l'URL
 > OTA puis persistée en NVS comme variable de config, alors que la version du
 > firmware est simplement compilée dans le binaire. Deux mécanismes pour la même
@@ -137,6 +138,75 @@ Chargement paresseux au premier appel, mis en cache — même pattern que
 ~200 octets dans SPIFFS, un SHA-256 sur ~1,4 Mo au build (quelques dizaines de ms),
 aucune capacité compile-time touchée.
 
+## Étape 1bis (implémentée) — le manifeste republie l'identité du build
+
+L'étape 1 a réglé « ce qui tourne » ; il restait « ce qui est disponible ».
+[export_binaries.py](../../scripts/export_binaries.py) n'utilisait aucune des
+identités produites par le build : il les **refabriquait** depuis le système de
+fichiers — `version` parsée dans le *nom du fichier*, `build_date` = **mtime**. Soit
+exactement `extractVersionFromUrl_` supprimé au §« Ce qui clochait », réapparu côté
+producteur au lieu du consommateur.
+
+Symptôme visible en page Mise à jour : pour un même 4.1.6, colonne « actuelle »
+11:27:03 (début du build, `FLOW_BUILD_REF`) contre « disponible » 11:27:47 (fin du
+link, mtime). Les 44 s sont le temps de compilation ; les deux colonnes ne
+partageaient aucune donnée.
+
+Deux défauts de fond, pas seulement d'affichage :
+
+1. **Le manifeste était recalculé en entier à chaque copie**, depuis les mtime
+   courants du dossier. Ce n'était pas un enregistrement mais une photo de
+   `binary/` — dossier hors git (`git ls-files binary` → 0), donc une recopie
+   réécrivait les 76 dates d'un coup.
+2. **C'était déjà faux** : avant correction, `flowios3-2.0.3.bin` était daté
+   17:03:43 alors que `2.0.4` était daté 15:23:51.
+
+### Ce qui a changé
+
+- **Side-car par artefact.** Chaque `.bin` publié est accompagné d'un
+  `<software>-<version>.json` (`schema: flowio.artifact.v1`) écrit par le build qui
+  l'a produit. Le manifeste devient une agrégation de ces fichiers.
+- **L'entrée vient du build, pas du disque** : `version` ← `custom_version` (même
+  source que `FIRMW` et que `/fsver.j`), `build_ref` ← le define `FLOW_BUILD_REF`,
+  `build_date` ← **dérivé de `build_ref`** et non du mtime, plus `sha256`, `size`,
+  `env`. Pour le SPIFFS, `content_hash`/`files`/`bytes` sont **relus dans le
+  `fsver.j` du staging** : le manifeste et l'image annoncent la même empreinte, et
+  deux images d'une même `custom_version` cessent d'y être indiscernables.
+- **Mise à jour additive** : le manifeste précédent est rechargé et seules les
+  entrées republiées changent. Vérifié sur l'arbre réel — un `buildfs` ne produit
+  plus qu'un diff de deux entrées (`generated_at` + l'artefact reconstruit) là où
+  il réécrivait 76 lignes de dates.
+- Le nom de fichier publié est **construit** depuis `software` + `version` au lieu
+  d'être réanalysé ensuite ; `_ARTIFACT_RE` ne sert plus qu'à l'inventaire.
+
+Priorité de résolution d'une entrée : **side-car** (produit par le build de ce
+fichier précis) → **entrée déjà publiée** → **repli disque**. Le repli existe pour
+les binaires antérieurs à ce dispositif et pour les `.tft` déposés à la main ; il
+est marqué `"source": "filesystem"` pour ne pas laisser croire que la date est
+fiable. Les artefacts produits par le build portent `"source": "build"`.
+
+Effet de bord voulu : `build_date` désigne désormais le **début** du build, comme
+l'estampille embarquée. Les deux colonnes de la page Mise à jour affichent la même
+valeur au caractère près dès que l'artefact affiché a été flashé depuis le même
+build.
+
+### Ce qui n'a pas bougé
+
+- **L'UI n'a pas été touchée.** Elle lit toujours `build_date` (ISO), simplement
+  fiable désormais ; `build_ref` est un champ additionnel. Et le choix du « plus
+  récent » passait déjà par `compareFirmwareVersions`, la date ne servant que de
+  départage ([app.js](../../data/webinterface/app.js) — `compareUpgradeArtifacts`,
+  `manifestArtifactEntries`).
+- Les 75 entrées antérieures gardent leurs dates issues de mtime, figées telles
+  quelles : aucune source ne permet de les reconstituer. Elles se corrigeront à la
+  republication.
+- `.gz` et `.pkg` restent hors manifeste (le firmware les devine), et sont
+  désormais ignorés sans avertissement — comme les side-cars.
+
+### Reste ouvert
+
+L'estampille reste dérivée de l'horloge, pas du code : voir l'étape 4.
+
 ## Étape 2 (proposée) — inventaire de versions unique
 
 L'UI reconstruit l'information à partir de trois globales JS alimentées par des
@@ -152,9 +222,18 @@ champs disparates (`supervisorFirmwareVersion`, `nextionDisplayVersion`,
 }
 ```
 
-réduirait la fonction à un lookup. Attention : `/api/web/meta` utilise un
-`StaticJsonDocument<1024>` déjà bien rempli — à redimensionner avant d'ajouter ce
-bloc, sous peine de troncature silencieuse.
+réduirait la fonction à un lookup. Depuis l'étape 1bis, `source` a une valeur de
+plus à porter : le manifeste distingue déjà `build` (identité produite par le build)
+de `filesystem` (repli sur le nom et le mtime), et l'UI gagnerait à ne pas présenter
+les deux avec la même autorité.
+
+Attention, **deux** limites à relever ensemble avant d'ajouter ce bloc, sinon
+l'endpoint casse au lieu de tronquer : le `StaticJsonDocument<1024>` déjà bien
+rempli, **et** le tampon de sérialisation `char out[960]`
+([WebInterfaceServer.cpp](../../src/Modules/Network/WebInterfaceModule/WebInterfaceServer.cpp)
+— fin du handler `web.meta`). Dépassement du second = `serializeJson` renvoie 0 ou
+≥ `sizeof(out)` et le handler répond **500** ; c'est au moins bruyant, contrairement
+au débordement du document JSON qui, lui, tronque en silence.
 
 ## Étape 3 (proposée) — signaler la désynchronisation firmware ↔ SPIFFS
 
@@ -169,3 +248,48 @@ page Mise à jour deviennent triviaux.
 Nuance : comparer **`core()` uniquement**. Les `build_ref` diffèrent presque
 toujours — un `pio run -t buildfs` seul en produit un nouveau — et servent au
 diagnostic affiché, pas au verdict.
+
+Avec l'étape 1bis, le manifeste porte aussi `content_hash` : une désynchronisation
+peut se signaler **sans rien télécharger**, en comparant l'empreinte annoncée pour
+l'image disponible à celle que `FilesystemVersion::contentHash()` lit dans l'image
+présente. C'est la seule comparaison qui distingue deux SPIFFS de même
+`custom_version` mais de contenu différent.
+
+## Étape 4 (proposée) — `build_ref` dérivé du commit, pas de l'horloge
+
+[generate_build_version.py](../../scripts/generate_build_version.py) pose
+`FLOW_BUILD_REF = datetime.now()`, **réévalué à chaque invocation de `pio`**. Trois
+conséquences, toutes constatées :
+
+1. `pio run` et `pio run -t buildfs` du même arbre produisent deux estampilles
+   différentes (11:27:03 pour le firmware, 11:28:22 pour le SPIFFS d'un même
+   4.1.6) : les deux artefacts d'une même livraison ne sont pas rattachables l'un à
+   l'autre par leur `build_ref`.
+2. Deux builds d'un même commit donnent deux versions complètes différentes, alors
+   que le binaire est identique. L'identifiant répond à « quand j'ai lancé la
+   commande », pas à « quel code tourne ».
+3. Corollaire de (1), l'étape 3 doit explicitement s'interdire de comparer les
+   `build_ref` — contrainte qui disparaîtrait ici.
+
+Remplacer par l'identité du commit : `git rev-parse --short HEAD`, suffixe `-dirty`
+si l'arbre est sale, repli sur la date actuelle hors dépôt git (archive, CI sans
+historique). `FLOW_FIRMWARE_VERSION_FULL` deviendrait `4.1.6+a1b2c3d`, et
+`4.1.6+a1b2c3d-dirty` pendant le développement.
+
+Points à trancher avant :
+
+- **Le format d'affichage change.** [app.js](../../data/webinterface/app.js)
+  scinde sur le `+` puis passe la partie droite à `formatUpgradeBuildStamp()`, qui
+  reconnaît `YYYYMMDD.HHMMSS` et retombe sur `Date.parse` : un SHA ne matche ni
+  l'un ni l'autre et serait **affiché brut** — acceptable, mais à décider. La date
+  reste disponible via `build_date` du manifeste, qui devrait alors venir de la
+  date du commit et non plus de `build_ref`.
+- **`upgradeBuildStampValue()` retournerait 0** pour un SHA, donc plus de départage
+  par date à version égale. Sans conséquence tant que les versions diffèrent.
+- **Un `pio run` sans changement de commit ne produirait plus de nouvel
+  identifiant** : c'est le but (reproductibilité), mais cela retire le repère qui
+  permet aujourd'hui de vérifier d'un coup d'œil qu'un flash a bien pris. Le
+  `-dirty` couvre le cas du développement en cours ; le `content_hash` du SPIFFS
+  couvre le reste.
+- Aucun effacement NVS : ni `FIRMW`, ni les clés de config, ni `/fsver.j` ne
+  changent de forme.
