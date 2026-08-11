@@ -17,10 +17,16 @@
 #include <esp_heap_caps.h>
 #include <miniz.h>
 
-// Transfert SPIFFS compresse : voir runSpiffsUpdate_. Desactive par defaut tant que
-// le chemin compresse n'a pas ete valide sur cible.
+// Deux variantes d'OTA SPIFFS ont ete tentees pour reduire le volume transfere :
+// l'image compressee (FLOW_OTA_SPIFFS_GZIP) et le paquet de fichiers
+// (FLOW_OTA_SPIFFS_PKG). Aucune n'aboutit sur cible a ce jour ; les deux sont donc
+// desactivees et le firmware utilise l'image complete, qui fonctionne.
+// Voir docs/notes/ota-spiffs-reduction-volume.md
 #ifndef FLOW_OTA_SPIFFS_GZIP
 #define FLOW_OTA_SPIFFS_GZIP 0
+#endif
+#ifndef FLOW_OTA_SPIFFS_PKG
+#define FLOW_OTA_SPIFFS_PKG 0
 #endif
 
 #include "App/BuildFlags.h"
@@ -874,6 +880,365 @@ bool FirmwareUpdateModule::runNextionReboot_(char* errOut, size_t errOutLen)
     return true;
 }
 
+namespace {
+
+// Paquet web : voir scripts/build_web_package.py pour le format complet.
+constexpr size_t kWebPkgHeaderBytes = 24U;
+constexpr uint16_t kWebPkgFormat = 1U;
+constexpr const char* kWebPkgMagic = "FLOWPKG1";
+constexpr const char* kWebPkgPath = "/ota/pkg.tmp";
+// SPIFFS plafonne les noms a CONFIG_SPIFFS_OBJ_NAME_LEN (32). Le plus long chemin
+// du contenu web fait 29 caracteres : un suffixe ".new" deborderait. D'ou un
+// temporaire court, reutilise pour chaque fichier avant sa bascule.
+constexpr const char* kWebPkgFileTmp = "/ota/t";
+constexpr size_t kSpiffsPathMax = 31U;
+
+/** CRC-32 (polynome reflechi), convention zlib : init 0xFFFFFFFF, inversion finale. */
+uint32_t crc32Update_(uint32_t crc, const uint8_t* data, size_t len)
+{
+    static const uint32_t kNibble[16] = {
+        0x00000000UL, 0x1DB71064UL, 0x3B6E20C8UL, 0x26D930ACUL,
+        0x76DC4190UL, 0x6B6B51F4UL, 0x4DB26158UL, 0x5005713CUL,
+        0xEDB88320UL, 0xF00F9344UL, 0xD6D6A3E8UL, 0xCB61B38CUL,
+        0x9B64C2B0UL, 0x86D3D2D4UL, 0xA00AE278UL, 0xBDBDF21CUL
+    };
+    for (size_t i = 0; i < len; ++i) {
+        crc ^= data[i];
+        crc = (crc >> 4) ^ kNibble[crc & 0x0FU];
+        crc = (crc >> 4) ^ kNibble[crc & 0x0FU];
+    }
+    return crc;
+}
+
+uint16_t readLe16_(const uint8_t* p) { return (uint16_t)(p[0] | ((uint16_t)p[1] << 8)); }
+
+uint32_t readLe32_(const uint8_t* p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+}  // namespace
+
+bool FirmwareUpdateModule::webPkgDownload_(NetworkClient* stream,
+                                           int32_t contentLength,
+                                           char* failMsg,
+                                           size_t failMsgLen)
+{
+    if (!stream) {
+        snprintf(failMsg, failMsgLen, "web pkg: no stream");
+        return false;
+    }
+    if (SPIFFS.exists(kWebPkgPath)) SPIFFS.remove(kWebPkgPath);
+
+    File out = SPIFFS.open(kWebPkgPath, FILE_WRITE);
+    if (!out) {
+        snprintf(failMsg, failMsgLen, "web pkg: cannot create %s", kWebPkgPath);
+        return false;
+    }
+
+    uint8_t buf[Limits::FirmwareUpdate::Http::StreamChunkBytes];
+    int32_t remaining = contentLength;
+    uint32_t lastReadMs = millis();
+    uint32_t chunkCount = 0U;
+    bool ok = true;
+
+    while (ok && (contentLength <= 0 || remaining > 0)) {
+        const size_t avail = stream->available();
+        if (avail == 0U) {
+            if (!stream->connected()) break;
+            if ((millis() - lastReadMs) > Limits::FirmwareUpdate::Http::StreamReadTimeoutMs) {
+                snprintf(failMsg, failMsgLen, "web pkg: stream timeout");
+                ok = false;
+                break;
+            }
+            delay(1);
+            continue;
+        }
+        const size_t toRead = (avail > sizeof(buf)) ? sizeof(buf) : avail;
+        const int rd = stream->readBytes((char*)buf, toRead);
+        if (rd <= 0) {
+            delay(1);
+            continue;
+        }
+        lastReadMs = millis();
+        if (out.write(buf, (size_t)rd) != (size_t)rd) {
+            snprintf(failMsg, failMsgLen, "web pkg: write failed (disque plein ?)");
+            ok = false;
+            break;
+        }
+        onProgressChunk_((uint32_t)rd);
+        if (contentLength > 0) remaining -= rd;
+        if ((++chunkCount % 16U) == 0U) vTaskDelay(1);
+    }
+    out.close();
+
+    if (ok && contentLength > 0 && remaining > 0) {
+        snprintf(failMsg, failMsgLen, "web pkg: telechargement incomplet");
+        ok = false;
+    }
+    if (!ok) SPIFFS.remove(kWebPkgPath);
+    return ok;
+}
+
+bool FirmwareUpdateModule::webPkgVerify_(uint16_t& fileCountOut,
+                                         uint32_t& indexBytesOut,
+                                         char* failMsg,
+                                         size_t failMsgLen)
+{
+    File pkg = SPIFFS.open(kWebPkgPath, FILE_READ);
+    if (!pkg) {
+        snprintf(failMsg, failMsgLen, "web pkg: introuvable apres telechargement");
+        return false;
+    }
+
+    uint8_t header[kWebPkgHeaderBytes] = {0};
+    if (pkg.read(header, sizeof(header)) != (int)sizeof(header)) {
+        snprintf(failMsg, failMsgLen, "web pkg: en-tete tronque");
+        pkg.close();
+        return false;
+    }
+    if (memcmp(header, kWebPkgMagic, 8) != 0) {
+        snprintf(failMsg, failMsgLen, "web pkg: signature invalide");
+        pkg.close();
+        return false;
+    }
+    const uint16_t format = readLe16_(header + 8);
+    if (format != kWebPkgFormat) {
+        snprintf(failMsg, failMsgLen, "web pkg: format %u non gere", (unsigned)format);
+        pkg.close();
+        return false;
+    }
+    fileCountOut = readLe16_(header + 10);
+    indexBytesOut = readLe32_(header + 12);
+    const uint32_t payloadBytes = readLe32_(header + 16);
+    const uint32_t expectedCrc = readLe32_(header + 20);
+
+    const size_t expectedSize = kWebPkgHeaderBytes + indexBytesOut + payloadBytes;
+    if ((size_t)pkg.size() != expectedSize) {
+        snprintf(failMsg, failMsgLen, "web pkg: taille %lu, %lu attendus",
+                 (unsigned long)pkg.size(), (unsigned long)expectedSize);
+        pkg.close();
+        return false;
+    }
+
+    // L'empreinte porte sur index + payload : c'est elle qui autorise a toucher au
+    // contenu en place. Tant qu'elle n'est pas verifiee, rien n'a ete remplace.
+    uint32_t crc = 0xFFFFFFFFUL;
+    uint8_t buf[512];
+    uint32_t chunkCount = 0U;
+    size_t left = indexBytesOut + payloadBytes;
+    while (left > 0U) {
+        const size_t want = (left > sizeof(buf)) ? sizeof(buf) : left;
+        const int rd = pkg.read(buf, want);
+        if (rd <= 0) break;
+        crc = crc32Update_(crc, buf, (size_t)rd);
+        left -= (size_t)rd;
+        if ((++chunkCount % 64U) == 0U) vTaskDelay(1);
+    }
+    pkg.close();
+    crc ^= 0xFFFFFFFFUL;
+
+    if (left != 0U || crc != expectedCrc) {
+        snprintf(failMsg, failMsgLen, "web pkg: empreinte invalide");
+        return false;
+    }
+    return true;
+}
+
+bool FirmwareUpdateModule::webPkgFileMatches_(const char* path, uint32_t size, uint32_t crcExpected)
+{
+    File existing = SPIFFS.open(path, FILE_READ);
+    if (!existing) return false;
+    if ((uint32_t)existing.size() != size) {
+        existing.close();
+        return false;
+    }
+
+    uint8_t buf[512];
+    uint32_t crc = 0xFFFFFFFFUL;
+    uint32_t left = size;
+    uint32_t blocks = 0U;
+    while (left > 0U) {
+        const size_t want = (left > sizeof(buf)) ? sizeof(buf) : left;
+        const int rd = existing.read(buf, want);
+        if (rd <= 0) break;
+        crc = crc32Update_(crc, buf, (size_t)rd);
+        left -= (uint32_t)rd;
+        if ((++blocks % 32U) == 0U) vTaskDelay(1);
+    }
+    existing.close();
+    return (left == 0U) && ((crc ^ 0xFFFFFFFFUL) == crcExpected);
+}
+
+bool FirmwareUpdateModule::webPkgExtract_(uint16_t fileCount,
+                                          uint32_t indexBytes,
+                                          char* failMsg,
+                                          size_t failMsgLen)
+{
+    File pkg = SPIFFS.open(kWebPkgPath, FILE_READ);
+    if (!pkg) {
+        snprintf(failMsg, failMsgLen, "web pkg: introuvable a l'extraction");
+        return false;
+    }
+
+    uint8_t* index = (uint8_t*)heap_caps_malloc(indexBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!index) index = (uint8_t*)malloc(indexBytes);
+    if (!index) {
+        snprintf(failMsg, failMsgLen, "web pkg: index trop gros (%lu o)", (unsigned long)indexBytes);
+        pkg.close();
+        return false;
+    }
+    if (!pkg.seek(kWebPkgHeaderBytes) || pkg.read(index, indexBytes) != (int)indexBytes) {
+        snprintf(failMsg, failMsgLen, "web pkg: index illisible");
+        free(index);
+        pkg.close();
+        return false;
+    }
+
+    const size_t payloadBase = kWebPkgHeaderBytes + indexBytes;
+    size_t cursor = 0U;
+    size_t payloadOfs = 0U;
+    // 2 Ko plutot que 512 o : une page SPIFFS fait 256 o, donc huit pages par
+    // ecriture au lieu de deux. L'ecriture est de loin l'operation couteuse ici.
+    uint8_t buf[2048];
+    bool ok = true;
+    uint16_t replaced = 0U;
+    uint16_t skipped = 0U;
+
+    for (uint16_t i = 0; ok && i < fileCount; ++i) {
+        if (cursor + 10U > indexBytes) {
+            snprintf(failMsg, failMsgLen, "web pkg: index incoherent");
+            ok = false;
+            break;
+        }
+        // Avancement publie a chaque fichier : c'est ce que l'interface affiche, et
+        // c'est aussi la trace qui dit ou l'operation s'arrete si elle s'arrete.
+        const uint8_t pct = (fileCount > 0U) ? (uint8_t)(((uint32_t)i * 100U) / fileCount) : 0U;
+        setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::Spiffs, pct, "installing web package");
+        if ((i % 16U) == 0U) {
+            LOGI("Paquet web : %u/%u fichiers (%u remplaces, %u deja a jour)",
+                 (unsigned)i, (unsigned)fileCount, (unsigned)replaced, (unsigned)skipped);
+        }
+
+        const uint16_t pathLen = readLe16_(index + cursor);
+        const uint32_t size = readLe32_(index + cursor + 2);
+        const uint32_t crcExpected = readLe32_(index + cursor + 6);
+        cursor += 10U;
+        if (cursor + pathLen > indexBytes || pathLen == 0U || pathLen > kSpiffsPathMax) {
+            snprintf(failMsg, failMsgLen, "web pkg: chemin invalide (%u o)", (unsigned)pathLen);
+            ok = false;
+            break;
+        }
+        char path[kSpiffsPathMax + 1] = {0};
+        memcpy(path, index + cursor, pathLen);
+        cursor += pathLen;
+
+        // Un fichier deja identique n'est pas reecrit : sur une mise a jour ou seuls
+        // quelques assets changent, cela evite l'essentiel des ecritures SPIFFS, de
+        // loin l'operation la plus lente. Une lecture coute une fraction d'une
+        // reecriture, et le CRC de l'index sert de comparaison.
+        if (webPkgFileMatches_(path, size, crcExpected)) {
+            payloadOfs += size;
+            ++skipped;
+            if ((i % 8U) == 0U) vTaskDelay(1);
+            continue;
+        }
+
+        if (SPIFFS.exists(kWebPkgFileTmp)) SPIFFS.remove(kWebPkgFileTmp);
+        File tmp = SPIFFS.open(kWebPkgFileTmp, FILE_WRITE);
+        if (!tmp) {
+            snprintf(failMsg, failMsgLen, "web pkg: temporaire impossible");
+            ok = false;
+            break;
+        }
+        if (!pkg.seek(payloadBase + payloadOfs)) {
+            snprintf(failMsg, failMsgLen, "web pkg: lecture %s impossible", path);
+            tmp.close();
+            ok = false;
+            break;
+        }
+
+        uint32_t crc = 0xFFFFFFFFUL;
+        uint32_t left = size;
+        uint32_t blocks = 0U;
+        while (left > 0U) {
+            const size_t want = (left > sizeof(buf)) ? sizeof(buf) : left;
+            const int rd = pkg.read(buf, want);
+            if (rd <= 0) break;
+            if (tmp.write(buf, (size_t)rd) != (size_t)rd) {
+                left = size;  // force l'echec ci-dessous
+                break;
+            }
+            crc = crc32Update_(crc, buf, (size_t)rd);
+            left -= (uint32_t)rd;
+            // Le yield doit etre ICI, pas seulement entre deux fichiers : un seul
+            // asset pese 100 Ko, soit des dizaines d'ecritures SPIFFS d'affilee.
+            // Rendre la main uniquement d'un fichier a l'autre laisse la tache
+            // monopoliser son coeur assez longtemps pour reveiller le watchdog.
+            if ((++blocks % 4U) == 0U) vTaskDelay(1);
+        }
+        tmp.close();
+        crc ^= 0xFFFFFFFFUL;
+
+        if (left != 0U || crc != crcExpected) {
+            snprintf(failMsg, failMsgLen, "web pkg: %s corrompu", path);
+            SPIFFS.remove(kWebPkgFileTmp);
+            ok = false;
+            break;
+        }
+
+        // Bascule : SPIFFS refuse un rename vers un nom existant, d'ou le retrait
+        // prealable. La fenetre est de quelques millisecondes, et le temporaire reste
+        // sur place si elle est interrompue.
+        if (SPIFFS.exists(path)) SPIFFS.remove(path);
+        if (!SPIFFS.rename(kWebPkgFileTmp, path)) {
+            snprintf(failMsg, failMsgLen, "web pkg: bascule de %s impossible", path);
+            ok = false;
+            break;
+        }
+
+        payloadOfs += size;
+        ++replaced;
+        vTaskDelay(1);
+    }
+
+    free(index);
+    pkg.close();
+    if (ok) {
+        LOGI("Paquet web installe : %u remplaces, %u deja a jour", (unsigned)replaced, (unsigned)skipped);
+    }
+    return ok;
+}
+
+bool FirmwareUpdateModule::runWebPackageUpdate_(NetworkClient* stream,
+                                                int32_t contentLength,
+                                                char* failMsg,
+                                                size_t failMsgLen)
+{
+    // Telechargement serveur web actif : il ne touche a rien, et l'interface peut
+    // suivre la progression. Seule l'extraction, courte, impose la mise en pause.
+    if (!webPkgDownload_(stream, contentLength, failMsg, failMsgLen)) return false;
+
+    uint16_t fileCount = 0U;
+    uint32_t indexBytes = 0U;
+    if (!webPkgVerify_(fileCount, indexBytes, failMsg, failMsgLen)) {
+        SPIFFS.remove(kWebPkgPath);
+        return false;
+    }
+
+    // Le serveur web n'est deliberement PAS mis en pause pendant l'extraction. Le
+    // chemin par image devait l'etre : il reecrivait la partition sous les pieds du
+    // serveur. Ici on remplace des fichiers un par un, et le serveur n'a besoin que
+    // des routes d'API pendant l'operation -- elles ne lisent pas le systeme de
+    // fichiers. En echange, l'interface continue d'afficher l'avancement, ce qui
+    // rend une extraction lente ou bloquee observable au lieu d'etre un ecran fige.
+    setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::Spiffs, 0, "installing web package");
+    const bool ok = webPkgExtract_(fileCount, indexBytes, failMsg, failMsgLen);
+
+    SPIFFS.remove(kWebPkgPath);
+    return ok;
+}
+
 bool FirmwareUpdateModule::runSpiffsInflate_(NetworkClient* stream,
                                              int32_t contentLength,
                                              uint32_t expectedOut,
@@ -1041,6 +1406,52 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     configureDownloadHttp_(http);
     bool compressed = false;
     int code = 0;
+
+    // Paquet web : meme nom de base que l'image, extension .pkg. Prefere a l'image
+    // quand il existe -- il ne reecrit pas la partition, donc une coupure ne peut
+    // pas laisser l'appareil sans interface. Absent, on retombe sur l'image.
+    //
+    // Desactive par defaut : sur cible, l'installation ne se termine pas, et la
+    // cause n'a pas ete trouvee. Le chemin par image, lui, fonctionne. Repasser
+    // FLOW_OTA_SPIFFS_PKG a 1 pour reprendre le diagnostic.
+#if FLOW_OTA_SPIFFS_PKG
+    {
+        char pkgUrl[kUrlLen] = {0};
+        const size_t urlLen = strlen(url);
+        const bool endsWithBin = (urlLen > 4U) && (strcmp(url + urlLen - 4, ".bin") == 0);
+        const int written = endsWithBin
+                                ? snprintf(pkgUrl, sizeof(pkgUrl), "%.*s.pkg", (int)(urlLen - 4), url)
+                                : -1;
+        if (written > 0 && (size_t)written < sizeof(pkgUrl) && http.begin(pkgUrl)) {
+            const int pkgCode = http.GET();
+            if (pkgCode == HTTP_CODE_OK) {
+                LOGI("SPIFFS update: paquet web retenu (%s)", pkgUrl);
+                const int32_t pkgLen = http.getSize();
+                setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::Spiffs, 0, "downloading web package");
+                portENTER_CRITICAL(&lock_);
+                activeTotalBytes_ = (pkgLen > 0) ? (uint32_t)pkgLen : 0U;
+                activeSentBytes_ = 0;
+                portEXIT_CRITICAL(&lock_);
+
+                char pkgFail[128] = {0};
+                const bool pkgOk = runWebPackageUpdate_(http.getStreamPtr(), pkgLen, pkgFail, sizeof(pkgFail));
+                http.end();
+                if (!pkgOk) {
+                    LOGE("Paquet web refuse : %s", pkgFail);
+                    writeSimpleError_(errOut, errOutLen, pkgFail);
+                    return false;
+                }
+                setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::Spiffs, 100, "rebooting");
+                delay(1800);
+                ESP.restart();
+                return true;
+            }
+            LOGI("SPIFFS update: pas de paquet web (HTTP %d), image complete", pkgCode);
+            http.end();
+        }
+    }
+#endif
+
 #if FLOW_OTA_SPIFFS_GZIP
     char gzUrl[kUrlLen] = {0};
     const int gzWritten = snprintf(gzUrl, sizeof(gzUrl), "%s.gz", url);

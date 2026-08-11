@@ -4,8 +4,12 @@ import json
 from pathlib import Path
 import re
 import shutil
+import sys
 
 Import("env")
+
+sys.path.insert(0, str(Path(env.subst("$PROJECT_DIR")) / "scripts"))
+from build_web_package import build_package as build_web_package, summarize  # noqa: E402
 
 
 _ARTIFACT_RE = re.compile(
@@ -185,6 +189,24 @@ def _gzip_spiffs_image(bin_name):
           f"({dst.stat().st_size} o, {ratio:.1f} % de l'original)")
 
 
+def _export_web_package(build_dir, bin_name):
+    """Paquet de fichiers, construit depuis le meme staging que l'image SPIFFS.
+
+    C'est la variante d'OTA non destructive : le firmware remplace les fichiers un
+    par un au lieu de reecrire toute la partition. Meme nom de base que l'image,
+    extension .pkg, ce qui permet au firmware de le deviner sans entree dediee dans
+    le manifeste.
+    """
+    staging = Path(str(build_dir)) / "spiffs_data"
+    if not staging.is_dir():
+        print("[export_binaries] staging SPIFFS absent, paquet web non genere")
+        return
+    package = build_web_package(staging)
+    dst = _binary_dir() / (bin_name[: -len(".bin")] + ".pkg")
+    dst.write_bytes(package)
+    print(f"[export_binaries] paquet web -> {dst.name} ({summarize(package, staging)})")
+
+
 def _export_spiffs_bin(source, target, env):
     build_dir = Path(env.subst("$BUILD_DIR"))
     env_name = env.subst("$PIOENV")
@@ -193,6 +215,7 @@ def _export_spiffs_bin(source, target, env):
         name = f"flowios3-spiffs-{fw_version}.bin"
         _copy_if_exists(build_dir / "spiffs.bin", name)
         _gzip_spiffs_image(name)
+        _export_web_package(build_dir, name)
         return
 
 

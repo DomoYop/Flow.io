@@ -71,7 +71,7 @@ USB. Le cas inverse était déjà rejeté par `Update.begin`.
 **Transférer l'image compressée — implémenté, non fonctionnel sur cible.** Le padding
 se compresse à presque rien : le `.gz` pèse 4 % du `.bin`. Le code est en place mais
 désactivé par défaut, faute d'avoir abouti. Détail, hypothèses testées et ce qu'il
-reste à mesurer : [ota-spiffs-transfert-gzip.md](ota-spiffs-transfert-gzip.md).
+reste à mesurer : [ota-spiffs-reduction-volume.md](ota-spiffs-reduction-volume.md).
 
 ## Reste à faire
 

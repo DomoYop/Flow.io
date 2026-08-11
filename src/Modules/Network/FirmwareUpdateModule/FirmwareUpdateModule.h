@@ -147,6 +147,29 @@ private:
      * @param expectedOut Taille attendue en sortie (taille de la partition).
      * @return false et failMsg renseigne si le flux est invalide ou incomplet.
      */
+    /**
+     * @brief Installe un paquet web : telechargement, verification, remplacement.
+     *
+     * Variante non destructive de l'OTA SPIFFS. L'image classique reecrit toute la
+     * partition (8,3 Mo pour ~320 Ko utiles) : une coupure en cours d'ecriture laisse
+     * un systeme de fichiers illisible, donc plus d'interface web. Ici le paquet est
+     * d'abord depose en entier dans le systeme de fichiers, verifie, et seulement
+     * ensuite extrait fichier par fichier. Tant que la verification n'a pas reussi,
+     * le contenu en place n'est pas touche.
+     */
+    bool runWebPackageUpdate_(NetworkClient* stream,
+                              int32_t contentLength,
+                              char* failMsg,
+                              size_t failMsgLen);
+    /** @brief Depose le paquet dans le systeme de fichiers, sans rien remplacer. */
+    bool webPkgDownload_(NetworkClient* stream, int32_t contentLength, char* failMsg, size_t failMsgLen);
+    /** @brief Verifie l'en-tete et l'empreinte du paquet depose. */
+    bool webPkgVerify_(uint16_t& fileCountOut, uint32_t& indexBytesOut, char* failMsg, size_t failMsgLen);
+    /** @brief Remplace les fichiers un par un, chacun verifie avant bascule. */
+    bool webPkgExtract_(uint16_t fileCount, uint32_t indexBytes, char* failMsg, size_t failMsgLen);
+    /** @brief true si le fichier en place a deja la taille et l'empreinte voulues. */
+    static bool webPkgFileMatches_(const char* path, uint32_t size, uint32_t crcExpected);
+
     bool runSpiffsInflate_(NetworkClient* stream,
                            int32_t contentLength,
                            uint32_t expectedOut,
