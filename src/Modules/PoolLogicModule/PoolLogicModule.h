@@ -308,6 +308,11 @@ private:
     // capteur installe (switch HA / config poollogic/safety flow_interlock).
     uint8_t flowCopyDelaySec_ = 30;
     bool flowInterlockEnabled_ = false;
+    // Le capteur est-il reellement installe ? Une entree TOR libre est en
+    // pull-up et lit « pas de debit » a vide : sans cette declaration, son etat
+    // ne peut pas servir a decider quoi que ce soit. Activer l'interlock vaut
+    // declaration -- on ne l'active pas sans capteur.
+    bool flowPresent_ = false;
 
     // Gel des mesures en ligne hors circulation. Une sonde montee sur la
     // tuyauterie ne voit plus que l'eau immobile du porte-sondes des que la
@@ -496,6 +501,8 @@ private:
                                                &flowSwitchIoId_, ConfigPersistence::Persistent, 0};
     ConfigVariable<IoId,0> coverClosedIdVar_{NVS_KEY(NvsKeys::PoolLogic::CoverClosedIoId), "cover_io_id", "poollogic/sensors", ConfigType::UInt16,
                                                 &coverClosedIoId_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> flowPresentVar_{NVS_KEY(NvsKeys::PoolLogic::FlowSwitchPresent), "flow_present", "poollogic/sensors", ConfigType::Bool,
+                                           &flowPresent_, ConfigPersistence::Persistent, 0};
 
     ConfigVariable<float,0> pressureLowVar_{NVS_KEY(NvsKeys::PoolLogic::PressureLow), "pressure_low_th", "poollogic/safety", ConfigType::Float,
                                        &pressureLowThreshold_, ConfigPersistence::Persistent, 0};
@@ -677,8 +684,10 @@ private:
     /**
      * @brief Publie l'etat hydraulique vers IOModule (front seulement).
      *
-     * Pompe alimentee != eau qui circule : si un flowswitch est cable, c'est lui
-     * qui fait foi (vanne fermee, amorcage perdu).
+     * Pompe alimentee != eau qui circule : si un flowswitch est **declare
+     * installe** (`flow_interlock`), c'est lui qui fait foi -- vanne fermee,
+     * amorcage perdu. Sans cette declaration l'entree TOR est en pull-up et
+     * lit « pas de debit » a vide : la suivre gelerait tout en permanence.
      */
     void updateSensorHold_(bool haveFlow, bool flowOn);
     /** @brief Vrai quand les mesures publiees sont figees (etat affichable). */

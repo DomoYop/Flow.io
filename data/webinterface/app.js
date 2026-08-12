@@ -4124,9 +4124,12 @@
       const unknownText = typeof opts.unknownText === 'string' && opts.unknownText.trim()
         ? opts.unknownText.trim()
         : 'Indisponible';
+      // Par defaut vrai = vert. Certains etats disent l'inverse : « mesures
+      // figees » a vrai est une degradation, pas une bonne nouvelle.
+      const okState = opts.invertSeverity ? !value : value;
 
       const tile = document.createElement('div');
-      tile.className = 'status-state-tile ' + (stateKnown ? (value ? 'is-true' : 'is-false') : 'is-empty');
+      tile.className = 'status-state-tile ' + (stateKnown ? (okState ? 'is-true' : 'is-false') : 'is-empty');
       tile.setAttribute('role', 'img');
       tile.setAttribute(
         'aria-label',
@@ -5966,7 +5969,8 @@
         {
           activeText: booleanTexts.activeText || displayConfig.activeText,
           inactiveText: booleanTexts.inactiveText || displayConfig.inactiveText,
-          unknownText: booleanTexts.unknownText || displayConfig.unknownText
+          unknownText: booleanTexts.unknownText || displayConfig.unknownText,
+          invertSeverity: displayConfig.invertSeverity === true
         }
       );
     }

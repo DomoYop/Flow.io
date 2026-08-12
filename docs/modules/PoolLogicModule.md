@@ -405,6 +405,12 @@ Pour `{i}` de 1 à 3 : `filtr_w{i}_en`, `filtr_w{i}_start`, `filtr_w{i}_stop` (m
 - `ph_lvl_io_id`
 - `chl_lvl_io_id`
 - `flow_io_id` (entrée digitale flowswitch ; défaut = rôle domaine `SensorFlowSwitch`)
+- `flow_present` (le flowswitch est réellement câblé ; défaut inactif). Déclaré,
+  il devient la référence de circulation à la place de l'état de la pompe — les
+  mesures restent donc valides quand la filtration est forcée à la main. Non
+  déclaré, l'entrée est ignorée : laissée libre elle est en pull-up et
+  signalerait « pas de débit » en permanence. Activer `flow_interlock` vaut
+  déclaration.
 - `cover_io_id` (entrée digitale contact volet fermé ; défaut = rôle domaine `SensorCoverClosed`)
 
 ### Sécurités (`poollogic/safety`)
@@ -424,9 +430,9 @@ Pour `{i}` de 1 à 3 : `filtr_w{i}_en`, `filtr_w{i}_start`, `filtr_w{i}_stop` (m
   ligne, à laisser inactif si elle est immergée dans le bassin)
 
 Le gel ne coupe et ne décide rien : il empêche de publier la dérive du
-porte-sondes. Le module ne fait que pousser l'état hydraulique
-(`filtration en marche` **et** flowswitch s'il est câblé) vers `IOModule`, qui
-gèle les endpoints marqués. La pression n'est jamais gelée. Détail :
+porte-sondes. Le module ne fait que pousser l'état hydraulique vers `IOModule`,
+qui gèle les endpoints marqués — flowswitch s'il est déclaré (`flow_present`),
+état de la pompe sinon. La pression n'est jamais gelée. Détail :
 [docs/notes/gel-mesures-hors-circulation.md](../notes/gel-mesures-hors-circulation.md).
 
 ### Robot (`poollogic/robot`)

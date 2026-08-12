@@ -158,6 +158,8 @@
     "cfgdocs.poollogic.sensors.dis_lvl_io_id.label": "IO niveau bidon désinfectant",
     "cfgdocs.poollogic.sensors.flow_io_id.help": "Identifiant IO de l'entrée digitale flowswitch (détection de débit).",
     "cfgdocs.poollogic.sensors.flow_io_id.label": "IO capteur débit (flowswitch)",
+    "cfgdocs.poollogic.sensors.flow_present.help": "À activer une fois le capteur de débit réellement câblé. Il devient alors la référence pour savoir si l'eau circule, à la place de l'état de la pompe : les mesures restent donc valides même quand la filtration est forcée à la main, hors du firmware. Tant que ce réglage est inactif, l'entrée est ignorée — laissée libre, elle est en pull-up et signalerait « pas de débit » en permanence. Activer la sécurité manque de débit vaut également déclaration.",
+    "cfgdocs.poollogic.sensors.flow_present.label": "Flowswitch installé",
     "cfgdocs.poollogic.sensors.ph_io_id.help": "Identifiant IO de la mesure pH.",
     "cfgdocs.poollogic.sensors.ph_io_id.label": "IO capteur pH",
     "cfgdocs.poollogic.sensors.ph_lvl_io_id.help": "Identifiant IO de l'entrée digitale niveau bas cuve pH.",

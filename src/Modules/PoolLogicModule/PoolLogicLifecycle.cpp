@@ -273,6 +273,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     phLevelIdVar_.moduleName = kCfgModuleSensors;
     chlorineLevelIdVar_.moduleName = kCfgModuleSensors;
     flowSwitchIdVar_.moduleName = kCfgModuleSensors;
+    flowPresentVar_.moduleName = kCfgModuleSensors;
     coverClosedIdVar_.moduleName = kCfgModuleSensors;
 
     pressureLowVar_.moduleName = kCfgModulePd0;
@@ -367,6 +368,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(phLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(chlorineLevelIdVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(flowSwitchIdVar_, kCfgModuleId, kCfgBranchSensors);
+    cfg.registerVar(flowPresentVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(coverClosedIdVar_, kCfgModuleId, kCfgBranchSensors);
 
     cfg.registerVar(pressureLowVar_, kCfgModuleId, kCfgBranchSafety);

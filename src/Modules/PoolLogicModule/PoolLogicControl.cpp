@@ -1105,10 +1105,25 @@ void PoolLogicModule::updateSensorHold_(bool haveFlow, bool flowOn)
 
     if (!ioSvc_ || !ioSvc_->setCirculating) return;
 
-    const bool circulating = filtrationFsm_.on && (!haveFlow || flowOn);
+    // Flowswitch declare installe : il decide seul. C'est une mesure physique du
+    // debit, la l'etat du relais n'est qu'une intention -- une pompe forcee a la
+    // main, hors du firmware, donne quand meme des mesures valides.
+    //
+    // Non declare : on retombe sur la mise en route de la pompe. Une entree TOR
+    // libre est en pull-up et lit « pas de debit » en permanence ; la suivre
+    // sans declaration gelait les mesures pour toujours, filtration comprise.
+    // Activer l'interlock vaut declaration : on ne l'active pas sans capteur.
+    const bool flowDeclared = (flowPresent_ || flowInterlockEnabled_) && haveFlow;
+    const bool circulating = flowDeclared ? flowOn : filtrationFsm_.on;
     if (circulatingKnown_ && circulating == circulatingLast_) return;
     circulatingKnown_ = true;
     circulatingLast_ = circulating;
+
+    // Filtration en marche mais toujours gele : c'est le flowswitch qui parle.
+    // Le tracer evite d'avoir a deduire la cause depuis l'interface.
+    if (!circulating && filtrationFsm_.on) {
+        LOGW("Sensor hold kept while filtration runs: flowswitch reports no flow");
+    }
     (void)ioSvc_->setCirculating(ioSvc_->ctx,
                                  circulating ? 1U : 0U,
                                  sensorHoldSettleSec_);

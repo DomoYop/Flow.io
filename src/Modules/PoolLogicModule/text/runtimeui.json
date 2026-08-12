@@ -246,7 +246,8 @@
       "display": "boolean",
       "displayConfig": {
         "activeText_t": "runtimeui.poollogic.v16.display.activeText",
-        "inactiveText_t": "runtimeui.poollogic.v16.display.inactiveText"
+        "inactiveText_t": "runtimeui.poollogic.v16.display.inactiveText",
+        "invertSeverity": true
       },
       "order": 30,
       "label_t": "runtimeui.poollogic.v16.label",

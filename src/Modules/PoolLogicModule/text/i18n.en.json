@@ -159,6 +159,8 @@
     "cfgdocs.poollogic.sensors.dis_lvl_io_id.label": "Disinfectant tank level IO",
     "cfgdocs.poollogic.sensors.flow_io_id.help": "IO id of the flow switch digital input (flow detection).",
     "cfgdocs.poollogic.sensors.flow_io_id.label": "Flow sensor IO (flow switch)",
+    "cfgdocs.poollogic.sensors.flow_present.help": "Enable once the flow switch is actually wired. It then becomes the reference for whether water circulates, instead of the pump state: readings stay valid even when filtration is forced by hand, outside the firmware. While this stays off the input is ignored — left floating it is pulled up and would report 'no flow' forever. Enabling the no-flow interlock also counts as declaring the sensor.",
+    "cfgdocs.poollogic.sensors.flow_present.label": "Flow switch fitted",
     "cfgdocs.poollogic.sensors.ph_io_id.help": "IO id of the pH reading.",
     "cfgdocs.poollogic.sensors.ph_io_id.label": "pH sensor IO",
     "cfgdocs.poollogic.sensors.ph_lvl_io_id.help": "IO id of the digital input for the pH tank low level.",

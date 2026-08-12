@@ -41,6 +41,23 @@ Assistant consomme.
 `ModuleId::Io` : la poussée se fait donc dans ce sens, via deux ajouts à
 `IOServiceV2` ([IIO.h](../../src/Core/Services/IIO.h)) :
 
+> **Qui décide que l'eau circule** dépend d'une seule question : le flowswitch
+> est-il déclaré installé (`flow_present`, ou `flow_interlock` qui vaut
+> déclaration) ?
+>
+> - **Oui** → le flowswitch décide **seul**. C'est une mesure physique du débit,
+>   là où l'état du relais n'est qu'une intention : une pompe forcée à la main,
+>   hors du firmware, donne quand même des mesures valides.
+> - **Non** → c'est la mise en route de la pompe qui pilote, et l'entrée TOR est
+>   ignorée.
+>
+> Cette déclaration n'est pas une formalité. Une entrée TOR libre est en pull-up
+> et lit « pas de débit » en permanence ; la première version obéissait à cette
+> lecture fantôme et gelait les mesures pour toujours, filtration en marche
+> comprise (**corrigé**). C'est exactement la précaution qui rend l'interlock de
+> sécurité opt-in.
+
+
 | Appel | Rôle |
 |---|---|
 | `setAnalogHold(id, hold)` | marque un endpoint comme gelable |
@@ -49,6 +66,11 @@ Assistant consomme.
 **Ce que voit l'utilisateur pendant le gel** : la dernière valeur acquise pompe
 en marche, `available` toujours vrai (pas de trou dans l'historique, pas de
 rafale de notifications `unavailable`), et un marqueur `held`.
+
+La tuile « Mesures figées » du tableau de bord porte `invertSeverity` dans son
+`displayConfig` : le rendu booléen colore `true` en vert par défaut, or ici
+`true` est une dégradation. Le drapeau est générique et réutilisable pour tout
+état dont le « vrai » est la mauvaise nouvelle.
 
 ### Trois décisions qui ne sont pas des détails
 
@@ -96,6 +118,10 @@ autre entrée déplace le gel avec lui, sans redémarrage
 | `sensor_hold_settle_s` (`pl_shsdl`) | 90 s | **borné à 240 s** |
 | `sensor_hold_wat` (`pl_shwat`) | activé | sonde d'eau montée en ligne |
 
+Plus, dans **Piscine → Sondes**, `flow_present` (`pl_fspres`, défaut inactif) :
+le flowswitch est-il réellement câblé. C'est lui qui arbitre qui décide de la
+circulation (voir plus haut).
+
 Le plafond de 240 s n'est pas arbitraire : la sonde de température du chauffage
 fait tourner la filtration 5 min et **décide à la fin**
 (`kHeatAssistProbeRunSec`). Un délai de reprise plus long lui ferait prendre sa
@@ -110,6 +136,10 @@ réécrite en NVS, avec un log.
   volontaire — figer sur une valeur d'eau stagnante serait pire.
 - Une sonde qui tombe en panne pendant le gel passe `invalid` : le marqueur
   `held` retombe avec la validité. Panne et gel restent distinguables.
+- **Si `flow_interlock` est activé avec un flowswitch défaillant, le gel ne se
+  lève plus.** C'est voulu — le système ne peut pas savoir que l'eau circule —
+  mais le dosage serait bloqué en même temps, donc le symptôme est visible. Un
+  `LOGW` est émis quand le gel persiste alors que la filtration tourne.
 - Le pire cas de `binary_sensor` Home Assistant passe à **22 sur 24**
   (8 entrées TOR + 10 alarmes + 4 PoolLogic). Il reste deux places ; au-delà,
   la troncature serait silencieuse — voir `HaCapacitySpec::binarySensors` dans

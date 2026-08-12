@@ -1038,7 +1038,8 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "display": "boolean",
       "displayConfig": {
         "activeText": "Fig\u00e9es (sans circulation)",
-        "inactiveText": "En direct"
+        "inactiveText": "En direct",
+        "invertSeverity": true
       }
     },
     {
