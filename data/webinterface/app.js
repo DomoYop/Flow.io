@@ -6138,6 +6138,100 @@
       return grid;
     }
 
+    // Variante visuelle d'une tuile d'alarme. Le texte affiche vient de l'enum du manifeste
+    // (deja traduit) ; on ne derive ici que la couleur depuis l'etat AlarmLifecycle.
+    function poolAlarmTileVariant(state, unavailable) {
+      if (unavailable || !Number.isFinite(state)) return 'is-unknown';
+      if (state === ALARM_STATE_ACTIVE_UNACKED) return 'is-active';
+      if (state === ALARM_STATE_ACTIVE_ACKED) return 'is-acked';
+      if (state === ALARM_STATE_CLEARED_UNACKED) return 'is-cleared';
+      if (state === ALARM_STATE_NORMAL) return 'is-normal';
+      return 'is-unknown';
+    }
+
+    // Tuile d'alarme : nom de l'alarme en haut, etat colore en bas. Remplace la pastille
+    // generique qui n'affichait que la valeur de l'enum ("Normal") sans dire de quoi.
+    function buildPoolAlarmTile(entry, runtimeValue) {
+      const unavailable = runtimeValueIsUnavailable(runtimeValue);
+      const rawState = Number(runtimeValue && runtimeValue.value);
+      const state = (unavailable || !Number.isFinite(rawState)) ? null : Math.trunc(rawState);
+      const label = String(runtimeMeasureDisplayLabel(entry) || tr('pool.alarm.defaultLabel', 'Alarme piscine'));
+      const text = formatRuntimeMeasureValue(entry, runtimeValue);
+
+      const tile = document.createElement('div');
+      tile.className = 'status-alarm-tile ' + poolAlarmTileVariant(state, unavailable);
+      tile.setAttribute('role', 'img');
+      tile.setAttribute('aria-label', label + ' : ' + text);
+
+      const name = document.createElement('div');
+      name.className = 'status-alarm-name';
+      name.textContent = label;
+      tile.appendChild(name);
+
+      const stateNode = document.createElement('div');
+      stateNode.className = 'status-alarm-state';
+      const dot = document.createElement('span');
+      dot.className = 'status-alarm-dot';
+      stateNode.appendChild(dot);
+      const stateText = document.createElement('span');
+      stateText.textContent = text;
+      stateNode.appendChild(stateText);
+      tile.appendChild(stateNode);
+
+      return tile;
+    }
+
+    // Ligne de synthese au-dessus de la grille : evite d'avoir a relire les 9 tuiles
+    // pour savoir s'il se passe quelque chose.
+    function buildPoolAlarmSummaryNode(entries, valueById) {
+      let active = 0;
+      let latched = 0;
+      let unavailable = 0;
+      (entries || []).forEach((entry) => {
+        const runtimeValue = valueById.get(Number(entry.id));
+        if (runtimeValueIsUnavailable(runtimeValue)) {
+          unavailable += 1;
+          return;
+        }
+        const state = Math.trunc(Number(runtimeValue.value));
+        if (state === ALARM_STATE_ACTIVE_UNACKED || state === ALARM_STATE_ACTIVE_ACKED) active += 1;
+        else if (state === ALARM_STATE_CLEARED_UNACKED) latched += 1;
+      });
+
+      const parts = [];
+      if (active) {
+        parts.push(active > 1
+          ? tr('pool.alarm.summary.activePlural', '{n} alarmes en cours').replace('{n}', String(active))
+          : tr('pool.alarm.summary.active', '{n} alarme en cours').replace('{n}', String(active)));
+      }
+      if (latched) {
+        parts.push(tr('pool.alarm.summary.latched', '{n} à acquitter').replace('{n}', String(latched)));
+      }
+      if (!parts.length && unavailable) {
+        parts.push(unavailable > 1
+          ? tr('pool.alarm.summary.unavailablePlural', '{n} alarmes indisponibles').replace('{n}', String(unavailable))
+          : tr('pool.alarm.summary.unavailable', '{n} alarme indisponible').replace('{n}', String(unavailable)));
+      }
+
+      const node = document.createElement('p');
+      node.className = 'status-alarm-summary';
+      if (active) node.classList.add('is-alert');
+      else if (latched) node.classList.add('is-warn');
+      node.textContent = parts.length
+        ? parts.join(' · ')
+        : tr('pool.alarm.summary.none', 'Aucune alarme en cours');
+      return node;
+    }
+
+    function buildPoolAlarmTilesGrid(entries, valueById) {
+      const grid = document.createElement('div');
+      grid.className = 'status-alarm-grid';
+      (entries || []).forEach((entry) => {
+        grid.appendChild(buildPoolAlarmTile(entry, valueById.get(Number(entry.id))));
+      });
+      return grid;
+    }
+
     function buildPoolMeasureCards(entries, values, options) {
       const fragment = document.createDocumentFragment();
       const opts = options && typeof options === 'object' ? options : {};
@@ -6196,6 +6290,15 @@
         // capteurs multi-valeurs regroupes dans une meme tuile.
         if (String(group.domainKey || '').trim().toLowerCase() === 'sondes') {
           card.appendChild(buildPoolSondeTilesGrid(group.entries, valueById));
+          fragment.appendChild(card);
+          return;
+        }
+
+        // Alarmes : rendu dedie en tuiles nommees. Le rendu badge generique jetait le
+        // libelle (displayConfig.badgeLabel vide) et alignait des pastilles "Normal" muettes.
+        if (String(group.domainKey || '').trim().toLowerCase() === 'alarm') {
+          card.appendChild(buildPoolAlarmSummaryNode(group.entries, valueById));
+          card.appendChild(buildPoolAlarmTilesGrid(group.entries, valueById));
           fragment.appendChild(card);
           return;
         }
