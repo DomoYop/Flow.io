@@ -81,15 +81,46 @@ static_assert((uint16_t)AlarmId::PoolWaterTemperatureUnavailable == 1008,
 // donc ces alarmes ne sont jamais enregistrees et leur topic jamais publie.
 // Une entite HA sans publication resterait indefiniment "unknown".
 
-static constexpr HAButtonEntry kAlarmResetSlotButtons[] = {
-    {"alarms", "alm_reset_slot_0", "Reset Alarm Slot 0", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":0}}", "diagnostic", "mdi:numeric-0-box-outline"},
-    {"alarms", "alm_reset_slot_1", "Reset Alarm Slot 1", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":1}}", "diagnostic", "mdi:numeric-1-box-outline"},
-    {"alarms", "alm_reset_slot_2", "Reset Alarm Slot 2", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":2}}", "diagnostic", "mdi:numeric-2-box-outline"},
-    {"alarms", "alm_reset_slot_3", "Reset Alarm Slot 3", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":3}}", "diagnostic", "mdi:numeric-3-box-outline"},
-    {"alarms", "alm_reset_slot_4", "Reset Alarm Slot 4", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":4}}", "diagnostic", "mdi:numeric-4-box-outline"},
-    {"alarms", "alm_reset_slot_5", "Reset Alarm Slot 5", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":5}}", "diagnostic", "mdi:numeric-5-box-outline"},
-    {"alarms", "alm_reset_slot_6", "Reset Alarm Slot 6", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":6}}", "diagnostic", "mdi:numeric-6-box-outline"},
-    {"alarms", "alm_reset_slot_7", "Reset Alarm Slot 7", MqttTopics::SuffixCmd, "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":7}}", "diagnostic", "mdi:numeric-7-box-outline"},
+// Un bouton par alarme, identifie par son AlarmId : plus aucun numero de slot
+// dans l'interface, donc plus aucune dependance a l'ordre d'enregistrement.
+// « Acquitter » couvre les deux gestes utiles -- effacer si la cause a disparu,
+// faire taire sinon -- ce qui evite un second bouton par alarme.
+static constexpr HAButtonEntry kAlarmAckButtons[] = {
+    {"alarms", "alm_ack_pressure_low", "Acknowledge Low Pressure", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1000}}", "diagnostic", "mdi:gauge-low"},
+    {"alarms", "alm_ack_pressure_high", "Acknowledge High Pressure", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1001}}", "diagnostic", "mdi:gauge-full"},
+    {"alarms", "alm_ack_ph_tank_low", "Acknowledge pH Tank Low", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1002}}", "diagnostic", "mdi:flask-empty-off-outline"},
+    {"alarms", "alm_ack_chlorine_tank_low", "Acknowledge Chlorine Tank Low", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1003}}", "diagnostic", "mdi:beaker-alert-outline"},
+    {"alarms", "alm_ack_ph_pump_max_uptime", "Acknowledge pH Pump Max Uptime", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1004}}", "diagnostic", "mdi:timer-alert-outline"},
+    {"alarms", "alm_ack_chlorine_pump_max_uptime", "Acknowledge Chlorine Pump Max Uptime", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1005}}", "diagnostic", "mdi:timer-alert-outline"},
+    {"alarms", "alm_ack_water_level_low", "Acknowledge Pool Water Level Low", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1006}}", "diagnostic", "mdi:waves-arrow-down"},
+    {"alarms", "alm_ack_ph_dose_no_effect", "Acknowledge pH Dosing Has No Effect", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1007}}", "diagnostic", "mdi:water-alert-outline"},
+    {"alarms", "alm_ack_water_temp_unavailable", "Acknowledge Water Temperature Unavailable", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1008}}", "diagnostic", "mdi:thermometer-alert"},
+};
+
+// Entites de l'ancien modele par slot, republiees en pierre tombale (discovery
+// vide) pour que Home Assistant les retire au lieu de les laisser orphelines.
+// Supprimables apres une release : elles occupent une place de bouton chacune.
+static constexpr HAButtonEntry kAlarmRetiredButtons[] = {
+    {"alarms", "alm_reset_slot_0", "Reset Alarm Slot 0", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_1", "Reset Alarm Slot 1", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_2", "Reset Alarm Slot 2", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_3", "Reset Alarm Slot 3", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_4", "Reset Alarm Slot 4", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_5", "Reset Alarm Slot 5", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_6", "Reset Alarm Slot 6", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    {"alarms", "alm_reset_slot_7", "Reset Alarm Slot 7", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
+    // Son payload_press etait double-echappe (HAModule applique deja jsonEscape),
+    // donc ce bouton n'a jamais pu declencher la commande. Remplace par alm_ack_all.
+    {"alarms", "alm_reset_all", "Reset Cleared Latched Alarms", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
 };
 }
 
@@ -150,6 +181,113 @@ void AlarmModule::emitAlarmEvent_(EventId id, AlarmId alarmId) const
     (void)eventBus_->post(id, &payload, sizeof(payload), ModuleId::Alarm);
 }
 
+uint32_t AlarmModule::nowEpoch_()
+{
+    if (!timeSvc_ && services_) timeSvc_ = services_->get<TimeService>(ServiceId::Time);
+    if (!timeSvc_ || !timeSvc_->isSynced || !timeSvc_->epoch) return 0U;
+    if (!timeSvc_->isSynced(timeSvc_->ctx)) return 0U;
+    return (uint32_t)timeSvc_->epoch(timeSvc_->ctx);
+}
+
+// Journal circulaire des transitions. Sans lui, la seule trace d'une alarme
+// retombee est une ligne de log serie que personne ne relit.
+void AlarmModule::appendLog_(AlarmId id, LogEvent event)
+{
+    LogEntry entry{};
+    entry.epochSec = nowEpoch_();
+    entry.upMs = millis();
+    entry.id = (uint16_t)id;
+    entry.event = (uint8_t)event;
+    entry.lifecycle = (uint8_t)lifecycle_(id);
+
+    portENTER_CRITICAL(&slotsMux_);
+    log_[logHead_] = entry;
+    logHead_ = (uint8_t)((logHead_ + 1U) % kLogCapacity);
+    if (logCount_ < kLogCapacity) ++logCount_;
+    portEXIT_CRITICAL(&slotsMux_);
+}
+
+// Seules les alarmes latchees encore actives sont persistees : une alarme non
+// latchee sera reevaluee en 250 ms, la persister n'apporterait rien.
+void AlarmModule::persistLatches_()
+{
+    PersistedLatchBlob blob{};
+    blob.magic = kLatchBlobMagic;
+    blob.version = kLatchBlobVersion;
+
+    portENTER_CRITICAL(&slotsMux_);
+    for (uint16_t i = 0; i < Limits::Alarm::MaxAlarms; ++i) {
+        const AlarmSlot& s = slots_[i];
+        if (!s.used || !s.active || !s.def.latched) continue;
+        if (blob.count >= (uint8_t)Limits::Alarm::MaxAlarms) break;
+        blob.items[blob.count].id = (uint16_t)s.id;
+        blob.items[blob.count].flags = s.acknowledged ? kLatchFlagAcknowledged : 0U;
+        ++blob.count;
+    }
+    portEXIT_CRITICAL(&slotsMux_);
+
+    if (cfgSvc_ && cfgSvc_->writeRuntimeBlobAsync) {
+        (void)cfgSvc_->writeRuntimeBlobAsync(cfgSvc_->ctx, NvsKeys::Alarm::LatchBlob, &blob, sizeof(blob));
+        return;
+    }
+    if (cfgStore_) {
+        (void)cfgStore_->writeRuntimeBlob(NvsKeys::Alarm::LatchBlob, &blob, sizeof(blob));
+    }
+}
+
+// Appelee apres l'enregistrement des alarmes (onConfigLoaded) : un latch de
+// securite ne doit pas disparaitre parce que la carte a redemarre.
+void AlarmModule::restoreLatches_()
+{
+    if (!cfgStore_) return;
+
+    PersistedLatchBlob blob{};
+    size_t actualLen = 0U;
+    if (!cfgStore_->readRuntimeBlob(NvsKeys::Alarm::LatchBlob, &blob, sizeof(blob), &actualLen)) return;
+    if (actualLen != sizeof(blob)) return;
+    if (blob.magic != kLatchBlobMagic || blob.version != kLatchBlobVersion) return;
+    if (blob.count == 0U) return;
+
+    const uint32_t nowMs = millis();
+    uint8_t restoredCount = 0U;
+    AlarmId restoredIds[Limits::Alarm::MaxAlarms]{};
+
+    for (uint8_t i = 0; i < blob.count && i < (uint8_t)Limits::Alarm::MaxAlarms; ++i) {
+        const AlarmId id = (AlarmId)blob.items[i].id;
+        const bool acked = (blob.items[i].flags & kLatchFlagAcknowledged) != 0U;
+
+        portENTER_CRITICAL(&slotsMux_);
+        const int16_t idx = findSlotById_(id);
+        bool applied = false;
+        if (idx >= 0) {
+            AlarmSlot& s = slots_[(uint16_t)idx];
+            // Une alarme dont la definition n'est plus latchee ne doit pas rester
+            // bloquee : elle se remettra a jour seule a la premiere evaluation.
+            if (s.def.latched && !s.active) {
+                s.active = true;
+                s.acknowledged = acked;
+                s.restored = true;
+                s.activeSinceMs = nowMs;
+                s.lastChangeMs = nowMs;
+                s.lastNotifyMs = nowMs;
+                // La condition n'a pas encore ete evaluee : ni vraie ni fausse.
+                s.lastCond = AlarmCondState::Unknown;
+                applied = true;
+            }
+        }
+        portEXIT_CRITICAL(&slotsMux_);
+
+        if (applied) restoredIds[restoredCount++] = id;
+    }
+
+    for (uint8_t i = 0; i < restoredCount; ++i) {
+        appendLog_(restoredIds[i], LogEvent::Restored);
+    }
+    if (restoredCount > 0U) {
+        LOGI("Alarm latches restored count=%u", (unsigned)restoredCount);
+    }
+}
+
 void AlarmModule::noteAlarmNotified_(AlarmId id, uint32_t nowMs)
 {
     portENTER_CRITICAL(&slotsMux_);
@@ -170,6 +308,8 @@ uint8_t AlarmModule::takeDueAlarmReminderIds_(AlarmId* out, uint8_t max, uint32_
     for (uint16_t i = 0; i < Limits::Alarm::MaxAlarms && count < max; ++i) {
         AlarmSlot& s = slots_[i];
         if (!s.used || !s.active || s.lastCond != AlarmCondState::True) continue;
+        // Acquittee : l'operateur a vu, le rappel periodique n'a plus d'objet.
+        if (s.acknowledged) continue;
         const uint32_t minRepeatMs = s.def.minRepeatMs;
         if (minRepeatMs > 0U &&
             s.lastNotifyMs != 0U &&
@@ -197,21 +337,6 @@ int16_t AlarmModule::findFreeSlot_() const
         if (!slots_[i].used) return (int16_t)i;
     }
     return -1;
-}
-
-bool AlarmModule::slotAlarmId_(uint8_t slot, AlarmId& outId) const
-{
-    outId = AlarmId::None;
-    if (slot >= Limits::Alarm::MaxAlarms) return false;
-
-    bool ok = false;
-    portENTER_CRITICAL(&slotsMux_);
-    if (slots_[slot].used) {
-        outId = slots_[slot].id;
-        ok = true;
-    }
-    portEXIT_CRITICAL(&slotsMux_);
-    return ok;
 }
 
 bool AlarmModule::registerAlarm_(const AlarmRegistration& def, AlarmCondFn condFn, void* condCtx)
@@ -267,6 +392,10 @@ bool AlarmModule::reset_(AlarmId id)
         if (s.active && s.def.latched && s.lastCond == AlarmCondState::False) {
             resetCond = s.lastCond;
             s.active = false;
+            s.acknowledged = false;
+            s.ackAtMs = 0U;
+            s.restored = false;
+            s.activeSinceEpoch = 0U;
             s.offSinceMs = 0U;
             s.lastChangeMs = nowMs;
             s.lastNotifyMs = nowMs;
@@ -286,6 +415,8 @@ bool AlarmModule::reset_(AlarmId id)
              alarmCode[0] ? alarmCode : "?",
              condStateStr_(resetCond));
         LOGI("Alarm reset id=%u code=%s", (unsigned)id, alarmCode[0] ? alarmCode : "?");
+        appendLog_(id, LogEvent::Reset);
+        persistLatches_();
         emitAlarmEvent_(EventId::AlarmReset, id);
         emitAlarmEvent_(EventId::AlarmCleared, id);
     } else if (warnConditionTrue) {
@@ -325,6 +456,80 @@ uint8_t AlarmModule::resetAll_()
     return resetCount;
 }
 
+// Geste unique de l'operateur : « j'ai vu ». Toujours accepte sur une alarme
+// active, contrairement a reset_() qui exige que la cause ait disparu. Si la
+// condition est deja retombee, acquitter revient a effacer -- c'est ce que
+// l'utilisateur attend d'un bouton unique par alarme.
+bool AlarmModule::ack_(AlarmId id)
+{
+    bool clearedByReset = false;
+    bool postAck = false;
+    bool warnNotActive = false;
+    char alarmCode[sizeof(slots_[0].def.code)] = {0};
+    const uint32_t nowMs = millis();
+
+    portENTER_CRITICAL(&slotsMux_);
+    const int16_t idx = findSlotById_(id);
+    if (idx >= 0) {
+        AlarmSlot& s = slots_[(uint16_t)idx];
+        strncpy(alarmCode, s.def.code, sizeof(alarmCode) - 1);
+        alarmCode[sizeof(alarmCode) - 1] = '\0';
+        if (!s.active) {
+            warnNotActive = true;
+        } else if (s.def.latched && s.lastCond == AlarmCondState::False) {
+            clearedByReset = true;
+        } else if (!s.acknowledged) {
+            s.acknowledged = true;
+            s.ackAtMs = nowMs;
+            s.lastNotifyMs = nowMs;
+            postAck = true;
+        }
+    }
+    portEXIT_CRITICAL(&slotsMux_);
+
+    // Hors section critique : reset_() reprend le verrou pour son compte.
+    if (clearedByReset) return reset_(id);
+
+    if (postAck) {
+        LOGI("Alarm acknowledged id=%u code=%s", (unsigned)id, alarmCode[0] ? alarmCode : "?");
+        appendLog_(id, LogEvent::Acked);
+        // L'acquittement doit survivre au redemarrage, sinon la carte se remet a
+        // sonner apres une coupure pour un defaut deja vu.
+        persistLatches_();
+        emitAlarmEvent_(EventId::AlarmSilenceChanged, id);
+        return true;
+    }
+
+    if (warnNotActive) {
+        LOGW("Alarm ack denied id=%u code=%s active=0", (unsigned)id, alarmCode[0] ? alarmCode : "?");
+    }
+    return false;
+}
+
+uint8_t AlarmModule::ackAll_()
+{
+    AlarmId pending[Limits::Alarm::MaxAlarms]{};
+    uint8_t pendingCount = 0;
+
+    portENTER_CRITICAL(&slotsMux_);
+    for (uint16_t i = 0; i < Limits::Alarm::MaxAlarms; ++i) {
+        const AlarmSlot& s = slots_[i];
+        if (!s.used || !s.active) continue;
+        // Deja acquittee et cause toujours presente : rien a faire.
+        if (s.acknowledged && !(s.def.latched && s.lastCond == AlarmCondState::False)) continue;
+        if (pendingCount < Limits::Alarm::MaxAlarms) {
+            pending[pendingCount++] = s.id;
+        }
+    }
+    portEXIT_CRITICAL(&slotsMux_);
+
+    uint8_t ackCount = 0;
+    for (uint8_t i = 0; i < pendingCount; ++i) {
+        if (ack_(pending[i])) ++ackCount;
+    }
+    return ackCount;
+}
+
 bool AlarmModule::isActive_(AlarmId id) const
 {
     bool out = false;
@@ -348,6 +553,56 @@ bool AlarmModule::isResettable_(AlarmId id) const
     return out;
 }
 
+// Source unique des affichages : (condition, active, acquittee) -> un seul etat.
+// Toute interface qui recompose ces trois dimensions elle-meme finit par diverger,
+// c'est ce qui est arrive aux masques par slot et au champ packe.
+AlarmLifecycle AlarmModule::lifecycle_(AlarmId id) const
+{
+    AlarmLifecycle out = AlarmLifecycle::Unavailable;
+    portENTER_CRITICAL(&slotsMux_);
+    const int16_t idx = findSlotById_(id);
+    if (idx >= 0) {
+        const AlarmSlot& s = slots_[(uint16_t)idx];
+        if (s.active) {
+            if (s.def.latched && s.lastCond == AlarmCondState::False) {
+                out = AlarmLifecycle::ClearedUnacked;
+            } else {
+                out = s.acknowledged ? AlarmLifecycle::ActiveAcked : AlarmLifecycle::ActiveUnacked;
+            }
+        } else {
+            out = (s.lastCond == AlarmCondState::Unknown) ? AlarmLifecycle::Unavailable
+                                                          : AlarmLifecycle::Normal;
+        }
+    }
+    portEXIT_CRITICAL(&slotsMux_);
+    return out;
+}
+
+// Le buffer pointe appartient au slot et n'est plus ecrit apres enregistrement :
+// un slot n'est jamais libere, le pointeur reste donc valide.
+const char* AlarmModule::codeOf_(AlarmId id) const
+{
+    const char* out = nullptr;
+    portENTER_CRITICAL(&slotsMux_);
+    const int16_t idx = findSlotById_(id);
+    if (idx >= 0) out = slots_[(uint16_t)idx].def.code;
+    portEXIT_CRITICAL(&slotsMux_);
+    return out;
+}
+
+bool AlarmModule::isAcknowledged_(AlarmId id) const
+{
+    bool out = false;
+    portENTER_CRITICAL(&slotsMux_);
+    const int16_t idx = findSlotById_(id);
+    if (idx >= 0) {
+        const AlarmSlot& slot = slots_[(uint16_t)idx];
+        out = slot.active && slot.acknowledged;
+    }
+    portEXIT_CRITICAL(&slotsMux_);
+    return out;
+}
+
 uint8_t AlarmModule::activeCount_() const
 {
     uint8_t count = 0;
@@ -359,17 +614,42 @@ uint8_t AlarmModule::activeCount_() const
     return count;
 }
 
-AlarmSeverity AlarmModule::highestSeverity_() const
+// Ce que doit suivre l'annonciation (buzzer, LED, notification) : une alarme
+// acquittee reste active et visible, mais ne doit plus reclamer l'attention.
+uint8_t AlarmModule::unackedCount_() const
+{
+    uint8_t count = 0;
+    portENTER_CRITICAL(&slotsMux_);
+    for (uint16_t i = 0; i < Limits::Alarm::MaxAlarms; ++i) {
+        const AlarmSlot& s = slots_[i];
+        if (s.used && s.active && !s.acknowledged) ++count;
+    }
+    portEXIT_CRITICAL(&slotsMux_);
+    return count;
+}
+
+AlarmSeverity AlarmModule::highestSeverityFiltered_(bool unackedOnly) const
 {
     AlarmSeverity highest = AlarmSeverity::Info;
     portENTER_CRITICAL(&slotsMux_);
     for (uint16_t i = 0; i < Limits::Alarm::MaxAlarms; ++i) {
         const AlarmSlot& s = slots_[i];
         if (!s.used || !s.active) continue;
+        if (unackedOnly && s.acknowledged) continue;
         if ((uint8_t)s.def.severity > (uint8_t)highest) highest = s.def.severity;
     }
     portEXIT_CRITICAL(&slotsMux_);
     return highest;
+}
+
+AlarmSeverity AlarmModule::highestSeverity_() const
+{
+    return highestSeverityFiltered_(false);
+}
+
+AlarmSeverity AlarmModule::highestUnackedSeverity_() const
+{
+    return highestSeverityFiltered_(true);
 }
 
 bool AlarmModule::buildSnapshot_(char* out, size_t len) const
@@ -382,13 +662,15 @@ bool AlarmModule::buildSnapshot_(char* out, size_t len) const
     portEXIT_CRITICAL(&slotsMux_);
 
     const uint8_t active = activeCount_();
+    const uint8_t unacked = unackedCount_();
     const AlarmSeverity highest = highestSeverity_();
 
     int wrote = snprintf(
         out,
         len,
-        "{\"ok\":true,\"active_count\":%u,\"highest_severity\":%u,\"alarms\":[",
+        "{\"ok\":true,\"active_count\":%u,\"unacked_count\":%u,\"highest_severity\":%u,\"alarms\":[",
         (unsigned)active,
+        (unsigned)unacked,
         (unsigned)((uint8_t)highest));
     if (wrote <= 0 || (size_t)wrote >= len) return false;
 
@@ -401,12 +683,14 @@ bool AlarmModule::buildSnapshot_(char* out, size_t len) const
         wrote = snprintf(
             out + pos,
             len - pos,
-            "%s{\"id\":%u,\"code\":\"%s\",\"title\":\"%s\",\"active\":true,\"resettable\":%s,\"severity\":%u}",
+            "%s{\"id\":%u,\"code\":\"%s\",\"title\":\"%s\",\"active\":true,"
+            "\"resettable\":%s,\"acknowledged\":%s,\"severity\":%u}",
             first ? "" : ",",
             (unsigned)s.id,
             s.def.code,
             s.def.title,
             (s.def.latched && s.lastCond == AlarmCondState::False) ? "true" : "false",
+            s.acknowledged ? "true" : "false",
             (unsigned)((uint8_t)s.def.severity));
         if (wrote <= 0 || (size_t)wrote >= (len - pos)) return false;
         pos += (size_t)wrote;
@@ -418,6 +702,56 @@ bool AlarmModule::buildSnapshot_(char* out, size_t len) const
     out[pos++] = '}';
     out[pos] = '\0';
     return true;
+}
+
+// Journal du plus recent au plus ancien, tronque des que le buffer de reponse
+// est plein : la taille du buffer varie selon l'appelant (commande MQTT, HTTP).
+bool AlarmModule::buildLog_(char* out, size_t len) const
+{
+    if (!out || len == 0) return false;
+
+    LogEntry snap[kLogCapacity]{};
+    uint8_t count = 0U;
+    uint8_t head = 0U;
+    portENTER_CRITICAL(&slotsMux_);
+    memcpy(snap, log_, sizeof(snap));
+    count = logCount_;
+    head = logHead_;
+    portEXIT_CRITICAL(&slotsMux_);
+
+    int wrote = snprintf(out, len, "{\"ok\":true,\"count\":%u,\"entries\":[", (unsigned)count);
+    if (wrote <= 0 || (size_t)wrote >= len) return false;
+    size_t pos = (size_t)wrote;
+
+    bool first = true;
+    bool truncated = false;
+    for (uint8_t i = 0; i < count; ++i) {
+        const uint8_t idx = (uint8_t)((head + kLogCapacity - 1U - i) % kLogCapacity);
+        const LogEntry& e = snap[idx];
+
+        char item[96] = {0};
+        wrote = snprintf(item,
+                         sizeof(item),
+                         "%s{\"id\":%u,\"e\":%u,\"l\":%u,\"t\":%lu,\"ms\":%lu}",
+                         first ? "" : ",",
+                         (unsigned)e.id,
+                         (unsigned)e.event,
+                         (unsigned)e.lifecycle,
+                         (unsigned long)e.epochSec,
+                         (unsigned long)e.upMs);
+        if (wrote <= 0) return false;
+        // 16 octets de marge pour la fermeture et le drapeau de troncature.
+        if (pos + (size_t)wrote + 16U >= len) {
+            truncated = true;
+            break;
+        }
+        memcpy(out + pos, item, (size_t)wrote);
+        pos += (size_t)wrote;
+        first = false;
+    }
+
+    wrote = snprintf(out + pos, len - pos, "],\"more\":%s}", truncated ? "true" : "false");
+    return (wrote > 0) && ((size_t)wrote < (len - pos));
 }
 
 uint8_t AlarmModule::listIds_(AlarmId* out, uint8_t max) const
@@ -439,96 +773,56 @@ bool AlarmModule::buildAlarmState_(AlarmId id, char* out, size_t len) const
 
     AlarmSlot snap{};
     bool found = false;
-    uint16_t slotIndex = 0;
     portENTER_CRITICAL(&slotsMux_);
     const int16_t idx = findSlotById_(id);
     if (idx >= 0) {
         snap = slots_[(uint16_t)idx];
-        slotIndex = (uint16_t)idx;
         found = true;
     }
     portEXIT_CRITICAL(&slotsMux_);
     if (!found) return false;
 
+    // `l` porte l'etat consolide (AlarmLifecycle) ; a/r/k/c restent publies
+    // separement pour les automatisations qui les consomment deja.
+    // Le numero de slot n'est plus expose : il n'a jamais ete une identite.
+    // `t` = epoch du declenchement (0 si l'horloge n'etait pas synchronisee),
+    // `lc` = millis() conserve comme repli avant synchronisation NTP.
     const int wrote = snprintf(
         out,
         len,
-        "{\"id\":%u,\"slot\":%u,\"a\":%u,\"r\":%u,\"c\":%u,\"s\":%u,\"lc\":%lu}",
+        "{\"id\":%u,\"l\":%u,\"a\":%u,\"r\":%u,\"k\":%u,\"c\":%u,\"s\":%u,\"t\":%lu,\"lc\":%lu}",
         (unsigned)snap.id,
-        (unsigned)slotIndex,
+        (unsigned)((uint8_t)lifecycle_(id)),
         snap.active ? 1u : 0u,
         (snap.active && snap.def.latched && snap.lastCond == AlarmCondState::False) ? 1u : 0u,
+        (snap.active && snap.acknowledged) ? 1u : 0u,
         (unsigned)((uint8_t)snap.lastCond),
         (unsigned)((uint8_t)snap.def.severity),
+        (unsigned long)snap.activeSinceEpoch,
         (unsigned long)snap.lastChangeMs);
     return (wrote > 0) && ((size_t)wrote < len);
 }
 
-bool AlarmModule::buildPacked_(char* out, size_t len, uint8_t slotCount) const
-{
-    if (!out || len == 0) return false;
-
-    uint8_t n = slotCount;
-    if (n == 0) n = 8;
-    if (n > 8) n = 8;
-    if (n > (uint8_t)Limits::Alarm::MaxAlarms) n = (uint8_t)Limits::Alarm::MaxAlarms;
-
-    uint64_t pack = 0ULL;
-    portENTER_CRITICAL(&slotsMux_);
-    for (uint8_t i = 0; i < n; ++i) {
-        const AlarmSlot& s = slots_[i];
-        uint8_t bits = 0;
-        if (s.used) {
-            if (s.active) bits |= 0x01U;
-            if (s.active && s.def.latched && s.lastCond == AlarmCondState::False) bits |= 0x02U;
-            if (s.lastCond == AlarmCondState::True) bits |= 0x04U;
-            bits |= (uint8_t)(((uint8_t)s.def.severity & 0x03U) << 3);
-        }
-        pack |= ((uint64_t)bits) << ((uint64_t)i * 5ULL);
-    }
-    portEXIT_CRITICAL(&slotsMux_);
-
-    const int wrote = snprintf(
-        out,
-        len,
-        "{\"v\":2,\"slots\":%u,\"p\":%llu,\"h\":\"%010llX\",\"ts\":%lu}",
-        (unsigned)n,
-        (unsigned long long)pack,
-        (unsigned long long)pack,
-        (unsigned long)millis());
-    return (wrote > 0) && ((size_t)wrote < len);
-}
-
-uint32_t AlarmModule::buildRuntimeMask_(RuntimeUiValueId valueId) const
-{
-    uint32_t mask = 0U;
-    portENTER_CRITICAL(&slotsMux_);
-    for (uint8_t i = 0; i < (uint8_t)Limits::Alarm::MaxAlarms && i < 32U; ++i) {
-        const AlarmSlot& slot = slots_[i];
-        if (!slot.used) continue;
-
-        bool setBit = false;
-        if (valueId == RuntimeUiActiveMask) {
-            setBit = slot.active;
-        } else if (valueId == RuntimeUiResettableMask) {
-            setBit = slot.active && slot.def.latched && slot.lastCond == AlarmCondState::False;
-        } else if (valueId == RuntimeUiConditionMask) {
-            setBit = slot.lastCond == AlarmCondState::True;
-        }
-
-        if (setBit) mask |= (1UL << i);
-    }
-    portEXIT_CRITICAL(&slotsMux_);
-    return mask;
-}
+// L'ordre de cette table n'a aucune importance fonctionnelle : chaque entree porte
+// son AlarmId. C'est precisement ce que les anciens masques ne garantissaient pas.
+const AlarmModule::RuntimeUiAlarmEntry AlarmModule::kRuntimeUiAlarms[9] = {
+    {11, AlarmId::PoolPressureLow, "alarms.pressure_low"},
+    {12, AlarmId::PoolPressureHigh, "alarms.pressure_high"},
+    {13, AlarmId::PoolPhTankLow, "alarms.ph_tank_low"},
+    {14, AlarmId::PoolChlorineTankLow, "alarms.chlorine_tank_low"},
+    {15, AlarmId::PoolPhPumpMaxUptime, "alarms.ph_pump_max_uptime"},
+    {16, AlarmId::PoolChlorinePumpMaxUptime, "alarms.chlorine_pump_max_uptime"},
+    {17, AlarmId::PoolWaterLevelLow, "alarms.water_level_low"},
+    {18, AlarmId::PoolPhDoseNoEffect, "alarms.ph_dose_no_effect"},
+    {19, AlarmId::PoolWaterTemperatureUnavailable, "alarms.water_temp_unavailable"},
+};
 
 bool AlarmModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) const
 {
-    const RuntimeUiId runtimeId = makeRuntimeUiId(moduleId(), valueId);
-    if (valueId == RuntimeUiActiveMask ||
-        valueId == RuntimeUiResettableMask ||
-        valueId == RuntimeUiConditionMask) {
-        return writer.writeU32(runtimeId, buildRuntimeMask_((RuntimeUiValueId)valueId));
+    for (const RuntimeUiAlarmEntry& entry : kRuntimeUiAlarms) {
+        if (entry.valueId != valueId) continue;
+        const RuntimeUiId runtimeId = makeRuntimeUiId(moduleId(), valueId);
+        return writer.writeU32(runtimeId, (uint32_t)(uint8_t)lifecycle_(entry.alarmId));
     }
     return false;
 }
@@ -545,6 +839,19 @@ bool AlarmModule::cmdList_(void* userCtx, const CommandRequest&, char* reply, si
     if (!self) return false;
     if (!self->buildSnapshot_(reply, replyLen)) {
         if (!writeErrorJson(reply, replyLen, ErrorCode::InternalAckOverflow, "alarms.list")) {
+            snprintf(reply, replyLen, "{\"ok\":false}");
+        }
+        return false;
+    }
+    return true;
+}
+
+bool AlarmModule::cmdLog_(void* userCtx, const CommandRequest&, char* reply, size_t replyLen)
+{
+    AlarmModule* self = static_cast<AlarmModule*>(userCtx);
+    if (!self) return false;
+    if (!self->buildLog_(reply, replyLen)) {
+        if (!writeErrorJson(reply, replyLen, ErrorCode::InternalAckOverflow, "alarms.log")) {
             snprintf(reply, replyLen, "{\"ok\":false}");
         }
         return false;
@@ -587,58 +894,6 @@ bool AlarmModule::handleCmdReset_(const CommandRequest& req, char* reply, size_t
     return true;
 }
 
-bool AlarmModule::handleCmdResetSlot_(const CommandRequest& req, char* reply, size_t replyLen)
-{
-    JsonObjectConst args;
-    if (!parseCmdArgsObject_(req, args)) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::MissingArgs, "alarms.reset_slot")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-    if (!args.containsKey("slot")) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::MissingSlot, "alarms.reset_slot.slot")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-    if (!args["slot"].is<uint8_t>() && !args["slot"].is<uint16_t>() &&
-        !args["slot"].is<uint32_t>() && !args["slot"].is<int32_t>()) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::InvalidSlot, "alarms.reset_slot.slot")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-
-    const uint32_t slotRaw = args["slot"].as<uint32_t>();
-    if (slotRaw >= 8U || slotRaw >= (uint32_t)Limits::Alarm::MaxAlarms) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::InvalidSlot, "alarms.reset_slot.slot")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-    const uint8_t slot = (uint8_t)slotRaw;
-
-    AlarmId id = AlarmId::None;
-    if (!slotAlarmId_(slot, id)) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::UnusedSlot, "alarms.reset_slot.slot")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-
-    if (!reset_(id)) {
-        if (!writeErrorJson(reply, replyLen, ErrorCode::Failed, "alarms.reset_slot")) {
-            snprintf(reply, replyLen, "{\"ok\":false}");
-        }
-        return false;
-    }
-
-    snprintf(reply, replyLen, "{\"ok\":true,\"slot\":%u,\"id\":%u}",
-             (unsigned)slot, (unsigned)((uint16_t)id));
-    return true;
-}
-
 bool AlarmModule::cmdReset_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen)
 {
     AlarmModule* self = static_cast<AlarmModule*>(userCtx);
@@ -646,11 +901,55 @@ bool AlarmModule::cmdReset_(void* userCtx, const CommandRequest& req, char* repl
     return self->handleCmdReset_(req, reply, replyLen);
 }
 
-bool AlarmModule::cmdResetSlot_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen)
+bool AlarmModule::handleCmdAck_(const CommandRequest& req, char* reply, size_t replyLen)
+{
+    JsonObjectConst args;
+    if (!parseCmdArgsObject_(req, args)) {
+        if (!writeErrorJson(reply, replyLen, ErrorCode::MissingArgs, "alarms.ack")) {
+            snprintf(reply, replyLen, "{\"ok\":false}");
+        }
+        return false;
+    }
+    if (!args.containsKey("id")) {
+        if (!writeErrorJson(reply, replyLen, ErrorCode::MissingValue, "alarms.ack.id")) {
+            snprintf(reply, replyLen, "{\"ok\":false}");
+        }
+        return false;
+    }
+    if (!args["id"].is<uint16_t>() && !args["id"].is<uint32_t>() && !args["id"].is<int32_t>()) {
+        if (!writeErrorJson(reply, replyLen, ErrorCode::InvalidEventId, "alarms.ack.id")) {
+            snprintf(reply, replyLen, "{\"ok\":false}");
+        }
+        return false;
+    }
+
+    const uint32_t idRaw = args["id"].as<uint32_t>();
+    const AlarmId id = (AlarmId)((uint16_t)idRaw);
+    if (!ack_(id)) {
+        if (!writeErrorJson(reply, replyLen, ErrorCode::Failed, "alarms.ack")) {
+            snprintf(reply, replyLen, "{\"ok\":false}");
+        }
+        return false;
+    }
+
+    snprintf(reply, replyLen, "{\"ok\":true,\"id\":%u}", (unsigned)((uint16_t)id));
+    return true;
+}
+
+bool AlarmModule::cmdAck_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen)
 {
     AlarmModule* self = static_cast<AlarmModule*>(userCtx);
     if (!self) return false;
-    return self->handleCmdResetSlot_(req, reply, replyLen);
+    return self->handleCmdAck_(req, reply, replyLen);
+}
+
+bool AlarmModule::cmdAckAll_(void* userCtx, const CommandRequest&, char* reply, size_t replyLen)
+{
+    AlarmModule* self = static_cast<AlarmModule*>(userCtx);
+    if (!self) return false;
+    const uint8_t ackCount = self->ackAll_();
+    snprintf(reply, replyLen, "{\"ok\":true,\"acked\":%u}", (unsigned)ackCount);
+    return true;
 }
 
 bool AlarmModule::cmdResetAll_(void* userCtx, const CommandRequest&, char* reply, size_t replyLen)
@@ -669,11 +968,14 @@ void AlarmModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(enabledVar_, kCfgModuleId, kCfgBranchId);
     cfg.registerVar(evalPeriodVar_, kCfgModuleId, kCfgBranchId);
 
+    services_ = &services;
+    cfgStore_ = &cfg;
     logHub_ = services.get<LogHubService>(ServiceId::LogHub);
     const EventBusService* eb = services.get<EventBusService>(ServiceId::EventBus);
     eventBus_ = eb ? eb->bus : nullptr;
     cmdSvc_ = services.get<CommandService>(ServiceId::Command);
     haSvc_ = services.get<HAService>(ServiceId::Ha);
+    cfgSvc_ = services.get<ConfigStoreService>(ServiceId::ConfigStore);
 
     if (!services.add(ServiceId::Alarm, &alarmSvc_)) {
         LOGE("service registration failed: %s", toString(ServiceId::Alarm));
@@ -681,9 +983,11 @@ void AlarmModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     if (cmdSvc_ && cmdSvc_->registerHandler) {
         cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.list", &AlarmModule::cmdList_, this);
+        cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.log", &AlarmModule::cmdLog_, this);
         cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.reset", &AlarmModule::cmdReset_, this);
-        cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.reset_slot", &AlarmModule::cmdResetSlot_, this);
         cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.reset_all", &AlarmModule::cmdResetAll_, this);
+        cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.ack", &AlarmModule::cmdAck_, this);
+        cmdSvc_->registerHandler(cmdSvc_->ctx, "alarms.ack_all", &AlarmModule::cmdAckAll_, this);
     }
 
     LOGI("Alarm service registered");
@@ -699,22 +1003,26 @@ void AlarmModule::registerHaEntities_(ServiceRegistry& services)
     bool registeredAny = false;
 
     if (haSvc_->addSensor) {
-        const HASensorEntry alarmsPack{
+        // Pierre tombale : le champ packe a ete remplace par un binary_sensor et
+        // un bouton d'acquittement par alarme. Supprimable apres une release.
+        const HASensorEntry retiredPack{
             "alarms",
             "alm_pack",
             "Alarms Pack",
-            "rt/alarms/p",
-            "{{ value_json.p | int(0) }}",
+            "rt/alarms/m",
+            // Champs inutilises par une pierre tombale, mais addSensorEntry() les
+            // exige non nuls avant d'accepter l'entree.
+            "{{ 0 }}",
             "diagnostic",
-            "mdi:alarm-light-outline",
+            nullptr,
             nullptr,
             false,
-            nullptr
+            nullptr,
+            false,
+            true
         };
-        if (haSvc_->addSensor(haSvc_->ctx, &alarmsPack)) {
-            registeredAny = true;
-        } else {
-            LOGW("HA registration failed: alm_pack");
+        if (!haSvc_->addSensor(haSvc_->ctx, &retiredPack)) {
+            LOGW("HA tombstone registration failed: alm_pack");
         }
     }
 
@@ -735,26 +1043,34 @@ void AlarmModule::registerHaEntities_(ServiceRegistry& services)
     }
 
     if (haSvc_->addButton) {
-        const HAButtonEntry resetAll{
+        // Payload en JSON brut : publishButton() applique jsonEscape() avant de
+        // l'inserer dans le message de discovery.
+        const HAButtonEntry ackAll{
             "alarms",
-            "alm_reset_all",
-            "Reset Cleared Latched Alarms",
+            "alm_ack_all",
+            "Acknowledge All Alarms",
             MqttTopics::SuffixCmd,
-            "{\\\"cmd\\\":\\\"alarms.reset_all\\\"}",
+            "{\"cmd\":\"alarms.ack_all\"}",
             "diagnostic",
-            "mdi:alarm-off"
+            "mdi:bell-check"
         };
-        if (haSvc_->addButton(haSvc_->ctx, &resetAll)) {
+        if (haSvc_->addButton(haSvc_->ctx, &ackAll)) {
             registeredAny = true;
         } else {
-            LOGW("HA registration failed: alm_reset_all");
+            LOGW("HA registration failed: alm_ack_all");
         }
 
-        for (uint8_t i = 0; i < (uint8_t)(sizeof(kAlarmResetSlotButtons) / sizeof(kAlarmResetSlotButtons[0])); ++i) {
-            if (haSvc_->addButton(haSvc_->ctx, &kAlarmResetSlotButtons[i])) {
+        for (uint8_t i = 0; i < (uint8_t)(sizeof(kAlarmAckButtons) / sizeof(kAlarmAckButtons[0])); ++i) {
+            if (haSvc_->addButton(haSvc_->ctx, &kAlarmAckButtons[i])) {
                 registeredAny = true;
             } else {
-                LOGW("HA registration failed: %s", kAlarmResetSlotButtons[i].objectSuffix);
+                LOGW("HA registration failed: %s", kAlarmAckButtons[i].objectSuffix);
+            }
+        }
+
+        for (uint8_t i = 0; i < (uint8_t)(sizeof(kAlarmRetiredButtons) / sizeof(kAlarmRetiredButtons[0])); ++i) {
+            if (!haSvc_->addButton(haSvc_->ctx, &kAlarmRetiredButtons[i])) {
+                LOGW("HA tombstone registration failed: %s", kAlarmRetiredButtons[i].objectSuffix);
             }
         }
     }
@@ -775,11 +1091,16 @@ void AlarmModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
                                services);
     }
     evalPeriodMsCfg_ = (int32_t)clampEvalPeriodMs_(evalPeriodMsCfg_);
+    // Tous les init() ont eu lieu : les alarmes des modules metier sont
+    // enregistrees, leurs latchs d'avant coupure peuvent etre reposes.
+    restoreLatches_();
     registerHaEntities_(services);
 }
 
 void AlarmModule::evaluateOnce_(uint32_t nowMs)
 {
+    // Lu une fois par passe : nowEpoch_() interroge le service de temps.
+    const uint32_t epochNow = nowEpoch_();
     AlarmId dueNotifyIds[Limits::Alarm::MaxAlarms]{};
     const uint8_t dueNotifyCount = takeDueAlarmReminderIds_(dueNotifyIds, (uint8_t)Limits::Alarm::MaxAlarms, nowMs);
     for (uint8_t i = 0; i < dueNotifyCount; ++i) {
@@ -833,6 +1154,12 @@ void AlarmModule::evaluateOnce_(uint32_t nowMs)
                     if (s.onSinceMs == 0U) s.onSinceMs = nowMs;
                     if (delayReached_(s.onSinceMs, s.def.onDelayMs, nowMs)) {
                         s.active = true;
+                        // Nouvelle occurrence : l'acquittement precedent ne vaut
+                        // plus, l'annonciation doit repartir.
+                        s.acknowledged = false;
+                        s.ackAtMs = 0U;
+                        s.restored = false;
+                        s.activeSinceEpoch = epochNow;
                         s.activeSinceMs = nowMs;
                         s.lastChangeMs = nowMs;
                         s.onSinceMs = 0U;
@@ -850,6 +1177,10 @@ void AlarmModule::evaluateOnce_(uint32_t nowMs)
                         if (s.offSinceMs == 0U) s.offSinceMs = nowMs;
                         if (delayReached_(s.offSinceMs, s.def.offDelayMs, nowMs)) {
                             s.active = false;
+                            s.acknowledged = false;
+                            s.ackAtMs = 0U;
+                            s.restored = false;
+                            s.activeSinceEpoch = 0U;
                             s.offSinceMs = 0U;
                             s.lastChangeMs = nowMs;
                             postCleared = true;
@@ -885,9 +1216,13 @@ void AlarmModule::evaluateOnce_(uint32_t nowMs)
 
         if (postRaised) {
             noteAlarmNotified_(id, nowMs);
+            appendLog_(id, LogEvent::Raised);
+            persistLatches_();
             emitAlarmEvent_(EventId::AlarmRaised, id);
         } else if (postCleared) {
             noteAlarmNotified_(id, nowMs);
+            appendLog_(id, LogEvent::Cleared);
+            persistLatches_();
             emitAlarmEvent_(EventId::AlarmCleared, id);
         } else if (postCondTrue || postCondFalse) {
             noteAlarmNotified_(id, nowMs);

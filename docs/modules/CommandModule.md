@@ -38,7 +38,7 @@ Aucun direct.
 Le `CommandModule` n'ajoute pas de commande métier lui-même; il sert d'infrastructure.
 Commandes que les modules tentent d'enregistrer selon le profil compilé:
 - `system.ping`, `system.reboot`, `system.factory_reset`
-- `alarms.list`, `alarms.reset`, `alarms.reset_slot`, `alarms.reset_all`
+- `alarms.list`, `alarms.log`, `alarms.ack`, `alarms.ack_all`, `alarms.reset`, `alarms.reset_all`
 - `time.resync`
 - `time.scheduler.info/get/set/clear/clear_all`
 - `wifi.dump_cfg`

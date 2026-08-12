@@ -74,6 +74,7 @@ Fonctions principales de `IOServiceV2`:
 - écriture digitale: `writeDigital`
 - lecture analogique: `readAnalog`
 - suivi du cycle IO: `tick`, `lastCycle`
+- gel hors circulation: `setAnalogHold`, `setCirculating`
 
 ## Capacités statiques
 
@@ -165,7 +166,7 @@ Le profil `FlowIO` instancie aujourd'hui:
 |---|---|
 | `OrpSensor` | `PortAdsInternal0` |
 | `PhSensor` | `PortAdsInternal1` |
-| `PsiSensor` | `PortAdsInternal2` |
+| `PressureSensor` | `PortAdsInternal2` |
 | `SpareAnalog` | `PortAdsInternal3` |
 | `WaterTemp` | `PortDsWater` |
 | `AirTemp` | `PortDsAir` |
@@ -335,3 +336,12 @@ Cette synchronisation repose sur:
 - les compteurs digitaux peuvent être persistés en NVS
 - le module maintient `IoCycleInfo` pour exposer la liste des `IoId` modifiés sur le dernier cycle
 - les labels exposés par `endpointLabel()` viennent des définitions construites par le profil
+- **gel des mesures hors circulation** : un endpoint analogique marqué par
+  `setAnalogHold` republie sa dernière valeur acquise pendant que l'eau circulait
+  tant que `setCirculating(0)` est actif, plus la temporisation de reprise.
+  L'acquisition continue (le filtre reste alimenté, le driver reste sollicité) et
+  l'horodatage avance : la mesure est figée, pas périmée. La valeur porte alors
+  `held` — dans `IOEndpointValue`, dans `IoValue`, dans `IOEndpointRuntime` et
+  dans le snapshot MQTT. La fenêtre du filtre médian est vidée au retour de la
+  circulation. Détail et décisions :
+  [docs/notes/gel-mesures-hors-circulation.md](../notes/gel-mesures-hors-circulation.md).

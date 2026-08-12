@@ -267,6 +267,15 @@ bool IOModule::buildEndpointSnapshot_(IOEndpoint* ep, char* out, size_t len, uin
     if (wrote < 0 || (size_t)wrote >= (len - used)) return false;
     used += (size_t)wrote;
 
+    // `held` n'apparait que quand il vaut vrai : la mesure est figee faute de
+    // circulation. Une valeur plate sans marqueur serait indiscernable d'une
+    // sonde morte, cote Home Assistant comme a l'ecran.
+    if (v.held) {
+        wrote = snprintf(out + used, len - used, ",\"held\":true");
+        if (wrote < 0 || (size_t)wrote >= (len - used)) return false;
+        used += (size_t)wrote;
+    }
+
     wrote = snprintf(out + used, len - used, ",\"ts\":%lu}", (unsigned long)millis());
     if (wrote < 0 || (size_t)wrote >= (len - used)) return false;
 

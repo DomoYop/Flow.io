@@ -1055,6 +1055,72 @@ bool PoolLogicModule::loadDigitalSensor_(IoId ioId, bool& out) const
     return true;
 }
 
+void PoolLogicModule::applySensorHoldBindings_()
+{
+    auto retryLater = [this]() {
+        portENTER_CRITICAL(&pendingMux_);
+        sensorHoldPending_ = true;
+        portEXIT_CRITICAL(&pendingMux_);
+    };
+
+    if (!ioSvc_ || !ioSvc_->setAnalogHold) {
+        retryLater();
+        return;
+    }
+
+    IoId wanted[kSensorHoldMax] = {IO_ID_INVALID, IO_ID_INVALID, IO_ID_INVALID};
+    if (sensorHoldEnabled_) {
+        // pH et ORP sont toujours en ligne : leur sonde est dans le
+        // porte-sondes, jamais dans le bassin. La pression reste libre -- a
+        // l'arret, 0 bar est une information vraie.
+        wanted[0] = phIoId_;
+        wanted[1] = orpIoId_;
+        if (sensorHoldWaterTemp_) wanted[2] = waterTempIoId_;
+    }
+
+    for (uint8_t i = 0; i < kSensorHoldMax; ++i) {
+        const IoId previous = sensorHoldIds_[i];
+        if (previous == wanted[i]) continue;
+        if (previous != IO_ID_INVALID) {
+            (void)ioSvc_->setAnalogHold(ioSvc_->ctx, previous, 0U);
+        }
+        if (wanted[i] != IO_ID_INVALID &&
+            ioSvc_->setAnalogHold(ioSvc_->ctx, wanted[i], 1U) != IO_OK) {
+            // Registre IO pas encore construit : reessayer au tick suivant.
+            retryLater();
+            continue;
+        }
+        sensorHoldIds_[i] = wanted[i];
+    }
+}
+
+void PoolLogicModule::updateSensorHold_(bool haveFlow, bool flowOn)
+{
+    bool pending = false;
+    portENTER_CRITICAL(&pendingMux_);
+    pending = sensorHoldPending_;
+    sensorHoldPending_ = false;
+    portEXIT_CRITICAL(&pendingMux_);
+    if (pending) applySensorHoldBindings_();
+
+    if (!ioSvc_ || !ioSvc_->setCirculating) return;
+
+    const bool circulating = filtrationFsm_.on && (!haveFlow || flowOn);
+    if (circulatingKnown_ && circulating == circulatingLast_) return;
+    circulatingKnown_ = true;
+    circulatingLast_ = circulating;
+    (void)ioSvc_->setCirculating(ioSvc_->ctx,
+                                 circulating ? 1U : 0U,
+                                 sensorHoldSettleSec_);
+}
+
+bool PoolLogicModule::sensorHoldActive_() const
+{
+    // Etat constate, pas intention : c'est IOModule qui tient la temporisation
+    // de reprise, la relire evite d'en entretenir une deuxieme ici.
+    return dataStore_ && ioAnyEndpointHeld(*dataStore_);
+}
+
 void PoolLogicModule::resetTemporalPidState_(TemporalPidState& st, uint32_t nowMs)
 {
     st.initialized = false;
@@ -1741,6 +1807,11 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     }
     noFlowError_ = interlockActive;
 
+    // Gel des mesures en ligne : meme lecture du debit que l'interlock, mais
+    // sans condition d'activation -- le gel ne coupe rien, il empeche seulement
+    // de publier la derive du porte-sondes.
+    updateSensorHold_(haveFlow, flowOn);
+
     // Chemical dosing is computed last because it depends on the resolved
     // filtration state, alarm state, and sensor freshness.
     bool phPumpDesired = phPumpFsm_.on;
@@ -1750,8 +1821,19 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     // d'elle-meme au repos (regulationArmed) sans perdre un melange en cours.
     if (phAutoMode_) {
         stepPhDosing_(havePh, ph, phAgeMs, nowMs, phPumpDesired);
-    } else if (phDosingState_.phase != DOSING_PHASE_IDLE) {
-        resetPhDosingState_(nowMs);
+    } else {
+        // Mode auto coupe : la FSM se tait, mais le volume injecte du jour, le gain
+        // effectif et la cause d'inaction restent des faits exacts. Les publier ici
+        // aussi evite de les figer sur la photo prise au boot -- sinon un dosage
+        // manuel, ou la remise a zero de minuit, ne remonterait jamais a l'ecran.
+        // Le cout est nul quand rien ne bouge : setPoolPhDosingRuntime compare avant
+        // d'ecrire, et refreshPhPumpMetrics_ ne relit le slot qu'une fois par seconde.
+        refreshPhPumpMetrics_(nowMs);
+        if (phDosingState_.phase != DOSING_PHASE_IDLE) {
+            resetPhDosingState_(nowMs);
+        } else {
+            publishPhDosingRuntime_();
+        }
     }
 
     // La desinfection liquide conserve le PID temporel par fenetre.

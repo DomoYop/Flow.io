@@ -186,7 +186,7 @@ constexpr char FiltrWin3Priority[] = "pl_fw3r"; // Filtration window 3 fill prio
 constexpr char FiltrCycleRatio[] = "pl_fcyr"; // Ratio applique aux cycles de renouvellement (%, 100 = courbe de reference).
 constexpr char PhIoId[] = "pl_phiid"; // Pool logic module persisted key for field `pl_phiid`.
 constexpr char OrpIoId[] = "pl_oiid"; // Pool logic module persisted key for field `pl_oiid`.
-constexpr char PressureIoId[] = "pl_piid"; // Pool logic module persisted key for field `pl_piid`.
+constexpr char PressureIoId[] = "pl_piid"; // IoId du capteur de pression. Suffixe `iid` commun aux autres IoId (pl_aiid, pl_wiid...).
 constexpr char WaterTempIoId[] = "pl_wiid"; // Pool logic module persisted key for field `pl_wiid`.
 constexpr char AirTempIoId[] = "pl_aiid"; // Pool logic module persisted key for field `pl_aiid`.
 constexpr char LevelIoId[] = "pl_liid"; // Pool logic module persisted key for field `pl_liid`.
@@ -194,8 +194,13 @@ constexpr char PhLevelIoId[] = "pl_phli"; // Pool logic module persisted key for
 constexpr char DisLevelIoId[] = "pl_disli"; // IoId capteur de niveau bas du bidon de desinfectant.
 constexpr char FlowSwitchIoId[] = "pl_fsiid"; // IoId capteur flowswitch (entree debit).
 constexpr char CoverClosedIoId[] = "pl_cciid"; // IoId capteur volet ferme.
-constexpr char PressureLow[] = "pl_psil"; // Pool logic module persisted key for field `pl_psil`.
-constexpr char PressureHigh[] = "pl_psih"; // Pool logic module persisted key for field `pl_psih`.
+// Seuils d'alarme de pression, en bar. Renommes psi -> pr en version 3 du schema
+// (le capteur ne s'exprime plus en PSI) ; les anciennes cles sont migrees puis
+// effacees par mig_2_to_3, et les AlarmId 1000/1001 restent inchanges.
+constexpr char PressureLow[] = "pl_prlow"; // Seuil de pression basse (bar) declenchant l'alarme.
+constexpr char PressureHigh[] = "pl_prhigh"; // Seuil de pression haute (bar) declenchant l'alarme.
+constexpr char PressureLowLegacy[] = "pl_psil"; // Ancien nom de PressureLow, lu par mig_2_to_3 seulement.
+constexpr char PressureHighLegacy[] = "pl_psih"; // Ancien nom de PressureHigh, lu par mig_2_to_3 seulement.
 constexpr char WinterStart[] = "pl_wstr"; // Pool logic module persisted key for field `pl_wstr`.
 constexpr char FreezeHold[] = "pl_whld"; // Pool logic module persisted key for field `pl_whld`.
 constexpr char SecureElectro[] = "pl_sect"; // Pool logic module persisted key for field `pl_sect`.
@@ -226,7 +231,8 @@ constexpr char DisWindowMs[] = "pl_diswms"; // Desinfection : fenetre PWM du PID
 // (caracteristique de la pompe / du reglage), plus mutualisees.
 constexpr char DisMinOnMs[] = "pl_dismon"; // Desinfection : duree ON minimale du PID.
 constexpr char DisSampleMs[] = "pl_dissmp"; // Desinfection : periode d'echantillonnage du PID.
-constexpr char PressureDelay[] = "pl_psdt"; // Pool logic module persisted key for field `pl_psdt`.
+constexpr char PressureDelay[] = "pl_prdelay"; // Delai (s) apres demarrage filtration avant de surveiller la pression.
+constexpr char PressureDelayLegacy[] = "pl_psdt"; // Ancien nom de PressureDelay, lu par mig_2_to_3 seulement.
 constexpr char DelayPids[] = "pl_dpds"; // Pool logic module persisted key for field `pl_dpds`.
 constexpr char DelayElectro[] = "pl_delt"; // Pool logic module persisted key for field `pl_delt`.
 constexpr char RobotDelay[] = "pl_rdel"; // Pool logic module persisted key for field `pl_rdel`.
@@ -242,6 +248,9 @@ constexpr char FiltrSegments[] = "pl_fseg"; // Pool logic runtime key for calcul
 constexpr char FiltrOptimalMin[] = "pl_fopt"; // Pool logic runtime key for calculated optimal filtration need (minutes/day).
 constexpr char FlowCopyDelay[] = "pl_fscdl"; // Flowswitch copy output activation delay (s).
 constexpr char FlowInterlock[] = "pl_flilk"; // Flowswitch safety interlock enable (block dosing/electrolysis when no flow).
+constexpr char SensorHold[] = "pl_shold"; // Gel des mesures en ligne (pH/ORP) tant que l'eau ne circule pas.
+constexpr char SensorHoldSettle[] = "pl_shsdl"; // Delai (s) de reprise des mesures apres redemarrage de la filtration.
+constexpr char SensorHoldWaterTemp[] = "pl_shwat"; // Inclut la sonde d'eau dans le gel (sonde montee en ligne).
 }  // namespace PoolLogic
 
 namespace PoolDevice {
@@ -264,6 +273,8 @@ constexpr char RuntimeFmt[] = "pd%urt"; // Pool device module runtime metrics ke
 namespace Alarm {
 constexpr char Enabled[] = "al_en"; // Alarm module persisted key for field `enabled`.
 constexpr char EvalPeriodMs[] = "al_epms"; // Alarm module persisted key for field `eval_period_ms`.
+/** @brief Latched alarms still active at power loss, restored at boot (runtime blob). */
+constexpr char LatchBlob[] = "al_lat"; // Alarm module runtime blob key; not a user-facing config field.
 }  // namespace Alarm
 
 namespace Hmi {

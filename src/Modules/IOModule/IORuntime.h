@@ -139,6 +139,40 @@ static inline bool setIoEndpointFloat(DataStore& ds, uint8_t idx, float value, u
     return true;
 }
 
+/**
+ * Vrai des qu'une mesure au moins est figee faute de circulation.
+ *
+ * Source unique de l'indicateur "mesures figees" : la question posee est
+ * toujours « qu'est-ce qui est reellement gele », jamais « quelle etait
+ * l'intention » -- ce qui evite de reimplementer la temporisation de reprise
+ * dans chaque consommateur (snapshot MQTT, Runtime UI, interface web).
+ */
+static inline bool ioAnyEndpointHeld(const DataStore& ds)
+{
+    const RuntimeData& rt = ds.data();
+    for (uint8_t i = 0; i < IO_MAX_ENDPOINTS; ++i) {
+        if (rt.io.endpoints[i].held) return true;
+    }
+    return false;
+}
+
+/**
+ * Marque la mesure comme figee ou vivante. Separe de setIoEndpointFloat : le
+ * marqueur change bien plus rarement que la valeur, et il ne doit pas provoquer
+ * une notification a chaque acquisition.
+ */
+static inline bool setIoEndpointHeld(DataStore& ds, uint8_t idx, bool held)
+{
+    if (idx >= IO_MAX_ENDPOINTS) return false;
+
+    IOEndpointRuntime& ep = ds.dataMutable().io.endpoints[idx];
+    if (ep.held == held) return false;
+    ep.held = held;
+
+    ds.notifyChanged((DataKey)(DATAKEY_IO_BASE + idx));
+    return true;
+}
+
 static inline bool setIoEndpointInvalid(DataStore& ds, uint8_t idx, uint8_t valueType, uint32_t tsMs)
 {
     if (idx >= IO_MAX_ENDPOINTS) return false;

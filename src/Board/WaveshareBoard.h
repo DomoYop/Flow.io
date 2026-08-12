@@ -111,7 +111,12 @@ inline constexpr MqttBufferSpec kWaveshareESP32S3MqttBuffers{
 // absence de debit) + 1 par alarme enregistree + l'agregat alm_any. L'ancienne
 // valeur de 10 etait deja depassee par le seul pire cas entrees + PoolLogic, et
 // addBinarySensorEntry() refuse en silence au-dela de la capacite.
-inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 24, 20, 30, 24, 6};
+// buttons : 10 pour les alarmes (1 acquittement par alarme + « tout acquitter »),
+// 9 pour PoolDevice, 1 pour PoolLogic, plus 9 pierres tombales publiees le temps
+// que Home Assistant oublie les entites de l'ancien modele par slot
+// (alm_reset_slot_0..7, alm_reset_all). Ces 9 places redeviendront libres quand
+// les pierres tombales seront retirees -- voir docs/notes/audit-gestion-alarmes.md.
+inline constexpr HaCapacitySpec kWaveshareESP32S3HaCapacity{48, 24, 20, 30, 32, 6};
 
 /*
  * UART definitions.

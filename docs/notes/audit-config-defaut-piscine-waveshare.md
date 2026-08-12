@@ -70,8 +70,8 @@ module, **DUP** = littéral identique à une constante `PoolDefaults` existante 
 
 | JSON | Clé NVS | Type | Défaut | Source |
 |---|---|---|---|---|
-| pressure_low_th | pl_psil | float | 0.15 | **DUP** (≡ PD PressureLow) |
-| pressure_high_th | pl_psih | float | 1.80 | **DUP** (≡ PD PressureHigh) |
+| pressure_low_th | pl_prlow | float | 0.15 | **DUP** (≡ PD PressureLow) |
+| pressure_high_th | pl_prhigh | float | 1.80 | **DUP** (≡ PD PressureHigh) |
 | winter_start_t | pl_wstr | float | -2.0 | **DUP** (≡ PD WinterStartTempC) |
 | freeze_hold_t | pl_whld | float | 2.0 | **DUP** (≡ PD FreezeHoldTempC) |
 | pressure_start_dly_s | pl_psdt | u8 | 60 | **DUP** (≡ PD PressureStartupDelaySec) |

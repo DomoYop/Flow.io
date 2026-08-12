@@ -2,15 +2,18 @@
 #
 # Paste this card into a dashboard view. It is not a full dashboard export.
 # It assumes:
-# - the helper entities from `home_assistant_alarm_helpers_fio53.yaml` are installed
+# - the helper entities from `home_assistant_alarm_helpers_pool.yaml` are installed
 # - custom cards `bubble-card`, `mushroom`, and `service-call` are available
 # - the MQTT topic below is updated to match your device:
-#   `flowio/ESP32-670D34/cmd`
+#   `flowio/poolbox/cmd`
 #
-# Reset behavior:
-# - use `{"cmd":"alarms.reset_slot","args":{"slot":N}}`
-# - reset is only meaningful for latched alarms
-# - the button is disabled when the alarm is not active or when condition is still true
+# Acknowledge behavior:
+# - use `{"cmd":"alarms.ack","args":{"id":<AlarmId>}}`
+# - acknowledging is a single gesture: it clears the alarm when the cause is
+#   already gone, and silences the annunciation otherwise
+# - the button is disabled only when the alarm is not active
+# - Home Assistant also auto-discovers `button.pool_alm_ack_*` per alarm, which
+#   does the same thing without any MQTT payload to maintain here
 
 type: vertical-stack
 cards:
@@ -26,17 +29,17 @@ cards:
     icon: m3o:warning
 
   - type: custom:mushroom-template-card
-    entity: binary_sensor.fio53_psi_low_active
+    entity: binary_sensor.pool_pressure_low_active
     primary: Low pressure
     secondary: >-
-      {% if is_state('binary_sensor.fio53_psi_low_active', 'off') %}
+      {% if is_state('binary_sensor.pool_pressure_low_active', 'off') %}
         Off
-      {% elif is_state('binary_sensor.fio53_psi_low_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_pressure_low_condition', 'off') %}
         Triggered (inactive)
       {% else %}
         Triggered (active)
       {% endif %} ({{
-      relative_time(states["binary_sensor.fio53_psi_low_active"].last_changed)
+      relative_time(states["binary_sensor.pool_pressure_low_active"].last_changed)
       }})
     icon: mdi:gauge-empty
     icon_tap_action:
@@ -44,9 +47,9 @@ cards:
     hold_action:
       action: none
     color: |
-      {% if is_state('binary_sensor.fio53_psi_low_active', 'off') %}
+      {% if is_state('binary_sensor.pool_pressure_low_active', 'off') %}
         green
-      {% elif is_state('binary_sensor.fio53_psi_low_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_pressure_low_condition', 'off') %}
         orange
       {% else %}
         red
@@ -58,7 +61,7 @@ cards:
         entries:
           - type: button
             icon: mdi:restart-alert
-            entity_id: binary_sensor.fio53_psi_low_active
+            entity_id: binary_sensor.pool_pressure_low_active
             value_attribute: state
             haptics: true
             autofill_entity_id: false
@@ -66,15 +69,15 @@ cards:
               action: call-service
               service: mqtt.publish
               data:
-                topic: flowio/ESP32-670D34/cmd
-                payload: "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":0}}"
+                topic: flowio/poolbox/cmd
+                payload: "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1000}}"
                 qos: 0
                 retain: false
             hold_action:
               action: none
             styles: |-
               :host {
-                {% if is_state('binary_sensor.fio53_psi_low_active', 'off') or is_state('binary_sensor.fio53_psi_low_condition', 'on') %}
+                {% if is_state('binary_sensor.pool_pressure_low_active', 'off') %}
                 --icon-color: var(--disabled-color);
                 opacity: 0.45;
                 pointer-events: none;
@@ -82,17 +85,17 @@ cards:
               }
 
   - type: custom:mushroom-template-card
-    entity: binary_sensor.fio53_psi_high_active
+    entity: binary_sensor.pool_pressure_high_active
     primary: High pressure
     secondary: >-
-      {% if is_state('binary_sensor.fio53_psi_high_active', 'off') %}
+      {% if is_state('binary_sensor.pool_pressure_high_active', 'off') %}
         Off
-      {% elif is_state('binary_sensor.fio53_psi_high_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_pressure_high_condition', 'off') %}
         Triggered (inactive)
       {% else %}
         Triggered (active)
       {% endif %} ({{
-      relative_time(states["binary_sensor.fio53_psi_high_active"].last_changed)
+      relative_time(states["binary_sensor.pool_pressure_high_active"].last_changed)
       }})
     icon: mdi:gauge-full
     icon_tap_action:
@@ -100,9 +103,9 @@ cards:
     hold_action:
       action: none
     color: |
-      {% if is_state('binary_sensor.fio53_psi_high_active', 'off') %}
+      {% if is_state('binary_sensor.pool_pressure_high_active', 'off') %}
         green
-      {% elif is_state('binary_sensor.fio53_psi_high_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_pressure_high_condition', 'off') %}
         orange
       {% else %}
         red
@@ -114,7 +117,7 @@ cards:
         entries:
           - type: button
             icon: mdi:restart-alert
-            entity_id: binary_sensor.fio53_psi_high_active
+            entity_id: binary_sensor.pool_pressure_high_active
             value_attribute: state
             haptics: true
             autofill_entity_id: false
@@ -122,15 +125,15 @@ cards:
               action: call-service
               service: mqtt.publish
               data:
-                topic: flowio/ESP32-670D34/cmd
-                payload: "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":1}}"
+                topic: flowio/poolbox/cmd
+                payload: "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1001}}"
                 qos: 0
                 retain: false
             hold_action:
               action: none
             styles: |-
               :host {
-                {% if is_state('binary_sensor.fio53_psi_high_active', 'off') or is_state('binary_sensor.fio53_psi_high_condition', 'on') %}
+                {% if is_state('binary_sensor.pool_pressure_high_active', 'off') %}
                 --icon-color: var(--disabled-color);
                 opacity: 0.45;
                 pointer-events: none;
@@ -138,17 +141,17 @@ cards:
               }
 
   - type: custom:mushroom-template-card
-    entity: binary_sensor.fio53_ph_tank_low_active
+    entity: binary_sensor.pool_ph_tank_low_active
     primary: pH tank low
     secondary: >-
-      {% if is_state('binary_sensor.fio53_ph_tank_low_active', 'off') %}
+      {% if is_state('binary_sensor.pool_ph_tank_low_active', 'off') %}
         Off
-      {% elif is_state('binary_sensor.fio53_ph_tank_low_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_ph_tank_low_condition', 'off') %}
         Triggered (inactive)
       {% else %}
         Triggered (active)
       {% endif %} ({{
-      relative_time(states["binary_sensor.fio53_ph_tank_low_active"].last_changed)
+      relative_time(states["binary_sensor.pool_ph_tank_low_active"].last_changed)
       }})
     icon: mdi:flask-outline
     icon_tap_action:
@@ -156,9 +159,9 @@ cards:
     hold_action:
       action: none
     color: |
-      {% if is_state('binary_sensor.fio53_ph_tank_low_active', 'off') %}
+      {% if is_state('binary_sensor.pool_ph_tank_low_active', 'off') %}
         green
-      {% elif is_state('binary_sensor.fio53_ph_tank_low_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_ph_tank_low_condition', 'off') %}
         orange
       {% else %}
         red
@@ -166,17 +169,17 @@ cards:
     multiline_secondary: false
 
   - type: custom:mushroom-template-card
-    entity: binary_sensor.fio53_chlorine_tank_low_active
+    entity: binary_sensor.pool_chlorine_tank_low_active
     primary: Chlorine tank low
     secondary: >-
-      {% if is_state('binary_sensor.fio53_chlorine_tank_low_active', 'off') %}
+      {% if is_state('binary_sensor.pool_chlorine_tank_low_active', 'off') %}
         Off
-      {% elif is_state('binary_sensor.fio53_chlorine_tank_low_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_chlorine_tank_low_condition', 'off') %}
         Triggered (inactive)
       {% else %}
         Triggered (active)
       {% endif %} ({{
-      relative_time(states["binary_sensor.fio53_chlorine_tank_low_active"].last_changed)
+      relative_time(states["binary_sensor.pool_chlorine_tank_low_active"].last_changed)
       }})
     icon: mdi:cup-water
     icon_tap_action:
@@ -184,9 +187,9 @@ cards:
     hold_action:
       action: none
     color: |
-      {% if is_state('binary_sensor.fio53_chlorine_tank_low_active', 'off') %}
+      {% if is_state('binary_sensor.pool_chlorine_tank_low_active', 'off') %}
         green
-      {% elif is_state('binary_sensor.fio53_chlorine_tank_low_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_chlorine_tank_low_condition', 'off') %}
         orange
       {% else %}
         red
@@ -194,17 +197,17 @@ cards:
     multiline_secondary: false
 
   - type: custom:mushroom-template-card
-    entity: binary_sensor.fio53_ph_pump_max_uptime_active
+    entity: binary_sensor.pool_ph_pump_max_uptime_active
     primary: pH pump max uptime reached
     secondary: >-
-      {% if is_state('binary_sensor.fio53_ph_pump_max_uptime_active', 'off') %}
+      {% if is_state('binary_sensor.pool_ph_pump_max_uptime_active', 'off') %}
         Off
-      {% elif is_state('binary_sensor.fio53_ph_pump_max_uptime_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_ph_pump_max_uptime_condition', 'off') %}
         Triggered (inactive)
       {% else %}
         Triggered (active)
       {% endif %} ({{
-      relative_time(states["binary_sensor.fio53_ph_pump_max_uptime_active"].last_changed)
+      relative_time(states["binary_sensor.pool_ph_pump_max_uptime_active"].last_changed)
       }})
     icon: mdi:timer-alert-outline
     icon_tap_action:
@@ -212,9 +215,9 @@ cards:
     hold_action:
       action: none
     color: |
-      {% if is_state('binary_sensor.fio53_ph_pump_max_uptime_active', 'off') %}
+      {% if is_state('binary_sensor.pool_ph_pump_max_uptime_active', 'off') %}
         green
-      {% elif is_state('binary_sensor.fio53_ph_pump_max_uptime_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_ph_pump_max_uptime_condition', 'off') %}
         orange
       {% else %}
         red
@@ -226,7 +229,7 @@ cards:
         entries:
           - type: button
             icon: mdi:restart-alert
-            entity_id: binary_sensor.fio53_ph_pump_max_uptime_active
+            entity_id: binary_sensor.pool_ph_pump_max_uptime_active
             value_attribute: state
             haptics: true
             autofill_entity_id: false
@@ -234,15 +237,15 @@ cards:
               action: call-service
               service: mqtt.publish
               data:
-                topic: flowio/ESP32-670D34/cmd
-                payload: "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":4}}"
+                topic: flowio/poolbox/cmd
+                payload: "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1004}}"
                 qos: 0
                 retain: false
             hold_action:
               action: none
             styles: |-
               :host {
-                {% if is_state('binary_sensor.fio53_ph_pump_max_uptime_active', 'off') or is_state('binary_sensor.fio53_ph_pump_max_uptime_condition', 'on') %}
+                {% if is_state('binary_sensor.pool_ph_pump_max_uptime_active', 'off') %}
                 --icon-color: var(--disabled-color);
                 opacity: 0.45;
                 pointer-events: none;
@@ -250,17 +253,17 @@ cards:
               }
 
   - type: custom:mushroom-template-card
-    entity: binary_sensor.fio53_chlorine_pump_max_uptime_active
+    entity: binary_sensor.pool_chlorine_pump_max_uptime_active
     primary: Chlorine pump max uptime reached
     secondary: >-
-      {% if is_state('binary_sensor.fio53_chlorine_pump_max_uptime_active', 'off') %}
+      {% if is_state('binary_sensor.pool_chlorine_pump_max_uptime_active', 'off') %}
         Off
-      {% elif is_state('binary_sensor.fio53_chlorine_pump_max_uptime_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_chlorine_pump_max_uptime_condition', 'off') %}
         Triggered (inactive)
       {% else %}
         Triggered (active)
       {% endif %} ({{
-      relative_time(states["binary_sensor.fio53_chlorine_pump_max_uptime_active"].last_changed)
+      relative_time(states["binary_sensor.pool_chlorine_pump_max_uptime_active"].last_changed)
       }})
     icon: mdi:timer-alert-outline
     icon_tap_action:
@@ -268,9 +271,9 @@ cards:
     hold_action:
       action: none
     color: |
-      {% if is_state('binary_sensor.fio53_chlorine_pump_max_uptime_active', 'off') %}
+      {% if is_state('binary_sensor.pool_chlorine_pump_max_uptime_active', 'off') %}
         green
-      {% elif is_state('binary_sensor.fio53_chlorine_pump_max_uptime_condition', 'off') %}
+      {% elif is_state('binary_sensor.pool_chlorine_pump_max_uptime_condition', 'off') %}
         orange
       {% else %}
         red
@@ -282,7 +285,7 @@ cards:
         entries:
           - type: button
             icon: mdi:restart-alert
-            entity_id: binary_sensor.fio53_chlorine_pump_max_uptime_active
+            entity_id: binary_sensor.pool_chlorine_pump_max_uptime_active
             value_attribute: state
             haptics: true
             autofill_entity_id: false
@@ -290,15 +293,15 @@ cards:
               action: call-service
               service: mqtt.publish
               data:
-                topic: flowio/ESP32-670D34/cmd
-                payload: "{\"cmd\":\"alarms.reset_slot\",\"args\":{\"slot\":5}}"
+                topic: flowio/poolbox/cmd
+                payload: "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1005}}"
                 qos: 0
                 retain: false
             hold_action:
               action: none
             styles: |-
               :host {
-                {% if is_state('binary_sensor.fio53_chlorine_pump_max_uptime_active', 'off') or is_state('binary_sensor.fio53_chlorine_pump_max_uptime_condition', 'on') %}
+                {% if is_state('binary_sensor.pool_chlorine_pump_max_uptime_active', 'off') %}
                 --icon-color: var(--disabled-color);
                 opacity: 0.45;
                 pointer-events: none;

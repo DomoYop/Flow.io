@@ -58,7 +58,7 @@ Le protocole `heat_assist` résout ce point: il fait d'abord un cycle court de f
 
 - `auto_mode` activé
 - `heater_auto_mode` activé
-- pas d'alarme pression PSI bloquante
+- pas d'alarme pression bloquante
 
 Si une de ces conditions n'est pas remplie, `heat_assist` reste inactif.
 
@@ -83,7 +83,7 @@ Si une de ces conditions n'est pas remplie, `heat_assist` reste inactif.
 
 - `DISABLED`: mode auto chauffage désactivé.
 - `MANUAL_MODE`: mode auto global désactivé.
-- `PSI_BLOCKED`: chauffage bloqué par la sécurité pression.
+- `PRESSURE_BLOCKED`: chauffage bloqué par la sécurité pression.
 - `SETPOINT_INVALID`: consigne chauffage invalide.
 - `TEMP_UNAVAILABLE`: température indisponible au moment de la décision.
 - `PROBE_WAIT_30M`: attente avant le prochain sondage (cadence normale).
@@ -121,7 +121,7 @@ Les conditions principales sont:
 - `auto_mode=true`
 - `disinfection_type=2` (`Oxygène actif`)
 - heure système synchronisée
-- pas de défaut pression PSI bloquant
+- pas de défaut pression bloquant
 - niveau de bidon désinfection OK (`chl_lvl_io_id`, réutilisé pour le bidon O2)
 - débit de la pompe de désinfection configuré dans PoolDevice (`flow_l_h`)
 - filtration en marche depuis au moins `min_filter_run_min`
@@ -250,7 +250,7 @@ Les raisons de blocage les plus utiles sont:
 
 - `inactive`: mode O2 non actif ou mode auto désactivé
 - `time_unsynced`: heure non synchronisée
-- `psi`: défaut pression
+- `pressure`: défaut pression
 - `tank_low`: bidon désinfection bas
 - `flow_invalid`: débit pompe non configuré ou invalide
 - `filtration_wait`: filtration pas encore prête
@@ -409,11 +409,25 @@ Pour `{i}` de 1 à 3 : `filtr_w{i}_en`, `filtr_w{i}_start`, `filtr_w{i}_stop` (m
 
 ### Sécurités (`poollogic/safety`)
 
-- `psi_low_th`
-- `psi_high_th`
-- `psi_start_dly_s`
+- `pressure_low_th`
+- `pressure_high_th`
+- `pressure_start_dly_s`
 - `winter_start_t`
 - `freeze_hold_t`
+- `flow_copy_delay_s`
+- `flow_interlock`
+- `sensor_hold` (gel des mesures en ligne hors circulation ; défaut activé)
+- `sensor_hold_settle_s` (délai de reprise après redémarrage filtration ; 90 s,
+  écrêté à 240 s — au-delà, la sonde 5 min du chauffage déciderait sur une
+  valeur figée)
+- `sensor_hold_wat` (inclut la sonde d'eau : à activer si elle est montée en
+  ligne, à laisser inactif si elle est immergée dans le bassin)
+
+Le gel ne coupe et ne décide rien : il empêche de publier la dérive du
+porte-sondes. Le module ne fait que pousser l'état hydraulique
+(`filtration en marche` **et** flowswitch s'il est câblé) vers `IOModule`, qui
+gèle les endpoints marqués. La pression n'est jamais gelée. Détail :
+[docs/notes/gel-mesures-hors-circulation.md](../notes/gel-mesures-hors-circulation.md).
 
 ### Robot (`poollogic/robot`)
 
@@ -537,10 +551,10 @@ Les réponses d'erreur suivent `ErrorCode` (`MissingArgs`, `MissingValue`, `NotR
 
 ### Entrées runtime
 
-- capteurs analogiques: pH, ORP, PSI, température eau, température air
+- capteurs analogiques: pH, ORP, pression, température eau, température air
 - capteur digital: niveau bassin
 - états actionneurs: lecture `pooldev.readActualOn(...)`
-- états alarmes PSI: via `alarmSvc->isActive(...)`
+- états alarmes pression: via `alarmSvc->isActive(...)`
 
 Convention logique des capteurs digitaux de niveau (règle harmonisée):
 - `true` (`ON`) = problème détecté (niveau bas / défaut)
@@ -551,8 +565,8 @@ Convention logique des capteurs digitaux de niveau (règle harmonisée):
 
 Ordre de décision appliqué à chaque cycle (`200 ms`):
 1. état réel et capteurs relus (`syncDeviceState_`, IO analog/digital)
-2. statut sécurité PSI recalculé (`psiError_`)
-3. si `psiError_==true` -> **filtration forcée OFF**, même en manuel
+2. statut sécurité pression recalculé (`pressureError_`)
+3. si `pressureError_==true` -> **filtration forcée OFF**, même en manuel
 4. sinon:
    - mode manuel (`auto_mode=false`): consigne manuelle conservée
    - mode auto: décision fenêtre scheduler / hiver / freeze-hold
@@ -562,9 +576,9 @@ Ordre de décision appliqué à chaque cycle (`200 ms`):
 
 Logique principale:
 - filtration:
-  - sécurité PSI prioritaire: coupe sur erreur PSI (auto **et** manuel)
+  - sécurité pression prioritaire: coupe sur erreur pression (auto **et** manuel)
   - en auto: suit fenêtre scheduler, mode hiver et freeze-hold
-  - en manuel (`auto_mode=false`): `PoolLogic` n'impose pas de demande auto hors sécurité PSI
+  - en manuel (`auto_mode=false`): `PoolLogic` n'impose pas de demande auto hors sécurité pression
 - robot:
   - démarre après `robot_delay_min` de filtration
   - s'arrête après `robot_dur_min`
@@ -578,13 +592,13 @@ Logique principale:
   - démarre si `Pool Level` est actif (`pool_lvl_io_id == true`)
   - respecte un minimum de marche `fill_min_on_s`
 
-### Alarmes pression PSI
+### Alarmes pression
 
-- `AlarmId::PoolPsiLow`
+- `AlarmId::PoolPressureLow`
   - latched
   - délai ON `2000 ms`, OFF `1000 ms`, répétition `60000 ms`
-  - condition active seulement si filtration ON et `runSec > psi_start_dly_s`
-- `AlarmId::PoolPsiHigh`
+  - condition active seulement si filtration ON et `runSec > pressure_start_dly_s`
+- `AlarmId::PoolPressureHigh`
   - latched
   - sévérité critique
   - délai ON `0 ms`, OFF `1000 ms`, répétition `60000 ms`
@@ -627,24 +641,24 @@ Une installation sans sonde d'eau configurée verra donc cette alarme active en
 permanence : c'est volontaire, puisque la filtration y tourne en permanence sur
 son plan de repli.
 
-Ce neuvième slot d'alarme sort des 8 couverts par `buildPacked_` et par les
-boutons `alm_reset_slot_*` de Home Assistant. C'est sans conséquence ici :
-l'alarme n'est pas latched et n'a donc jamais besoin d'être acquittée.
+L'alarme n'est pas latched : elle retombe seule dès que la mesure revient et n'a
+donc jamais besoin d'être acquittée. (La limite historique de 8 slots du champ
+packé, qui motivait aussi ce choix, n'existe plus.)
 
-### Réarmement PSI
+### Réarmement pression
 
-- source de vérité en nominal: `alarmSvc->isActive(PoolPsiLow|PoolPsiHigh)`
-- tant qu'une alarme PSI latched reste `active`, `psiError_` reste vrai et la filtration est bloquée
+- source de vérité en nominal: `alarmSvc->isActive(PoolPressureLow|PoolPressureHigh)`
+- tant qu'une alarme pression latched reste `active`, `pressureError_` reste vrai et la filtration est bloquée
 - si la condition est redevenue fausse, un `reset` manuel est alors autorisé pour clear l'alarme
 - si la filtration est redémarrée alors que la pression reste anormale:
-  - `psi_high` peut reraiser immédiatement
-  - `psi_low` reraisera après `psi_start_dly_s` (délai de démarrage)
+  - `pressure_high` peut reraiser immédiatement
+  - `pressure_low` reraisera après `pressure_start_dly_s` (délai de démarrage)
 
 ### Mode dégradé sans `AlarmService`
 
-Si le service alarmes est indisponible, `PoolLogic` applique un latch local PSI minimal:
-- détection locale `psi < low` (après délai de démarrage) ou `psi > high`
-- `psiError_` passe à vrai
+Si le service alarmes est indisponible, `PoolLogic` applique un latch local pression minimal:
+- détection locale `pression < low` (après délai de démarrage) ou `pression > high`
+- `pressureError_` passe à vrai
 - pas de clear automatique local (mode dégradé conservatif)
 
 ## Régulation pH : dosage volumétrique par lots
@@ -861,7 +875,7 @@ Sémantique importante:
 - `swgm`: mode SWG numérique (`0` suivi ORP, `1` continu filtration)
 - `swgms`: libellé machine du mode SWG
 - `o2.state`, `o2.state_s`: état protocole O2 (`idle`, `pending`, `dosing`, `blocked`)
-- `o2.block`, `o2.block_s`: raison de blocage O2 (`inactive`, `time_unsynced`, `psi`, `tank_low`, `flow_invalid`, `filtration_wait`, `pump_service`, `pump_blocked`, `config`)
+- `o2.block`, `o2.block_s`: raison de blocage O2 (`inactive`, `time_unsynced`, `pressure`, `tank_low`, `flow_invalid`, `filtration_wait`, `pump_service`, `pump_blocked`, `config`)
 - `o2.last_day`, `o2.done_ml`, `o2.pending_ml`: curseur O2 persistant
 - `o2.plan_ml`, `o2.flow_l_h`: dose élémentaire calculée et débit pompe utilisé
 
@@ -902,8 +916,13 @@ Entités enregistrées par `PoolLogicModule`:
   - `dis_setpoint`
   - `ph_pid_window_min` (conversion vers `ph_window_ms`)
   - `dis_pid_window_min` (conversion vers `dis_window_ms`)
-  - `psi_low_threshold`
-  - `psi_high_threshold`
+  - `pressure_low_threshold`
+  - `pressure_high_threshold`
+- binary sensors (sur `rt/poollogic/flow`):
+  - `pl_flow_copy_out`, `pl_cover_out`, `pl_no_flow`
+  - `pl_sensor_hold` (`Readings Held (no flow)`) — dit pourquoi les courbes pH
+    et Redox sont plates ; sans lui, une sonde morte y ressemblerait trait pour
+    trait
 - button:
   - `filtration_recalc` -> `{"cmd":"poollogic.filtration.recalc"}`
 

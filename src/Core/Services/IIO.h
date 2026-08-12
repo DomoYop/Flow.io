@@ -75,7 +75,11 @@ enum IoCap : uint8_t {
 /** Typed runtime value snapshot used by generic readers. */
 struct IoValue {
     uint8_t valid = 0;
-    uint8_t reserved = 0;
+    /**
+     * Mesure figee volontairement : la valeur est la derniere acquise pendant
+     * que l'eau circulait, pas la lecture courante. Reste `valid`.
+     */
+    uint8_t held = 0;
     uint8_t type = IO_VAL_FLOAT;
     uint32_t tsMs = 0;
     IoSeq cycleSeq = 0;
@@ -169,6 +173,27 @@ struct IOServiceV2 {
      * (0 = always-on driver like GPIO/ADS/TCA). Used by the I/O summary page.
      */
     IoStatus (*backendInfo)(void* ctx, uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable);
+
+    /**
+     * Marque un endpoint analogique comme "gelable hors circulation" (hold = 1)
+     * ou le libere (hold = 0).
+     *
+     * Une sonde en ligne ne mesure plus que l'eau immobile du porte-sondes des
+     * que la pompe s'arrete : sa valeur derive sans rien dire du bassin. Un
+     * endpoint marque republie alors sa derniere valeur acquise en circulation
+     * au lieu de cette derive. Le marquage suit le role metier (pH, ORP,
+     * temperature d'eau...), pas le slot : c'est a l'appelant de le refaire
+     * quand son binding change.
+     */
+    IoStatus (*setAnalogHold)(void* ctx, IoId id, uint8_t hold);
+    /**
+     * Publie l'etat hydraulique : circulating = 0 gele les endpoints marques,
+     * 1 les libere apres `settleSec`.
+     *
+     * Le delai de reprise couvre la purge du porte-sondes et le renouvellement
+     * de la fenetre du filtre median, videe au front montant.
+     */
+    IoStatus (*setCirculating)(void* ctx, uint8_t circulating, uint16_t settleSec);
 
     /** Opaque implementation context. */
     void* ctx;

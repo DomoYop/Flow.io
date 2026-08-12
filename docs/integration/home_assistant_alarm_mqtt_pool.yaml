@@ -1,0 +1,88 @@
+# Flow.io alarm state sensors for Home Assistant.
+#
+# Include from configuration.yaml:
+#
+#   mqtt: !include home_assistant_alarm_mqtt_pool.yaml
+#
+# One sensor per alarm, fed by the retained topic `rt/alarms/id<AlarmId>`.
+# The state is the consolidated lifecycle value (`l`, see AlarmLifecycle in
+# src/Core/Services/IAlarm.h):
+#   0 normal | 1 active, unacknowledged | 2 active, acknowledged
+#   3 cleared, waiting for acknowledgement | 4 unavailable (sensor silent)
+#
+# All other fields of the payload are exposed as attributes:
+#   a active | r resettable | k acknowledged | c condition (0 false, 1 true, 2 unknown)
+#   s severity (0 info, 1 warning, 2 alarm, 3 critical)
+#   t epoch of the trigger (0 before NTP sync) | lc uptime ms of the last change
+#
+# Values below match this installation: base topic `flowio/poolbox` and Home
+# Assistant entity prefix `pool` (firmware config key `ha/entity_prefix`).
+# Change both if the unit is reconfigured.
+#
+# This replaces the former `sensor.pool_alm_pack` decoding: alarm identity no
+# longer depends on the registration order of the slots.
+
+sensor:
+
+  - name: "pool_pressure_low_state"
+    unique_id: pool_pressure_low_state
+    state_topic: "flowio/poolbox/rt/alarms/id1000"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1000"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_pressure_high_state"
+    unique_id: pool_pressure_high_state
+    state_topic: "flowio/poolbox/rt/alarms/id1001"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1001"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_ph_tank_low_state"
+    unique_id: pool_ph_tank_low_state
+    state_topic: "flowio/poolbox/rt/alarms/id1002"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1002"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_chlorine_tank_low_state"
+    unique_id: pool_chlorine_tank_low_state
+    state_topic: "flowio/poolbox/rt/alarms/id1003"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1003"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_ph_pump_max_uptime_state"
+    unique_id: pool_ph_pump_max_uptime_state
+    state_topic: "flowio/poolbox/rt/alarms/id1004"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1004"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_chlorine_pump_max_uptime_state"
+    unique_id: pool_chlorine_pump_max_uptime_state
+    state_topic: "flowio/poolbox/rt/alarms/id1005"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1005"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_water_level_low_state"
+    unique_id: pool_water_level_low_state
+    state_topic: "flowio/poolbox/rt/alarms/id1006"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1006"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_ph_dose_no_effect_state"
+    unique_id: pool_ph_dose_no_effect_state
+    state_topic: "flowio/poolbox/rt/alarms/id1007"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1007"
+    icon: mdi:alarm-light-outline
+
+  - name: "pool_water_temp_unavailable_state"
+    unique_id: pool_water_temp_unavailable_state
+    state_topic: "flowio/poolbox/rt/alarms/id1008"
+    value_template: "{{ value_json.l | int(4) }}"
+    json_attributes_topic: "flowio/poolbox/rt/alarms/id1008"
+    icon: mdi:alarm-light-outline

@@ -1,10 +1,10 @@
 ﻿ID,Module,Champ_teste,Cas_usage,Preconditions,Action_Entree,Resultat_attendu
-A01,PoolLogic,auto_filtration,Filtration auto active pendant plage planifiée,auto_filtration=true; pas d’erreur PSI; plage active,Exécuter un cycle logique,La filtration est demandée ON; le slot filtration PDM passe desiredOn=true
-A02,PoolLogic,auto_filtration,Filtration auto inactive hors plage,auto_filtration=true; pas d’erreur PSI; plage inactive; pas de condition hiver,Exécuter un cycle logique,La filtration est demandée OFF; le slot filtration PDM passe desiredOn=false
-A03,PoolLogic,auto_filtration,Winter mode force la filtration,auto_filtration=true; winterMode=true; température air sous seuil hiver; pas d’erreur PSI,Exécuter un cycle logique,La filtration est demandée ON même hors plage
+A01,PoolLogic,auto_filtration,Filtration auto active pendant plage planifiée,auto_filtration=true; pas d’erreur pression; plage active,Exécuter un cycle logique,La filtration est demandée ON; le slot filtration PDM passe desiredOn=true
+A02,PoolLogic,auto_filtration,Filtration auto inactive hors plage,auto_filtration=true; pas d’erreur pression; plage inactive; pas de condition hiver,Exécuter un cycle logique,La filtration est demandée OFF; le slot filtration PDM passe desiredOn=false
+A03,PoolLogic,auto_filtration,Winter mode force la filtration,auto_filtration=true; winterMode=true; température air sous seuil hiver; pas d’erreur pression,Exécuter un cycle logique,La filtration est demandée ON même hors plage
 A04,PoolLogic,auto_filtration,Freeze hold maintient la filtration,Filtration déjà ON; auto_filtration=true; température air sous seuil freeze hold,Exécuter un cycle logique,La filtration reste ON
-A05,PoolLogic,auto_filtration,Erreur PSI coupe la filtration auto,auto_filtration=true; filtration ON; psiError=true,Exécuter un cycle logique,Filtration forcée OFF; la sécurité est prioritaire
-A06,PoolLogic,auto_filtration,"En manuel, PoolLogic ne décide plus hors sécurité",auto_filtration=false; filtration ON ou OFF manuellement; pas d’erreur PSI,Exécuter un cycle logique,PoolLogic ne modifie pas l’état de filtration
+A05,PoolLogic,auto_filtration,Erreur pression coupe la filtration auto,auto_filtration=true; filtration ON; pressureError=true,Exécuter un cycle logique,Filtration forcée OFF; la sécurité est prioritaire
+A06,PoolLogic,auto_filtration,"En manuel, PoolLogic ne décide plus hors sécurité",auto_filtration=false; filtration ON ou OFF manuellement; pas d’erreur pression,Exécuter un cycle logique,PoolLogic ne modifie pas l’état de filtration
 A07,PoolLogic,auto_filtration,Retour au mode auto recalcule l’état,auto_filtration=false puis passage à true; état filtration quelconque,Basculer en auto puis exécuter un cycle,L’état filtration est recalculé selon planning/hiver/sécurité
 A08,PoolLogic,auto_filtration,Auto avec capteur air absent,auto_filtration=true; mode hiver actif; sonde air absente,Exécuter un cycle logique,Pas de faux déclenchement hiver; comportement sûr et déterministe
 A09,PoolLogic,auto_filtration,Démarrage auto après redémarrage système,auto_filtration=true; plage active au boot,Redémarrer puis exécuter la logique,La filtration repart automatiquement selon les règles
@@ -14,7 +14,7 @@ B02,PoolLogic,auto_ph,Délai de stabilisation avant PID pH,auto_ph=true; filtrat
 B03,PoolLogic,auto_ph,Régulation pH active quand toutes conditions sont OK,auto_ph=true; filtration ON depuis assez longtemps; sonde pH valide; pas d’erreur; bidon OK,Exécuter un cycle logique,La demande pH est calculée et la pompe pH peut être activée
 B04,PoolLogic,auto_ph,Pas de régulation sans sonde pH,auto_ph=true; filtration ON; sonde pH absente ou invalide,Exécuter un cycle logique,Pompe pH OFF
 B05,PoolLogic,auto_ph,Pas de régulation pH si filtration OFF,auto_ph=true; filtration OFF,Exécuter un cycle logique,Pompe pH OFF
-B06,PoolLogic,auto_ph,Pas de régulation pH si erreur PSI,auto_ph=true; filtration théoriquement autorisée; psiError=true,Exécuter un cycle logique,Pompe pH OFF; PID réinitialisé ou inhibé
+B06,PoolLogic,auto_ph,Pas de régulation pH si erreur pression,auto_ph=true; filtration théoriquement autorisée; pressureError=true,Exécuter un cycle logique,Pompe pH OFF; PID réinitialisé ou inhibé
 B07,PoolLogic,auto_ph,Bidon pH vide bloque l’injection,auto_ph=true; filtration ON; délai écoulé; phTankLow=true,Exécuter un cycle logique,Pompe pH OFF
 B08,PoolLogic,auto_ph,Sens de régulation selon mode pH+/pH-,auto_ph=true; filtration ON; pH valide; conditions OK,Tester une valeur de pH au-dessus et au-dessous de consigne avec phDosePlus=true puis false,La pompe ne s’active que dans le sens cohérent avec la configuration
 B09,PoolLogic,auto_ph,Retour capteur pH valide relance la régulation,auto_ph=true; sonde pH invalide puis valide,Exécuter deux cycles,Pas de régulation quand invalide; reprise normale quand valide
@@ -24,7 +24,7 @@ C02,PoolLogic,auto_orp,Délai de stabilisation avant PID ORP,auto_orp=true; filt
 C03,PoolLogic,auto_orp,Régulation ORP active quand toutes conditions sont OK,auto_orp=true; filtration ON; délai écoulé; sonde ORP valide; électrolyse OFF; bidon OK,Exécuter un cycle logique,La demande ORP est calculée et la pompe ORP peut être activée
 C04,PoolLogic,auto_orp,Pas de régulation sans sonde ORP,auto_orp=true; filtration ON; sonde ORP absente ou invalide,Exécuter un cycle logique,Pompe ORP OFF
 C05,PoolLogic,auto_orp,Électrolyse inhibe la pompe ORP,auto_orp=true; filtration ON; ORP valide; electrolyseMode=true,Exécuter un cycle logique,Pompe ORP OFF
-C06,PoolLogic,auto_orp,Erreur PSI bloque la régulation ORP,auto_orp=true; psiError=true,Exécuter un cycle logique,Pompe ORP OFF
+C06,PoolLogic,auto_orp,Erreur pression bloque la régulation ORP,auto_orp=true; pressureError=true,Exécuter un cycle logique,Pompe ORP OFF
 C07,PoolLogic,auto_orp,Bidon chlore vide bloque la régulation ORP,auto_orp=true; filtration ON; chlorineTankLow=true,Exécuter un cycle logique,Pompe ORP OFF
 C08,PoolLogic,auto_orp,ORP à consigne,auto_orp=true; filtration ON; ORP = consigne,Exécuter un cycle logique,Pas de demande de correction significative
 C09,PoolLogic,auto_orp,Retour ORP valide relance la régulation,Sonde ORP invalide puis valide,Exécuter deux cycles,Pas de régulation puis reprise normale
@@ -33,7 +33,7 @@ D01,PDM,filtration_pump_force,Commande directe ON filtration,Slot filtration act
 D02,PDM,filtration_pump_force,Commande directe OFF filtration,Filtration ON,Mettre filtration_pump_force=false,desiredOn=false; actualOn=false
 D03,PDM,filtration_pump_force,Commande ON bloquée par interlock,Interlock simulé ou dépendance non satisfaite,Mettre filtration_pump_force=true,Pompe non activée; blockReason=INTERLOCK
 D04,PDM,filtration_pump_force,Commande ON échoue si IO write échoue,Sortie IO en erreur,Mettre filtration_pump_force=true,actualOn=false; blockReason=IO_ERROR
-D05,PDM + PoolLogic,filtration_pump_force,Commande directe ON ensuite coupée par PSI,Pompe forcée ON puis psiError=true,Exécuter logique sécurité,Filtration coupée malgré le switch ON
+D05,PDM + PoolLogic,filtration_pump_force,Commande directe ON ensuite coupée par pression,Pompe forcée ON puis pressureError=true,Exécuter logique sécurité,Filtration coupée malgré le switch ON
 D06,PDM,filtration_pump_force,Écriture répétée ON idempotente,Pompe déjà ON,Réécrire true,Pas d’effet secondaire; état reste ON
 D07,PDM,filtration_pump_force,Écriture répétée OFF idempotente,Pompe déjà OFF,Réécrire false,Pas d’effet secondaire; état reste OFF
 D08,PDM,filtration_pump_force,Changement rapide ON/OFF,Pompe OFF,Basculer rapidement true puis false,L’état final est OFF sans incohérence runtime
@@ -77,8 +77,8 @@ H07,PoolLogic,robot,Nouveau cycle filtration réarme le robot,cleaningDone=true;
 H08,PoolLogic,robot,"En manuel global, robot non repiloté automatiquement",auto_filtration=false,Exécuter un cycle logique,PoolLogic ne change pas le robot hors règles d’arrêt nécessaires
 I01,IO + PoolLogic,pH / auto_ph,Lecture pH valide utilisée par la logique,pH injecté via IO,Exécuter un cycle complet,La décision pH est basée sur la mesure injectée
 I02,IO + PoolLogic,ORP / auto_orp,Lecture ORP valide utilisée par la logique,ORP injecté via IO,Exécuter un cycle complet,La décision ORP est basée sur la mesure injectée
-I03,IO + PoolLogic,PSI / auto_filtration,PSI invalide n’entraîne pas de faux défaut immédiat,Capteur PSI absent ou invalide,Exécuter un cycle logique,Pas de faux arrêt si la logique exige une vraie mesure pour déclencher
-I04,IO + PoolLogic,PSI / sécurité,PSI bas après délai déclenche erreur,Filtration ON; PSI trop bas après le délai de grâce,Exécuter la logique avec temps avancé,psiError=true; filtration coupée
+I03,IO + PoolLogic,pression / auto_filtration,pression invalide n’entraîne pas de faux défaut immédiat,Capteur pression absent ou invalide,Exécuter un cycle logique,Pas de faux arrêt si la logique exige une vraie mesure pour déclencher
+I04,IO + PoolLogic,pression / sécurité,pression bas après délai déclenche erreur,Filtration ON; pression trop bas après le délai de grâce,Exécuter la logique avec temps avancé,pressureError=true; filtration coupée
 I05,PDM + IO,filtration_pump_force,Commande filtration répercutée en runtime,Switch filtration ON; IO OK,Écrire le switch puis faire tourner PDM,desiredOn et actualOn cohérents dans le runtime
 I06,PDM + IO,ph_pump_force,Commande pompe pH répercutée en runtime,Switch pH ON; IO OK,Écrire le switch puis faire tourner PDM,desiredOn et actualOn cohérents
 I07,PDM + IO,orp_pump_force,Commande pompe ORP répercutée en runtime,Switch ORP ON; IO OK,Écrire le switch puis faire tourner PDM,desiredOn et actualOn cohérents

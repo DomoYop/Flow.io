@@ -85,7 +85,7 @@ Bits actuellement utilisés :
 - bit `2` : bidon chlore bas
 - bit `3` : alarme temps max pompe pH
 - bit `4` : alarme temps max pompe ORP
-- bit `5` : alarme PSI
+- bit `5` : alarme pression
 
 ### Page de configuration
 

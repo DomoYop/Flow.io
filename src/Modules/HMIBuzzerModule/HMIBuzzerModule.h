@@ -116,4 +116,6 @@ private:
     void handlePoolDeviceStateChanged_(const DataChangedPayload& payload);
     void handleAlarmRaised_();
     void tickAlarmReminder_(uint32_t nowMs);
+    uint8_t annunciationCount_() const;
+    AlarmSeverity annunciationSeverity_() const;
 };

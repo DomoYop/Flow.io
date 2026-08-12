@@ -182,6 +182,7 @@ IoStatus IOModule::ioReadValue_(IoId id, IoValue* outValue) const
         if (!s.endpoint->read(v) || !v.valid || v.valueType != IO_EP_VALUE_FLOAT) return IO_ERR_NOT_READY;
 
         outValue->valid = 1U;
+        outValue->held = v.held ? 1U : 0U;
         outValue->type = IO_VAL_FLOAT;
         outValue->tsMs = v.timestampMs;
         outValue->cycleSeq = lastCycle_ ? lastCycle_->seq : 0U;

@@ -42,6 +42,58 @@ const IOBindingPortSpec* IOModule::bindingPortSpec_(PhysicalPortId portId) const
     return nullptr;
 }
 
+/**
+ * Signale deux endpoints qui revendiquent le meme port physique.
+ *
+ * Rien ne detectait ce cas : le second binding gagnait ou perdait selon l'ordre
+ * d'assemblage, en silence. Le risque est reel des lors que la sortie d'une
+ * fonction se choisit depuis sa page (il n'y a que 8 relais EXIO pour 12
+ * fonctions declarees), et un relais pilote par deux fonctions est un vrai
+ * probleme materiel.
+ *
+ * On journalise sans refuser le binding : couper une sortie deja cablee au boot
+ * serait plus dangereux que de laisser passer un doublon, et l'utilisateur voit
+ * l'avertissement dans le journal comme dans la page E/S.
+ */
+void IOModule::logBindingPortConflicts_()
+{
+    struct PortClaim {
+        PhysicalPortId port;
+        char owner[20];
+    };
+    PortClaim claims[ANALOG_CFG_SLOTS + DIGITAL_INPUT_CFG_SLOTS + DIGITAL_CFG_SLOTS]{};
+    uint8_t claimCount = 0;
+    uint8_t conflicts = 0;
+
+    auto claim = [&](PhysicalPortId port, const char* kind, uint8_t index) {
+        if (port == IO_PORT_INVALID || port == 0) return;
+        for (uint8_t i = 0; i < claimCount; ++i) {
+            if (claims[i].port != port) continue;
+            const IOBindingPortSpec* spec = bindingPortSpec_(port);
+            LOGW("io binding conflict port=%u (%s) claimed by %s and %s%02u",
+                 (unsigned)port,
+                 (spec && spec->name) ? spec->name : "?",
+                 claims[i].owner,
+                 kind,
+                 (unsigned)index);
+            ++conflicts;
+            return;
+        }
+        if (claimCount >= (uint8_t)(sizeof(claims) / sizeof(claims[0]))) return;
+        claims[claimCount].port = port;
+        snprintf(claims[claimCount].owner, sizeof(claims[claimCount].owner), "%s%02u", kind, (unsigned)index);
+        ++claimCount;
+    };
+
+    for (uint8_t i = 0; i < ANALOG_CFG_SLOTS; ++i) claim(analogCfg_[i].bindingPort, "a", i);
+    for (uint8_t i = 0; i < DIGITAL_INPUT_CFG_SLOTS; ++i) claim(digitalInCfg_[i].bindingPort, "i", i);
+    for (uint8_t i = 0; i < DIGITAL_CFG_SLOTS; ++i) claim(digitalCfg_[i].bindingPort, "d", i);
+
+    if (conflicts > 0) {
+        LOGW("io binding conflicts detected=%u (a relay driven by two functions)", (unsigned)conflicts);
+    }
+}
+
 void IOModule::autoBindEnabledAnalogDrivers_()
 {
     if (!bindingPorts_ || bindingPortCount_ == 0) return;

@@ -185,7 +185,7 @@ private:
     static constexpr uint16_t StatusMsgRuntimeBase = 32;
 
     static constexpr uint16_t AlarmMsgMeta = 1;
-    static constexpr uint16_t AlarmMsgPack = 2;
+    // 2 = ancien champ packe rt/alarms/p, retire : identite par slot abandonnee.
     static constexpr uint16_t AlarmMsgStateBase = 100;
 
     static constexpr uint8_t MaxProducers = Limits::Mqtt::Capacity::MaxProducers;

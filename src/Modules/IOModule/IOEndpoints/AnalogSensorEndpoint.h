@@ -17,7 +17,11 @@ public:
     bool read(IOEndpointValue& out) override;
     bool write(const IOEndpointValue&) override { return false; }
 
-    void update(float value, bool valid, uint32_t timestampMs);
+    /**
+     * @param held Valeur figee hors circulation : la mesure reste valide, mais
+     *             elle date de la derniere periode de brassage.
+     */
+    void update(float value, bool valid, uint32_t timestampMs, bool held = false);
 
 private:
     const char* endpointId_ = nullptr;

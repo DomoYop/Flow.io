@@ -189,7 +189,11 @@ void PoolLogicModule::publishPhDosingRuntime_() const
     PoolLogicPhDosingRuntimeData out{};
     out.valid = phDosingState_.tickValid;
     out.phase = phDosingLast_.phase;
-    out.blockReason = phDosingLast_.blockReason;
+    // Mode auto coupe : la FSM ne tourne plus et sa derniere sortie a ete remise a
+    // zero, donc elle porte DOSING_BLOCK_NONE. Annoncer "aucune cause" serait faux :
+    // la cause est le desarmement lui-meme, et c'est precisement ce que l'ecran doit
+    // dire au moment ou plus rien ne se passe.
+    out.blockReason = phAutoMode_ ? phDosingLast_.blockReason : (uint8_t)DOSING_BLOCK_DISABLED;
     // Hors phase de melange, le decompte n'a pas de sens : le consommateur doit
     // pouvoir distinguer "0 minute restante" de "pas d'attente en cours".
     out.mixing = (phDosingLast_.phase == DOSING_PHASE_MIXING);
@@ -261,6 +265,8 @@ bool PoolLogicModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& wri
             return writer.writeF32(runtimeId, phDosingLast_.doseTargetMl);
         case RuntimeUiPhBatchDeliveredMl:
             return writer.writeF32(runtimeId, phDosingLast_.doseDeliveredMl);
+        case RuntimeUiSensorHold:
+            return writer.writeBool(runtimeId, sensorHoldActive_());
         case RuntimeUiPhExpectedDelta: {
             float delta = 0.0f;
             if (!phExpectedBatchDelta_(delta)) return writer.writeUnavailable(runtimeId);
@@ -423,12 +429,16 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
     if (idx == 4) {
         // Etat des sorties indicatrices flowswitch : recopie temporisee, volet,
         // et interlock securite (no_flow). Consomme par les binary_sensor HA.
+        // `hold` s'y ajoute : c'est la meme question physique (l'eau circule-t-elle),
+        // et il dit pourquoi les courbes pH/Redox sont plates.
         const int wrote = snprintf(out,
                                    len,
-                                   "{\"flow_copy\":%s,\"cover\":%s,\"no_flow\":%s,\"delay_s\":%u,\"t\":%lu}",
+                                   "{\"flow_copy\":%s,\"cover\":%s,\"no_flow\":%s,\"hold\":%s,"
+                                   "\"delay_s\":%u,\"t\":%lu}",
                                    flowCopyOutState_ ? "true" : "false",
                                    coverClosedState_ ? "true" : "false",
                                    noFlowError_ ? "true" : "false",
+                                   sensorHoldActive_() ? "true" : "false",
                                    (unsigned)flowCopyDelaySec_,
                                    (unsigned long)nowMs);
         if (wrote < 0 || (size_t)wrote >= len) return false;

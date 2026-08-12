@@ -96,6 +96,12 @@ constexpr uint8_t DosingGainWindow = 8;        // fenetre de la moyenne glissant
 
 constexpr uint8_t PressureStartupDelaySec = 60;
 constexpr uint8_t DelayPidsMin = 5;
+// Gel des mesures en ligne hors circulation. 90 s couvrent la purge du
+// porte-sondes au redemarrage et le remplissage de la fenetre du filtre median
+// (11 echantillons) meme pour les sources lentes.
+constexpr bool SensorHold = true;
+constexpr uint16_t SensorHoldSettleSec = 90;
+constexpr bool SensorHoldWaterTemp = true;
 constexpr uint8_t DelayElectroMin = 10;
 constexpr uint8_t RobotDelayMin = 30;
 constexpr uint8_t RobotDurationMin = 120;

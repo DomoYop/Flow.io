@@ -176,6 +176,22 @@ effective en NVS / Config Store.
 
 ---
 
+## Un cinquième index, à ne pas confondre avec les autres
+
+Le DataStore ajoute un index de plus, qui ne fait partie d'aucune des 4 couches :
+la position dans `IORuntimeData::endpoints[]`. C'est un **index de registre**,
+donné par l'ordre d'insertion dans `IORegistry` — et seuls les slots dont le
+binding est résolu y entrent (`configureAnalogSlots_` fait `continue` sur les
+autres). Un slot analogique sans binding décale donc **tous les suivants** :
+avec `a00` non bindé, `a01` occupe la case 0.
+
+Toute lecture ou écriture doit donc résoudre par `IoId`
+(`ioEndpointIndexByIoId`, `endpointIndexFromId_`), jamais par l'index de slot.
+`forceAnalogSnapshotPublish_` ne le faisait pas : un changement de précision
+d'affichage écrivait la valeur du slot dans la case d'un autre endpoint, qui la
+republiait vers Home Assistant jusqu'à sa propre acquisition suivante
+(**corrigé**).
+
 ## Voir aussi
 
 - [Structure des profils, cartes, domaines et bootstrap](../core/profiles-board-domain-app.md)

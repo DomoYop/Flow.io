@@ -108,7 +108,6 @@ void MQTTModule::enqueueAlarmFullSync_()
         (void)enqueue(ProducerIdAlarm, msg, MqttPublishPriority::High, 0);
     }
     (void)enqueue(ProducerIdAlarm, AlarmMsgMeta, MqttPublishPriority::Normal, 0);
-    (void)enqueue(ProducerIdAlarm, AlarmMsgPack, MqttPublishPriority::Normal, 0);
 }
 
 MqttBuildResult MQTTModule::buildAckStatic_(void* ctx, uint16_t messageId, MqttBuildContext& buildCtx)
@@ -240,11 +239,15 @@ MqttBuildResult MQTTModule::buildAlarm_(uint16_t messageId, MqttBuildContext& ct
         if (!(tw > 0 && (uint16_t)tw < ctx.topicCapacity)) return MqttBuildResult::PermanentError;
 
         const uint8_t active = alarmSvc_->activeCount(alarmSvc_->ctx);
+        const uint8_t unacked = alarmSvc_->unackedCount ? alarmSvc_->unackedCount(alarmSvc_->ctx) : active;
         const AlarmSeverity highest = alarmSvc_->highestSeverity(alarmSvc_->ctx);
+        // `a` = alarmes actives (ce que suit le binary_sensor agrege alm_any),
+        // `u` = celles que personne n'a encore acquittees (ce que suit l'annonciation).
         const int pw = snprintf(ctx.payload,
                                 ctx.payloadCapacity,
-                                "{\"a\":%u,\"h\":%u,\"ts\":%lu}",
+                                "{\"a\":%u,\"u\":%u,\"h\":%u,\"ts\":%lu}",
                                 (unsigned)active,
+                                (unsigned)unacked,
                                 (unsigned)((uint8_t)highest),
                                 (unsigned long)millis());
         if (!(pw > 0 && (uint16_t)pw < ctx.payloadCapacity)) return MqttBuildResult::PermanentError;
@@ -255,23 +258,6 @@ MqttBuildResult MQTTModule::buildAlarm_(uint16_t messageId, MqttBuildContext& ct
         // Retenu : porte l'etat du binary_sensor agrege alm_any, qui doit etre
         // connu de Home Assistant sans attendre le prochain evenement d'alarme.
         ctx.retain = true;
-        return MqttBuildResult::Ready;
-    }
-
-    if (messageId == AlarmMsgPack) {
-        if (!alarmSvc_->buildPacked) return MqttBuildResult::PermanentError;
-
-        const int tw = snprintf(ctx.topic, ctx.topicCapacity, "%s/%s/rt/alarms/p", cfgData_.baseTopic, deviceId_);
-        if (!(tw > 0 && (uint16_t)tw < ctx.topicCapacity)) return MqttBuildResult::PermanentError;
-
-        if (!alarmSvc_->buildPacked(alarmSvc_->ctx, ctx.payload, ctx.payloadCapacity, 8)) {
-            return MqttBuildResult::RetryLater;
-        }
-
-        ctx.topicLen = (uint16_t)tw;
-        ctx.payloadLen = (uint16_t)strnlen(ctx.payload, ctx.payloadCapacity);
-        ctx.qos = 0;
-        ctx.retain = false;
         return MqttBuildResult::Ready;
     }
 

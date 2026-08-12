@@ -13,7 +13,9 @@ inline constexpr MqttCapacitySpec kFlowIODINMqttCapacity{5712, 8, 8, 48, 24, 16,
 inline constexpr MqttBufferSpec kFlowIODINMqttBuffers{
     64, 32, 32, 15, 15, 70, 160, 128, 384, 1536, 1024, 1536, 1536, 64, 320, 32
 };
-inline constexpr HaCapacitySpec kFlowIODINHaCapacity{48, 6, 16, 30, 24, 6};
+// buttons : meme jeu de modules metier que Waveshare (alarmes + PoolDevice), donc
+// meme besoin -- voir le commentaire de kWaveshareESP32S3HaCapacity.
+inline constexpr HaCapacitySpec kFlowIODINHaCapacity{48, 6, 16, 30, 32, 6};
 
 inline constexpr UartSpec kFlowIODINv1Uarts[] = {
     // {name, uartIndex, rxPin, txPin, baud, primary, enableRxPin}

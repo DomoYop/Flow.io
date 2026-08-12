@@ -1819,37 +1819,6 @@ void waveshareLoadMqttServer_(ConfigStore* cfgStore, char* out, size_t outLen)
     }
 }
 
-void waveshareLoadAlarmMasks_(const AlarmService* alarmSvc,
-                             uint32_t& activeMask,
-                             uint32_t& resettableMask,
-                             uint32_t& conditionMask)
-{
-    activeMask = 0U;
-    resettableMask = 0U;
-    conditionMask = 0U;
-    if (!alarmSvc || !alarmSvc->listIds || !alarmSvc->buildAlarmState) return;
-
-    AlarmId ids[Limits::Alarm::MaxAlarms] = {};
-    const uint8_t count = alarmSvc->listIds(alarmSvc->ctx, ids, (uint8_t)Limits::Alarm::MaxAlarms);
-    for (uint8_t i = 0; i < count; ++i) {
-        char stateJson[144] = {0};
-        if (!alarmSvc->buildAlarmState(alarmSvc->ctx, ids[i], stateJson, sizeof(stateJson))) continue;
-
-        StaticJsonDocument<192> doc;
-        if (deserializeJson(doc, stateJson)) continue;
-        const uint8_t slot = doc["slot"] | 255U;
-        if (slot >= 32U) continue;
-        const uint32_t bit = (1UL << slot);
-
-        const uint8_t active = doc["a"] | 0U;
-        const uint8_t resettable = doc["r"] | 0U;
-        const uint8_t cond = doc["c"] | 0U;
-        if (active != 0U) activeMask |= bit;
-        if (resettable != 0U) resettableMask |= bit;
-        if (cond == 1U) conditionMask |= bit;
-    }
-}
-
 struct WaveshareRuntimeContext {
     bool poolModeLoaded = false;
     bool poolModeAvailable = false;
@@ -1865,10 +1834,6 @@ struct WaveshareRuntimeContext {
     bool poolDisAvailable = false;     // desinfection auto : masquee si disinfection_type == Disabled
     bool mqttServerLoaded = false;
     char mqttServer[96] = {0};
-    bool alarmMasksLoaded = false;
-    uint32_t alarmActiveMask = 0U;
-    uint32_t alarmResettableMask = 0U;
-    uint32_t alarmConditionMask = 0U;
     bool systemStatsLoaded = false;
     SystemStatsSnapshot systemStats{};
 };
@@ -1899,11 +1864,40 @@ void waveshareEnsureMqttServer_(WaveshareRuntimeContext& ctx, ConfigStore* cfgSt
     waveshareLoadMqttServer_(cfgStore, ctx.mqttServer, sizeof(ctx.mqttServer));
 }
 
-void waveshareEnsureAlarmMasks_(WaveshareRuntimeContext& ctx, const AlarmService* alarmSvc)
+// Etat de cycle de vie d'une alarme, lu directement du moteur : aucune
+// recomposition locale de (actif, reamorcable, condition) cote interface.
+uint8_t waveshareAlarmLifecycle_(const AlarmService* alarmSvc, AlarmId id)
 {
-    if (ctx.alarmMasksLoaded) return;
-    ctx.alarmMasksLoaded = true;
-    waveshareLoadAlarmMasks_(alarmSvc, ctx.alarmActiveMask, ctx.alarmResettableMask, ctx.alarmConditionMask);
+    if (!alarmSvc || !alarmSvc->lifecycle) return (uint8_t)AlarmLifecycle::Unavailable;
+    return (uint8_t)alarmSvc->lifecycle(alarmSvc->ctx, id);
+}
+
+// Table miroir de AlarmModule::kRuntimeUiAlarms (le manifeste Runtime UI n'est pas
+// lisible depuis ici). Les identifiants sont ceux de src/Modules/AlarmModule/text/runtimeui.json.
+struct WaveshareAlarmRuntimeValue {
+    uint8_t valueId;
+    AlarmId alarmId;
+    const char* key;
+};
+
+constexpr WaveshareAlarmRuntimeValue kWaveshareAlarmRuntimeValues[] = {
+    {11, AlarmId::PoolPressureLow, "alarms.pressure_low"},
+    {12, AlarmId::PoolPressureHigh, "alarms.pressure_high"},
+    {13, AlarmId::PoolPhTankLow, "alarms.ph_tank_low"},
+    {14, AlarmId::PoolChlorineTankLow, "alarms.chlorine_tank_low"},
+    {15, AlarmId::PoolPhPumpMaxUptime, "alarms.ph_pump_max_uptime"},
+    {16, AlarmId::PoolChlorinePumpMaxUptime, "alarms.chlorine_pump_max_uptime"},
+    {17, AlarmId::PoolWaterLevelLow, "alarms.water_level_low"},
+    {18, AlarmId::PoolPhDoseNoEffect, "alarms.ph_dose_no_effect"},
+    {19, AlarmId::PoolWaterTemperatureUnavailable, "alarms.water_temp_unavailable"},
+};
+
+AlarmId waveshareAlarmIdForRuntimeValueId_(uint8_t valueId)
+{
+    for (const WaveshareAlarmRuntimeValue& entry : kWaveshareAlarmRuntimeValues) {
+        if (entry.valueId == valueId) return entry.alarmId;
+    }
+    return AlarmId::None;
 }
 
 void waveshareEnsureSystemStats_(WaveshareRuntimeContext& ctx)
@@ -1969,19 +1963,16 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         return true;
     }
 
+    // Alarmes : une entree de table par alarme, resolue avant le switch. Ajouter
+    // une alarme au manifeste sans l'ajouter a kWaveshareAlarmRuntimeValues la
+    // ferait repondre « indisponible » en silence.
+    for (const WaveshareAlarmRuntimeValue& entry : kWaveshareAlarmRuntimeValues) {
+        if (id != makeRuntimeUiId(ModuleId::Alarm, entry.valueId)) continue;
+        printRuntimeEnum_(out, firstValue, id, entry.key, waveshareAlarmLifecycle_(alarmSvc, entry.alarmId));
+        return true;
+    }
+
     switch (id) {
-        case 901:
-            waveshareEnsureAlarmMasks_(ctx, alarmSvc);
-            printRuntimeU32_(out, firstValue, id, "alarms.active_mask", ctx.alarmActiveMask);
-            return true;
-        case 902:
-            waveshareEnsureAlarmMasks_(ctx, alarmSvc);
-            printRuntimeU32_(out, firstValue, id, "alarms.resettable_mask", ctx.alarmResettableMask);
-            return true;
-        case 903:
-            waveshareEnsureAlarmMasks_(ctx, alarmSvc);
-            printRuntimeU32_(out, firstValue, id, "alarms.condition_mask", ctx.alarmConditionMask);
-            return true;
         case 2401:
             waveshareEnsurePoolMode_(ctx, cfgStore);
             if (!ctx.poolModeAvailable) {
@@ -2116,7 +2107,13 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
         case 2414:
         case 2415: {
             const PoolLogicPhDosingRuntimeData& ph = poolPhDosingRuntime(*dataStore);
-            if (!ph.valid) {
+            // Le garde ne couvre que le lot en cours : sans un seul tick de FSM, ses
+            // trois valeurs valent 0 mL, ce qui se lirait comme un lot vide plutot
+            // que comme l'absence de lot. Les autres n'en dependent pas -- phase,
+            // cause d'inaction, volume du jour et gain restent exacts regulation a
+            // l'arret, et c'est justement alors qu'on veut les lire.
+            const bool batchScoped = (id == 2413 || id == 2414 || id == 2415);
+            if (batchScoped && !ph.valid) {
                 wavesharePrintUnavailableByManifestType_(out, firstValue, id);
                 return true;
             }
@@ -2172,6 +2169,11 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
             }
             return true;
         }
+        case 2416:
+            // Mesures figees : etat constate dans le DataStore, la meme source
+            // que le module lui-meme -- pas une temporisation recalculee ici.
+            printRuntimeBool_(out, firstValue, id, "pool.sensor_hold", ioAnyEndpointHeld(*dataStore));
+            return true;
         case 2205: {
             // Compteur d'eau : 4e entree TOR du domaine.
             const IoId counterIoId = ioIdFromSlot(digitalInputSlot(3));
@@ -2471,21 +2473,22 @@ bool waveshareBuildStatusDomainJson_(FlowStatusDomain domain,
     }
 
     if (domain == FlowStatusDomain::Alarm) {
-        waveshareEnsureAlarmMasks_(ctx, alarmSvc);
         JsonObject alm = doc.createNestedObject("alm");
-        const uint32_t activeMask = ctx.alarmActiveMask;
         uint8_t count = 0U;
-        for (uint8_t bit = 0U; bit < 32U; ++bit) {
-            if ((activeMask & (1UL << bit)) != 0U) ++count;
+        JsonArray codes = alm.createNestedArray("codes");
+        // Codes reels declares par le moteur ("pressure_low"), et non un
+        // "alarm_<position+1>" fabrique a partir du numero de slot.
+        if (alarmSvc && alarmSvc->listIds && alarmSvc->isActive) {
+            AlarmId ids[Limits::Alarm::MaxAlarms] = {};
+            const uint8_t total = alarmSvc->listIds(alarmSvc->ctx, ids, (uint8_t)Limits::Alarm::MaxAlarms);
+            for (uint8_t i = 0U; i < total; ++i) {
+                if (!alarmSvc->isActive(alarmSvc->ctx, ids[i])) continue;
+                ++count;
+                const char* code = alarmSvc->codeOf ? alarmSvc->codeOf(alarmSvc->ctx, ids[i]) : nullptr;
+                if (code && code[0] != '\0') codes.add(code);
+            }
         }
         alm["cnt"] = count;
-        JsonArray codes = alm.createNestedArray("codes");
-        for (uint8_t bit = 0U; bit < 32U; ++bit) {
-            if ((activeMask & (1UL << bit)) == 0U) continue;
-            char code[20] = {0};
-            snprintf(code, sizeof(code), "alarm_%u", (unsigned)(bit + 1U));
-            codes.add(code);
-        }
         return serializeJson(doc, out, outLen) > 0U;
     }
 
@@ -2568,20 +2571,6 @@ struct WaveshareDashboardSlotConfig {
     uint8_t colorId = 0U;
 };
 
-struct WaveshareAlarmDashboardSlotConfig {
-    bool enabled = true;
-    uint16_t alarmId = 0U;
-    char label[24] = {0};
-    uint8_t colorId = 0U;
-};
-
-struct WaveshareAlarmDashboardSlotState {
-    bool available = false;
-    bool latched = false;
-    bool conditionKnown = false;
-    bool conditionTrue = false;
-};
-
 struct WaveshareDashboardRuntimeValue {
     bool available = false;
     RuntimeUiWireType wireType = RuntimeUiWireType::Unavailable;
@@ -2623,46 +2612,11 @@ constexpr uint8_t kWaveshareDashboardDefaultColorIds[kWaveshareDashboardSlotCoun
     6U,
     7U,
 };
-constexpr uint16_t kWaveshareAlarmDashboardDefaultIds[kWaveshareDashboardSlotCount] = {
-    (uint16_t)AlarmId::PoolPressureLow,
-    (uint16_t)AlarmId::PoolPressureHigh,
-    (uint16_t)AlarmId::PoolPhTankLow,
-    (uint16_t)AlarmId::PoolChlorineTankLow,
-    (uint16_t)AlarmId::PoolPhPumpMaxUptime,
-    (uint16_t)AlarmId::PoolChlorinePumpMaxUptime,
-    (uint16_t)AlarmId::PoolWaterLevelLow,
-    (uint16_t)AlarmId::PoolPhDoseNoEffect,
-};
-constexpr bool kWaveshareAlarmDashboardDefaultEnabled[kWaveshareDashboardSlotCount] = {
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-};
-constexpr const char* kWaveshareAlarmDashboardDefaultLabels[kWaveshareDashboardSlotCount] = {
-    "Pression basse",
-    "Pression haute",
-    "pH vide",
-    "Chlore vide",
-    "pH uptime",
-    "ORP uptime",
-    "Eau basse",
-    "pH sans effet",
-};
-constexpr uint8_t kWaveshareAlarmDashboardDefaultColorIds[kWaveshareDashboardSlotCount] = {
-    17U,
-    17U,
-    8U,
-    10U,
-    9U,
-    7U,
-    5U,
-    19U,
-};
+// Les tuiles d'alarme du tableau de bord ont ete retirees : elles etaient limitees
+// a 8 slots, portaient un troisieme jeu de libelles francais en dur, et se
+// configuraient par des cles `tft/s3/alarms/*` appartenant a un module hors build
+// sur ce profil -- donc jamais enregistrees, jamais lues.
+// Les alarmes passent desormais par /api/runtime/values (une valeur par alarme).
 constexpr const char* kWaveshareDashboardColorHex[] = {
     "#E6EFFF", "#E5F8FC", "#E8FAEF", "#F0EAFE", "#E4F6FA", "#E3F7FE", "#EAF8FD",
     "#FEF0E8", "#FCE7EF", "#FFF0E1", "#FFF7D9", "#EDF8E7", "#F0FAE6", "#F5EEFF",
@@ -2678,22 +2632,6 @@ const char* waveshareDashboardColorHex_(uint8_t colorId, uint8_t slot)
         if (fallbackId < colorCount) return kWaveshareDashboardColorHex[fallbackId];
     }
     return "#FFFFFF";
-}
-
-const char* waveshareAlarmDashboardLabel_(uint16_t alarmId)
-{
-    switch ((AlarmId)alarmId) {
-        case AlarmId::PoolPressureLow: return "Pression basse";
-        case AlarmId::PoolPressureHigh: return "Pression haute";
-        case AlarmId::PoolPhTankLow: return "pH vide";
-        case AlarmId::PoolChlorineTankLow: return "Chlore vide";
-        case AlarmId::PoolPhPumpMaxUptime: return "pH uptime";
-        case AlarmId::PoolChlorinePumpMaxUptime: return "ORP uptime";
-        case AlarmId::PoolWaterLevelLow: return "Eau basse";
-        case AlarmId::PoolPhDoseNoEffect: return "pH sans effet";
-        case AlarmId::None:
-        default: return "Alarme";
-    }
 }
 
 void waveshareDashboardFallbackLabel_(RuntimeUiId id, char* out, size_t outLen)
@@ -2746,34 +2684,6 @@ void waveshareLoadDashboardSlotConfig_(ConfigStore* cfgStore, uint8_t slot, Wave
     if (deserializeJson(doc, moduleJson)) return;
     if (doc.containsKey("enabled")) out.enabled = doc["enabled"].as<bool>();
     if (doc.containsKey("runtime_ui_id")) out.runtimeUiId = (RuntimeUiId)(doc["runtime_ui_id"].as<uint32_t>() & 0xFFFFU);
-    if (doc.containsKey("color_id")) out.colorId = (uint8_t)(doc["color_id"].as<uint32_t>() & 0xFFU);
-    if (doc.containsKey("label")) {
-        const char* label = doc["label"].as<const char*>();
-        snprintf(out.label, sizeof(out.label), "%s", label ? label : "");
-    }
-}
-
-void waveshareLoadAlarmDashboardSlotConfig_(ConfigStore* cfgStore, uint8_t slot, WaveshareAlarmDashboardSlotConfig& out)
-{
-    out.enabled = (slot < kWaveshareDashboardSlotCount) ? kWaveshareAlarmDashboardDefaultEnabled[slot] : false;
-    out.alarmId = (slot < kWaveshareDashboardSlotCount) ? kWaveshareAlarmDashboardDefaultIds[slot] : 0U;
-    out.colorId = (slot < kWaveshareDashboardSlotCount) ? kWaveshareAlarmDashboardDefaultColorIds[slot] : 0U;
-    snprintf(out.label,
-             sizeof(out.label),
-             "%s",
-             (slot < kWaveshareDashboardSlotCount) ? kWaveshareAlarmDashboardDefaultLabels[slot] : "");
-    if (!cfgStore || slot >= kWaveshareDashboardSlotCount) return;
-
-    char moduleName[32] = {0};
-    snprintf(moduleName, sizeof(moduleName), "tft/s3/alarms/slot%02u", (unsigned)slot);
-    char moduleJson[384] = {0};
-    bool truncated = false;
-    if (!cfgStore->toJsonModule(moduleName, moduleJson, sizeof(moduleJson), &truncated, true) || truncated) return;
-
-    StaticJsonDocument<448> doc;
-    if (deserializeJson(doc, moduleJson)) return;
-    if (doc.containsKey("enabled")) out.enabled = doc["enabled"].as<bool>();
-    if (doc.containsKey("alarm_id")) out.alarmId = (uint16_t)(doc["alarm_id"].as<uint32_t>() & 0xFFFFU);
     if (doc.containsKey("color_id")) out.colorId = (uint8_t)(doc["color_id"].as<uint32_t>() & 0xFFU);
     if (doc.containsKey("label")) {
         const char* label = doc["label"].as<const char*>();
@@ -2882,15 +2792,15 @@ bool waveshareReadDashboardRuntimeValue_(DataStore* dataStore,
     const ModuleId module = (ModuleId)runtimeUiModuleId(id);
     const uint8_t valueId = runtimeUiValueId(id);
     switch (module) {
-        case ModuleId::Alarm:
-            waveshareEnsureAlarmMasks_(ctx, alarmSvc);
+        case ModuleId::Alarm: {
+            // Une tuile d'alarme porte l'etat de cycle de vie de l'alarme choisie.
+            const AlarmId alarmId = waveshareAlarmIdForRuntimeValueId_(valueId);
+            if (alarmId == AlarmId::None) return false;
             out.available = true;
             out.wireType = RuntimeUiWireType::UInt32;
-            if (valueId == 1U) out.u32Value = ctx.alarmActiveMask;
-            else if (valueId == 2U) out.u32Value = ctx.alarmResettableMask;
-            else if (valueId == 3U) out.u32Value = ctx.alarmConditionMask;
-            else return false;
+            out.u32Value = waveshareAlarmLifecycle_(alarmSvc, alarmId);
             return true;
+        }
 
         case ModuleId::PoolLogic:
             // Temperatures metier : la sonde lue suit le reglage PoolLogic.
@@ -3613,26 +3523,6 @@ void sendWaveshareIoSummaryResponse_(AsyncResponseStream& response,
     response.print("]}");
 }
 
-bool waveshareReadAlarmDashboardSlotState_(const AlarmService* alarmSvc,
-                                          uint16_t alarmId,
-                                          WaveshareAlarmDashboardSlotState& out)
-{
-    out = WaveshareAlarmDashboardSlotState{};
-    if (!alarmSvc || !alarmSvc->buildAlarmState || alarmId == 0U) return false;
-
-    char stateJson[144] = {0};
-    if (!alarmSvc->buildAlarmState(alarmSvc->ctx, (AlarmId)alarmId, stateJson, sizeof(stateJson))) return false;
-
-    StaticJsonDocument<192> doc;
-    if (deserializeJson(doc, stateJson)) return false;
-    out.available = true;
-    out.latched = (doc["a"] | 0U) != 0U;
-    const uint8_t condition = doc["c"] | 2U;
-    out.conditionKnown = condition != (uint8_t)AlarmCondState::Unknown;
-    out.conditionTrue = condition == (uint8_t)AlarmCondState::True;
-    return true;
-}
-
 void sendWaveshareDashboardSlotsResponse_(AsyncResponseStream& response,
                                          bool& firstSlot,
                                          DataStore* dataStore,
@@ -3686,52 +3576,6 @@ void sendWaveshareDashboardSlotsResponse_(AsyncResponseStream& response,
         printJsonEscaped_(response, waveshareDashboardColorHex_(slot.colorId, i));
         response.print(",\"available\":");
         response.print(available ? "true" : "false");
-        response.print("}");
-        firstSlot = false;
-    }
-}
-
-void sendWaveshareAlarmDashboardSlotsResponse_(AsyncResponseStream& response,
-                                              bool& firstSlot,
-                                              ConfigStore* cfgStore,
-                                              const AlarmService* alarmSvc)
-{
-    for (uint8_t i = 0U; i < kWaveshareDashboardSlotCount; ++i) {
-        WaveshareAlarmDashboardSlotConfig slot{};
-        waveshareLoadAlarmDashboardSlotConfig_(cfgStore, i, slot);
-
-        char label[32] = {0};
-        if (slot.enabled) {
-            snprintf(label, sizeof(label), "%s", slot.label);
-            if (label[0] == '\0') {
-                snprintf(label, sizeof(label), "%s", waveshareAlarmDashboardLabel_(slot.alarmId));
-            }
-        }
-
-        WaveshareAlarmDashboardSlotState state{};
-        const bool available = slot.enabled &&
-                               waveshareReadAlarmDashboardSlotState_(alarmSvc, slot.alarmId, state);
-        state.available = available;
-
-        if (!firstSlot) response.print(',');
-        response.print("{\"slot\":");
-        response.print((unsigned)i);
-        response.print(",\"enabled\":");
-        response.print(slot.enabled ? "true" : "false");
-        response.print(",\"alarm_id\":");
-        response.print((unsigned)slot.alarmId);
-        response.print(",\"label\":");
-        printJsonEscaped_(response, label);
-        response.print(",\"bg_color\":");
-        printJsonEscaped_(response, waveshareDashboardColorHex_(slot.colorId, i));
-        response.print(",\"available\":");
-        response.print(available ? "true" : "false");
-        response.print(",\"latched\":");
-        response.print(state.latched ? "true" : "false");
-        response.print(",\"condition_known\":");
-        response.print(state.conditionKnown ? "true" : "false");
-        response.print(",\"condition_true\":");
-        response.print(state.conditionTrue ? "true" : "false");
         response.print("}");
         firstSlot = false;
     }
@@ -6709,16 +6553,8 @@ void WebInterfaceModule::startServer_()
 #else
         (void)first;
 #endif
-        response->print("],\"alarm_slots\":[");
-        bool firstAlarmSlot = true;
-#if defined(FLOW_PROFILE_WAVESHARE)
-        {
-            const AlarmService* alarmSvc = services_ ? services_->get<AlarmService>(ServiceId::Alarm) : nullptr;
-            sendWaveshareAlarmDashboardSlotsResponse_(*response, firstAlarmSlot, cfgStore_, alarmSvc);
-        }
-#else
-        (void)firstAlarmSlot;
-#endif
+        // Plus de tableau "alarm_slots" : les alarmes sont des valeurs Runtime UI
+        // comme les autres, lues par /api/runtime/values.
         response->print("]}");
         request->send(response);
     });

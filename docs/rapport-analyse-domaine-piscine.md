@@ -92,7 +92,7 @@ Points structurants vérifiés dans le code :
 
 1. **Hiérarchie de sécurité explicite et correcte** dans l'arbitrage filtration
    ([PoolLogicControl.cpp:910](../src/Modules/PoolLogicModule/PoolLogicControl.cpp)) :
-   PSI > mode manuel > maintien hors-gel > planning. Le hors-gel ne s'applique
+   pression > mode manuel > maintien hors-gel > planning. Le hors-gel ne s'applique
    qu'au *maintien* (« une fois démarrée, ne jamais s'arrêter sous le seuil »),
    ce qui est physiquement le bon choix.
 2. **Interlocks réévalués à chaque tick** côté PoolDevice
@@ -111,7 +111,7 @@ Points structurants vérifiés dans le code :
    intentions (`pendingDailyRecalc_`…) sous spinlock, le travail reste dans la
    tâche du module. Les commandes vers PoolDevice sont retentées à cadence
    bornée (5 s) au lieu de spammer.
-6. **Fallback dégradé pensé** : sans AlarmService, PoolLogic garde un latch PSI
+6. **Fallback dégradé pensé** : sans AlarmService, PoolLogic garde un latch pression
    local conservateur ; sans heure synchronisée, une pompe retenue au boot reste
    en marche jusqu'à ce que le scheduler puisse décider.
 7. **Découpage des modules en translation units** (Lifecycle / Control /
@@ -198,11 +198,11 @@ qui fonctionne mais documente le problème.
   haut), l'intégrale croît sans limite jusqu'au plafond fenêtre. Le plafond
   fenêtre protège l'actionneur, mais le déstockage sera long.
 
-### F6 — Latch PSI en mode dégradé jamais réarmé — **à documenter ou corriger**
+### F6 — Latch pression en mode dégradé jamais réarmé — **à documenter ou corriger**
 
 Dans le fallback sans AlarmService
 ([PoolLogicControl.cpp:816-831](../src/Modules/PoolLogicModule/PoolLogicControl.cpp)),
-`psiError_` se latch mais **aucun chemin ne le remet à false** (pas de reset
+`pressureError_` se latch mais **aucun chemin ne le remet à false** (pas de reset
 commande, pas de clear sur condition revenue). C'est défendable comme choix
 conservateur (redémarrer = reset), mais ce n'est écrit nulle part, et sur la
 cible S3 l'AlarmModule est présent donc ce chemin ne sert que si l'init échoue —
@@ -236,7 +236,7 @@ sur cible — ce qui explique sans doute qu'il soit seul.
 - Le robot a trois sources de vérité d'intention (auto, override manuel sous
   spinlock, durée max) avec quatre sections critiques dans le même bloc —
   correct mais dense ; une mini-FSM robot serait plus claire.
-- `condPsiLowStatic_` retourne `False` quand le module est désactivé — OK, mais
+- `condPressureLowStatic_` retourne `False` quand le module est désactivé — OK, mais
   `Unknown` serait plus honnête sémantiquement pour l'affichage HA.
 
 ---
@@ -259,9 +259,9 @@ sur cible — ce qui explique sans doute qu'il soit seul.
      sécurité/manuel/hors-gel/planning/demandes-externes en une fonction
      `resolve(demands) -> filtrationDesired` qui rend l'ordre des priorités
      explicite et testable.
-3. **Écrire les tests des invariants de sécurité** en premier : « PSI error ⇒
+3. **Écrire les tests des invariants de sécurité** en premier : « pression error ⇒
    filtration coupée même en manuel », « hors-gel ⇒ pas d'arrêt », « O2 ne force
-   pas la filtration si PSI », « robot jamais sans filtration ». Ce sont eux qui
+   pas la filtration si pression », « robot jamais sans filtration ». Ce sont eux qui
    protègent la piscine et le matériel.
 
 ### P2 — Supprimer les couplages fragiles (effort : faible, gain : robustesse)
@@ -324,7 +324,7 @@ sur cible — ce qui explique sans doute qu'il soit seul.
 | `PoolDeviceCommands.cpp` | 305 | write/refill/reset uptime |
 | Tests | 1 fichier | `computeFiltrationWindowDeterministic` uniquement |
 
-Alarmes pool enregistrées (7) : `PoolPsiLow`, `PoolPsiHigh`, `PoolPhTankLow`,
+Alarmes pool enregistrées (7) : `PoolPressureLow`, `PoolPressureHigh`, `PoolPhTankLow`,
 `PoolChlorineTankLow`, `PoolPhPumpMaxUptime`, `PoolChlorinePumpMaxUptime`,
 `PoolWaterLevelLow` — toutes avec conditions évaluées par l'AlarmModule central
 (anti-rebond on/off, latch, reset commandable).

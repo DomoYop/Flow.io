@@ -392,6 +392,22 @@
       "help_t": "cfgdocs.poollogic.safety.freeze_hold_t.help",
       "unit": "C"
     },
+    "poollogic/safety/sensor_hold": {
+      "type": "Bool",
+      "label_t": "cfgdocs.poollogic.safety.sensor_hold.label",
+      "help_t": "cfgdocs.poollogic.safety.sensor_hold.help"
+    },
+    "poollogic/safety/sensor_hold_settle_s": {
+      "type": "UInt16",
+      "unit": "s",
+      "label_t": "cfgdocs.poollogic.safety.sensor_hold_settle_s.label",
+      "help_t": "cfgdocs.poollogic.safety.sensor_hold_settle_s.help"
+    },
+    "poollogic/safety/sensor_hold_wat": {
+      "type": "Bool",
+      "label_t": "cfgdocs.poollogic.safety.sensor_hold_wat.label",
+      "help_t": "cfgdocs.poollogic.safety.sensor_hold_wat.help"
+    },
     "poollogic/safety/winter_start_t": {
       "type": "Float",
       "label_t": "cfgdocs.poollogic.safety.winter_start_t.label",

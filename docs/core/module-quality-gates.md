@@ -424,7 +424,7 @@ Risques:
 Actions recommandées:
 
 - tests unitaires du moteur de transitions
-- test d'intégration avec `PoolLogic` sur défaut PSI/bidons
+- test d'intégration avec `PoolLogic` sur défaut pression/bidons
 
 ### `ethernet` - 22/30 - Gate B
 
@@ -684,7 +684,7 @@ Points forts:
 - module métier très documenté
 - Runtime UI et runtime snapshot
 - commandes nombreuses
-- interlocks alarmes/PSI/bidons/eau
+- interlocks alarmes/pression/bidons/eau
 - tests unitaires existants sur `FiltrationWindow`
 - intégration scheduler/time, IO, PoolDevice, Alarm, HA/MQTT
 
@@ -791,7 +791,7 @@ Priorité 3 - renforcer les scénarios critiques:
 
 - boot Ethernet OK / Ethernet absent / WiFi OK / WiFi timeout / portail AP
 - OTA firmware et SPIFFS: URL invalide, manifest invalide, réseau coupé, reboot
-- alarmes de sécurité piscine: PSI bas/haut, bidons bas, niveau eau bas,
+- alarmes de sécurité piscine: pression bas/haut, bidons bas, niveau eau bas,
   reset latch
 - IO: capteur absent, bus I2C bloqué, DS18B20 absent, sortie TCA9554 inactive
 

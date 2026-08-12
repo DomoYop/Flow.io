@@ -100,7 +100,6 @@ Réactions:
   - le segment `<nodeTopicId>` du topic Discovery est dérivé de `ha/device_id` (ou fallback MAC hex si vide)
   - `availability` basée sur topic `status`
 - capteurs diagnostic natifs publiés:
-  - `alarms_pack` (`rt/alarms/p`)
   - `uptime` (`rt/system/state`, conversion en minutes depuis `upt_ms`)
   - `heap_free_bytes` (`rt/system/state`, conversion en `ko`)
   - `heap_min_free_bytes` (`rt/system/state`, conversion en `ko`)

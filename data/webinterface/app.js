@@ -590,7 +590,7 @@
     }
 
     function createRuntimeDomainState() {
-      return { active: false, loading: false, entries: [], allEntries: [], values: [], sondeSlots: [], alarmSlots: [], outputPorts: {}, error: '', requestSeq: 0 };
+      return { active: false, loading: false, entries: [], allEntries: [], values: [], sondeSlots: [], outputPorts: {}, error: '', requestSeq: 0 };
     }
 
     function ensureRuntimeDomainState() {
@@ -5714,25 +5714,33 @@
         .slice(0, 8);
     }
 
-    async function fetchPoolAlarmSlots() {
-      const data = await fetchPoolDashboardSlots();
-      const slots = Array.isArray(data && data.alarm_slots) ? data.alarm_slots : [];
-      return slots
-        .map((slot) => {
-          const idx = Number(slot && slot.slot);
-          return {
-            slot: Number.isFinite(idx) ? idx : 999,
-            label: String(slot && slot.label ? slot.label : '').trim(),
-            bgColor: String(slot && slot.bg_color ? slot.bg_color : '').trim(),
-            enabled: !!(slot && slot.enabled),
-            available: !!(slot && slot.available),
-            latched: !!(slot && slot.latched),
-            conditionKnown: !!(slot && slot.condition_known),
-            conditionTrue: !!(slot && slot.condition_true)
-          };
-        })
-        .sort((a, b) => a.slot - b.slot)
-        .slice(0, 8);
+    // Etats du cycle de vie publies par le firmware (AlarmLifecycle, IAlarm.h).
+    // Ne jamais recomposer ces etats a partir de plusieurs champs cote client :
+    // c'est exactement ce que faisaient les anciens masques par slot.
+    const ALARM_STATE_NORMAL = 0;
+    const ALARM_STATE_ACTIVE_UNACKED = 1;
+    const ALARM_STATE_ACTIVE_ACKED = 2;
+    const ALARM_STATE_CLEARED_UNACKED = 3;
+
+    // Liste des alarmes avec leur etat, lue par la meme voie que toutes les autres
+    // mesures : manifeste Runtime UI (libelles deja traduits) + /api/runtime/values.
+    async function fetchPoolAlarms(forceRefresh) {
+      const entries = await runtimeMeasureEntriesForDomain('alarm', !!forceRefresh);
+      const ids = entries.map((entry) => Number(entry.id)).filter((id) => Number.isFinite(id));
+      if (!ids.length) return [];
+      const values = await fetchRuntimeValues(ids);
+      const byId = new Map(values.map((value) => [Number(value.id), value]));
+      return entries.map((entry) => {
+        const runtimeValue = byId.get(Number(entry.id));
+        const unavailable = runtimeValueIsUnavailable(runtimeValue);
+        const rawState = Number(runtimeValue && runtimeValue.value);
+        return {
+          key: String((entry && entry.key) || ''),
+          label: runtimeMeasureDisplayLabel(entry),
+          available: !unavailable,
+          state: unavailable || !Number.isFinite(rawState) ? null : Math.trunc(rawState)
+        };
+      });
     }
 
     // Carte index de sortie (0..7) -> nom du port physique (ex. "EXIO1"), a partir du
@@ -5896,7 +5904,7 @@
     function runtimeMeasureDisplayKind(entry) {
       const explicit = String(entry && entry.display ? entry.display : '').trim();
       if (explicit === 'gauge' || explicit === 'circ-gauge') return 'threshold';
-      if (explicit === 'threshold' || explicit === 'horiz-gauge' || explicit === 'badge' || explicit === 'boolean' || explicit === 'time' || explicit === 'value' || explicit === 'flags') {
+      if (explicit === 'threshold' || explicit === 'horiz-gauge' || explicit === 'badge' || explicit === 'boolean' || explicit === 'time' || explicit === 'value') {
         return explicit;
       }
       return String(entry && entry.type ? entry.type : '') === 'bool' ? 'boolean' : 'value';
@@ -5980,276 +5988,6 @@
       const badgeLabel = String(displayConfig.badgeLabel || '').trim();
       badge.textContent = badgeLabel ? (badgeLabel + ' : ' + text) : text;
       return badge;
-    }
-
-    function runtimeMeasureFlagRole(entry) {
-      const displayConfig = runtimeMeasureDisplayConfig(entry);
-      const role = String(displayConfig.flagRole || '').trim().toLowerCase();
-      if (role === 'active' || role === 'resettable' || role === 'condition') return role;
-      return '';
-    }
-
-    function runtimeMeasureFlagColumnLabel(entry) {
-      const displayConfig = runtimeMeasureDisplayConfig(entry);
-      const explicit = String(displayConfig.columnLabel || '').trim();
-      if (explicit) return explicit;
-      const role = runtimeMeasureFlagRole(entry);
-      if (role === 'active') return 'Act.';
-      if (role === 'resettable') return 'Reset';
-      if (role === 'condition') return 'Cond.';
-      return runtimeMeasureDisplayLabel(entry);
-    }
-
-    function normalizeRuntimeMeasureFlags(entry) {
-      const rawFlags = Array.isArray(entry && entry.flags) ? entry.flags : [];
-      return rawFlags
-        .map((flag, index) => {
-          const mask = Number(flag && flag.mask);
-          const label = String(flag && flag.label ? flag.label : '').trim();
-          if (!Number.isFinite(mask) || mask <= 0 || !label) return null;
-          return {
-            mask: Math.trunc(mask),
-            label,
-            order: Number.isFinite(Number(flag && flag.order)) ? Number(flag.order) : index
-          };
-        })
-        .filter((flag) => !!flag)
-        .sort((left, right) => left.order - right.order);
-    }
-
-    function runtimeMeasureMaskValue(runtimeValue) {
-      if (!runtimeValue || runtimeValue.status === 'not_found' || runtimeValue.status === 'unavailable') {
-        return null;
-      }
-      const value = Number(runtimeValue.value);
-      if (!Number.isFinite(value)) return null;
-      return Math.trunc(value);
-    }
-
-    function mergeRuntimeAlarmFlags(entries) {
-      const byMask = new Map();
-
-      (entries || []).forEach((entry) => {
-        normalizeRuntimeMeasureFlags(entry).forEach((flag) => {
-          if (!flag || !Number.isFinite(Number(flag.mask))) return;
-          const mask = Math.trunc(Number(flag.mask));
-          if (mask <= 0) return;
-          const existing = byMask.get(mask);
-          if (!existing) {
-            byMask.set(mask, flag);
-            return;
-          }
-          if ((!existing.label || !existing.label.trim()) && flag.label && flag.label.trim()) {
-            byMask.set(mask, flag);
-          }
-        });
-      });
-
-      return Array.from(byMask.values())
-        .sort((left, right) => {
-          const leftOrder = Number.isFinite(Number(left && left.order)) ? Number(left.order) : 9999;
-          const rightOrder = Number.isFinite(Number(right && right.order)) ? Number(right.order) : 9999;
-          if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-          return Number(left.mask) - Number(right.mask);
-        });
-    }
-
-    function buildRuntimeMeasureFlagCell(value, label, columnLabel) {
-      const known = typeof value === 'boolean';
-      const state = known ? (value ? 'is-true' : 'is-false') : 'is-empty';
-      const marker = document.createElement('span');
-      marker.className = 'status-flag-check ' + state;
-      marker.textContent = known ? (value ? iconCheckText() : '') : '?';
-      marker.setAttribute(
-        'aria-label',
-        label + ' / ' + columnLabel + ' : ' + (known ? (value ? 'oui' : 'non') : 'indisponible')
-      );
-      return marker;
-    }
-
-    function isRuntimeAlarmGroup(group) {
-      if (!group) return false;
-      if (String(group.domainKey || '').trim().toLowerCase() !== 'alarm') return false;
-      return String(group.groupKey || '').trim().localeCompare('Alarmes', 'fr', { sensitivity: 'base' }) === 0;
-    }
-
-    function buildRuntimeAlarmStateNode(value) {
-      const known = typeof value === 'boolean';
-      const node = document.createElement('div');
-      node.className = 'status-alarm-slot-state ' + (known ? (value ? 'is-true' : 'is-false') : 'is-empty');
-
-      const dot = document.createElement('span');
-      dot.className = 'status-state-dot';
-      node.appendChild(dot);
-
-      const text = document.createElement('span');
-      text.className = 'status-alarm-slot-state-text';
-      text.textContent = known ? (value ? 'Déclenchée' : 'OK') : 'Indispo';
-      node.appendChild(text);
-      return node;
-    }
-
-    function buildRuntimeAlarmConditionNode(value) {
-      const known = typeof value === 'boolean';
-      const node = document.createElement('div');
-      node.className = 'status-alarm-slot-condition ' + (known ? (value ? 'is-true' : 'is-false') : 'is-empty');
-      node.textContent = known ? ('Statut: ' + (value ? 'KO' : 'OK')) : 'Statut: ?';
-      return node;
-    }
-
-    function buildRuntimeAlarmGrid(entries, valueById) {
-      const columnsByRole = new Map();
-      const flagDefs = mergeRuntimeAlarmFlags(entries);
-
-      (entries || []).forEach((entry) => {
-        const role = runtimeMeasureFlagRole(entry);
-        if (!role || columnsByRole.has(role)) return;
-        columnsByRole.set(role, entry);
-      });
-
-      const activeEntry = columnsByRole.get('active') || null;
-      const conditionEntry = columnsByRole.get('condition') || null;
-      if (!flagDefs.length || (!activeEntry && !conditionEntry)) return null;
-
-      const activeMaskValue = activeEntry ? runtimeMeasureMaskValue(valueById.get(Number(activeEntry.id))) : null;
-      const conditionMaskValue = conditionEntry ? runtimeMeasureMaskValue(valueById.get(Number(conditionEntry.id))) : null;
-      const maxSlots = 8;
-
-      const grid = document.createElement('div');
-      grid.className = 'status-alarm-slot-grid';
-
-      for (let index = 0; index < maxSlots; index += 1) {
-        const flag = flagDefs[index] || null;
-        const tile = document.createElement('div');
-        tile.className = 'status-alarm-slot';
-
-        if (!flag) {
-          tile.classList.add('is-empty');
-          grid.appendChild(tile);
-          continue;
-        }
-
-        const title = document.createElement('div');
-        title.className = 'status-alarm-slot-title';
-        title.textContent = flag.label;
-        tile.appendChild(title);
-
-        const footer = document.createElement('div');
-        footer.className = 'status-alarm-slot-row';
-
-        const activeValue = activeMaskValue === null ? null : ((activeMaskValue & flag.mask) !== 0);
-        const conditionValue = conditionMaskValue === null ? null : ((conditionMaskValue & flag.mask) !== 0);
-        footer.appendChild(buildRuntimeAlarmStateNode(activeValue));
-        footer.appendChild(buildRuntimeAlarmConditionNode(conditionValue));
-
-        tile.appendChild(footer);
-        grid.appendChild(tile);
-      }
-
-      return grid;
-    }
-
-    function buildPoolAlarmSlotsGrid(slots) {
-      const cleanSlots = Array(8).fill(null);
-      if (Array.isArray(slots)) {
-        slots.forEach((slot) => {
-          const idx = Number(slot && slot.slot);
-          if (Number.isInteger(idx) && idx >= 0 && idx < 8) cleanSlots[idx] = slot;
-        });
-      }
-
-      const grid = document.createElement('div');
-      grid.className = 'status-alarm-slot-grid';
-
-      for (let i = 0; i < 8; i += 1) {
-        const slot = cleanSlots[i] || null;
-        const tile = document.createElement('div');
-        tile.className = 'status-alarm-slot';
-        const enabled = !!(slot && slot.enabled);
-        if (!enabled) {
-          tile.classList.add('is-empty');
-          grid.appendChild(tile);
-          continue;
-        }
-
-        const bgColor = slot && isValidHexColor(slot.bgColor) ? slot.bgColor : '';
-        if (bgColor) tile.style.background = bgColor;
-
-        const title = document.createElement('div');
-        title.className = 'status-alarm-slot-title';
-        title.textContent = slot && slot.label ? slot.label : 'Alarme';
-        tile.appendChild(title);
-
-        const footer = document.createElement('div');
-        footer.className = 'status-alarm-slot-row';
-        footer.appendChild(buildRuntimeAlarmStateNode(slot && slot.available ? !!slot.latched : null));
-        footer.appendChild(buildRuntimeAlarmConditionNode(slot && slot.available && slot.conditionKnown ? !!slot.conditionTrue : null));
-        tile.appendChild(footer);
-        grid.appendChild(tile);
-      }
-
-      return grid;
-    }
-
-    function buildRuntimeMeasureFlagsTable(entries, valueById) {
-      const columnsByRole = new Map();
-      let flagDefs = [];
-
-      (entries || []).forEach((entry) => {
-        const role = runtimeMeasureFlagRole(entry);
-        if (!role || columnsByRole.has(role)) return;
-        columnsByRole.set(role, entry);
-        if (!flagDefs.length) {
-          flagDefs = normalizeRuntimeMeasureFlags(entry);
-        }
-      });
-
-      if (!flagDefs.length || columnsByRole.size === 0) return null;
-
-      const orderedColumns = ['active', 'condition']
-        .map((role) => ({ role, entry: columnsByRole.get(role) || null }))
-        .filter((column) => !!column.entry);
-      if (!orderedColumns.length) return null;
-
-      const table = document.createElement('table');
-      table.className = 'status-flag-table';
-
-      const thead = document.createElement('thead');
-      const headRow = document.createElement('tr');
-      const nameHead = document.createElement('th');
-      nameHead.scope = 'col';
-      nameHead.textContent = 'Alarme';
-      headRow.appendChild(nameHead);
-      orderedColumns.forEach((column) => {
-        const th = document.createElement('th');
-        th.scope = 'col';
-        th.textContent = runtimeMeasureFlagColumnLabel(column.entry);
-        headRow.appendChild(th);
-      });
-      thead.appendChild(headRow);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
-      flagDefs.forEach((flag) => {
-        const row = document.createElement('tr');
-        const labelCell = document.createElement('th');
-        labelCell.scope = 'row';
-        labelCell.textContent = flag.label;
-        row.appendChild(labelCell);
-
-        orderedColumns.forEach((column) => {
-          const runtimeValue = valueById.get(Number(column.entry.id));
-          const maskValue = runtimeMeasureMaskValue(runtimeValue);
-          const cell = document.createElement('td');
-          const enabled = maskValue === null ? null : ((maskValue & flag.mask) !== 0);
-          cell.appendChild(buildRuntimeMeasureFlagCell(enabled, flag.label, runtimeMeasureFlagColumnLabel(column.entry)));
-          row.appendChild(cell);
-        });
-
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-      return table;
     }
 
     function runtimeValueIsUnavailable(runtimeValue) {
@@ -6405,7 +6143,6 @@
       const opts = options && typeof options === 'object' ? options : {};
       const sondeSlots = Array.isArray(opts.sondeSlots) ? opts.sondeSlots : [];
       const outputPorts = opts.outputPorts && typeof opts.outputPorts === 'object' ? opts.outputPorts : {};
-      const alarmSlots = Array.isArray(opts.alarmSlots) ? opts.alarmSlots : [];
       const valueById = new Map();
       (values || []).forEach((item) => {
         const id = Number(item && item.id);
@@ -6466,7 +6203,6 @@
         const badgeNodes = [];
         const horizGaugeRows = [];
         const booleanNodes = [];
-        const flagEntries = [];
         const valueRows = [];
 
         group.entries.forEach((entry) => {
@@ -6497,10 +6233,6 @@
             booleanNodes.push(buildRuntimeMeasureBooleanNode(entry, runtimeValue, groupDisplayOptions));
             return;
           }
-          if (display === 'flags') {
-            flagEntries.push(entry);
-            return;
-          }
           const thresholdNode = buildRuntimeMeasureThresholdNode(entry, runtimeValue);
           valueRows.push([
             runtimeMeasureResolvedLabel(entry, groupDisplayOptions),
@@ -6518,23 +6250,6 @@
         if (booleanNodes.length) {
           const stateGrid = buildFlowReadonlyStateGrid(booleanNodes);
           if (stateGrid) card.appendChild(stateGrid);
-        }
-
-        if (flagEntries.length) {
-          if (isRuntimeAlarmGroup(group)) {
-            const alarmGrid = alarmSlots.length
-              ? buildPoolAlarmSlotsGrid(alarmSlots)
-              : buildRuntimeAlarmGrid(flagEntries, valueById);
-            if (alarmGrid) {
-              card.appendChild(alarmGrid);
-            } else {
-              const flagTable = buildRuntimeMeasureFlagsTable(flagEntries, valueById);
-              if (flagTable) card.appendChild(flagTable);
-            }
-          } else {
-            const flagTable = buildRuntimeMeasureFlagsTable(flagEntries, valueById);
-            if (flagTable) card.appendChild(flagTable);
-          }
         }
 
         if (horizGaugeRows.length || valueRows.length) {
@@ -6639,7 +6354,6 @@
       const cleanDomain = normalizeRuntimeMeasureDomainKey(domainKey);
       const domainState = state && typeof state === 'object' ? state : null;
       if (!cleanDomain || !domainState) return false;
-      if (cleanDomain === 'alarm' && Array.isArray(domainState.alarmSlots) && domainState.alarmSlots.length > 0) return true;
       return Array.isArray(domainState.entries) && domainState.entries.length > 0;
     }
 
@@ -6868,7 +6582,6 @@
         }
         const cards = buildPoolMeasureCards(state.entries, state.values, {
           sondeSlots: state.sondeSlots,
-          alarmSlots: state.alarmSlots,
           outputPorts: state.outputPorts
         });
         renderedCardCount += cards.childNodes.length;
@@ -6909,7 +6622,6 @@
         valueCount += state.entries.length;
         if (domainKey === 'sondes') {
           valueCount += Array.isArray(state.sondeSlots) ? state.sondeSlots.length : 0;
-          valueCount += Array.isArray(state.alarmSlots) ? state.alarmSlots.length : 0;
         }
       });
 
@@ -6962,9 +6674,6 @@
         const entries = allEntries;
         const ids = allEntries.map((entry) => Number(entry.id)).filter((id) => Number.isFinite(id));
         const values = ids.length ? await fetchRuntimeValues(ids) : [];
-        const alarmSlots = cleanDomain === 'alarm'
-          ? await fetchPoolAlarmSlots().catch(() => [])
-          : [];
         // Equipements : ports physiques (EXIO1..EXIO8) pour prefixer les libelles.
         const outputPorts = cleanDomain === 'equipements'
           ? await fetchPoolOutputPortLabels().catch(() => ({}))
@@ -6974,7 +6683,6 @@
         state.allEntries = allEntries;
         state.values = values;
         state.sondeSlots = [];
-        state.alarmSlots = alarmSlots;
         state.outputPorts = outputPorts;
         state.error = '';
       } catch (err) {
@@ -6984,7 +6692,6 @@
           state.allEntries = [];
           state.values = [];
           state.sondeSlots = [];
-          state.alarmSlots = [];
           state.outputPorts = {};
         }
         state.error = 'Chargement ' + formatRuntimeDomainLabel(cleanDomain) + ' echoue: ' + err;
@@ -7167,6 +6874,18 @@
     const ACTIVITY_STATE_OFF = 4;
     const PH_BATCH_MIN_HEIGHT_PCT = 12;
 
+    // Le journal d'activite ne repond pas avec l'enveloppe {"ok":true} des API de
+    // configuration : son corps commence par "available". fetchOkJson exige ce champ
+    // ok et rejetterait donc toutes les reponses, y compris les bonnes -- c'est le
+    // code HTTP qui fait foi ici, comme dans la page Journal.
+    async function poolPhFetchActivityJson(url) {
+      const response = await fetchJsonResponse(url, { cache: 'no-store' }, fetchFlowRemoteQueued);
+      if (!response.res.ok || !response.data || typeof response.data !== 'object') {
+        throw new Error(tr('pool.phTimeline.readFailed', 'lecture du journal impossible'));
+      }
+      return response.data;
+    }
+
     // Lots de la journee, reconstitues par appariement marche/arret de la pompe pH.
     // Le volume n'est pas journalise : il se deduit de la duree reelle et du debit
     // configure de la pompe (pdm/pd1), ce qui evite d'ajouter un stockage.
@@ -7174,12 +6893,7 @@
     // du tampon circulaire : pour la journee en cours il faut remonter depuis la fin.
     // On s'arrete des qu'une page commence avant minuit, avec un plafond de pages.
     async function poolPhFetchRecentEvents(midnightSec) {
-      const status = await fetchOkJson(
-        '/api/activity/status',
-        { cache: 'no-store' },
-        tr('pool.phTimeline.readFailed', 'lecture du journal impossible'),
-        fetchFlowRemoteQueued
-      );
+      const status = await poolPhFetchActivityJson('/api/activity/status');
       let end = Number(status && status.entries);
       if (!Number.isFinite(end) || end <= 0) return [];
 
@@ -7187,11 +6901,8 @@
       for (let page = 0; page < 3 && end > 0; page += 1) {
         const size = Math.min(128, end);
         const offset = end - size;
-        const data = await fetchOkJson(
-          '/api/activity/logs?offset=' + offset + '&limit=' + size,
-          { cache: 'no-store' },
-          tr('pool.phTimeline.readFailed', 'lecture du journal impossible'),
-          fetchFlowRemoteQueued
+        const data = await poolPhFetchActivityJson(
+          '/api/activity/logs?offset=' + offset + '&limit=' + size
         );
         const events = Array.isArray(data && data.events) ? data.events : [];
         if (!events.length) break;
@@ -7655,10 +7366,10 @@
         .replace('{heater}', heaterState);
     }
 
-    function poolConfigRenderHero(modules, alarmSlots) {
+    function poolConfigRenderHero(modules, poolAlarms) {
       const modes = modules['poollogic/bassin'] || {};
       const filtration = modules['poollogic/filtration'] || {};
-      const alarms = poolConfigActiveAlarms(alarmSlots);
+      const alarms = poolConfigActiveAlarms(poolAlarms);
       const startValue = filtration.filtr_start_clc ?? filtration.filtr_start_min;
       const stopValue = filtration.filtr_stop_clc ?? filtration.filtr_stop_max;
       const start = poolConfigFormatHour(startValue);
@@ -7782,24 +7493,31 @@
       poolDisinfectionModes.appendChild(detail);
     }
 
-    function poolConfigActiveAlarms(alarmSlots) {
-      return (Array.isArray(alarmSlots) ? alarmSlots : [])
-        .filter((slot) => {
-          if (!slot || slot.enabled === false) return false;
-          return slot.conditionTrue === true || slot.latched === true;
-        })
-        .map((slot) => {
-          const label = String(slot.label || '').trim() || tr('pool.alarm.defaultLabel', 'Alarme piscine');
-          const state = slot.conditionTrue === true
-            ? tr('pool.alarm.state.activeCondition', 'condition active')
-            : tr('pool.alarm.state.latched', 'alarme mémorisée');
+    function poolConfigActiveAlarms(alarms) {
+      // Une mesure indisponible (etat 4) n'est pas une alarme piscine en cours :
+      // elle est signalee par sa propre alarme « temperature d'eau indisponible ».
+      return (Array.isArray(alarms) ? alarms : [])
+        .filter((alarm) => alarm && alarm.available &&
+                           (alarm.state === ALARM_STATE_ACTIVE_UNACKED ||
+                            alarm.state === ALARM_STATE_ACTIVE_ACKED ||
+                            alarm.state === ALARM_STATE_CLEARED_UNACKED))
+        .map((alarm) => {
+          const label = String(alarm.label || '').trim() || tr('pool.alarm.defaultLabel', 'Alarme piscine');
+          let state = tr('pool.alarm.state.activeCondition', 'en cours');
+          if (alarm.state === ALARM_STATE_ACTIVE_UNACKED) {
+            state = tr('pool.alarm.state.activeCondition', 'en cours');
+          } else if (alarm.state === ALARM_STATE_ACTIVE_ACKED) {
+            state = tr('pool.alarm.state.acknowledged', 'en cours, acquittée');
+          } else if (alarm.state === ALARM_STATE_CLEARED_UNACKED) {
+            state = tr('pool.alarm.state.latched', 'terminée, à acquitter');
+          }
           return { label, state };
         });
     }
 
-    function poolConfigRenderAlarms(alarmSlots) {
+    function poolConfigRenderAlarms(poolAlarms) {
       if (!poolAlarmCard) return;
-      const alarms = poolConfigActiveAlarms(alarmSlots);
+      const alarms = poolConfigActiveAlarms(poolAlarms);
       poolAlarmCard.innerHTML = '';
       poolAlarmCard.hidden = alarms.length === 0;
       if (alarms.length === 0) return;
@@ -8178,16 +7896,29 @@
       });
     }
 
-    function poolConfigRender(modules, alarmSlots) {
+    function poolConfigRender(modules, poolAlarms) {
       const source = modules && typeof modules === 'object' ? modules : {};
-      poolConfigRenderHero(source, alarmSlots);
+      poolConfigRenderHero(source, poolAlarms);
       poolConfigRenderWaterHealth();
       poolConfigRenderDisinfection(source);
       poolConfigRenderFiltrationPanel(source);
-      poolConfigRenderAlarms([]);
+      // La carte recevait une liste vide en dur depuis son introduction : elle
+      // n'a donc jamais rien affiche. Le bandeau ne montre que la premiere alarme,
+      // la carte les detaille toutes.
+      poolConfigRenderAlarms(poolAlarms);
       poolConfigRenderGeneralCards(source);
-      poolConfigRenderPhTimeline(source).catch(() => {
-        if (poolPhRibbonTrack) poolPhRibbonTrack.hidden = true;
+      // Un echec de lecture doit se voir : masquer la piste sans un mot rendait la
+      // panne indistinguable d'une installation depourvue de pompe pH.
+      poolConfigRenderPhTimeline(source).catch((err) => {
+        if (!poolPhRibbonTrack) return;
+        poolPhRibbonTrack.innerHTML = '';
+        poolPhRibbonTrack.hidden = false;
+        const failed = document.createElement('span');
+        failed.className = 'pool-ph-empty';
+        failed.textContent = (err && err.message)
+          ? String(err.message)
+          : tr('pool.phTimeline.readFailed', 'lecture du journal impossible');
+        poolPhRibbonTrack.appendChild(failed);
       });
     }
 
@@ -8331,9 +8062,9 @@
           modules['poollogic/filtration'] || {},
           modules[poolFiltrationWindowsBranch] || {}
         );
-        const alarmSlots = await fetchPoolAlarmSlots().catch(() => []);
+        const poolAlarms = await fetchPoolAlarms(true).catch(() => []);
         if (reqSeq !== poolConfigReqSeq) return;
-        poolConfigRender(modules, alarmSlots);
+        poolConfigRender(modules, poolAlarms);
         poolConfigLoadedOnce = true;
       } catch (err) {
         if (reqSeq !== poolConfigReqSeq) return;

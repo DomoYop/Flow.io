@@ -417,6 +417,9 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
 
     cfg.registerVar(flowCopyDelayVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(flowInterlockVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(sensorHoldVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(sensorHoldSettleVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(sensorHoldWatVar_, kCfgModuleId, kCfgBranchSafety);
 
     const EventBusService* ebSvc = services.get<EventBusService>(ServiceId::EventBus);
     eventBus_ = ebSvc ? ebSvc->bus : nullptr;
@@ -1108,9 +1111,18 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "{{ 'True' if value_json.no_flow else 'False' }}",
             "problem", nullptr, "mdi:water-alert", false
         };
+        // Sans cette entite, une courbe pH parfaitement plate pendant douze
+        // heures serait indiscernable d'une sonde morte.
+        const HABinarySensorEntry sensorHold{
+            "poollogic", "pl_sensor_hold", "Readings Held (no flow)",
+            "rt/poollogic/flow",
+            "{{ 'True' if value_json.hold else 'False' }}",
+            nullptr, nullptr, "mdi:snowflake", false
+        };
         (void)haSvc->addBinarySensor(haSvc->ctx, &flowCopyOut);
         (void)haSvc->addBinarySensor(haSvc->ctx, &coverOut);
         (void)haSvc->addBinarySensor(haSvc->ctx, &noFlow);
+        (void)haSvc->addBinarySensor(haSvc->ctx, &sensorHold);
     }
     if (cmdSvc && cmdSvc->registerHandler) {
         cmdSvc->registerHandler(cmdSvc->ctx, "poollogic.filtration.write", &PoolLogicModule::cmdFiltrationWriteStatic_, this);
@@ -1274,9 +1286,9 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         }
 
         // Non latchee : la disponibilite d'une sonde est un etat, pas un defaut
-        // a acquitter. L'alarme retombe seule des que la mesure revient, ce qui
-        // evite aussi de dependre d'un bouton de reset : ce neuvieme slot sort
-        // des 8 couverts par buildPacked_ et par les boutons alm_reset_slot_*.
+        // a acquitter. L'alarme retombe seule des que la mesure revient.
+        // (La limite historique de 8 slots qui motivait aussi ce choix a disparu
+        // avec le champ packe : chaque alarme a desormais son propre bouton.)
         // onDelay de 60 s en plus de la fenetre de fraicheur de 10 min de la
         // condition : une lecture 1-Wire qui rate ponctuellement, ou un premier
         // demarrage avant la premiere conversion, n'alarment pas.
@@ -1374,6 +1386,13 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
     if (!std::isfinite(o2PendingMl_) || o2PendingMl_ < 0.0f) {
         o2PendingMl_ = 0.0f;
         if (cfgStore_) (void)cfgStore_->set(o2PendingVar_, o2PendingMl_);
+    }
+    if (sensorHoldSettleSec_ > kSensorHoldSettleMaxSec) {
+        LOGW("PoolLogic sensor hold settle %us > %us (heater probe window), clamped",
+             (unsigned)sensorHoldSettleSec_,
+             (unsigned)kSensorHoldSettleMaxSec);
+        sensorHoldSettleSec_ = kSensorHoldSettleMaxSec;
+        if (cfgStore_) (void)cfgStore_->set(sensorHoldSettleVar_, sensorHoldSettleSec_);
     }
 
     LOGI("PoolLogic pH dosing mode=%s", phDosePlus_ ? "pH+" : "pH-");
@@ -1655,6 +1674,22 @@ void PoolLogicModule::onEvent_(const Event& e)
                 (void)forceDeviceStop_(swgDeviceSlot_);
                 LOGI("PoolLogic SWG control changed: %s", swgControlModeStr_(swgControlMode_));
             }
+            return;
+        }
+        // Le gel des mesures suit le role metier : un capteur rebinde sur un
+        // autre slot doit emporter son gel avec lui, sans redemarrage.
+        if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&
+            (p->localBranchId == kCfgBranchSensors || p->localBranchId == kCfgBranchSafety)) {
+            if (sensorHoldSettleSec_ > kSensorHoldSettleMaxSec) {
+                LOGW("PoolLogic sensor hold settle %us > %us (heater probe window), clamped",
+                     (unsigned)sensorHoldSettleSec_,
+                     (unsigned)kSensorHoldSettleMaxSec);
+                sensorHoldSettleSec_ = kSensorHoldSettleMaxSec;
+                if (cfgStore_) (void)cfgStore_->set(sensorHoldSettleVar_, sensorHoldSettleSec_);
+            }
+            portENTER_CRITICAL(&pendingMux_);
+            sensorHoldPending_ = true;
+            portEXIT_CRITICAL(&pendingMux_);
             return;
         }
         if (p->moduleId == (uint8_t)ConfigModuleId::PoolLogic &&

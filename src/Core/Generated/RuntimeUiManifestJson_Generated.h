@@ -12,181 +12,229 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
   "ok": true,
   "values": [
     {
-      "id": 901,
-      "runtimeId": 901,
+      "id": 911,
+      "runtimeId": 911,
       "moduleId": 9,
       "module": "alarms",
-      "valueId": 1,
-      "key": "alarms.active_mask",
-      "label": "Alarmes actives",
-      "type": "uint32",
+      "valueId": 11,
+      "key": "alarms.pressure_low",
+      "label": "Pression filtration basse",
+      "type": "enum",
       "domain": "alarm",
       "group": "Alarmes",
       "unit": null,
       "decimals": null,
       "order": 10,
-      "enum": null,
-      "flags": [
-        {
-          "mask": 1,
-          "label": "Pression Filtration Basse"
-        },
-        {
-          "mask": 2,
-          "label": "Pression Filtration Haute"
-        },
-        {
-          "mask": 4,
-          "label": "Bidon pH bas"
-        },
-        {
-          "mask": 8,
-          "label": "Bidon chlore bas"
-        },
-        {
-          "mask": 16,
-          "label": "Pompe pH dur\u00e9e max atteinte"
-        },
-        {
-          "mask": 32,
-          "label": "Pompe Orp dur\u00e9e max atteinte"
-        },
-        {
-          "mask": 64,
-          "label": "Niveau d'eau bas dans le bassin"
-        },
-        {
-          "mask": 128,
-          "label": "Dosage pH sans effet"
-        },
-        {
-          "mask": 256,
-          "label": "Temp\u00e9rature d'eau indisponible"
-        }
-      ],
-      "display": "flags",
-      "displayConfig": {
-        "flagRole": "active",
-        "columnLabel": "Act."
-      }
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
     },
     {
-      "id": 902,
-      "runtimeId": 902,
+      "id": 912,
+      "runtimeId": 912,
       "moduleId": 9,
       "module": "alarms",
-      "valueId": 2,
-      "key": "alarms.resettable_mask",
-      "label": "Alarmes rearmables",
-      "type": "uint32",
+      "valueId": 12,
+      "key": "alarms.pressure_high",
+      "label": "Pression filtration haute",
+      "type": "enum",
       "domain": "alarm",
       "group": "Alarmes",
       "unit": null,
       "decimals": null,
       "order": 20,
-      "enum": null,
-      "flags": [
-        {
-          "mask": 1,
-          "label": "Pression Filtration Basse"
-        },
-        {
-          "mask": 2,
-          "label": "Pression Filtration Haute"
-        },
-        {
-          "mask": 4,
-          "label": "Bidon pH bas"
-        },
-        {
-          "mask": 8,
-          "label": "Bidon chlore bas"
-        },
-        {
-          "mask": 16,
-          "label": "Pompe pH dur\u00e9e max atteinte"
-        },
-        {
-          "mask": 32,
-          "label": "Pompe Orp dur\u00e9e max atteinte"
-        },
-        {
-          "mask": 64,
-          "label": "Niveau d'eau bas dans le bassin"
-        },
-        {
-          "mask": 128,
-          "label": "Dosage pH sans effet"
-        },
-        {
-          "mask": 256,
-          "label": "Temp\u00e9rature d'eau indisponible"
-        }
-      ],
-      "display": "flags",
-      "displayConfig": {
-        "flagRole": "resettable",
-        "columnLabel": "Reset"
-      }
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
     },
     {
-      "id": 903,
-      "runtimeId": 903,
+      "id": 913,
+      "runtimeId": 913,
       "moduleId": 9,
       "module": "alarms",
-      "valueId": 3,
-      "key": "alarms.condition_mask",
-      "label": "Conditions alarmes",
-      "type": "uint32",
+      "valueId": 13,
+      "key": "alarms.ph_tank_low",
+      "label": "Bidon pH bas",
+      "type": "enum",
       "domain": "alarm",
       "group": "Alarmes",
       "unit": null,
       "decimals": null,
       "order": 30,
-      "enum": null,
-      "flags": [
-        {
-          "mask": 1,
-          "label": "Pression Filtration Basse"
-        },
-        {
-          "mask": 2,
-          "label": "Pression Filtration Haute"
-        },
-        {
-          "mask": 4,
-          "label": "Bidon pH bas"
-        },
-        {
-          "mask": 8,
-          "label": "Bidon chlore bas"
-        },
-        {
-          "mask": 16,
-          "label": "Pompe pH dur\u00e9e max atteinte"
-        },
-        {
-          "mask": 32,
-          "label": "Pompe Orp dur\u00e9e max atteinte"
-        },
-        {
-          "mask": 64,
-          "label": "Niveau d'eau bas dans le bassin"
-        },
-        {
-          "mask": 128,
-          "label": "Dosage pH sans effet"
-        },
-        {
-          "mask": 256,
-          "label": "Temp\u00e9rature d'eau indisponible"
-        }
-      ],
-      "display": "flags",
-      "displayConfig": {
-        "flagRole": "condition",
-        "columnLabel": "Cond."
-      }
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
+    },
+    {
+      "id": 914,
+      "runtimeId": 914,
+      "moduleId": 9,
+      "module": "alarms",
+      "valueId": 14,
+      "key": "alarms.chlorine_tank_low",
+      "label": "Bidon d\u00e9sinfectant bas",
+      "type": "enum",
+      "domain": "alarm",
+      "group": "Alarmes",
+      "unit": null,
+      "decimals": null,
+      "order": 40,
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
+    },
+    {
+      "id": 915,
+      "runtimeId": 915,
+      "moduleId": 9,
+      "module": "alarms",
+      "valueId": 15,
+      "key": "alarms.ph_pump_max_uptime",
+      "label": "Pompe pH : dur\u00e9e max atteinte",
+      "type": "enum",
+      "domain": "alarm",
+      "group": "Alarmes",
+      "unit": null,
+      "decimals": null,
+      "order": 50,
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
+    },
+    {
+      "id": 916,
+      "runtimeId": 916,
+      "moduleId": 9,
+      "module": "alarms",
+      "valueId": 16,
+      "key": "alarms.chlorine_pump_max_uptime",
+      "label": "Pompe d\u00e9sinfectant : dur\u00e9e max atteinte",
+      "type": "enum",
+      "domain": "alarm",
+      "group": "Alarmes",
+      "unit": null,
+      "decimals": null,
+      "order": 60,
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
+    },
+    {
+      "id": 917,
+      "runtimeId": 917,
+      "moduleId": 9,
+      "module": "alarms",
+      "valueId": 17,
+      "key": "alarms.water_level_low",
+      "label": "Niveau d'eau bas dans le bassin",
+      "type": "enum",
+      "domain": "alarm",
+      "group": "Alarmes",
+      "unit": null,
+      "decimals": null,
+      "order": 70,
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
+    },
+    {
+      "id": 918,
+      "runtimeId": 918,
+      "moduleId": 9,
+      "module": "alarms",
+      "valueId": 18,
+      "key": "alarms.ph_dose_no_effect",
+      "label": "Dosage pH sans effet",
+      "type": "enum",
+      "domain": "alarm",
+      "group": "Alarmes",
+      "unit": null,
+      "decimals": null,
+      "order": 80,
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
+    },
+    {
+      "id": 919,
+      "runtimeId": 919,
+      "moduleId": 9,
+      "module": "alarms",
+      "valueId": 19,
+      "key": "alarms.water_temp_unavailable",
+      "label": "Temp\u00e9rature d'eau indisponible",
+      "type": "enum",
+      "domain": "alarm",
+      "group": "Alarmes",
+      "unit": null,
+      "decimals": null,
+      "order": 90,
+      "enum": {
+        "0": "Normal",
+        "1": "En cours",
+        "2": "En cours, acquitt\u00e9e",
+        "3": "Termin\u00e9e, \u00e0 acquitter",
+        "4": "Indisponible"
+      },
+      "flags": null,
+      "display": "badge",
+      "displayConfig": null
     },
     {
       "id": 2301,
@@ -969,6 +1017,28 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
           "criticalHighStart": 820,
           "max": 900
         }
+      }
+    },
+    {
+      "id": 2416,
+      "runtimeId": 2416,
+      "moduleId": 24,
+      "module": "poollogic",
+      "valueId": 16,
+      "key": "pool.sensor_hold",
+      "label": "Mesures fig\u00e9es",
+      "type": "bool",
+      "domain": "sondes",
+      "group": "Sondes",
+      "unit": null,
+      "decimals": null,
+      "order": 30,
+      "enum": null,
+      "flags": null,
+      "display": "boolean",
+      "displayConfig": {
+        "activeText": "Fig\u00e9es (sans circulation)",
+        "inactiveText": "En direct"
       }
     },
     {

@@ -20,10 +20,11 @@ bool AnalogSensorEndpoint::read(IOEndpointValue& out)
     return value_.valid;
 }
 
-void AnalogSensorEndpoint::update(float value, bool valid, uint32_t timestampMs)
+void AnalogSensorEndpoint::update(float value, bool valid, uint32_t timestampMs, bool held)
 {
     value_.valueType = IO_EP_VALUE_FLOAT;
     value_.v.f = value;
     value_.valid = valid;
+    value_.held = held;
     value_.timestampMs = timestampMs;
 }

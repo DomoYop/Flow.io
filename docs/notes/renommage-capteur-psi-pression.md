@@ -70,12 +70,10 @@ réappliquera pas automatiquement les réglages du capteur de pression lors d'un
 import après mise à jour — à resaisir manuellement le cas échéant. Aucun impact
 sur le stockage NVS lui-même (voir §3).
 
-Les dashboards Home Assistant exemple
-(`docs/integration/home_assistant_alarm_helpers_fio53.yaml` et
-`..._dashboard_fio53.yaml`) référencent les entités par leur `unique_id`
-(`fio53_pressure_low_active`, etc.) — mis à jour dans ce commit. Une
-installation HA existante utilisant les anciens noms d'entité (`fio53_psi_low_active`)
-devra être re-liée aux nouvelles entités après mise à jour du firmware.
+Les fichiers d'intégration Home Assistant référencent les entités par leur
+`unique_id`. Ils portaient encore `psi_low`/`psi_high` jusqu'à la deuxième passe
+du §7, qui les a alignés sur `pressure_low`/`pressure_high`. Une installation HA
+existante utilisant les anciens noms devra être re-liée aux nouvelles entités.
 
 ## 5. Fichiers touchés
 
@@ -119,7 +117,9 @@ devra être re-liée aux nouvelles entités après mise à jour du firmware.
 - `docs/core/module-quality-gates.md`
 - `docs/integration/flowio-poollogic-business.md`, `nextion-esp-protocol.md`
 - `docs/integration/plan_tests_{poollogic_pdm_io,sequentiel_poollogic_pdm_io}.csv`
-- `docs/integration/home_assistant_alarm_{dashboard,helpers}_fio53.yaml`
+- `docs/integration/home_assistant_alarm_{dashboard,helpers}_pool.yaml`
+  (renommés depuis `*_fio53.yaml` : le suffixe porte le préfixe d'entité HA,
+  qui vaut `pool` sur cette installation)
 - `docs/rapport-analyse-domaine-piscine.md`
 - `docs/notes/audit-config-defaut-piscine-waveshare.md`, `io-mapping-capteur-mesure.md`
 
@@ -135,11 +135,62 @@ devra être re-liée aux nouvelles entités après mise à jour du firmware.
 
 - **Build `Waveshare-ESP32-S3` : SUCCESS**, Flash 46,7 % (1 957 110 / 4 194 304
   octets), RAM 34,4 %.
-- Recherche exhaustive de `psi`/`Psi`/`PSI` résiduel sur tout le dépôt après
-  renommage : plus aucune occurrence hors `vaPSINiddle` (intentionnel, §3) et
-  quelques faux positifs de sous-chaîne (`kO2DoseEpsilonMl`, `collapsible`).
+- Recherche exhaustive de `psi`/`Psi`/`PSI` résiduel **dans `src/` et `include/`**
+  après renommage : plus aucune occurrence hors `vaPSINiddle` (intentionnel, §3)
+  et quelques faux positifs de sous-chaîne (`kO2DoseEpsilonMl`, `collapsible`).
+  La documentation et les fichiers d'intégration, eux, n'avaient pas suivi — voir §7.
 - `data/wc/*.j` (SPIFFS) régénéré au build : les clés `pressure_*` sont bien
   présentes, plus aucune clé `psi_*`.
 
 > Note environnement : lancer `pio` depuis **PowerShell** natif Windows, pas
 > depuis le shell Bash/MSys (rejet d'`esptool`).
+
+## 7. Deuxième passe — documentation et intégration (2026-08-11)
+
+Le renommage de juillet portait sur `src/` et `include/`. La documentation, les
+plans de tests et les fichiers d'intégration Home Assistant étaient restés au
+vocabulaire « PSI », et **décrivaient des identifiants qui n'existaient plus** :
+`PSI_BLOCKED`, `psi_low_th`, `psi_high_th`, `psi_start_dly_s`, `psi_io_id`,
+`psiError_`, `AlarmId::PoolPsiLow/High`, la valeur de blocage O2 `psi`. Aucun de
+ces symboles n'était présent dans les sources — la doc décrivait un firmware
+révolu.
+
+Corrigé dans : `docs/modules/PoolLogicModule.md`, `docs/modules/IOModule.md`,
+`docs/integration/flowio-poollogic-business.md`,
+`docs/integration/nextion-esp-protocol.md`,
+`docs/rapport-analyse-domaine-piscine.md`, `docs/core/module-quality-gates.md`,
+les deux plans de tests CSV et les trois fichiers d'intégration Home Assistant
+(entités `pool_psi_low_*` → `pool_pressure_low_*`).
+
+Les deux exceptions du §3 restent en place, pour les mêmes raisons :
+
+- **`vaPSINiddle`** (voir ci-dessous) est désormais la seule exception : les clés
+  NVS ont été renommées dans la foulée, voir §8.
+- **`vaPSINiddle`** : nom de composant figé dans le projet Nextion Editor, hors
+  de ce dépôt. Le renommer côté firmware sans régénérer le `.tft` casse l'aiguille
+  de pression de l'écran V2 legacy.
+
+## 8. Clés NVS renommées — schéma de config v3 (2026-08-11)
+
+Dernier point du §3 levé. Le renommage existait depuis le 07/08 sur la branche
+`refactor/fonctions-piscine-et-io` (commit `9447203`), jamais fusionnée dans
+`main` ; il est ici porté seul, sans le reste de cette branche.
+
+| Avant | Après | Type |
+|---|---|---|
+| `pl_psil` | `pl_prlow` | float (bar) |
+| `pl_psih` | `pl_prhigh` | float (bar) |
+| `pl_psdt` | `pl_prdelay` | uint8 (s) |
+
+`pl_piid` est **conservée** : ce n'est pas une trace de « PSI » mais `p` +
+suffixe `iid`, commun à tous les IoId (`pl_aiid`, `pl_wiid`, `pl_oiid`…).
+
+`CURRENT_CFG_VERSION` passe de 2 à 3 et `mig_2_to_3`
+([ConfigMigrations.h](../../src/Core/ConfigMigrations.h)) recopie chaque valeur
+sous son nouveau nom puis efface l'ancienne. **Aucun effacement NVS requis, aucun
+réglage perdu.** La migration est best-effort et renvoie toujours `true` : un
+`false` déclencherait un `clear()` de toute la configuration.
+
+Les trois clés `*Legacy` de `NvsKeys.h` ne servent qu'à cette migration. Elles
+seront supprimables quand plus aucune installation ne pourra encore être en
+schéma v2 — c'est-à-dire une fois toutes les cartes passées à ce firmware.

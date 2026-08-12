@@ -12,6 +12,13 @@ public:
     RunningMedianAverageFloat(uint8_t windowSize = 11, uint8_t avgCount = 5)
         : rm_(windowSize), avgCount_(avgCount) {}
 
+    /**
+     * Vide la fenetre. Appele quand la nature de ce qui est mesure change d'un
+     * coup (reprise de la circulation) : sans cela les echantillons d'eau
+     * immobile resteraient melanges aux premiers echantillons frais.
+     */
+    void clear() { rm_.clear(); }
+
     float update(float value) {
         rm_.add(value);
         uint8_t count = rm_.getCount();

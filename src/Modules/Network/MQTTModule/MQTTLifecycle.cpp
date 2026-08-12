@@ -352,7 +352,6 @@ void MQTTModule::onEvent_(const Event& e)
         }
 
         (void)enqueue(ProducerIdAlarm, AlarmMsgMeta, MqttPublishPriority::Normal, 0);
-        (void)enqueue(ProducerIdAlarm, AlarmMsgPack, MqttPublishPriority::Normal, 0);
         return;
     }
 }

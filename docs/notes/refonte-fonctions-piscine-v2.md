@@ -174,3 +174,30 @@ La temporisation de la recopie du débit reste `flow_copy_delay_s` (`pl_fscdl`, 
 cette chaîne pour un gain nul, la page affichant le délai via `compose` de toute façon.
 En contrepartie, `on_delay_s` est masqué sur pd9 et pd10 pour éviter deux réglages concurrents,
 et `onDelaySec` doit rester à 0 sur ces deux appareils.
+
+## Reliquat de la branche abandonnée (2026-08-11)
+
+`refactor/fonctions-piscine-et-io` (commit `9447203`, 7 août) est resté à un seul
+commit pendant que `main` en prenait 19. Sa version de la refonte est périmée :
+elle numérote `DeviceRobot = 3, DeviceFillPump = 4, DeviceChlorineGenerator = 5,
+DeviceAux2..4`, sans oxygène actif ni sorties de report, et introduit un
+`PoolFunctions.h` (table fonction → appareil) que l'invariant `pdN ⇔ dNN` de
+cette v2 rend inutile.
+
+Trois éléments n'y étaient liés que par le hasard du commit et ont été portés
+seuls sur `main` :
+
+1. le renommage des clés NVS de pression `pl_psi*` → `pl_pr*` avec `mig_2_to_3`
+   (voir [renommage-capteur-psi-pression.md](renommage-capteur-psi-pression.md) §8) ;
+2. [scripts/check_io_port_sync.py](../../scripts/check_io_port_sync.py), branché
+   en gate CI bloquant (`io-port-sync`) : il compare les ports proposés par
+   l'interface web à `kBindingPorts[]` du firmware ;
+3. `IOModule::logBindingPortConflicts_()`, appelé après `autoBindEnabledAnalogDrivers_()` :
+   il journalise deux endpoints qui revendiquent le même port physique. Le cas
+   passait en silence, et le second binding gagnait ou perdait selon l'ordre
+   d'assemblage — avec 8 relais EXIO pour 12 fonctions déclarées, un relais
+   piloté par deux fonctions est un vrai problème matériel. Volontairement
+   journalisé sans refuser le binding : couper au boot une sortie déjà câblée
+   serait plus dangereux que de laisser passer le doublon.
+
+Le reste de la branche est sans valeur pour `main` : elle peut être supprimée.

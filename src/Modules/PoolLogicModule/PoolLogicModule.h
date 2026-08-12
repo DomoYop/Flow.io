@@ -97,6 +97,9 @@ private:
         RuntimeUiPhBatchTargetMl = 13,
         RuntimeUiPhBatchDeliveredMl = 14,
         RuntimeUiPhExpectedDelta = 15,
+        // Mesures figees faute de circulation : dit pourquoi pH et Redox sont
+        // plats, sans quoi une sonde morte y ressemblerait trait pour trait.
+        RuntimeUiSensorHold = 16,
     };
 
     enum DisinfectionType : uint8_t {
@@ -186,6 +189,16 @@ private:
         IdlePumpOn,
         SetpointReached,
     };
+
+    /**
+     * Plafond du delai de reprise des mesures.
+     *
+     * La sonde de temperature du chauffage fait tourner la filtration 5 min et
+     * decide a la fin : au-dela de cette borne, elle deciderait sur la valeur
+     * figee de la veille. Meme raisonnement pour l'armement des regulations
+     * (dly_pid_min, 5 min par defaut).
+     */
+    static constexpr uint16_t kSensorHoldSettleMaxSec = 240U;
 
     static constexpr uint8_t SLOT_DAILY_RECALC = 3;
     static constexpr uint8_t SLOT_FILTR_WINDOW_BASE = 4;  // slots 4..6, un par segment planifie
@@ -296,6 +309,18 @@ private:
     uint8_t flowCopyDelaySec_ = 30;
     bool flowInterlockEnabled_ = false;
 
+    // Gel des mesures en ligne hors circulation. Une sonde montee sur la
+    // tuyauterie ne voit plus que l'eau immobile du porte-sondes des que la
+    // pompe s'arrete : la mesure derive sans rien dire du bassin. Les
+    // regulations sont deja protegees (armement dly_pid_min, interlock debit) ;
+    // ce qui derive, c'est ce qui est publie -- Home Assistant, ecran, web.
+    bool sensorHoldEnabled_ = PoolDefaults::SensorHold;
+    uint16_t sensorHoldSettleSec_ = PoolDefaults::SensorHoldSettleSec;
+    // La sonde de temperature d'eau peut etre en ligne (elle derive) ou
+    // immergee dans le bassin (elle reste juste) : c'est un fait de montage,
+    // pas une preference, d'ou le reglage separe.
+    bool sensorHoldWaterTemp_ = PoolDefaults::SensorHoldWaterTemp;
+
     // Volume du bassin : transverse (filtration + doses O2), voir page Bassin.
     float poolVolumeM3_ = PoolDefaults::PoolVolumeM3;
 
@@ -379,6 +404,16 @@ private:
     bool flowCopyOutState_ = false;
     bool coverClosedState_ = false;
     bool noFlowError_ = false;
+
+    // Gel des mesures : dernier etat pousse a IOModule, et IoId marques (pour
+    // les liberer si l'utilisateur rebinde un role sur un autre slot).
+    static constexpr uint8_t kSensorHoldMax = 3;  // pH, ORP, temperature d'eau
+    IoId sensorHoldIds_[kSensorHoldMax] = {IO_ID_INVALID, IO_ID_INVALID, IO_ID_INVALID};
+    // Le registre IO n'est pas forcement construit quand la config est chargee :
+    // un marquage refuse est rejoue au tick suivant plutot que perdu.
+    bool sensorHoldPending_ = true;
+    bool circulatingLast_ = false;
+    bool circulatingKnown_ = false;
 
     portMUX_TYPE pendingMux_ = portMUX_INITIALIZER_UNLOCKED;
 
@@ -568,6 +603,12 @@ private:
                                                 &flowCopyDelaySec_, ConfigPersistence::Persistent, 0};
     ConfigVariable<bool,0> flowInterlockVar_{NVS_KEY(NvsKeys::PoolLogic::FlowInterlock), "flow_interlock", "poollogic/safety", ConfigType::Bool,
                                              &flowInterlockEnabled_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> sensorHoldVar_{NVS_KEY(NvsKeys::PoolLogic::SensorHold), "sensor_hold", "poollogic/safety", ConfigType::Bool,
+                                          &sensorHoldEnabled_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> sensorHoldSettleVar_{NVS_KEY(NvsKeys::PoolLogic::SensorHoldSettle), "sensor_hold_settle_s", "poollogic/safety", ConfigType::UInt16,
+                                                    &sensorHoldSettleSec_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<bool,0> sensorHoldWatVar_{NVS_KEY(NvsKeys::PoolLogic::SensorHoldWaterTemp), "sensor_hold_wat", "poollogic/safety", ConfigType::Bool,
+                                             &sensorHoldWaterTemp_, ConfigPersistence::Persistent, 0};
 
     // Services and adapters
     ConfigStore* cfgStore_ = nullptr;
@@ -624,6 +665,24 @@ private:
     uint32_t stateUptimeSec_(const DeviceFsm& fsm, uint32_t nowMs) const;
     bool loadAnalogSensor_(IoId ioId, float& out, uint32_t* tsMsOut = nullptr) const;
     bool loadDigitalSensor_(IoId ioId, bool& out) const;
+    /**
+     * @brief Declare a IOModule les sondes a geler hors circulation.
+     *
+     * Le marquage suit le role metier : rebinder ph_io_id sur un autre slot
+     * deplace le gel avec lui, d'ou la liberation des IoId precedents avant de
+     * remarquer. A rejouer apres tout changement de `poollogic/sensors` ou des
+     * reglages de gel.
+     */
+    void applySensorHoldBindings_();
+    /**
+     * @brief Publie l'etat hydraulique vers IOModule (front seulement).
+     *
+     * Pompe alimentee != eau qui circule : si un flowswitch est cable, c'est lui
+     * qui fait foi (vanne fermee, amorcage perdu).
+     */
+    void updateSensorHold_(bool haveFlow, bool flowOn);
+    /** @brief Vrai quand les mesures publiees sont figees (etat affichable). */
+    bool sensorHoldActive_() const;
     void resetTemporalPidState_(TemporalPidState& st, uint32_t nowMs);
     void stepTemporalPid_(TemporalPidState& st,
                           float input,

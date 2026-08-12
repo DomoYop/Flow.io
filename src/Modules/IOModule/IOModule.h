@@ -200,6 +200,10 @@ private:
     IoStatus ioSensorStatus_(IoId id, IoSensorStatus* outStatus) const;
     IoStatus ioListInvalidSensors_(IoId* outIds, uint8_t maxIds, uint8_t* outCount) const;
     IoStatus ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable) const;
+    IoStatus ioSetAnalogHold_(IoId id, uint8_t hold);
+    IoStatus ioSetCirculating_(uint8_t circulating, uint16_t settleSec);
+    /** Vrai tant que les endpoints marques doivent republier leur valeur figee. */
+    bool analogHoldActive_(uint32_t nowMs) const;
 
     bool setLedMask_(uint8_t mask, uint32_t tsMs);
     bool turnLedOn_(uint8_t bit, uint32_t tsMs);
@@ -238,6 +242,8 @@ private:
      * debinde rien : desactiver le driver arrete le provisioning, sans effacer).
      */
     void autoBindEnabledAnalogDrivers_();
+    /** Journalise deux endpoints lies au meme port physique (voir .cpp). */
+    void logBindingPortConflicts_();
     bool resolveAnalogBinding_(PhysicalPortId portId, uint8_t& sourceOut, uint8_t& channelOut, uint8_t& backendOut) const;
     bool resolveDigitalInputBinding_(PhysicalPortId portId, uint8_t& pinOut, uint8_t& backendOut, uint8_t& channelOut) const;
     bool resolveDigitalOutputBinding_(PhysicalPortId portId,
@@ -287,6 +293,10 @@ private:
     bool analogSlotPublished_(uint8_t idx) const;
     bool analogSlotUsesUndefinedInvalidValue_(uint8_t idx) const;
     void invalidateAnalogSlot_(AnalogSlot& slot, uint32_t nowMs);
+    /** Ecrit la valeur d'un slot analogique dans le DataStore (index de registre). */
+    void publishAnalogSlotValue_(const AnalogSlot& slot, float value, uint32_t nowMs);
+    /** Publie le marqueur "mesure figee" du slot dans le DataStore. */
+    void publishAnalogSlotHeld_(const AnalogSlot& slot, bool held);
     bool processAnalogDefinition_(uint8_t idx, uint32_t nowMs);
     bool processDigitalInputDefinition_(uint8_t slotIdx, uint32_t nowMs);
     int32_t sanitizeAnalogPrecision_(int32_t precision) const;
@@ -376,6 +386,14 @@ private:
         uint32_t lastSampleSeq = 0;
         bool lastRoundedValid = false;
         float lastRounded = 0.0f;
+        // Gel hors circulation (voir IOServiceV2::setAnalogHold). `heldValue`
+        // est la derniere valeur acquise pompe en marche : c'est elle qu'on
+        // republie tant que l'eau est immobile.
+        bool holdWhenIdle = false;
+        bool held = false;
+        bool heldValid = false;
+        float heldValue = 0.0f;
+        uint32_t heldSinceMs = 0;
     };
     enum DigitalSlotKind : uint8_t {
         DIGITAL_SLOT_INPUT = 0,
@@ -465,8 +483,14 @@ private:
         ServiceBinding::bind<&IOModule::ioSensorStatus_>,
         ServiceBinding::bind<&IOModule::ioListInvalidSensors_>,
         ServiceBinding::bind<&IOModule::ioBackendInfo_>,
+        ServiceBinding::bind<&IOModule::ioSetAnalogHold_>,
+        ServiceBinding::bind<&IOModule::ioSetCirculating_>,
         this
     };
+    // Etat hydraulique pousse par le metier. Vrai par defaut : un profil sans
+    // PoolLogic (ou le temps que celui-ci demarre) ne doit rien geler.
+    bool circulating_ = true;
+    uint32_t holdSettleUntilMs_ = 0;
     StatusLedsService statusLedsSvc_{
         ServiceBinding::bind<&IOModule::setLedMask_>,
         ServiceBinding::bind<&IOModule::getLedMaskSvc_>,

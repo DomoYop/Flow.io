@@ -398,26 +398,45 @@ void HMIBuzzerModule::handlePoolDeviceStateChanged_(const DataChangedPayload& pa
     requestPattern_(state.actualOn ? BuzzerPattern::DeviceOn : BuzzerPattern::DeviceOff);
 }
 
+// L'annonciation suit les alarmes NON acquittees : une alarme acquittee reste
+// active et visible, mais cesse de reclamer l'attention. Sans cela, un bidon vide
+// fait biper toutes les 8 s jusqu'a ce que quelqu'un le remplisse.
+uint8_t HMIBuzzerModule::annunciationCount_() const
+{
+    if (!alarmSvc_) return 0U;
+    if (alarmSvc_->unackedCount) return alarmSvc_->unackedCount(alarmSvc_->ctx);
+    return alarmSvc_->activeCount ? alarmSvc_->activeCount(alarmSvc_->ctx) : 0U;
+}
+
+AlarmSeverity HMIBuzzerModule::annunciationSeverity_() const
+{
+    if (alarmSvc_ && alarmSvc_->highestUnackedSeverity) {
+        return alarmSvc_->highestUnackedSeverity(alarmSvc_->ctx);
+    }
+    if (alarmSvc_ && alarmSvc_->highestSeverity) {
+        return alarmSvc_->highestSeverity(alarmSvc_->ctx);
+    }
+    return AlarmSeverity::Alarm;
+}
+
 void HMIBuzzerModule::handleAlarmRaised_()
 {
-    const AlarmSeverity highest = (alarmSvc_ && alarmSvc_->highestSeverity)
-        ? alarmSvc_->highestSeverity(alarmSvc_->ctx)
-        : AlarmSeverity::Alarm;
+    const AlarmSeverity highest = annunciationSeverity_();
     requestPattern_((highest == AlarmSeverity::Critical) ? BuzzerPattern::AlarmCritical : BuzzerPattern::AlarmActive);
     lastAlarmPatternMs_ = millis();
 }
 
 void HMIBuzzerModule::tickAlarmReminder_(uint32_t nowMs)
 {
-    if (!alarmSvc_ || !alarmSvc_->activeCount || !alarmSvc_->highestSeverity) return;
-    if (alarmSvc_->activeCount(alarmSvc_->ctx) == 0U) {
+    if (!alarmSvc_) return;
+    if (annunciationCount_() == 0U) {
         lastAlarmPatternMs_ = 0U;
         return;
     }
 
     if (lastAlarmPatternMs_ != 0U && (uint32_t)(nowMs - lastAlarmPatternMs_) < kAlarmRepeatMs) return;
 
-    const AlarmSeverity highest = alarmSvc_->highestSeverity(alarmSvc_->ctx);
+    const AlarmSeverity highest = annunciationSeverity_();
     requestPattern_((highest == AlarmSeverity::Critical) ? BuzzerPattern::AlarmCritical : BuzzerPattern::AlarmActive);
     lastAlarmPatternMs_ = nowMs;
 }

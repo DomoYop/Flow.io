@@ -1,0 +1,296 @@
+# Home Assistant helper entities for Flow.io alarms.
+#
+# Include from configuration.yaml:
+#
+#   template: !include home_assistant_alarm_helpers_pool.yaml
+#
+# Firmware behavior:
+# - Flow.io auto-discovers one `binary_sensor.pool_alm_*` per alarm, fed by the
+#   retained topic `rt/alarms/id<AlarmId>` (field `a`).
+# - Flow.io auto-discovers `binary_sensor.pool_alm_any` (topic `rt/alarms/m`).
+# - Flow.io auto-discovers one `button.pool_alm_ack_*` per alarm plus
+#   `button.pool_alm_ack_all`, using the command path
+#   `{"cmd":"alarms.ack","args":{"id":<AlarmId>}}`.
+#   Acknowledging is a single gesture: it clears the alarm when the cause is
+#   already gone, and silences it otherwise.
+#
+# The helpers below only rename and derive those native entities. The
+# `*_resettable`, `*_acknowledged` and `*_condition` helpers read the sensors
+# declared in `home_assistant_alarm_mqtt_pool.yaml`, which must be installed
+# too. Nothing here depends on the alarm registration order any more -- the
+# former `sensor.pool_alm_pack` bit decoding is gone.
+
+- binary_sensor:
+
+      - name: pool_alarm_any_active
+        unique_id: pool_alarm_any_active
+        icon: mdi:alarm-multiple
+        availability: >
+          {{ states('binary_sensor.pool_alm_any') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_any', 'on') }}
+
+      # AlarmId 1000 -- Low pressure (latched)
+      - name: pool_pressure_low_active
+        unique_id: pool_pressure_low_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_pressure_low') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_pressure_low', 'on') }}
+
+      - name: pool_pressure_low_condition
+        unique_id: pool_pressure_low_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_pressure_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_pressure_low_state', 'c') | int(2) == 1 }}
+
+      - name: pool_pressure_low_acknowledged
+        unique_id: pool_pressure_low_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_pressure_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_pressure_low_state', 'k') | int(0) == 1 }}
+
+      - name: pool_pressure_low_resettable
+        unique_id: pool_pressure_low_resettable
+        icon: mdi:restart-alert
+        availability: >
+          {{ has_value('sensor.pool_pressure_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_pressure_low_state', 'r') | int(0) == 1 }}
+
+      # AlarmId 1001 -- High pressure (latched)
+      - name: pool_pressure_high_active
+        unique_id: pool_pressure_high_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_pressure_high') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_pressure_high', 'on') }}
+
+      - name: pool_pressure_high_condition
+        unique_id: pool_pressure_high_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_pressure_high_state') }}
+        state: >
+          {{ state_attr('sensor.pool_pressure_high_state', 'c') | int(2) == 1 }}
+
+      - name: pool_pressure_high_acknowledged
+        unique_id: pool_pressure_high_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_pressure_high_state') }}
+        state: >
+          {{ state_attr('sensor.pool_pressure_high_state', 'k') | int(0) == 1 }}
+
+      - name: pool_pressure_high_resettable
+        unique_id: pool_pressure_high_resettable
+        icon: mdi:restart-alert
+        availability: >
+          {{ has_value('sensor.pool_pressure_high_state') }}
+        state: >
+          {{ state_attr('sensor.pool_pressure_high_state', 'r') | int(0) == 1 }}
+
+      # AlarmId 1002 -- pH tank low
+      - name: pool_ph_tank_low_active
+        unique_id: pool_ph_tank_low_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_ph_tank_low') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_ph_tank_low', 'on') }}
+
+      - name: pool_ph_tank_low_condition
+        unique_id: pool_ph_tank_low_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_ph_tank_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_tank_low_state', 'c') | int(2) == 1 }}
+
+      - name: pool_ph_tank_low_acknowledged
+        unique_id: pool_ph_tank_low_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_ph_tank_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_tank_low_state', 'k') | int(0) == 1 }}
+
+      # AlarmId 1003 -- Disinfectant tank low
+      - name: pool_chlorine_tank_low_active
+        unique_id: pool_chlorine_tank_low_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_chlorine_tank_low') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_chlorine_tank_low', 'on') }}
+
+      - name: pool_chlorine_tank_low_condition
+        unique_id: pool_chlorine_tank_low_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_chlorine_tank_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_chlorine_tank_low_state', 'c') | int(2) == 1 }}
+
+      - name: pool_chlorine_tank_low_acknowledged
+        unique_id: pool_chlorine_tank_low_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_chlorine_tank_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_chlorine_tank_low_state', 'k') | int(0) == 1 }}
+
+      # AlarmId 1004 -- pH pump max uptime (latched)
+      - name: pool_ph_pump_max_uptime_active
+        unique_id: pool_ph_pump_max_uptime_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_ph_pump_max_uptime') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_ph_pump_max_uptime', 'on') }}
+
+      - name: pool_ph_pump_max_uptime_condition
+        unique_id: pool_ph_pump_max_uptime_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_ph_pump_max_uptime_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_pump_max_uptime_state', 'c') | int(2) == 1 }}
+
+      - name: pool_ph_pump_max_uptime_acknowledged
+        unique_id: pool_ph_pump_max_uptime_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_ph_pump_max_uptime_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_pump_max_uptime_state', 'k') | int(0) == 1 }}
+
+      - name: pool_ph_pump_max_uptime_resettable
+        unique_id: pool_ph_pump_max_uptime_resettable
+        icon: mdi:restart-alert
+        availability: >
+          {{ has_value('sensor.pool_ph_pump_max_uptime_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_pump_max_uptime_state', 'r') | int(0) == 1 }}
+
+      # AlarmId 1005 -- Disinfectant pump max uptime (latched)
+      - name: pool_chlorine_pump_max_uptime_active
+        unique_id: pool_chlorine_pump_max_uptime_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_chlorine_pump_max_uptime') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_chlorine_pump_max_uptime', 'on') }}
+
+      - name: pool_chlorine_pump_max_uptime_condition
+        unique_id: pool_chlorine_pump_max_uptime_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_chlorine_pump_max_uptime_state') }}
+        state: >
+          {{ state_attr('sensor.pool_chlorine_pump_max_uptime_state', 'c') | int(2) == 1 }}
+
+      - name: pool_chlorine_pump_max_uptime_acknowledged
+        unique_id: pool_chlorine_pump_max_uptime_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_chlorine_pump_max_uptime_state') }}
+        state: >
+          {{ state_attr('sensor.pool_chlorine_pump_max_uptime_state', 'k') | int(0) == 1 }}
+
+      - name: pool_chlorine_pump_max_uptime_resettable
+        unique_id: pool_chlorine_pump_max_uptime_resettable
+        icon: mdi:restart-alert
+        availability: >
+          {{ has_value('sensor.pool_chlorine_pump_max_uptime_state') }}
+        state: >
+          {{ state_attr('sensor.pool_chlorine_pump_max_uptime_state', 'r') | int(0) == 1 }}
+
+      # AlarmId 1006 -- Pool water level low
+      - name: pool_water_level_low_active
+        unique_id: pool_water_level_low_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_water_level_low') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_water_level_low', 'on') }}
+
+      - name: pool_water_level_low_condition
+        unique_id: pool_water_level_low_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_water_level_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_water_level_low_state', 'c') | int(2) == 1 }}
+
+      - name: pool_water_level_low_acknowledged
+        unique_id: pool_water_level_low_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_water_level_low_state') }}
+        state: >
+          {{ state_attr('sensor.pool_water_level_low_state', 'k') | int(0) == 1 }}
+
+      # AlarmId 1007 -- pH dosing has no effect (latched)
+      - name: pool_ph_dose_no_effect_active
+        unique_id: pool_ph_dose_no_effect_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_ph_dose_no_effect') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_ph_dose_no_effect', 'on') }}
+
+      - name: pool_ph_dose_no_effect_condition
+        unique_id: pool_ph_dose_no_effect_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_ph_dose_no_effect_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_dose_no_effect_state', 'c') | int(2) == 1 }}
+
+      - name: pool_ph_dose_no_effect_acknowledged
+        unique_id: pool_ph_dose_no_effect_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_ph_dose_no_effect_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_dose_no_effect_state', 'k') | int(0) == 1 }}
+
+      - name: pool_ph_dose_no_effect_resettable
+        unique_id: pool_ph_dose_no_effect_resettable
+        icon: mdi:restart-alert
+        availability: >
+          {{ has_value('sensor.pool_ph_dose_no_effect_state') }}
+        state: >
+          {{ state_attr('sensor.pool_ph_dose_no_effect_state', 'r') | int(0) == 1 }}
+
+      # AlarmId 1008 -- Water temperature unavailable
+      - name: pool_water_temp_unavailable_active
+        unique_id: pool_water_temp_unavailable_active
+        icon: mdi:alarm-light
+        availability: >
+          {{ states('binary_sensor.pool_alm_water_temp_unavailable') in ['on', 'off'] }}
+        state: >
+          {{ is_state('binary_sensor.pool_alm_water_temp_unavailable', 'on') }}
+
+      - name: pool_water_temp_unavailable_condition
+        unique_id: pool_water_temp_unavailable_condition
+        icon: mdi:flash-alert
+        availability: >
+          {{ has_value('sensor.pool_water_temp_unavailable_state') }}
+        state: >
+          {{ state_attr('sensor.pool_water_temp_unavailable_state', 'c') | int(2) == 1 }}
+
+      - name: pool_water_temp_unavailable_acknowledged
+        unique_id: pool_water_temp_unavailable_acknowledged
+        icon: mdi:bell-check-outline
+        availability: >
+          {{ has_value('sensor.pool_water_temp_unavailable_state') }}
+        state: >
+          {{ state_attr('sensor.pool_water_temp_unavailable_state', 'k') | int(0) == 1 }}

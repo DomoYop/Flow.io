@@ -891,6 +891,12 @@ void IOModule::invalidateAnalogSlot_(AnalogSlot& slot, uint32_t nowMs)
 
     slot.endpoint->update(slot.lastRounded, false, nowMs);
     slot.lastRoundedValid = false;
+    // Une sonde muette n'est pas une sonde gelee : le marqueur tombe avec la
+    // validite, sans effacer heldValue (utile si la sonde revient a l'arret).
+    if (slot.held) {
+        slot.held = false;
+        publishAnalogSlotHeld_(slot, false);
+    }
 
     if (dataStore_) {
         uint8_t rtIdx = 0;
@@ -899,6 +905,63 @@ void IOModule::invalidateAnalogSlot_(AnalogSlot& slot, uint32_t nowMs)
         }
     }
     markIoCycleChanged_(slot.ioId);
+}
+
+bool IOModule::analogHoldActive_(uint32_t nowMs) const
+{
+    if (!circulating_) return true;
+    // Reprise : on reste gele le temps que le porte-sondes soit purge et que la
+    // fenetre du filtre median se soit remplie d'echantillons frais.
+    return (int32_t)(nowMs - holdSettleUntilMs_) < 0;
+}
+
+IoStatus IOModule::ioSetAnalogHold_(IoId id, uint8_t hold)
+{
+    if (id < IO_ID_AI_BASE || id >= IO_ID_AI_MAX) return IO_ERR_UNKNOWN_ID;
+    if (!analogSlots_) return IO_ERR_NOT_READY;
+
+    const uint8_t idx = (uint8_t)(id - IO_ID_AI_BASE);
+    if (idx >= MAX_ANALOG_ENDPOINTS) return IO_ERR_UNKNOWN_ID;
+
+    AnalogSlot& slot = analogSlots_[idx];
+    const bool wanted = (hold != 0U);
+    if (slot.holdWhenIdle == wanted) return IO_OK;
+    slot.holdWhenIdle = wanted;
+    if (!wanted && slot.held) {
+        slot.held = false;
+        publishAnalogSlotHeld_(slot, false);
+    }
+    return IO_OK;
+}
+
+IoStatus IOModule::ioSetCirculating_(uint8_t circulating, uint16_t settleSec)
+{
+    const bool on = (circulating != 0U);
+    const uint32_t nowMs = millis();
+
+    if (on == circulating_) return IO_OK;
+    circulating_ = on;
+
+    if (!on) {
+        holdSettleUntilMs_ = nowMs;
+        LOGI("Sensor hold armed (no circulation)");
+        return IO_OK;
+    }
+
+    // Front montant : la fenetre mediane est encore pleine d'eau immobile. La
+    // vider maintenant, puis attendre settleSec, evite de republier ce melange
+    // a la seconde ou le gel tombe.
+    if (analogSlots_) {
+        for (uint8_t i = 0; i < MAX_ANALOG_ENDPOINTS; ++i) {
+            AnalogSlot& slot = analogSlots_[i];
+            if (!slot.used || !slot.holdWhenIdle) continue;
+            slot.median.clear();
+            slot.lastSampleSeqValid = false;
+        }
+    }
+    holdSettleUntilMs_ = nowMs + ((uint32_t)settleSec * 1000UL);
+    LOGI("Sensor hold releasing in %us (circulation resumed)", (unsigned)settleSec);
+    return IO_OK;
 }
 
 bool IOModule::processAnalogDefinition_(uint8_t idx, uint32_t nowMs)
@@ -959,24 +1022,73 @@ bool IOModule::processAnalogDefinition_(uint8_t idx, uint32_t nowMs)
         }
     }
 
+    // Gel hors circulation. On continue d'acquerir (le filtre reste alimente,
+    // le driver reste sollicite) mais on republie la derniere valeur acquise
+    // pompe en marche : hors circulation la sonde ne voit que l'eau immobile du
+    // porte-sondes, qui derive sans rien dire du bassin.
+    //
+    // L'horodatage, lui, continue d'avancer : la mesure est volontairement
+    // figee, pas perimee. Le figer aussi ferait sonner chaque nuit les gardes
+    // de fraicheur metier (alarme sonde d'eau muette, repli de FiltrationWindow).
+    const bool holdWindow = analogHoldActive_(nowMs);
+    if (slot.holdWhenIdle && slot.heldValid && holdWindow) {
+        slot.endpoint->update(slot.heldValue, true, nowMs, true);
+        if (!slot.held) {
+            slot.held = true;
+            slot.heldSinceMs = nowMs;
+            publishAnalogSlotHeld_(slot, true);
+            // La valeur ne bougera plus : sans republication forcee, le
+            // marqueur n'atteindrait ni Home Assistant ni l'interface web.
+            publishAnalogSlotValue_(slot, slot.heldValue, nowMs);
+        }
+        return true;
+    }
+
+    const bool leavingHold = slot.held;
+    if (leavingHold) {
+        slot.held = false;
+        publishAnalogSlotHeld_(slot, false);
+    }
     slot.endpoint->update(rounded, true, nowMs);
+    // Ne devient reference que ce qui a ete acquis en circulation etablie. Sans
+    // cette garde, un boot pompe a l'arret figerait sur le premier echantillon
+    // d'eau immobile en le presentant comme la derniere mesure vraie.
+    if (!holdWindow) {
+        slot.heldValue = rounded;
+        slot.heldValid = true;
+    }
 
     if (!slot.lastRoundedValid || rounded != slot.lastRounded) {
         slot.lastRounded = rounded;
         slot.lastRoundedValid = true;
-        if (dataStore_) {
-            uint8_t rtIdx = 0;
-            if (endpointIndexFromId_(slot.id, rtIdx)) {
-                (void)setIoEndpointFloat(*dataStore_, rtIdx, rounded, nowMs);
-            }
-        }
+        publishAnalogSlotValue_(slot, rounded, nowMs);
         markIoCycleChanged_(slot.ioId);
         if (slot.onValueChanged) {
             slot.onValueChanged(slot.onValueCtx, rounded);
         }
+    } else if (leavingHold) {
+        // Sortie de gel sur une valeur inchangee : republier quand meme, sinon
+        // le marqueur "figee" resterait affiche jusqu'au prochain mouvement.
+        publishAnalogSlotValue_(slot, rounded, nowMs);
     }
 
     return true;
+}
+
+void IOModule::publishAnalogSlotValue_(const AnalogSlot& slot, float value, uint32_t nowMs)
+{
+    if (!dataStore_) return;
+    uint8_t rtIdx = 0;
+    if (!endpointIndexFromId_(slot.id, rtIdx)) return;
+    (void)setIoEndpointFloat(*dataStore_, rtIdx, value, nowMs);
+}
+
+void IOModule::publishAnalogSlotHeld_(const AnalogSlot& slot, bool held)
+{
+    if (!dataStore_) return;
+    uint8_t rtIdx = 0;
+    if (!endpointIndexFromId_(slot.id, rtIdx)) return;
+    (void)setIoEndpointHeld(*dataStore_, rtIdx, held);
 }
 
 bool IOModule::processDigitalInputDefinition_(uint8_t slotIdx, uint32_t nowMs)
@@ -1141,10 +1253,13 @@ void IOModule::forceAnalogSnapshotPublish_(uint8_t analogIdx, uint32_t nowMs)
     if (!slot.endpoint->read(v) || !v.valid || v.valueType != IO_EP_VALUE_FLOAT) return;
 
     float republished = ioRoundToPrecision(v.v.f, slot.cfg.precision);
-    slot.endpoint->update(republished, true, nowMs);
-    if (dataStore_) {
-        (void)setIoEndpointFloat(*dataStore_, analogIdx, republished, nowMs);
-    }
+    // `held` est reconduit : republier a cause d'un changement de precision ne
+    // remet pas une mesure figee en direct.
+    slot.endpoint->update(republished, true, nowMs, slot.held);
+    // L'index de registre n'est pas l'index de slot : un slot amont sans binding
+    // n'entre pas dans le registre et decale tous les suivants. Ecrire a
+    // `analogIdx` visait alors la case d'un autre endpoint.
+    publishAnalogSlotValue_(slot, republished, nowMs);
 }
 
 void IOModule::refreshAnalogConfigState_()
@@ -1416,6 +1531,7 @@ void IOModule::onConfigLoaded(ConfigStore& cfg, ServiceRegistry& services)
     // (donc apres fusion des valeurs NVS) et avant configureRuntime_ pour que les
     // endpoints soient crees ce boot.
     autoBindEnabledAnalogDrivers_();
+    logBindingPortConflicts_();
 #if defined(FLOW_PROFILE_WAVESHARE)
     // On Waveshare, TCA9554 is the only path to drive digital outputs (EXIO1-8);
     // it cannot be an optional, user-disableable driver like PCF8574/MCP23017.

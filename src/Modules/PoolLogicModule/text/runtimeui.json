@@ -237,6 +237,20 @@
       "order": 120,
       "label_t": "runtimeui.poollogic.v10.label",
       "group_t": "runtimeui.poollogic.ph.group"
+    },
+    {
+      "valueId": 16,
+      "key": "pool.sensor_hold",
+      "type": "bool",
+      "domain": "sondes",
+      "display": "boolean",
+      "displayConfig": {
+        "activeText_t": "runtimeui.poollogic.v16.display.activeText",
+        "inactiveText_t": "runtimeui.poollogic.v16.display.inactiveText"
+      },
+      "order": 30,
+      "label_t": "runtimeui.poollogic.v16.label",
+      "group_t": "runtimeui.poollogic.v16.group"
     }
   ]
 }

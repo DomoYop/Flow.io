@@ -26,6 +26,11 @@ enum IOEndpointCapability : uint8_t {
 struct IOEndpointValue {
     uint32_t timestampMs = 0;
     bool valid = false;
+    /**
+     * Valeur figee volontairement (eau immobile) plutot que fraichement
+     * acquise. Reste `valid` : c'est la derniere mesure vraie, pas une panne.
+     */
+    bool held = false;
     uint8_t valueType = IO_EP_VALUE_FLOAT;
     union {
         bool b;

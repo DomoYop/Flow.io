@@ -20,6 +20,23 @@ jobs:
           python-version: "3.11"
       - run: python scripts/validate_i18n.py --ratchet scripts/i18n_ratchet.json
 
+  io-port-sync:
+    # Verifie que les ports proposes par l'interface web (io_port_labels.py)
+    # existent bien dans kBindingPorts[] du firmware. Une divergence ne casse
+    # aucun build : l'UI offre simplement un binding que le firmware refuse au
+    # boot, sans erreur visible -- c'est exactement ce qui etait arrive avec les
+    # ports MCP23017 400-415. Stdlib seule, quelques secondes.
+    name: check io port sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Sans --profile, tous les profils de PROFILE_LAYOUTS sont verifies : un
+      # profil ajoute plus tard est couvert sans toucher a ce workflow.
+      - run: python scripts/check_io_port_sync.py
+
   secrets:
     # Scan de secrets sur l'historique pousse. L'allowlist est dans
     # .gitleaks.toml : un faux positif se corrige par une regex ciblee, pas en

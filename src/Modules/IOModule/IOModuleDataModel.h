@@ -18,6 +18,9 @@ enum IOValueType : uint8_t {
 
 struct IOEndpointRuntime {
     bool valid = false;
+    // Mesure figee faute de circulation (voir IOServiceV2::setAnalogHold) : la
+    // valeur est la derniere prise pompe en marche, pas la lecture courante.
+    bool held = false;
     uint8_t valueType = IO_VALUE_FLOAT;
     float floatValue = 0.0f;
     bool boolValue = false;
