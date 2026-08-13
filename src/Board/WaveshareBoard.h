@@ -55,7 +55,13 @@ inline constexpr uint32_t kWaveshareESP32S3InterlinkI2cHz = 400000U;
  *   Not stored in NVS. These are compile-time sizing limits, so the compiled
  *   values always apply.
  */
-inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{32, 8, 12, 32, 8, 12};
+// 24 = le pire cas exact des ports analogiques declares par ce profil :
+// 8 roles de layout (a00-a07) + 8 canaux POWERMON + SHT40 (2) + BMP280 (2)
+// + BME680 (4). Aucun capteur ne peut donc se voir refuser un slot, et l'arbre
+// de configuration n'expose plus de branches io/input/aNN qu'aucun port ne
+// pourra jamais alimenter. Relever cette valeur si un backend analogique est
+// ajoute a kBindingPorts[].
+inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{24, 8, 12, 24, 8, 12};
 
 /*
  * MQTT task and queue capacities.

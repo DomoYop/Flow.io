@@ -181,7 +181,7 @@ la cible de référence actuelle ; `FlowIO` est conservé pour comparaison.
 
 | Domaine | Waveshare | FlowIO | Implémentation |
 |---|---:|---:|---|
-| Entrées analogiques IO | 32 | 17 | `IOModule::MAX_ANALOG_ENDPOINTS` |
+| Entrées analogiques IO | 24 | 17 | `IOModule::MAX_ANALOG_ENDPOINTS` |
 | Entrées digitales IO | 8 | 5 | `IOModule::MAX_DIGITAL_INPUTS` |
 | Sorties digitales IO | 12 | 10 | `IOModule::MAX_DIGITAL_OUTPUTS` |
 | Équipements `PoolDevice` (plafond) | 16 | 16 | `POOL_DEVICE_MAX` |

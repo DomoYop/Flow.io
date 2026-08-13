@@ -42,10 +42,10 @@ Ces valeurs ne disent **rien** sur « quel capteur fait quoi ». Ce sont uniquem
 
 | Champ | Valeur | Rôle |
 |---|---:|---|
-| `analogEndpoints` | 32 | nb max d'entrées analogiques physiques |
+| `analogEndpoints` | 24 | nb max d'entrées analogiques physiques (= pire cas des ports déclarés : 8 rôles + 8 POWERMON + SHT40 + BMP280 + BME680) |
 | `digitalInputs` | 8 | nb max d'entrées TOR |
 | `digitalOutputs` | 16 | nb max de sorties TOR |
-| `analogConfigSlots` | 32 | nb max de *slots de config* analogiques (endpoints nommés/calibrés) |
+| `analogConfigSlots` | 24 | nb max de *slots de config* analogiques (endpoints nommés/calibrés) |
 | `digitalInputConfigSlots` | 8 | idem entrées TOR |
 | `digitalOutputConfigSlots` | 16 | idem sorties TOR |
 

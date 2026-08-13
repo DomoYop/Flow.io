@@ -51,7 +51,7 @@ Une inversion se corrige désormais de deux façons, toutes deux sans reflasher 
 
 `SensorWaterTemp` / `SensorAirTemp` deviennent `SensorTemperature1..4` sur `analogInputSlot(4..7)`, suffixes HA `io_temp1..4`. `DomainSlotCount` passe de 22 à 24 (valeur documentaire : elle n'est référencée nulle part et ne dimensionne aucun tableau).
 
-`kAnalogHaSlots` passe de 17 à `Limits::Io::MaxAnalogEndpoints` (32) : le plafond historique tronquait silencieusement les capteurs auto-provisionnés dès qu'on activait POWERMON + BME680 + SHT40.
+`kAnalogHaSlots` passe de 17 à `Limits::Io::MaxAnalogEndpoints` (32 à l'époque, 24 depuis le recadrage sur le pire cas réel) : le plafond historique tronquait silencieusement les capteurs auto-provisionnés dès qu'on activait POWERMON + BME680 + SHT40.
 
 ### Couche métier
 

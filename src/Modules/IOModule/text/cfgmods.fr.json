@@ -244,38 +244,6 @@
         "store": "io/input/a23"
       },
       {
-        "display": "io/input/analog/a24",
-        "store": "io/input/a24"
-      },
-      {
-        "display": "io/input/analog/a25",
-        "store": "io/input/a25"
-      },
-      {
-        "display": "io/input/analog/a26",
-        "store": "io/input/a26"
-      },
-      {
-        "display": "io/input/analog/a27",
-        "store": "io/input/a27"
-      },
-      {
-        "display": "io/input/analog/a28",
-        "store": "io/input/a28"
-      },
-      {
-        "display": "io/input/analog/a29",
-        "store": "io/input/a29"
-      },
-      {
-        "display": "io/input/analog/a30",
-        "store": "io/input/a30"
-      },
-      {
-        "display": "io/input/analog/a31",
-        "store": "io/input/a31"
-      },
-      {
         "display": "io/input/digital/i00",
         "store": "io/input/i00"
       },
@@ -342,15 +310,7 @@
           "a20",
           "a21",
           "a22",
-          "a23",
-          "a24",
-          "a25",
-          "a26",
-          "a27",
-          "a28",
-          "a29",
-          "a30",
-          "a31"
+          "a23"
         ]
       },
       {
@@ -778,38 +738,6 @@
         {
           "value": 215,
           "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.23.label"
-        },
-        {
-          "value": 216,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.24.label"
-        },
-        {
-          "value": 217,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.25.label"
-        },
-        {
-          "value": 218,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.26.label"
-        },
-        {
-          "value": 219,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.27.label"
-        },
-        {
-          "value": 220,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.28.label"
-        },
-        {
-          "value": 221,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.29.label"
-        },
-        {
-          "value": 222,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.30.label"
-        },
-        {
-          "value": 223,
-          "label_t": "cfgmods_meta.iomodule.enum_sets.flowio_logical_input_analog.31.label"
         }
       ],
       "flowio_logical_input_digital": [
