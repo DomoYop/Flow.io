@@ -920,10 +920,17 @@ Entités enregistrées par `PoolLogicModule`:
   - `dly_pid_min`
   - `ph_setpoint`
   - `dis_setpoint`
-  - `ph_pid_window_min` (conversion vers `ph_window_ms`)
   - `dis_pid_window_min` (conversion vers `dis_window_ms`)
   - `pressure_low_threshold`
   - `pressure_high_threshold`
+  - `pl_pool_vol` (`Pool Volume`) — lit et écrit `poollogic/bassin/pool_volume_m3`,
+    le volume partagé entre besoin de filtration et doses O2
+- pierres tombales (entités publiées avec un payload discovery vide pour que Home
+  Assistant les supprime, retirables après une release) :
+  - `pl_ph_window` — l'ex-`pH PID Window Size` pilotait `ph_window_ms`, clé
+    supprimée avec le PID pH
+  - `pl_o2_vol` — ancien object_id du volume bassin, hérité du temps où il vivait
+    dans la branche Oxygène actif
 - binary sensors (sur `rt/poollogic/flow`):
   - `pl_flow_copy_out`, `pl_cover_out`, `pl_no_flow`
   - `pl_sensor_hold` (`Readings Held (no flow)`) — dit pourquoi les courbes pH

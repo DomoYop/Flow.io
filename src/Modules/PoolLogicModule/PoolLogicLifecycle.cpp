@@ -898,21 +898,26 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:thermometer-alert",
             "C"
         };
-        const HANumberEntry phWindowMin{
+        // Pierre tombale : le PID pH a laisse place au dosage par lots, la cle
+        // ph_window_ms n'existe plus. L'entite pilotait donc une cle absente.
+        // Champs inutilises par une pierre tombale, mais addNumberEntry() les
+        // exige non nuls avant d'accepter l'entree. Supprimable apres une release.
+        const HANumberEntry retiredPhWindow{
             "poollogic",
             "pl_ph_window",
             "pH PID Window Size",
             "cfg/poollogic/ph",
-            "{{ ((value_json.ph_window_ms | float(0)) / 60000) | round(0) | int(0) }}",
+            "{{ 0 }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/ph\\\":{\\\"ph_window_ms\\\":{{ (value | float(0) * 60000) | round(0) | int(0) }}}}",
-            1.0f,
-            180.0f,
-            1.0f,
-            "slider",
+            "{}",
+            0.0f,
+            0.0f,
+            0.0f,
+            "box",
             "config",
-            "mdi:timeline-clock-outline",
-            "min"
+            nullptr,
+            nullptr,
+            true
         };
         const HANumberEntry orpWindowMin{
             "poollogic",
@@ -962,16 +967,18 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:gauge-full",
             "bar"
         };
-        // Volume du bassin : desormais publie dans la branche filtration.
-        // L'object_id reste pl_o2_vol pour ne pas renommer l'entite existante.
-        const HANumberEntry o2PoolVolume{
+        // Volume du bassin : parametre partage (besoin de filtration et doses O2),
+        // porte par la branche Bassin. L'entite pointait cfg/poollogic/filtration,
+        // ou la cle n'a jamais existe : elle affichait 0 et ses commandes etaient
+        // ignorees en silence (patch sur une branche sans pool_volume_m3).
+        const HANumberEntry poolVolume{
             "poollogic",
-            "pl_o2_vol",
+            "pl_pool_vol",
             "Pool Volume",
-            "cfg/poollogic/filtration",
+            "cfg/poollogic/bassin",
             "{{ value_json.pool_volume_m3 | float(0) }}",
             MqttTopics::SuffixCfgSet,
-            "{\\\"poollogic/filtration\\\":{\\\"pool_volume_m3\\\":{{ value | float(0) }}}}",
+            "{\\\"poollogic/bassin\\\":{\\\"pool_volume_m3\\\":{{ value | float(0) }}}}",
             1.0f,
             200.0f,
             0.1f,
@@ -979,6 +986,26 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "config",
             "mdi:pool",
             "m3"
+        };
+        // Pierre tombale de l'ancien object_id, dont le prefixe o2 datait du temps
+        // ou le volume vivait dans la branche Oxygene actif. Supprimable apres une
+        // release, comme retiredPhWindow.
+        const HANumberEntry retiredO2PoolVolume{
+            "poollogic",
+            "pl_o2_vol",
+            "Pool Volume",
+            "cfg/poollogic/bassin",
+            "{{ 0 }}",
+            MqttTopics::SuffixCfgSet,
+            "{}",
+            0.0f,
+            0.0f,
+            0.0f,
+            "box",
+            "config",
+            nullptr,
+            nullptr,
+            true
         };
         const HANumberEntry o2WeeklyDose{
             "poollogic",
@@ -1053,11 +1080,16 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addNumber(haSvc->ctx, &phSetpoint);
         (void)haSvc->addNumber(haSvc->ctx, &orpSetpoint);
         (void)haSvc->addNumber(haSvc->ctx, &chlorineGeneratorMinTemp);
-        (void)haSvc->addNumber(haSvc->ctx, &phWindowMin);
         (void)haSvc->addNumber(haSvc->ctx, &orpWindowMin);
         (void)haSvc->addNumber(haSvc->ctx, &pressureLowThreshold);
         (void)haSvc->addNumber(haSvc->ctx, &pressureHighThreshold);
-        (void)haSvc->addNumber(haSvc->ctx, &o2PoolVolume);
+        (void)haSvc->addNumber(haSvc->ctx, &poolVolume);
+        if (!haSvc->addNumber(haSvc->ctx, &retiredPhWindow)) {
+            LOGW("HA tombstone registration failed: pl_ph_window");
+        }
+        if (!haSvc->addNumber(haSvc->ctx, &retiredO2PoolVolume)) {
+            LOGW("HA tombstone registration failed: pl_o2_vol");
+        }
         const HANumberEntry flowCopyDelay{
             "poollogic",
             "pl_flow_copy_delay",
@@ -1437,7 +1469,7 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
         setAbs("pl_swg_dly_elec", notSwg);
         setAbs("pl_swg_min_temp", notSwg);
         // Oxygene actif (type 3).
-        // pl_o2_vol absent de cette liste : le volume du bassin est un parametre
+        // pl_pool_vol absent de cette liste : le volume du bassin est un parametre
         // general (filtration + doses O2), il reste expose dans tous les modes.
         static const char* const kO2Suffixes[] = {
             "pl_o2_temp_comp", "pl_o2_hour", "pl_o2_state", "pl_o2_done",
