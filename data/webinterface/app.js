@@ -5724,6 +5724,9 @@
     const ALARM_STATE_ACTIVE_UNACKED = 1;
     const ALARM_STATE_ACTIVE_ACKED = 2;
     const ALARM_STATE_CLEARED_UNACKED = 3;
+    // AlarmLifecycle::Unavailable : condition jamais evaluee, capteur absent, ou
+    // alarme sans objet dans la configuration courante.
+    const ALARM_STATE_UNAVAILABLE = 4;
 
     // Liste des alarmes avec leur etat, lue par la meme voie que toutes les autres
     // mesures : manifeste Runtime UI (libelles deja traduits) + /api/runtime/values.
@@ -6002,7 +6005,7 @@
     // - equipements: masquer ceux reellement absents (valeur indisponible).
     // - sondes: masquer les sondes non disponibles (driver desactive / absent);
     //   les sondes activees ET disponibles s'affichent en tuiles dynamiques.
-    // - mode: afficher tous les modes disponibles (Marche ET Arret); seuls les modes
+    // - mode: afficher tous les modes disponibles (actives ET desactives); seuls les modes
     //   dont le module associe est desactive (indisponibles cote firmware) sont masques.
     function poolMeasureEntryHiddenByFilter(entry, runtimeValue) {
       const domainKey = String(entry && entry.domain ? entry.domain : '').trim().toLowerCase();
@@ -6227,11 +6230,30 @@
       return node;
     }
 
+    // Une alarme dont la fonction n'existe pas dans la configuration courante
+    // (bidon et pompe de desinfectant quand la desinfection est desactivee ou en
+    // electrolyse) est publiee par le firmware en etat « indisponible ». Elle ne
+    // devient pas une tuile : afficher « Normal » pour un equipement absent
+    // laissait croire a une surveillance qui n'existe pas. Le compte du bandeau
+    // de synthese n'en tient pas compte : ce n'est pas une alarme en attente.
+    //
+    // L'autre source d'etat 4 est un role d'entree explicitement debinde (« Non
+    // connecte ») : une entree TOR bindee lit toujours un etat, meme sans capteur
+    // cable. Masquer reste donc juste -- c'est un capteur que l'utilisateur a
+    // declare absent, pas une surveillance perdue en silence.
+    function poolAlarmEntryHidden(runtimeValue) {
+      if (runtimeValueIsUnavailable(runtimeValue)) return true;
+      const rawState = Number(runtimeValue && runtimeValue.value);
+      return Number.isFinite(rawState) && Math.trunc(rawState) === ALARM_STATE_UNAVAILABLE;
+    }
+
     function buildPoolAlarmTilesGrid(entries, valueById) {
       const grid = document.createElement('div');
       grid.className = 'status-alarm-grid';
       (entries || []).forEach((entry) => {
-        grid.appendChild(buildPoolAlarmTile(entry, valueById.get(Number(entry.id))));
+        const runtimeValue = valueById.get(Number(entry.id));
+        if (poolAlarmEntryHidden(runtimeValue)) return;
+        grid.appendChild(buildPoolAlarmTile(entry, runtimeValue));
       });
       return grid;
     }
@@ -6273,17 +6295,13 @@
           'status-card status-card-runtime'
           + ' status-card-runtime-domain-' + runtimeMeasureCssSlug(group.domainKey)
           + ' status-card-runtime-group-' + runtimeMeasureCssSlug(group.groupKey);
-        const isPoolModeGroup =
-          String(group.domainKey || '').trim().toLowerCase() === 'mode' &&
-          String(group.groupKey || '').trim().localeCompare('Mode', 'fr', { sensitivity: 'base' }) === 0;
+        // Les textes d'etat des modes viennent du manifeste Runtime UI
+        // (runtimeui.poollogic.v01..v05.display.*, deja traduits). L'override en
+        // dur qui forcait "Marche / Arret" ici ecrasait ces tokens : toute
+        // correction de libelle cote firmware restait invisible dans le tableau
+        // de bord.
         const groupDisplayOptions = {
-          displayLabelResolver: (entry) => resolvePoolMeasureLabel(entry, outputPorts),
-          booleanTexts: isPoolModeGroup
-            ? {
-              activeText: 'Marche',
-              inactiveText: 'Arrêt'
-            }
-            : null
+          displayLabelResolver: (entry) => resolvePoolMeasureLabel(entry, outputPorts)
         };
 
         const heading = document.createElement('h3');

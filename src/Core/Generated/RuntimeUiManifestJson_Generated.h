@@ -518,8 +518,8 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "flags": null,
       "display": "boolean",
       "displayConfig": {
-        "activeText": "Actif",
-        "inactiveText": "Manuel"
+        "activeText": "Activ\u00e9",
+        "inactiveText": "D\u00e9sactiv\u00e9"
       }
     },
     {
@@ -540,8 +540,8 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "flags": null,
       "display": "boolean",
       "displayConfig": {
-        "activeText": "Actif",
-        "inactiveText": "Arret"
+        "activeText": "Activ\u00e9",
+        "inactiveText": "D\u00e9sactiv\u00e9"
       }
     },
     {
@@ -562,8 +562,8 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "flags": null,
       "display": "boolean",
       "displayConfig": {
-        "activeText": "Actif",
-        "inactiveText": "Arret"
+        "activeText": "Activ\u00e9",
+        "inactiveText": "D\u00e9sactiv\u00e9"
       }
     },
     {
@@ -584,8 +584,8 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "flags": null,
       "display": "boolean",
       "displayConfig": {
-        "activeText": "Actif",
-        "inactiveText": "Arret"
+        "activeText": "Activ\u00e9",
+        "inactiveText": "D\u00e9sactiv\u00e9"
       }
     },
     {
@@ -606,8 +606,8 @@ inline constexpr const char kRuntimeUiManifestJson[] = R"RUI(
       "flags": null,
       "display": "boolean",
       "displayConfig": {
-        "activeText": "Actif",
-        "inactiveText": "Arret"
+        "activeText": "Activ\u00e9",
+        "inactiveText": "D\u00e9sactiv\u00e9"
       }
     },
     {

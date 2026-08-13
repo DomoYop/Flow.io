@@ -810,6 +810,29 @@ AlarmCondState PoolLogicModule::condPhDoseNoEffectStatic_(void* ctx, uint32_t)
                                                                            : AlarmCondState::False;
 }
 
+/*
+ * Etat a renvoyer quand une alarme ne s'applique pas a la configuration courante
+ * (typiquement les alarmes de desinfection liquide en electrolyse ou desinfection
+ * desactivee).
+ *
+ * `Unknown` plutot que `False` : le moteur en fait un cycle de vie `Unavailable`,
+ * que le tableau de bord masque, au lieu d'afficher une tuile « Normal » pour une
+ * fonction qui n'existe pas. Les alarmes ne sont enregistrees qu'au demarrage et
+ * ne peuvent pas etre desenregistrees, alors que le type de desinfection change a
+ * chaud : c'est le seul levier disponible cote condition.
+ *
+ * Exception : si l'alarme est encore active, on renvoie `False` pour la faire
+ * retomber. `AlarmModule::reset_` exige `lastCond == False`, donc une alarme
+ * latchee figee sur `Unknown` ne serait plus jamais acquittable.
+ */
+AlarmCondState PoolLogicModule::condInapplicable_(AlarmId id) const
+{
+    if (alarmSvc_ && alarmSvc_->isActive && alarmSvc_->isActive(alarmSvc_->ctx, id)) {
+        return AlarmCondState::False;
+    }
+    return AlarmCondState::Unknown;
+}
+
 AlarmCondState PoolLogicModule::condChlorineTankLowStatic_(void* ctx, uint32_t)
 {
     PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
@@ -817,10 +840,10 @@ AlarmCondState PoolLogicModule::condChlorineTankLowStatic_(void* ctx, uint32_t)
 
     // Le bidon de desinfectant n'existe que pour les modes de dosage liquide
     // (chlore/brome, oxygene actif). En electrolyse ou desinfection desactivee,
-    // le capteur de niveau est libere : pas d'alarme.
+    // le capteur de niveau est libere : l'alarme est declaree indisponible.
     if (!self->isDisinfectionType_(DisinfectionChlorineBromine) &&
         !self->isDisinfectionType_(DisinfectionActiveOxygen)) {
-        return AlarmCondState::False;
+        return self->condInapplicable_(AlarmId::PoolChlorineTankLow);
     }
 
     bool low = false;
@@ -882,11 +905,11 @@ AlarmCondState PoolLogicModule::condChlorinePumpMaxUptimeStatic_(void* ctx, uint
     PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
     if (!self) return AlarmCondState::Unknown;
     // La pompe de desinfection n'est pilotee qu'en dosage liquide (chlore/brome,
-    // oxygene actif). En electrolyse ou desinfection desactivee, pas d'alarme
-    // uptime : le device est libere.
+    // oxygene actif). En electrolyse ou desinfection desactivee, le device est
+    // libere : l'alarme est declaree indisponible.
     if (!self->isDisinfectionType_(DisinfectionChlorineBromine) &&
         !self->isDisinfectionType_(DisinfectionActiveOxygen)) {
-        return AlarmCondState::False;
+        return self->condInapplicable_(AlarmId::PoolChlorinePumpMaxUptime);
     }
     return self->condPumpMaxUptime_(self->orpPumpDeviceSlot_);
 }

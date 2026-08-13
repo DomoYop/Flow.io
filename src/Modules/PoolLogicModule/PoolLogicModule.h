@@ -659,6 +659,8 @@ private:
     static AlarmCondState condPhPumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorinePumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     AlarmCondState condPumpMaxUptime_(uint8_t deviceSlot) const;
+    /** Etat d'une alarme sans objet dans la configuration courante (voir .cpp). */
+    AlarmCondState condInapplicable_(AlarmId id) const;
     bool readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const;
     bool writeDeviceDesired_(uint8_t deviceSlot,
                              bool on,
