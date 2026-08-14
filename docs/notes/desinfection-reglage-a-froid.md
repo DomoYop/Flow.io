@@ -1,6 +1,8 @@
 # Type de désinfection : le passer en réglage « à froid »
 
-**État : étude, aucune modification.** Profil `Waveshare-ESP32-S3`.
+**État : implémenté (option B), le 14/08/2026.** Profil `Waveshare-ESP32-S3`,
+appliqué aussi à `FlowIO`. Voir le §7 pour ce qui a été fait et les écarts par
+rapport à l'étude. Les §1 à §6 sont l'étude d'origine, conservée telle quelle.
 
 Question posée : `poollogic/bassin/disinfection_type` se règle aujourd'hui à chaud.
 Le mode de désinfection dépend du matériel installé, pas d'un usage quotidien —
@@ -209,13 +211,128 @@ La condition de réussite est le §4.2 : sans un signal visible « redémarrage
 requis », le froid transforme un réglage sans effet apparent en support
 téléphonique.
 
-## Vérification (après implémentation)
+## 7. Ce qui a été implémenté (14/08/2026)
+
+Option B complète, en commençant par le correctif §4.1. Build
+`Waveshare-ESP32-S3` vert (flash 47,6 %), gates `i18n`, `io-port-sync`,
+`firmware-size` et `cppcheck` rejoués localement sans alerte.
+
+### 7.1 Le mode vit désormais dans le domaine
+
+`PoolIds::Disinfection` ([PoolIds.h](../../src/Domain/Pool/PoolIds.h)) remplace
+l'enum privé de `PoolLogicModule`, qui n'en garde que des alias. Le bootstrap de
+profil en a besoin **avant** que le module existe : le laisser dans le module
+aurait demandé de rendre l'enum public sans que la couche soit la bonne.
+
+`disinfectionTypeInPreferences()` lit `pl_dtype` juste après `runMigrations`, sur
+le patron de `mqttEnabledInPreferences`. Une valeur hors enum retombe sur
+Désactivé. La valeur est passée à `configurePoolDevices()`, qui saute les
+équipements des deux modes non retenus, puis à
+`PoolLogicModule::setBootDisinfectionType()`.
+
+Fait sur **les deux** profils qui portent PoolLogic (`Waveshare` et `FlowIO`).
+L'étude ne visait que Waveshare, mais sans l'appel côté FlowIO le mode y serait
+resté silencieusement figé sur « Désactivé ».
+
+### 7.2 Deux valeurs, une seule fait foi
+
+`disinfectionType_` reste le miroir de la config (il suit la liste déroulante) ;
+`bootDisinfectionType_` est le mode en service. **`isDisinfectionType_()` consulte
+le second** : c'était le seul point d'entrée de la logique de contrôle, la bascule
+a donc tenu en une ligne. Les champs `dt`/`dts` des snapshots MQTT décrivent eux
+aussi le mode en service.
+
+Sont conditionnés par le mode figé, dans `init()` (donc avant tout chargement de
+config) :
+
+| | chlore | électrolyse | O2 |
+|---|---|---|---|
+| variables de config | `dis_auto_mode`, PID Redox (6) | `swg_control_mode`, `secure_elec_t`, `dly_electro_min` | les 10 `o2*` |
+| `dis_setpoint` | oui | oui (consigne partagée) | non |
+| entités HA | 1 switch, 1 number | 1 select, 2 numbers | 7 sensors, 1 switch, 1 select, 4 numbers |
+| alarmes | bidon + uptime pompe | — | bidon + uptime pompe |
+
+Le select `pl_modes_dis` (le choix lui-même) et les pierres tombales
+(`pl_ph_window`, `pl_o2_vol`) restent déclarés dans tous les cas.
+
+Supprimés, devenus sans objet : le handler à chaud de `DisinfectionType`
+(remplacé par une simple trace de l'écart), les `setEntityAbsent` par mode, et
+`condInapplicable_` avec les deux tests qui l'appelaient.
+`updateDisinfectionDeviceSlot_` devient `resolveDisinfectionDeviceSlot_`, appelée
+une fois.
+
+### 7.3 Le mode en service ne se publie pas, il se constate
+
+L'étude proposait une valeur Runtime UI booléenne. Elle n'était pas praticable
+telle quelle : sur Waveshare, `/api/runtime/values` ne lit que le DataStore et le
+ConfigStore, jamais `writeRuntimeUiValue`
+([runtime-ui-double-chemin-waveshare.md](runtime-ui-double-chemin-waveshare.md)).
+
+Première tentative, abandonnée : republier la valeur figée dans une variable de
+configuration `poollogic/bassin/dis_type_live`. Elle fonctionnait, mais mettait
+dans un arbre de **réglages** une valeur qui n'en est pas un — deux lignes
+voisines disant la même chose, dont une en lecture seule qu'il fallait masquer.
+Un `hidden: true` n'aurait fait que cacher le problème.
+
+Retenu : **le mode en service se déduit des équipements réellement définis.**
+`waveshareLivePoolDisinfectionType_` regarde lequel de `pd2` / `pd3` / `pd4` est
+présent dans le DataStore (`PoolDeviceRuntimeStateEntry::valid`, vrai pour les
+seuls slots définis) et publie `dis_live` dans
+`/api/flow/status/domain?d=pool`, que l'UI sait déjà consommer avec cache.
+
+C'est plus juste qu'une recopie : ce qui compte pour l'utilisateur n'est pas un
+`uint8_t` mais quel équipement existe. `pd0` (filtration, toujours défini) sert
+de témoin de disponibilité — sans lui, on ne saurait pas distinguer « PoolDevice
+n'a pas fini d'initialiser » de « désinfection désactivée », et le bandeau
+clignoterait au démarrage. Absence de `dis_live` = aucun bandeau.
+
+Le bandeau s'affiche dans le sélecteur de traitement de la page Piscine
+(`poolConfigFillRebootNotice`), rempli en différé comme les métriques runtime,
+avec un bouton qui appelle l'endpoint de redémarrage existant. L'écran TFT fait
+la même déduction depuis le DataStore.
+
+Les `visible_if` de `dis_io_id` / `dis_lvl_io_id` restent volontairement sur
+`disinfection_type`, c'est-à-dire sur le **choix** : ces deux réglages de sonde
+sont enregistrés dans tous les cas (les conditionner ferait perdre leur valeur
+en mode désactivé), et pouvoir préparer l'affectation des sondes avant de
+redémarrer est légitime.
+
+### 7.4 Deux défauts trouvés en chemin
+
+Le §4.1 décrivait `poollogic.dis_pump.write`. Il existait une **seconde** porte,
+plus dommageable : `pooldevice.write`
+([PoolDeviceCommands.cpp](../../src/Modules/PoolDeviceModule/PoolDeviceCommands.cpp)),
+atteinte depuis Home Assistant et MQTT, écrivait `disinfection_type = 3` — un
+démarrage manuel de la pompe à chlore basculait donc toute la piscine en oxygène
+actif. Les deux chemins visent désormais `dis_auto_mode`. Au passage, les
+lectures de `poollogic/ph/ph_pump_slot` et `poollogic/disinfection/dis_pump_slot`
+y étaient mortes depuis la refonte des fonctions piscine (clés supprimées) : le
+slot vient de la table de domaine, et la pompe de désinfection peut être celle du
+chlore ou celle de l'oxygène actif.
+
+Second défaut, dans `waveshareEnsurePoolMode_` : le commentaire
+« type == Disabled == 3 » datait d'avant le réordonnancement de l'enum. La tuile
+« désinfection auto » était donc masquée en **oxygène actif** et affichée en
+**désinfection désactivée**, exactement à l'envers. Le test disparaît : la seule
+présence de la clé `dis_auto_mode` répond désormais à la question.
+
+### 7.5 Pas d'effacement NVS
+
+`pl_dtype` est inchangée et aucune clé n'est ajoutée. Les clés des modes non
+retenus restent en NVS sans être lues : rebasculer sur un mode restaure ses
+réglages tels qu'ils étaient. Seule une restauration **après** effacement NVS ne
+ramènerait que le mode courant (§4.4), ce que dit maintenant l'aide du champ.
+
+## Vérification (à faire sur cible)
 
 - Compter les entités du device `poolbox` dans HA avant/après, en mode chlore :
   les 7 sensors O2 doivent avoir disparu, pas seulement être `unavailable`.
-- `poollogic.dis_pump.write` puis redémarrage : le mode de désinfection doit
-  être **inchangé**.
+- `poollogic.dis_pump.write` **et** `pooldevice.write` sur le slot pd2, puis
+  redémarrage : le mode de désinfection doit être **inchangé**, et seul
+  `dis_auto_mode` doit être retombé.
 - Bascule chlore → O2 : avant redémarrage, le comportement reste chlore et le
   bandeau s'affiche ; après, l'inverse.
 - Arbre de configuration : la branche `poollogic/disinfection` ne doit contenir
   que les champs du mode retenu.
+- Revenir au mode précédent et redémarrer : les réglages d'origine doivent être
+  retrouvés intacts (validation du §7.5).

@@ -1733,7 +1733,12 @@ bool TFTModuleS3::loadPoolModeFlags_(bool& autoMode,
     if (root.isNull()) return false;
     autoMode = root["auto_mode"] | false;
     winterMode = root["winter_mode"] | false;
-    swgAutoMode = ((root["disinfection_type"] | 0) == 1);
+    // Le type de desinfection ne s'applique qu'au redemarrage : l'ecran doit
+    // montrer ce que le firmware fait vraiment, donc la presence effective de la
+    // pompe de chlore liquide, et non le type choisi dans la configuration.
+    const DataStore* poolDs = dsSvc_ ? dsSvc_->store : nullptr;
+    PoolDeviceRuntimeStateEntry chlorinePump{};
+    swgAutoMode = poolDs && poolDeviceRuntimeState(*poolDs, PoolIds::DeviceChlorinePump, chlorinePump);
 
     memset(moduleJson, 0, sizeof(moduleJson));
     truncated = false;

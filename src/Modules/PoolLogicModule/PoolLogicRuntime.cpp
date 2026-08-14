@@ -333,8 +333,12 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
     if (idx == 3) {
         // Le sous-objet O2 n'est emis qu'en mode oxygene actif : hors O2 il serait
         // fige et inerte, donc du trafic MQTT inutile. Payload compact sinon.
+        //
+        // Les champs dt/dts decrivent le mode *en service*, celui fige au
+        // demarrage : un mode choisi mais pas encore applique n'a aucun effet sur
+        // ces snapshots. Le reglage lui-meme reste lisible sur cfg/poollogic/bassin.
         int wrote = 0;
-        if (disinfectionType_ == DisinfectionActiveOxygen) {
+        if (bootDisinfectionType_ == DisinfectionActiveOxygen) {
             wrote = snprintf(out,
                              len,
                              "{\"dt\":%u,\"dts\":\"%s\",\"swgm\":%u,\"swgms\":\"%s\","
@@ -342,8 +346,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
                              "\"last_day\":%u,\"done_ml\":%.1f,\"pending_ml\":%.1f,"
                              "\"plan_ml\":%.1f,\"flow_l_h\":%.2f},"
                              "\"t\":%lu}",
-                             (unsigned)disinfectionType_,
-                             disinfectionTypeStr_(disinfectionType_),
+                             (unsigned)bootDisinfectionType_,
+                             disinfectionTypeStr_(bootDisinfectionType_),
                              (unsigned)swgControlMode_,
                              swgControlModeStr_(swgControlMode_),
                              (unsigned)o2ProtocolState_,
@@ -360,8 +364,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             wrote = snprintf(out,
                              len,
                              "{\"dt\":%u,\"dts\":\"%s\",\"swgm\":%u,\"swgms\":\"%s\",\"t\":%lu}",
-                             (unsigned)disinfectionType_,
-                             disinfectionTypeStr_(disinfectionType_),
+                             (unsigned)bootDisinfectionType_,
+                             disinfectionTypeStr_(bootDisinfectionType_),
                              (unsigned)swgControlMode_,
                              swgControlModeStr_(swgControlMode_),
                              (unsigned long)nowMs);
@@ -484,8 +488,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
                 (double)phDosedTodayMl_,
                 (double)phTankRemainMl_,
                 (double)phPumpFlowLh_,
-                (unsigned)disinfectionType_,
-                disinfectionTypeStr_(disinfectionType_),
+                (unsigned)bootDisinfectionType_,
+                disinfectionTypeStr_(bootDisinfectionType_),
                 (unsigned long)nowMs
             );
         } else {
@@ -510,8 +514,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
                 (double)phDosedTodayMl_,
                 (double)phTankRemainMl_,
                 (double)phPumpFlowLh_,
-                (unsigned)disinfectionType_,
-                disinfectionTypeStr_(disinfectionType_),
+                (unsigned)bootDisinfectionType_,
+                disinfectionTypeStr_(bootDisinfectionType_),
                 (unsigned long)nowMs
             );
         }
@@ -560,8 +564,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             (unsigned long)st.outputOnMs,
             (unsigned long)elapsedMs,
             (unsigned long)st.sampleTsMs,
-            (unsigned)disinfectionType_,
-            disinfectionTypeStr_(disinfectionType_),
+            (unsigned)bootDisinfectionType_,
+            disinfectionTypeStr_(bootDisinfectionType_),
             (unsigned)swgControlMode_,
             swgControlModeStr_(swgControlMode_),
             (unsigned long)nowMs
@@ -587,8 +591,8 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             (long)disMinOnMs_,
             (unsigned long)st.outputOnMs,
             (unsigned long)elapsedMs,
-            (unsigned)disinfectionType_,
-            disinfectionTypeStr_(disinfectionType_),
+            (unsigned)bootDisinfectionType_,
+            disinfectionTypeStr_(bootDisinfectionType_),
             (unsigned)swgControlMode_,
             swgControlModeStr_(swgControlMode_),
             (unsigned long)nowMs

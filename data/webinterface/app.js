@@ -7523,6 +7523,65 @@
       poolConfigRenderModeBadges(modules);
     }
 
+    // Le type de désinfection est un réglage appliqué au démarrage : il décide
+    // des équipements créés, des réglages enregistrés et des entités déclarées,
+    // choses qui ne se refont pas à chaud. Sans ce bandeau, rien ne distinguerait
+    // « il ne s'est rien passé » de « ça s'appliquera au redémarrage ».
+    //
+    // `dis_live` vient du statut piscine et vaut ce que le firmware constate :
+    // lequel des trois équipements de désinfection existe réellement. Absent tant
+    // que PoolDevice n'est pas prêt — on s'abstient alors, plutôt que d'annoncer
+    // un écart qui n'existe pas.
+    async function poolConfigFillRebootNotice(selectorEl, selectedType) {
+      if (!selectorEl || !Number.isFinite(selectedType)) return;
+      const status = await fetchFlowStatusDomain('pool', false, 'pool-config');
+      const live = status && status.pool ? status.pool.dis_live : undefined;
+      if (live === undefined || live === null) return;
+      const liveType = Number(live);
+      if (!Number.isFinite(liveType) || liveType === selectedType) return;
+      if (!selectorEl.isConnected) return;
+      selectorEl.appendChild(poolConfigCreateRebootNotice(selectedType, liveType));
+    }
+
+    function poolConfigCreateRebootNotice(selectedType, liveType) {
+      const notice = document.createElement('div');
+      notice.className = 'pool-treatment-reboot';
+      const icon = document.createElement('span');
+      icon.className = 'ui-msr pool-treatment-reboot-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'restart_alt';
+      const copy = document.createElement('div');
+      copy.className = 'pool-treatment-reboot-copy';
+      const title = document.createElement('strong');
+      title.textContent = tr('pool.treatment.reboot.title', 'Redémarrage requis');
+      const detail = document.createElement('p');
+      detail.textContent = tr(
+        'pool.treatment.reboot.detail',
+        'Le traitement « {selected} » est enregistré, mais l’appareil fonctionne toujours en « {live} ». Le changement ne prend effet qu’au démarrage.'
+      )
+        .replace('{selected}', poolConfigDisinfectionLabel(selectedType))
+        .replace('{live}', poolConfigDisinfectionLabel(liveType));
+      copy.appendChild(title);
+      copy.appendChild(detail);
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'btn-primary pool-treatment-reboot-btn';
+      action.textContent = tr('pool.treatment.reboot.action', 'Redémarrer');
+      bindClickAction(action, async () => {
+        if (!confirm(tr('pool.treatment.reboot.confirm', 'Confirmer le redémarrage pour appliquer le traitement choisi ?'))) return;
+        action.disabled = true;
+        try {
+          await callSystemAction('flow', 'reboot');
+        } finally {
+          action.disabled = false;
+        }
+      });
+      notice.appendChild(icon);
+      notice.appendChild(copy);
+      notice.appendChild(action);
+      return notice;
+    }
+
     function poolConfigRenderDisinfection(modules) {
       if (!poolDisinfectionModes) return;
       poolDisinfectionModes.innerHTML = '';
@@ -7567,6 +7626,9 @@
         choiceGroup.appendChild(choice);
       });
       selector.appendChild(choiceGroup);
+      // Rempli en différé, comme les métriques runtime : le mode réellement en
+      // service vient du statut piscine, pas de la branche de configuration.
+      poolConfigFillRebootNotice(selector, selectedType).catch(() => {});
 
       const detail = document.createElement('article');
       detail.className = 'pool-treatment-detail is-' + selectedDef.accent;
@@ -10755,6 +10817,7 @@
       const controlsPrimaryPane = !!opts.controlsPrimaryPane;
       const onApplyField = typeof opts.onApplyField === 'function' ? opts.onApplyField : null;
       const sectionTitle = String(opts.sectionTitle || '').trim();
+      const inhibited = !!opts.inhibited;
       let modeFieldInputEl = null;
       const visibilityEntries = [];
       if (controlsPrimaryPane) {
@@ -10934,7 +10997,22 @@
           modeFieldInputEl = inputEl;
         }
 
-        if (perFieldApply && inputEl) {
+        if (inhibited && inputEl) {
+          const reason = String(opts.inhibitedReason || '').trim()
+            || tr('config.inhibited.generic',
+                  'Fonction inhibée : cet équipement n’est pas déclaré au démarrage.');
+          inputEl.disabled = true;
+          inputEl.dataset.runtimeHidden = '1';
+          row.classList.add('control-row-inhibited');
+          const lock = document.createElement('span');
+          lock.className = 'control-inhibited-lock';
+          lock.setAttribute('role', 'img');
+          lock.title = reason;
+          lock.setAttribute('aria-label', reason);
+          valueWrap.insertBefore(lock, valueWrap.firstChild);
+        }
+
+        if (perFieldApply && inputEl && !inhibited) {
           const applyBtn = document.createElement('button');
           applyBtn.type = 'button';
           applyBtn.className = 'control-field-apply';
@@ -10953,7 +11031,7 @@
           inputEl.addEventListener('change', syncApplyState);
           updateControlFieldApplyState(inputEl, applyBtn);
           valueWrap.appendChild(applyBtn);
-        } else if (controlsPrimaryPane && inputEl) {
+        } else if (controlsPrimaryPane && inputEl && !inhibited) {
           const syncPrimaryState = () => {
             validateConfigFieldValue(inputEl, { silent: true });
             updatePrimaryCfgApplyState();
@@ -10965,7 +11043,10 @@
 
         row.appendChild(valueWrap);
         containerEl.appendChild(row);
-        visibilityEntries.push({ row, inputEl, key, doc });
+        // Un champ inhibe reste hors des passes de visibilite : elles reecrivent
+        // runtimeHidden et disabled, et rendraient l'interrupteur actionnable
+        // alors que sa branche n'existe pas cote firmware.
+        if (!inhibited) visibilityEntries.push({ row, inputEl, key, doc });
       }
 
       if (isDigitalInputConfigModule(moduleName) && visibilityEntries.length > 0) {
@@ -11195,6 +11276,61 @@
       return buildPatchJsonFromFields(flowCfgFields, flowCfgCurrentModule);
     }
 
+    // Les trois modes de desinfection s'excluent : celui qui est fige au
+    // demarrage decide lequel des PoolDevices pd2/pd3/pd4 est defini, les deux
+    // autres n'existant alors pas du tout (docs/notes/desinfection-reglage-a-froid.md).
+    // Leur branche pdm/pdN ne repond rien et la section "Activation" de leur page
+    // disparaissait sans laisser de trace, ce qui donne une page de reglages
+    // presque vide sans explication.
+    const cfgDisinfectionPageTypes = Object.freeze({
+      'piscine/desinfection-chlore': 1,
+      'piscine/desinfection-electrolyseur': 2,
+      'piscine/desinfection-o2': 3
+    });
+
+    function cfgDisinfectionPageType(moduleName) {
+      const key = nettoyerNomFlowCfg(moduleName);
+      return Object.prototype.hasOwnProperty.call(cfgDisinfectionPageTypes, key)
+        ? cfgDisinfectionPageTypes[key]
+        : NaN;
+    }
+
+    async function cfgLiveDisinfectionType() {
+      // Le mode en service se constate, il ne se republie pas : dis_live dit
+      // quel equipement de desinfection existe reellement dans le DataStore.
+      try {
+        const status = await fetchFlowStatusDomain('pool', false, 'pool-config');
+        const live = (status && status.pool) ? Number(status.pool.dis_live) : NaN;
+        return Number.isFinite(live) ? live : NaN;
+      } catch (err) {
+        return NaN;
+      }
+    }
+
+    // Interrupteur d'activation d'un equipement non declare : on rend la meme
+    // ligne, fermee et verrouillee. Le champ porte runtimeHidden, donc il est
+    // exclu du patch (buildPatchJsonFromFields) et du calcul "modifie" -- il ne
+    // peut pas ecrire dans une branche que le firmware n'a pas creee.
+    async function cfgInhibitedActivationSection(pageModule, entryModule, fields, rawEntry) {
+      if (!Number.isFinite(cfgDisinfectionPageType(pageModule))) return null;
+      if (fields.length !== 1 || String(fields[0] || '').trim() !== 'enabled') return null;
+      const liveType = await cfgLiveDisinfectionType();
+      const reason = Number.isFinite(liveType)
+        ? tr('config.inhibited.byDisinfection',
+             'Fonction inhibée : le traitement en service est « {live} ». Choisissez ce mode, puis redémarrez.')
+            .replace('{live}', poolConfigDisinfectionLabel(liveType))
+        : tr('config.inhibited.generic',
+             'Fonction inhibée : cet équipement n’est pas déclaré au démarrage.');
+      const localized = cfgDocApplyLocalizedText(rawEntry);
+      return {
+        module: entryModule,
+        data: { enabled: false },
+        title: (localized && typeof localized.label === 'string') ? localized.label : '',
+        inhibited: true,
+        inhibitedReason: reason
+      };
+    }
+
     // Sections composees : la meta cfgmods "compose" d'une branche declare des
     // champs d'autres branches store a afficher sur sa page (ex: le switch
     // pdm/pdN/enabled dans poollogic/heater). L'apply standard groupe deja le
@@ -11244,15 +11380,20 @@
           } catch (err) {}
           moduleDataCache.set(entryModule, data);
         }
-        if (!data) continue;
         const filtered = {};
-        fields.forEach((field) => {
-          const key = String(field || '').trim();
-          if (key && Object.prototype.hasOwnProperty.call(data, key)) {
-            filtered[key] = data[key];
-          }
-        });
-        if (Object.keys(filtered).length === 0) continue;
+        if (data) {
+          fields.forEach((field) => {
+            const key = String(field || '').trim();
+            if (key && Object.prototype.hasOwnProperty.call(data, key)) {
+              filtered[key] = data[key];
+            }
+          });
+        }
+        if (Object.keys(filtered).length === 0) {
+          const inhibited = await cfgInhibitedActivationSection(moduleName, entryModule, fields, rawEntry);
+          if (inhibited) sections.push(inhibited);
+          continue;
+        }
         const localized = cfgDocApplyLocalizedText(rawEntry);
         let title = (localized && typeof localized.label === 'string') ? localized.label : '';
         if (!title) {
@@ -11278,7 +11419,9 @@
           sectionTitle: section.title,
           controlsPrimaryPane: true,
           perFieldApply: perFieldApply,
-          onApplyField: onApplyField
+          onApplyField: onApplyField,
+          inhibited: !!section.inhibited,
+          inhibitedReason: section.inhibitedReason
         });
       });
     }

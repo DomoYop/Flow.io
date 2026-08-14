@@ -3,7 +3,7 @@
   "translations": {
     "cfgdocs.poollogic.bassin.auto_mode.help": "Enables global automatic control of the pool.",
     "cfgdocs.poollogic.bassin.auto_mode.label": "Auto mode global",
-    "cfgdocs.poollogic.bassin.disinfection_type.help": "Selects the main disinfection strategy.",
+    "cfgdocs.poollogic.bassin.disinfection_type.help": "Selects the main disinfection strategy. The change is applied on the next start-up: it decides which equipment is created, which settings are available and which entities are published. A configuration backup only contains the settings of the current mode.",
     "cfgdocs.poollogic.bassin.disinfection_type.label": "Disinfection type",
     "cfgdocs.poollogic.bassin.dly_pid_min.help": "Delay before the PID controllers start once filtration has begun.",
     "cfgdocs.poollogic.bassin.dly_pid_min.label": "PID delay after filtration start (min)",

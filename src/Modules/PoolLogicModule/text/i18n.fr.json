@@ -2,7 +2,7 @@
   "translations": {
     "cfgdocs.poollogic.bassin.auto_mode.help": "Active le pilotage automatique global de la piscine.",
     "cfgdocs.poollogic.bassin.auto_mode.label": "Mode auto global",
-    "cfgdocs.poollogic.bassin.disinfection_type.help": "Choisit la stratégie de désinfection principale.",
+    "cfgdocs.poollogic.bassin.disinfection_type.help": "Choisit la stratégie de désinfection principale. Le changement est pris en compte au prochain démarrage : c'est lui qui décide des équipements créés, des réglages disponibles et des entités publiées. Une sauvegarde de configuration ne contient que les réglages du mode en cours.",
     "cfgdocs.poollogic.bassin.disinfection_type.label": "Type de désinfection",
     "cfgdocs.poollogic.bassin.dly_pid_min.help": "Délai avant activation des PID après début filtration.",
     "cfgdocs.poollogic.bassin.dly_pid_min.label": "Délai PID après filtration (min)",

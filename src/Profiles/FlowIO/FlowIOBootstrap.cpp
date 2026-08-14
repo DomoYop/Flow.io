@@ -158,12 +158,41 @@ uint16_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset
     return (uint16_t)(1u << dependency->id);
 }
 
-void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
+/**
+ * Mode de traitement de l'eau, lu a froid avant le ModuleManager : il decide
+ * quels equipements de desinfection existent. Voir la note
+ * docs/notes/desinfection-reglage-a-froid.md (meme mecanique que sur Waveshare).
+ */
+uint8_t disinfectionTypeInPreferences(Preferences& prefs)
+{
+    const uint8_t type = prefs.getUChar(NvsKeys::PoolLogic::DisinfectionType,
+                                        (uint8_t)PoolIds::DisinfectionDisabled);
+    return (type > (uint8_t)PoolIds::DisinfectionActiveOxygen)
+               ? (uint8_t)PoolIds::DisinfectionDisabled
+               : type;
+}
+
+bool poolDeviceServesDisinfectionType(PoolDeviceId id, uint8_t disinfectionType)
+{
+    switch (id) {
+        case PoolIds::DeviceChlorinePump:
+            return disinfectionType == (uint8_t)PoolIds::DisinfectionChlorineBromine;
+        case PoolIds::DeviceChlorineGenerator:
+            return disinfectionType == (uint8_t)PoolIds::DisinfectionSwg;
+        case PoolIds::DeviceO2Pump:
+            return disinfectionType == (uint8_t)PoolIds::DisinfectionActiveOxygen;
+        default:
+            return true;
+    }
+}
+
+void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules, uint8_t disinfectionType)
 {
     for (uint8_t i = 0; i < ctx.domain->poolDeviceCount; ++i) {
         // Voir le static_assert de PoolDomain.h : la correspondance role ->
         // sortie logique est validee a la compilation.
         const PoolDevicePreset& preset = ctx.domain->poolDevices[i];
+        if (!poolDeviceServesDisinfectionType(preset.id, disinfectionType)) continue;
         const IoSlotId ioSlot = domainIoSlotForRole(*ctx.domain, preset.commandSlot);
 
         PoolDeviceDefinition def{};
@@ -212,10 +241,13 @@ void setupProfile(AppContext& ctx)
     ctx.registry.setPreferences(ctx.preferences);
     ctx.registry.runMigrations(CURRENT_CFG_VERSION, steps, MIGRATION_COUNT);
 
+    const uint8_t disinfectionType = disinfectionTypeInPreferences(ctx.preferences);
+
     registerModules(ctx, modules);
     modules.hmiModule.setRemoteUdpServer(&modules.hmiUdpServerModule);
     configureIoModule(ctx, modules);
-    configurePoolDevices(ctx, modules);
+    configurePoolDevices(ctx, modules, disinfectionType);
+    modules.poolLogicModule.setBootDisinfectionType(disinfectionType);
     modules.poolLogicModule.applyDomainDefaults(*ctx.domain);
 
     // Keep PoolLogic runtime snapshots first so HA-critical state (including

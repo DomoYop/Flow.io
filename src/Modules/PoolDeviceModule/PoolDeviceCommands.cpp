@@ -60,8 +60,7 @@ void writeCmdErrorSlot_(char* reply, size_t replyLen, const char* where, ErrorCo
 bool readConfigBool_(ConfigStore* cfgStore, const char* moduleName, const char* key, bool& out)
 {
     if (!cfgStore || !moduleName || !key) return false;
-    // 384 : les branches metier poollogic (ph, chlorine) depassent 192 octets
-    // depuis qu'elles portent aussi leur slot role->PDM.
+    // 384 : les branches metier poollogic (ph, disinfection) depassent 192 octets.
     char json[384]{};
     bool truncated = false;
     if (!cfgStore->toJsonModule(moduleName, json, sizeof(json), &truncated) || truncated) return false;
@@ -72,22 +71,6 @@ bool readConfigBool_(ConfigStore* cfgStore, const char* moduleName, const char* 
     JsonVariantConst value = doc.as<JsonObjectConst>()[key];
     if (!value.is<bool>()) return false;
     out = value.as<bool>();
-    return true;
-}
-
-bool readConfigUInt8_(ConfigStore* cfgStore, const char* moduleName, const char* key, uint8_t& out)
-{
-    if (!cfgStore || !moduleName || !key) return false;
-    char json[384]{};
-    bool truncated = false;
-    if (!cfgStore->toJsonModule(moduleName, json, sizeof(json), &truncated) || truncated) return false;
-
-    StaticJsonDocument<384> doc;
-    const DeserializationError err = deserializeJson(doc, json);
-    if (err || !doc.is<JsonObjectConst>()) return false;
-    JsonVariantConst value = doc.as<JsonObjectConst>()[key];
-    if (!value.is<uint8_t>()) return false;
-    out = value.as<uint8_t>();
     return true;
 }
 } // namespace
@@ -266,68 +249,48 @@ bool PoolDeviceModule::handlePoolWrite_(const CommandRequest& req, char* reply, 
     // if a dosing pump is manually forced ON, disable the corresponding auto mode
     // regardless of the command source (HMI, MQTT, Web, ...).
     if (requested && cfgStore_) {
-        uint8_t phPumpSlot = PoolIds::DevicePhPump;
-        uint8_t orpPumpSlot = PoolIds::DeviceChlorinePump;
-
-        // Slots role->PDM lus depuis leur branche metier respective.
-        uint8_t slotVal = 0;
-        if (readConfigUInt8_(cfgStore_, "poollogic/ph", "ph_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
-            phPumpSlot = slotVal;
-        }
-        if (readConfigUInt8_(cfgStore_, "poollogic/disinfection", "dis_pump_slot", slotVal) && slotVal < POOL_DEVICE_MAX) {
-            orpPumpSlot = slotVal;
-        }
-
+        // Le slot d'une pompe doseuse est fige par la table de domaine
+        // (invariant pdN <-> dNN) : les cles poollogic/*_pump_slot ont disparu
+        // avec la refonte des fonctions piscine, les relire ne rendait plus que
+        // false. La pompe de desinfection est celle du chlore liquide ou celle
+        // de l'oxygene actif, selon le mode retenu.
         const char* modeKey = nullptr;
-        if (slot == phPumpSlot) modeKey = "ph_auto_mode";
-        else if (slot == orpPumpSlot) modeKey = "disinfection_type";
+        const char* modeBranch = nullptr;
+        ActivityRole disabledRole = ActivityRole::None;
+        const char* disabledLabel = nullptr;
+        if (slot == (uint8_t)PoolIds::DevicePhPump) {
+            modeKey = "ph_auto_mode";
+            modeBranch = "poollogic/ph";
+            disabledRole = ActivityRole::Ph;
+            disabledLabel = "pH";
+        } else if (slot == (uint8_t)PoolIds::DeviceChlorinePump ||
+                   slot == (uint8_t)PoolIds::DeviceO2Pump) {
+            modeKey = "dis_auto_mode";
+            modeBranch = "poollogic/disinfection";
+            disabledRole = ActivityRole::Disinfection;
+            disabledLabel = "ORP";
+        }
 
         if (modeKey) {
-            bool shouldLogAutoDisabled = false;
-            ActivityRole disabledRole = ActivityRole::None;
-            const char* disabledLabel = nullptr;
+            // Un demarrage manuel suspend l'automatisme, jamais la configuration
+            // materielle. La regle valait deja pour le pH ; cote desinfection le
+            // code ecrivait disinfection_type=3, ce qui basculait toute la
+            // piscine en oxygene actif au lieu d'arreter le dosage -- et, ce type
+            // etant desormais lu a froid, aurait redefini les equipements au
+            // redemarrage suivant.
+            bool autoMode = false;
+            const bool shouldLogAutoDisabled =
+                !readConfigBool_(cfgStore_, modeBranch, modeKey, autoMode) || autoMode;
             char patch[96]{};
-            if (strcmp(modeKey, "disinfection_type") == 0) {
-                uint8_t disinfectionType = 0;
-                shouldLogAutoDisabled = !readConfigUInt8_(cfgStore_,
-                                                           "poollogic/bassin",
-                                                           "disinfection_type",
-                                                           disinfectionType) ||
-                                        disinfectionType != 3U;
-                disabledRole = ActivityRole::Disinfection;
-                disabledLabel = "ORP";
-                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"disinfection_type\":3}}");
-            } else if (strcmp(modeKey, "ph_auto_mode") == 0) {
-                bool phAutoMode = false;
-                shouldLogAutoDisabled = !readConfigBool_(cfgStore_,
-                                                         "poollogic/ph",
-                                                         "ph_auto_mode",
-                                                         phAutoMode) ||
-                                        phAutoMode;
-                disabledRole = ActivityRole::Ph;
-                disabledLabel = "pH";
-                snprintf(patch, sizeof(patch), "{\"poollogic/ph\":{\"ph_auto_mode\":false}}");
-            } else {
-                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"%s\":false}}", modeKey);
-            }
+            snprintf(patch, sizeof(patch), "{\"%s\":{\"%s\":false}}", modeBranch, modeKey);
             if (!cfgStore_->applyJson(patch)) {
                 LOGW("Manual pump start slot=%u failed to clear %s",
                      (unsigned)slot,
                      modeKey);
             } else {
-                if (strcmp(modeKey, "disinfection_type") == 0) {
-                    const PoolDeviceSvcStatus rest = svcWriteDesiredImpl_(slot, 1U);
-                    if (rest != POOLDEV_SVC_OK) {
-                        writeCmdErrorSlot_(reply, replyLen, "pooldevice.write", ErrorCode::Failed, slot);
-                        return false;
-                    }
-                    LOGI("Manual pump start slot=%u -> disinfection_type=3",
-                         (unsigned)slot);
-                } else {
-                    LOGI("Manual pump start slot=%u -> %s=false",
-                         (unsigned)slot,
-                         modeKey);
-                }
+                LOGI("Manual pump start slot=%u -> %s=false",
+                     (unsigned)slot,
+                     modeKey);
                 if (shouldLogAutoDisabled) {
                     emitAutoModeDisabledByManualActivity_(disabledRole, slot, disabledLabel);
                 }

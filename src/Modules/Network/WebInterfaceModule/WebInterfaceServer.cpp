@@ -1713,8 +1713,7 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
                                 bool& phAutoMode,
                                 bool& orpAutoMode,
                                 bool& phAvailable,
-                                bool& orpAvailable,
-                                uint8_t* disinfectionTypeOut = nullptr)
+                                bool& orpAvailable)
 {
     hasMode = false;
     autoMode = false;
@@ -1723,7 +1722,6 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
     orpAutoMode = false;
     phAvailable = false;
     orpAvailable = false;
-    if (disinfectionTypeOut) *disinfectionTypeOut = 0U;
     if (!cfgStore) return false;
 
     // Les branches sont serialisees en entier pour un seul booleen : le buffer doit
@@ -1746,7 +1744,6 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
     hasMode = true;
     autoMode = root["auto_mode"] | false;
     winterMode = root["winter_mode"] | false;
-    if (disinfectionTypeOut) *disinfectionTypeOut = root["disinfection_type"] | 0U;
 
     // Le meme buffer et le meme document servent aux lectures suivantes : elles
     // sont sequentielles, et trois documents distincts pesaient sur la pile de la
@@ -1770,6 +1767,38 @@ bool waveshareLoadPoolModeFlags_(ConfigStore* cfgStore,
 
     phAvailable = readBranchFlag("poollogic/ph", "ph_auto_mode", phAutoMode);
     orpAvailable = readBranchFlag("poollogic/disinfection", "dis_auto_mode", orpAutoMode);
+    return true;
+}
+
+/**
+ * Mode de desinfection reellement en service.
+ *
+ * Il ne se lit nulle part : il se constate. Le type choisi est un reglage
+ * applique au demarrage (docs/notes/desinfection-reglage-a-froid.md), et sa
+ * consequence concrete est qu'un seul des trois equipements de desinfection est
+ * defini. Regarder lequel existe est donc plus fiable que republier la valeur
+ * figee dans une variable de configuration, qui polluerait l'arbre des reglages
+ * avec quelque chose qui n'en est pas un.
+ *
+ * pd0 (filtration) est toujours defini : son absence signifie que PoolDevice n'a
+ * pas fini d'initialiser son runtime, pas que la desinfection est desactivee.
+ * On repond alors false, et l'interface s'abstient plutot que de clignoter.
+ */
+bool waveshareLivePoolDisinfectionType_(DataStore* dataStore, uint8_t& typeOut)
+{
+    typeOut = (uint8_t)PoolIds::DisinfectionDisabled;
+    if (!dataStore) return false;
+
+    PoolDeviceRuntimeStateEntry state{};
+    if (!poolDeviceRuntimeState(*dataStore, PoolIds::DeviceFiltrationPump, state)) return false;
+
+    if (poolDeviceRuntimeState(*dataStore, PoolIds::DeviceChlorinePump, state)) {
+        typeOut = (uint8_t)PoolIds::DisinfectionChlorineBromine;
+    } else if (poolDeviceRuntimeState(*dataStore, PoolIds::DeviceChlorineGenerator, state)) {
+        typeOut = (uint8_t)PoolIds::DisinfectionSwg;
+    } else if (poolDeviceRuntimeState(*dataStore, PoolIds::DeviceO2Pump, state)) {
+        typeOut = (uint8_t)PoolIds::DisinfectionActiveOxygen;
+    }
     return true;
 }
 
@@ -1842,7 +1871,6 @@ void waveshareEnsurePoolMode_(WaveshareRuntimeContext& ctx, ConfigStore* cfgStor
 {
     if (ctx.poolModeLoaded) return;
     ctx.poolModeLoaded = true;
-    uint8_t disinfectionType = 0U;
     ctx.poolModeAvailable = waveshareLoadPoolModeFlags_(cfgStore,
                                                        ctx.poolModeAvailable,
                                                        ctx.poolAutoMode,
@@ -1850,10 +1878,14 @@ void waveshareEnsurePoolMode_(WaveshareRuntimeContext& ctx, ConfigStore* cfgStor
                                                        ctx.poolPhAutoMode,
                                                        ctx.poolOrpAutoMode,
                                                        ctx.poolPhAvailable,
-                                                       ctx.poolOrpAvailable,
-                                                       &disinfectionType);
-    // Desinfection auto masquee quand la desinfection est desactivee (type == Disabled == 3).
-    ctx.poolDisAvailable = ctx.poolModeAvailable && ctx.poolOrpAvailable && disinfectionType != 3U;
+                                                       ctx.poolOrpAvailable);
+    // La cle dis_auto_mode n'existe que si le mode en service est le dosage de
+    // chlore liquide : sa presence est donc la reponse exacte a « ce mode a-t-il
+    // un sens ici ? ». L'ancien test comparait disinfection_type a 3 en dur pour
+    // dire « desactive », alors que 3 vaut Oxygene actif depuis le reordonnancement
+    // de l'enum -- la tuile etait masquee en O2 et affichee en desinfection
+    // desactivee, exactement a l'envers.
+    ctx.poolDisAvailable = ctx.poolModeAvailable && ctx.poolOrpAvailable;
     (void)waveshareLoadPoolHeaterMode_(cfgStore, ctx.poolHeaterAutoMode);
 }
 
@@ -2422,6 +2454,13 @@ bool waveshareBuildStatusDomainJson_(FlowStatusDomain domain,
         pool["wint"] = winterMode;
         pool["pha"] = phAutoMode;
         pool["ora"] = orpAutoMode;
+        // Mode de desinfection en service : l'interface le compare au type choisi
+        // pour signaler qu'un redemarrage est necessaire. Absent tant que
+        // PoolDevice n'est pas pret, pour ne rien affirmer de faux.
+        uint8_t liveDisinfection = 0U;
+        if (waveshareLivePoolDisinfectionType_(dataStore, liveDisinfection)) {
+            pool["dis_live"] = liveDisinfection;
+        }
 
         // Lecture par IoId : l'index d'une case du DataStore est un index de
         // registre et n'est pas stable.

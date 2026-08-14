@@ -58,6 +58,23 @@ enum Device : PoolDeviceId {
     DeviceAux1 = 11
 };
 
+/**
+ * Mode de traitement de l'eau. C'est un choix de materiel installe (pompe
+ * doseuse, electrolyseur au sel, bidon d'oxygene actif), pas un reglage d'usage
+ * courant : il est lu dans les Preferences au demarrage du profil et decide
+ * quels equipements, quelles variables de configuration et quelles entites
+ * Home Assistant existent. Il vit donc dans le domaine et non dans PoolLogic,
+ * qui n'en est qu'un consommateur parmi d'autres (bootstrap compris).
+ *
+ * Voir docs/notes/desinfection-reglage-a-froid.md.
+ */
+enum Disinfection : uint8_t {
+    DisinfectionDisabled = 0,
+    DisinfectionChlorineBromine = 1,
+    DisinfectionSwg = 2,
+    DisinfectionActiveOxygen = 3,
+};
+
 constexpr uint8_t DeviceCount = 12;
 constexpr uint8_t SensorCount = 14;
 constexpr uint8_t DomainSlotCount = 26;

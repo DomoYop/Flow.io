@@ -323,6 +323,20 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     o2PendingVar_.moduleName = kCfgModuleDisinfection;
 
 
+    // Le mode de traitement est fige au demarrage (bootstrap de profil) : les
+    // reglages, alarmes et entites des deux autres modes ne sont pas declares du
+    // tout. Une variable non enregistree ne parait ni dans l'arbre de
+    // configuration, ni dans les routes MQTT, ni dans l'export JSON -- alors que
+    // la replier avec visible_if ou la masquer avec setEntityAbsent la laissait
+    // occuper sa place. Voir docs/notes/desinfection-reglage-a-froid.md.
+    const bool disChlorine = (bootDisinfectionType_ == DisinfectionChlorineBromine);
+    const bool disSwg = (bootDisinfectionType_ == DisinfectionSwg);
+    const bool disO2 = (bootDisinfectionType_ == DisinfectionActiveOxygen);
+    // Les deux modes a bidon partagent la pompe doseuse et le capteur de niveau.
+    const bool disLiquid = disChlorine || disO2;
+    // La consigne Redox sert au dosage chlore et a l'electrolyse pilotee en ORP.
+    const bool disUsesOrpSetpoint = disChlorine || disSwg;
+
     // Registration order mirrors the published config branches so init remains
     // easy to diff against the generated cfgdocs and MQTT routes.
     // Bassin : parametres transverses (identite du bassin, modes maitres,
@@ -335,10 +349,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(delayPidsVar_, kCfgModuleId, kCfgBranchBassin);
 
     cfg.registerVar(phAutoModeVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpAutoModeVar_, kCfgModuleId, kCfgBranchDisinfection);
+    if (disChlorine) cfg.registerVar(orpAutoModeVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(heaterAutoModeVar_, kCfgModuleId, kCfgBranchHeater);
     cfg.registerVar(phDosePlusVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchDisinfection);
+    if (disSwg) cfg.registerVar(swgControlModeVar_, kCfgModuleId, kCfgBranchDisinfection);
 
     cfg.registerVar(pumpFlowVar_, kCfgModuleId, kCfgBranchFiltration);
     cfg.registerVar(filtrCycleRatioVar_, kCfgModuleId, kCfgBranchFiltration);
@@ -375,7 +389,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(pressureHighVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(winterStartVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchSafety);
-    cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
+    if (disSwg) cfg.registerVar(secureElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(phSetpointVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(phDoseMlPerM3Var_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(phDeadbandVar_, kCfgModuleId, kCfgBranchPh);
@@ -391,31 +405,39 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(phNoEffectLotsVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(phGainSamplesVar_, kCfgModuleId, kCfgBranchPh);
     cfg.registerVar(phLastDoseTsVar_, kCfgModuleId, kCfgBranchPh);
-    cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchDisinfection);
+    if (disUsesOrpSetpoint) cfg.registerVar(orpSetpointVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(heaterSetpointVar_, kCfgModuleId, kCfgBranchHeater);
-    cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(disMinOnMsVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(disSampleMsVar_, kCfgModuleId, kCfgBranchDisinfection);
+    // Le PID Redox ne pilote que la pompe de chlore liquide : l'electrolyse
+    // compare la mesure a la consigne sans regulation temporelle.
+    if (disChlorine) {
+        cfg.registerVar(orpKpVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(orpKiVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(orpKdVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(orpWindowMsVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(disMinOnMsVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(disSampleMsVar_, kCfgModuleId, kCfgBranchDisinfection);
+    }
 
     cfg.registerVar(pressureDelayVar_, kCfgModuleId, kCfgBranchSafety);
-    cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
+    if (disSwg) cfg.registerVar(delayElectroVar_, kCfgModuleId, kCfgBranchDisinfection);
     cfg.registerVar(robotDelayVar_, kCfgModuleId, kCfgBranchRobot);
     cfg.registerVar(robotDurationVar_, kCfgModuleId, kCfgBranchRobot);
     cfg.registerVar(fillingMinOnVar_, kCfgModuleId, kCfgBranchRefill);
 
-    cfg.registerVar(o2DoseVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2MainHourVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2SplitCountVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2TempCompVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2LoadFactorVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2MinFilterRunVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2ProtocolStateVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2LastDoseDayVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchDisinfection);
-    cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchDisinfection);
+    if (disO2) {
+        cfg.registerVar(o2DoseVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2MainHourVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2SplitCountVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2TempCompVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2LoadFactorVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2MinFilterRunVar_, kCfgModuleId, kCfgBranchDisinfection);
+        // Etat du protocole hebdomadaire : persiste pour survivre a une coupure
+        // en cours de dosage, donc enregistre avec les reglages qu'il accompagne.
+        cfg.registerVar(o2ProtocolStateVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2LastDoseDayVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2WeeklyDoneVar_, kCfgModuleId, kCfgBranchDisinfection);
+        cfg.registerVar(o2PendingVar_, kCfgModuleId, kCfgBranchDisinfection);
+    }
 
     cfg.registerVar(flowCopyDelayVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(flowInterlockVar_, kCfgModuleId, kCfgBranchSafety);
@@ -543,10 +565,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addSwitch(haSvc->ctx, &autoModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &winterModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &phAutoModeSwitch);
-        (void)haSvc->addSwitch(haSvc->ctx, &orpAutoModeSwitch);
+        if (disChlorine) (void)haSvc->addSwitch(haSvc->ctx, &orpAutoModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &heaterAutoModeSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &phDosePlusSwitch);
-        (void)haSvc->addSwitch(haSvc->ctx, &o2TempCompSwitch);
+        if (disO2) (void)haSvc->addSwitch(haSvc->ctx, &o2TempCompSwitch);
         (void)haSvc->addSwitch(haSvc->ctx, &flowInterlockSwitch);
     }
     if (haSvc && haSvc->addSelect) {
@@ -598,9 +620,11 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:clock-time-four-outline",
             "config"
         };
+        // Le choix du mode reste expose dans tous les cas : c'est lui qui decide
+        // des autres entites, et il doit rester atteignable pour en changer.
         (void)haSvc->addSelect(haSvc->ctx, &disinfectionTypeSelect);
-        (void)haSvc->addSelect(haSvc->ctx, &swgControlModeSelect);
-        (void)haSvc->addSelect(haSvc->ctx, &o2MainHourSelect);
+        if (disSwg) (void)haSvc->addSelect(haSvc->ctx, &swgControlModeSelect);
+        if (disO2) (void)haSvc->addSelect(haSvc->ctx, &o2MainHourSelect);
     }
     if (haSvc && haSvc->addSensor) {
         const HASensorEntry filtrationStart{
@@ -745,13 +769,18 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addSensor(haSvc->ctx, &filtrationStart);
         (void)haSvc->addSensor(haSvc->ctx, &filtrationStop);
         (void)haSvc->addSensor(haSvc->ctx, &heatAssistStatus);
-        (void)haSvc->addSensor(haSvc->ctx, &o2ProtocolState);
-        (void)haSvc->addSensor(haSvc->ctx, &o2WeeklyDone);
-        (void)haSvc->addSensor(haSvc->ctx, &o2Pending);
-        (void)haSvc->addSensor(haSvc->ctx, &o2LastDoseDay);
-        (void)haSvc->addSensor(haSvc->ctx, &o2BlockReason);
-        (void)haSvc->addSensor(haSvc->ctx, &o2PlannedDose);
-        (void)haSvc->addSensor(haSvc->ctx, &o2PumpFlow);
+        // Les 7 sensors du protocole O2 sont exactement la marge qui manquait au
+        // profil (≈ 45 entrees pour MaxSensors = 48, debordement muet) : hors
+        // oxygene actif, ils ne sont plus declares du tout.
+        if (disO2) {
+            (void)haSvc->addSensor(haSvc->ctx, &o2ProtocolState);
+            (void)haSvc->addSensor(haSvc->ctx, &o2WeeklyDone);
+            (void)haSvc->addSensor(haSvc->ctx, &o2Pending);
+            (void)haSvc->addSensor(haSvc->ctx, &o2LastDoseDay);
+            (void)haSvc->addSensor(haSvc->ctx, &o2BlockReason);
+            (void)haSvc->addSensor(haSvc->ctx, &o2PlannedDose);
+            (void)haSvc->addSensor(haSvc->ctx, &o2PumpFlow);
+        }
     }
     if (haSvc && haSvc->addNumber) {
         const HANumberEntry pumpFlow{
@@ -1075,12 +1104,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addNumber(haSvc->ctx, &pumpFlow);
         (void)haSvc->addNumber(haSvc->ctx, &filtrCycleRatio);
         (void)haSvc->addNumber(haSvc->ctx, &delayPidsMin);
-        (void)haSvc->addNumber(haSvc->ctx, &delayElectroMin);
+        if (disSwg) (void)haSvc->addNumber(haSvc->ctx, &delayElectroMin);
         (void)haSvc->addNumber(haSvc->ctx, &fillMinUptime);
         (void)haSvc->addNumber(haSvc->ctx, &phSetpoint);
-        (void)haSvc->addNumber(haSvc->ctx, &orpSetpoint);
-        (void)haSvc->addNumber(haSvc->ctx, &chlorineGeneratorMinTemp);
-        (void)haSvc->addNumber(haSvc->ctx, &orpWindowMin);
+        if (disUsesOrpSetpoint) (void)haSvc->addNumber(haSvc->ctx, &orpSetpoint);
+        if (disSwg) (void)haSvc->addNumber(haSvc->ctx, &chlorineGeneratorMinTemp);
+        if (disChlorine) (void)haSvc->addNumber(haSvc->ctx, &orpWindowMin);
         (void)haSvc->addNumber(haSvc->ctx, &pressureLowThreshold);
         (void)haSvc->addNumber(haSvc->ctx, &pressureHighThreshold);
         (void)haSvc->addNumber(haSvc->ctx, &poolVolume);
@@ -1106,10 +1135,12 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:timer-sand",
             "s"
         };
-        (void)haSvc->addNumber(haSvc->ctx, &o2WeeklyDose);
-        (void)haSvc->addNumber(haSvc->ctx, &o2SplitCount);
-        (void)haSvc->addNumber(haSvc->ctx, &o2LoadFactor);
-        (void)haSvc->addNumber(haSvc->ctx, &o2MinFilterRun);
+        if (disO2) {
+            (void)haSvc->addNumber(haSvc->ctx, &o2WeeklyDose);
+            (void)haSvc->addNumber(haSvc->ctx, &o2SplitCount);
+            (void)haSvc->addNumber(haSvc->ctx, &o2LoadFactor);
+            (void)haSvc->addNumber(haSvc->ctx, &o2MinFilterRun);
+        }
         (void)haSvc->addNumber(haSvc->ctx, &flowCopyDelay);
     }
     if (haSvc && haSvc->addButton) {
@@ -1242,6 +1273,10 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             LOGW("PoolLogic failed to register AlarmId::PoolPhTankLow");
         }
 
+        // Bidon de desinfectant : n'existe qu'en dosage liquide (chlore/brome,
+        // oxygene actif). En electrolyse ou desinfection desactivee, l'alarme
+        // n'est plus enregistree du tout -- elle n'a plus a se declarer
+        // « indisponible » a chaque evaluation.
         const AlarmRegistration chlorineTankLowAlarm{
             AlarmId::PoolChlorineTankLow,
             AlarmSeverity::Alarm,
@@ -1253,7 +1288,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "Chlorine tank low",
             "poollogic"
         };
-        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &chlorineTankLowAlarm, &PoolLogicModule::condChlorineTankLowStatic_, this)) {
+        if (disLiquid &&
+            !alarmSvc_->registerAlarm(alarmSvc_->ctx, &chlorineTankLowAlarm, &PoolLogicModule::condChlorineTankLowStatic_, this)) {
             LOGW("PoolLogic failed to register AlarmId::PoolChlorineTankLow");
         }
 
@@ -1283,7 +1319,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "Chlorine pump max uptime reached",
             "poollogic"
         };
-        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &chlorinePumpMaxUptimeAlarm, &PoolLogicModule::condChlorinePumpMaxUptimeStatic_, this)) {
+        if (disLiquid &&
+            !alarmSvc_->registerAlarm(alarmSvc_->ctx, &chlorinePumpMaxUptimeAlarm, &PoolLogicModule::condChlorinePumpMaxUptimeStatic_, this)) {
             LOGW("PoolLogic failed to register AlarmId::PoolChlorinePumpMaxUptime");
         }
 
@@ -1430,25 +1467,29 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
     }
 
     LOGI("PoolLogic pH dosing mode=%s", phDosePlus_ ? "pH+" : "pH-");
-    LOGI("PoolLogic disinfection=%s swg_control=%s",
+    LOGI("PoolLogic disinfection=%s (config=%s) swg_control=%s",
+         disinfectionTypeStr_(bootDisinfectionType_),
          disinfectionTypeStr_(disinfectionType_),
          swgControlModeStr_(swgControlMode_));
-    updateDisinfectionDeviceSlot_();
+    if (disinfectionType_ != bootDisinfectionType_) {
+        LOGW("PoolLogic disinfection config differs from running mode: reboot required");
+    }
+    resolveDisinfectionDeviceSlot_();
     logDeviceSlotConfig_();
 
-    // Masquage Home Assistant selon le type de desinfection et la presence des
-    // equipements optionnels : les entites non pertinentes sont marquees absentes
-    // (tombstone au boot). Cote arbre web, l'attribut visible_if des cfgdocs fait
-    // le meme filtrage. Reconfiguration prise en compte au prochain redemarrage
-    // (discovery one-shot).
+    // Masquage Home Assistant des equipements optionnels absents : l'entite est
+    // marquee absente (tombstone au boot), reconfiguration prise en compte au
+    // prochain redemarrage (discovery one-shot).
+    //
+    // Les entites liees au type de desinfection ne passent plus par ici : elles
+    // ne sont carrement plus declarees (init()). setEntityAbsent ne liberait
+    // aucune capacite -- l'entree gardait sa place dans le tableau et publiait
+    // une pierre tombale, ce qui laissait le profil a ≈ 45 sensors sur 48.
     const HAService* haCfgSvc = services.get<HAService>(ServiceId::Ha);
     if (haCfgSvc && haCfgSvc->setEntityAbsent) {
         auto setAbs = [&](const char* suffix, bool absent) {
             (void)haCfgSvc->setEntityAbsent(haCfgSvc->ctx, "poollogic", suffix, absent);
         };
-        const bool notChlorine = (disinfectionType_ != DisinfectionChlorineBromine);
-        const bool notSwg = (disinfectionType_ != DisinfectionSwg);
-        const bool notO2 = (disinfectionType_ != DisinfectionActiveOxygen);
 
         auto deviceEnabled = [&](uint8_t slot) -> bool {
             if (!poolSvc_ || !poolSvc_->meta) return true;
@@ -1459,26 +1500,6 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
         const bool heaterOff = !deviceEnabled(heaterDeviceSlot_);
         const bool fillOff = !deviceEnabled(fillingDeviceSlot_);
 
-        // Chlore liquide (type 1) : PID ORP + fenetre.
-        setAbs("pl_dis_auto", notChlorine);
-        setAbs("pl_dis_window", notChlorine);
-        // Consigne ORP partagee chlore liquide (1) et electrolyse-ORP (2).
-        setAbs("pl_dis_setpoint", notChlorine && notSwg);
-        // Electrolyse (type 2).
-        setAbs("pl_swg_ctrl", notSwg);
-        setAbs("pl_swg_dly_elec", notSwg);
-        setAbs("pl_swg_min_temp", notSwg);
-        // Oxygene actif (type 3).
-        // pl_pool_vol absent de cette liste : le volume du bassin est un parametre
-        // general (filtration + doses O2), il reste expose dans tous les modes.
-        static const char* const kO2Suffixes[] = {
-            "pl_o2_temp_comp", "pl_o2_hour", "pl_o2_state", "pl_o2_done",
-            "pl_o2_pending", "pl_o2_last_day", "pl_o2_block", "pl_o2_plan",
-            "pl_o2_flow", "pl_o2_dose", "pl_o2_split",
-            "pl_o2_load", "pl_o2_min_flt"
-        };
-        for (const char* suffix : kO2Suffixes) setAbs(suffix, notO2);
-        // Equipements optionnels.
         setAbs("pl_heat_auto", heaterOff);
         setAbs("pl_heat_setpoint", heaterOff);
         setAbs("pl_has_rsn", heaterOff);
@@ -1647,30 +1668,21 @@ void PoolLogicModule::onEvent_(const Event& e)
                 portEXIT_CRITICAL(&pendingMux_);
             } else if (strcmp(p->nvsKey, NvsKeys::PoolLogic::DisinfectionType) == 0) {
                 if (disinfectionType_ > DisinfectionActiveOxygen) disinfectionType_ = DisinfectionDisabled;
-                // L'ancienne pompe est arretee avant la bascule : apres
-                // updateDisinfectionDeviceSlot_ elle n'aurait plus de pilote et
-                // resterait en marche.
-                (void)forceDeviceStop_(orpPumpDeviceSlot_);
-                (void)forceDeviceStop_(swgDeviceSlot_);
-                updateDisinfectionDeviceSlot_();
-                (void)forceDeviceStop_(orpPumpDeviceSlot_);
-                if (disinfectionType_ == DisinfectionChlorineBromine && !orpAutoMode_ && cfgStore_) {
-                    (void)cfgStore_->set(orpAutoModeVar_, true);
-                    orpAutoMode_ = true;
+                // Reglage a froid : rien ne bascule ici. Les equipements, les
+                // variables de configuration, les alarmes et les entites ont ete
+                // declares pour le mode fige au demarrage -- appliquer le nouveau
+                // a chaud piloterait une pompe qui n'existe pas. On se contente
+                // de tracer l'ecart, que l'interface signale par un bandeau
+                // « redemarrage requis » : l'interface compare ce choix a
+                // l'equipement de desinfection reellement defini.
+                if (disinfectionType_ != bootDisinfectionType_) {
+                    LOGI("PoolLogic disinfection set to %s, running on %s until reboot",
+                         disinfectionTypeStr_(disinfectionType_),
+                         disinfectionTypeStr_(bootDisinfectionType_));
+                } else {
+                    LOGI("PoolLogic disinfection back to running mode: %s",
+                         disinfectionTypeStr_(bootDisinfectionType_));
                 }
-                // Resolution one-shot de la strategie : hors oxygene actif, le
-                // protocole O2 n'est plus evalue par la boucle, on le remet donc
-                // au repos ici (remplace le reset qui etait fait a chaque tour).
-                if (disinfectionType_ != DisinfectionActiveOxygen) {
-                    o2PendingMl_ = 0.0f;
-                    o2LastProgressMs_ = 0;
-                    o2ProtocolState_ = O2ProtocolIdle;
-                    o2BlockReason_ = O2BlockInactive;
-                    persistO2Protocol_(millis(), true);
-                }
-                resetTemporalPidState_(orpPidState_, millis());
-                orpPidEnabled_ = false;
-                LOGI("PoolLogic disinfection changed: %s", disinfectionTypeStr_(disinfectionType_));
             }
             return;
         }
@@ -1785,19 +1797,30 @@ void PoolLogicModule::onEvent_(const Event& e)
  * La pompe de desinfection n'est pas la meme selon le mode : chlore liquide /
  * brome et oxygene actif sont deux appareils, avec leur propre debit, leur
  * propre bidon et leurs propres compteurs de consommation. Le slot est donc
- * derive de disinfection_type et non configure.
+ * derive du mode de traitement et non configure.
+ *
+ * Resolution unique au demarrage : le mode etant fige, le slot ne bouge plus
+ * ensuite (l'appareil de l'autre mode n'est meme pas defini).
  */
-void PoolLogicModule::updateDisinfectionDeviceSlot_()
+void PoolLogicModule::resolveDisinfectionDeviceSlot_()
 {
-    const uint8_t previous = orpPumpDeviceSlot_;
-    orpPumpDeviceSlot_ = (disinfectionType_ == DisinfectionActiveOxygen)
+    orpPumpDeviceSlot_ = (bootDisinfectionType_ == DisinfectionActiveOxygen)
                              ? (uint8_t)PoolIds::DeviceO2Pump
                              : (uint8_t)PoolIds::DeviceChlorinePump;
-    if (previous != orpPumpDeviceSlot_) {
-        LOGI("PoolLogic disinfection pump slot=%u (type=%s)",
-             (unsigned)orpPumpDeviceSlot_,
-             disinfectionTypeStr_(disinfectionType_));
-    }
+    LOGI("PoolLogic disinfection pump slot=%u (type=%s)",
+         (unsigned)orpPumpDeviceSlot_,
+         disinfectionTypeStr_(bootDisinfectionType_));
+}
+
+void PoolLogicModule::setBootDisinfectionType(uint8_t type)
+{
+    bootDisinfectionType_ = (type > (uint8_t)DisinfectionActiveOxygen)
+                                ? (uint8_t)DisinfectionDisabled
+                                : type;
+    // Sert aussi de defaut a la variable de configuration : sans cle NVS (sortie
+    // d'usine, premier demarrage apres effacement), la liste deroulante affiche
+    // le mode reellement en service et non un troisieme etat.
+    disinfectionType_ = bootDisinfectionType_;
 }
 
 void PoolLogicModule::logDeviceSlotConfig_() const

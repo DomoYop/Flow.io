@@ -58,6 +58,22 @@ public:
      * conserve tant que la clé NVS correspondante n'existe pas.
      */
     void applyDomainDefaults(const DomainSpec& domain);
+    /**
+     * @brief Fige le mode de traitement lu dans les Preferences au démarrage.
+     *
+     * À appeler depuis le bootstrap de profil AVANT ModuleManager::initAll() :
+     * c'est cette valeur, et non celle de la config courante, qui décide quelles
+     * variables de configuration, quelles alarmes et quelles entités Home
+     * Assistant sont déclarées — et que suivent les régulations.
+     *
+     * Le réglage reste modifiable à chaud (il alimente la liste déroulante),
+     * mais le firmware continue de fonctionner sur le mode figé jusqu'au
+     * redémarrage suivant. Le mode en service n'est pas republié : il se
+     * constate, en regardant lequel des trois équipements de désinfection
+     * existe réellement. C'est ce que fait l'interface pour signaler
+     * « redémarrage requis ».
+     */
+    void setBootDisinfectionType(uint8_t type);
     void loop() override;
     uint16_t taskStackSize() const override { return 4096; }
     uint32_t startDelayMs() const override {
@@ -102,12 +118,14 @@ private:
         RuntimeUiSensorHold = 16,
     };
 
-    enum DisinfectionType : uint8_t {
-        DisinfectionDisabled = 0,
-        DisinfectionChlorineBromine = 1,
-        DisinfectionSwg = 2,
-        DisinfectionActiveOxygen = 3,
-    };
+    // Le mode de traitement appartient au domaine (PoolIds::Disinfection) : il
+    // est lu a froid par le bootstrap de profil, avant que ce module existe.
+    // Les alias evitent de qualifier les ~40 usages internes.
+    using DisinfectionType = PoolIds::Disinfection;
+    static constexpr DisinfectionType DisinfectionDisabled = PoolIds::DisinfectionDisabled;
+    static constexpr DisinfectionType DisinfectionChlorineBromine = PoolIds::DisinfectionChlorineBromine;
+    static constexpr DisinfectionType DisinfectionSwg = PoolIds::DisinfectionSwg;
+    static constexpr DisinfectionType DisinfectionActiveOxygen = PoolIds::DisinfectionActiveOxygen;
 
     enum SwgControlMode : uint8_t {
         SwgControlOrp = 0,
@@ -224,7 +242,14 @@ private:
     bool orpAutoMode_ = false;
     bool heaterAutoMode_ = false;
     bool phDosePlus_ = false;
+    // disinfectionType_ est le miroir de la config : il suit la liste deroulante
+    // et peut changer a chaud. bootDisinfectionType_ est le mode reellement en
+    // service, fige par le bootstrap avant que les equipements, les variables et
+    // les entites soient declares. Toute la logique consulte le second, via
+    // isDisinfectionType_ ; le premier ne sert qu'a detecter l'ecart et a
+    // demander un redemarrage.
     uint8_t disinfectionType_ = DisinfectionDisabled;
+    uint8_t bootDisinfectionType_ = DisinfectionDisabled;
     uint8_t swgControlMode_ = SwgControlContinuous;
 
     // Schedule / filtration plan (turnover volumique + fenetres priorisees)
@@ -633,7 +658,7 @@ private:
     // Lifecycle
     static void onEventStatic_(const Event& e, void* user);
     void onEvent_(const Event& e);
-    void updateDisinfectionDeviceSlot_();
+    void resolveDisinfectionDeviceSlot_();
     void logDeviceSlotConfig_() const;
     void logDeviceSlotBinding_(const char* role, uint8_t slot, int8_t expectedType) const;
     bool activityTimeReady_() const;
@@ -659,8 +684,6 @@ private:
     static AlarmCondState condPhPumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorinePumpMaxUptimeStatic_(void* ctx, uint32_t nowMs);
     AlarmCondState condPumpMaxUptime_(uint8_t deviceSlot) const;
-    /** Etat d'une alarme sans objet dans la configuration courante (voir .cpp). */
-    AlarmCondState condInapplicable_(AlarmId id) const;
     bool readDeviceActualOn_(uint8_t deviceSlot, bool& onOut) const;
     bool writeDeviceDesired_(uint8_t deviceSlot,
                              bool on,

@@ -305,15 +305,16 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
 
         // Keep behavior aligned with pooldevice.write: manual pump start disables
         // the corresponding automatic dosing only after the hardware write is accepted.
+        // Un demarrage manuel coupe l'automatisme, jamais la configuration
+        // materielle : la cle visee est dis_auto_mode, comme le pH vise
+        // ph_auto_mode. Ecrire disinfection_type=0 ici effacait le mode de
+        // traitement choisi par l'utilisateur (et, ce type etant lu a froid,
+        // aurait fait disparaitre la pompe et ses reglages au redemarrage).
         if (requested && clearDosingModeKey && cfgStore_) {
             const bool disabledPhAutoMode = (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) && phAutoMode_;
             const bool disabledOrpAutoMode = (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) && orpAutoMode_;
-            const bool disabledDisinfection = (strcmp(clearDosingModeKey, "disinfection_type") == 0) &&
-                                              (disinfectionType_ != DisinfectionDisabled);
             char patch[96]{};
-            if (strcmp(clearDosingModeKey, "disinfection_type") == 0) {
-                snprintf(patch, sizeof(patch), "{\"poollogic/bassin\":{\"disinfection_type\":%u}}", (unsigned)DisinfectionDisabled);
-            } else if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) {
+            if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) {
                 snprintf(patch, sizeof(patch), "{\"poollogic/ph\":{\"ph_auto_mode\":false}}");
             } else if (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) {
                 snprintf(patch, sizeof(patch), "{\"poollogic/disinfection\":{\"dis_auto_mode\":false}}");
@@ -323,19 +324,11 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
             if (cfgStore_->applyJson(patch)) {
                 if (strcmp(clearDosingModeKey, "ph_auto_mode") == 0) phAutoMode_ = false;
                 else if (strcmp(clearDosingModeKey, "dis_auto_mode") == 0) orpAutoMode_ = false;
-                else if (strcmp(clearDosingModeKey, "disinfection_type") == 0) {
-                    disinfectionType_ = DisinfectionDisabled;
-                    const PoolDeviceSvcStatus rest = poolSvc_->writeDesired(poolSvc_->ctx, slot, 1U);
-                    if (rest != POOLDEV_SVC_OK) {
-                        writeCmdError_(reply, replyLen, where, ErrorCode::Failed);
-                        return false;
-                    }
-                }
                 if (disabledPhAutoMode) {
                     emitAutoModeDisabledByManualActivity_(ActivityRole::Ph,
                                                           slot,
                                                           "pH");
-                } else if (disabledOrpAutoMode || disabledDisinfection) {
+                } else if (disabledOrpAutoMode) {
                     emitAutoModeDisabledByManualActivity_(ActivityRole::Disinfection,
                                                           slot,
                                                           "ORP");
@@ -489,10 +482,10 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
         return toggleDeviceValue("poollogic.ph_pump.toggle", phPumpDeviceSlot_, false, "ph_auto_mode");
     }
     if (strcmp(cmdName, "poollogic.orp_pump.write") == 0 || strcmp(cmdName, "poollogic.dis_pump.write") == 0) {
-        return writeDeviceFromArgs("poollogic.dis_pump.write", orpPumpDeviceSlot_, false, "disinfection_type");
+        return writeDeviceFromArgs("poollogic.dis_pump.write", orpPumpDeviceSlot_, false, "dis_auto_mode");
     }
     if (strcmp(cmdName, "poollogic.orp_pump.toggle") == 0 || strcmp(cmdName, "poollogic.dis_pump.toggle") == 0) {
-        return toggleDeviceValue("poollogic.dis_pump.toggle", orpPumpDeviceSlot_, false, "disinfection_type");
+        return toggleDeviceValue("poollogic.dis_pump.toggle", orpPumpDeviceSlot_, false, "dis_auto_mode");
     }
     if (strcmp(cmdName, "poollogic.light.write") == 0 || strcmp(cmdName, "poollogic.lights.write") == 0) {
         return writeDeviceFromArgs("poollogic.lights.write", PoolIds::DeviceLights, false, nullptr);

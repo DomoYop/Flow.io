@@ -61,6 +61,46 @@ bool mqttEnabledInPreferences(Preferences& prefs)
     return prefs.getBool(NvsKeys::Mqtt::Enabled, false);
 }
 
+/**
+ * Le mode de traitement de l'eau est un reglage a froid : il decide quels
+ * equipements de desinfection existent, donc quelles variables de configuration
+ * et quelles entites Home Assistant sont declarees. On le lit ici, avant le
+ * ModuleManager, sur le meme patron que mqttEnabledInPreferences.
+ *
+ * Une valeur hors enum (NVS d'une version anterieure, ecriture externe) est
+ * ramenee a Desactive : mieux vaut demarrer sans equipement de desinfection
+ * qu'avec une strategie indeterminee.
+ */
+uint8_t disinfectionTypeInPreferences(Preferences& prefs)
+{
+    const uint8_t type = prefs.getUChar(NvsKeys::PoolLogic::DisinfectionType,
+                                        (uint8_t)PoolIds::DisinfectionDisabled);
+    return (type > (uint8_t)PoolIds::DisinfectionActiveOxygen)
+               ? (uint8_t)PoolIds::DisinfectionDisabled
+               : type;
+}
+
+/**
+ * Les trois fonctions de desinfection s'excluent : seule celle du mode retenu
+ * est definie. Les deux autres n'existent alors pas du tout -- ni PoolDevice,
+ * ni variables de configuration, ni entites. Les masquer apres coup ne libere
+ * rien : setEntityAbsent garde la place de l'entite et publie une pierre
+ * tombale (docs/notes/desinfection-reglage-a-froid.md, §3).
+ */
+bool poolDeviceServesDisinfectionType(PoolDeviceId id, uint8_t disinfectionType)
+{
+    switch (id) {
+        case PoolIds::DeviceChlorinePump:
+            return disinfectionType == (uint8_t)PoolIds::DisinfectionChlorineBromine;
+        case PoolIds::DeviceChlorineGenerator:
+            return disinfectionType == (uint8_t)PoolIds::DisinfectionSwg;
+        case PoolIds::DeviceO2Pump:
+            return disinfectionType == (uint8_t)PoolIds::DisinfectionActiveOxygen;
+        default:
+            return true;
+    }
+}
+
 bool buildNetworkSnapshot(MQTTModule* mqtt, char* out, size_t len)
 {
     if (!mqtt || !out || len == 0) return false;
@@ -191,7 +231,7 @@ uint16_t dependsOnMaskForPreset(const DomainSpec& domain, const PoolDevicePreset
     return (uint16_t)(1u << dependency->id);
 }
 
-void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
+void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules, uint8_t disinfectionType)
 {
     // Un PoolDevice n'est instancie que pour un role decrit par le domaine.
     // MaxPoolDevices n'est qu'un plafond de capacite : creer les slots
@@ -201,6 +241,7 @@ void configurePoolDevices(const AppContext& ctx, ModuleInstances& modules)
     for (uint8_t i = 0; i < Limits::Io::MaxPoolDevices; ++i) {
         const PoolDevicePreset* preset = findPoolPresetById(*ctx.domain, i);
         if (!preset) continue;
+        if (!poolDeviceServesDisinfectionType(preset->id, disinfectionType)) continue;
 
         // L'invariant pdN <-> dNN est verifie a la compilation par le
         // static_assert de PoolDomain.h : inutile de risquer ici une boucle
@@ -267,10 +308,16 @@ void setupProfile(AppContext& ctx)
     ctx.registry.setPreferences(ctx.preferences);
     ctx.registry.runMigrations(CURRENT_CFG_VERSION, steps, MIGRATION_COUNT);
 
+    // Lu avant tout enregistrement de module : ce choix decide des equipements
+    // definis ci-dessous, et PoolLogic s'y tient jusqu'au prochain demarrage
+    // meme si l'utilisateur change le reglage a chaud.
+    const uint8_t disinfectionType = disinfectionTypeInPreferences(ctx.preferences);
+
     registerModules(ctx, modules);
     modules.hmiModule.setRemoteUdpServer(&modules.hmiUdpServerModule);
     configureIoModule(ctx, modules);
-    configurePoolDevices(ctx, modules);
+    configurePoolDevices(ctx, modules, disinfectionType);
+    modules.poolLogicModule.setBootDisinfectionType(disinfectionType);
     modules.poolLogicModule.applyDomainDefaults(*ctx.domain);
 
     // Keep PoolLogic runtime snapshots first so HA-critical state (including
