@@ -1,14 +1,28 @@
 # Name,   Type, SubType, Offset,   Size,     Flags
-# spiffs reste a 0x7E0000 alors que data/ n'occupe que ~320 Ko : mkspiffs pade
-# l'image jusqu'a la taille de la partition, donc chaque mise a jour du contenu web
-# transfere 7,9 Mo pour 317 Ko utiles. La retrecir a 1 Mo diviserait le transfert
-# par 7,9, mais l'OTA ne met pas a jour la table de partitions : il faudrait un
-# flash USB complet sur chaque appareil deja en service. Tant que ce n'est pas
-# possible, la taille reste inchangee et le volume se traite ailleurs.
-# Voir docs/notes/ota-spiffs-lenteur-plantage.md
+# Le contenu web reellement flashe pese ~317 Ko (staging gzippe produit par
+# prepare_spiffs_data.py, 164 fichiers), soit ~420 Ko une fois les surcouts SPIFFS
+# comptes. La partition faisait 7,875 Mo : mkspiffs padait l'image jusqu'a cette
+# taille, donc chaque mise a jour ecrivait 8,26 Mo pour 317 Ko utiles.
+#
+# Le gain n'est PAS sur le reseau -- l'image compressee pese 333 Ko parce que le
+# contenu pese 317 Ko, le padding se compressant a presque rien. Le gain est sur la
+# duree d'ecriture, et surtout sur le nombre de fenetres pendant lesquelles le cache
+# flash (et donc la PSRAM octale) est coupe : ~2 140 avant, ~545 avec 2 Mo.
+# Voir docs/notes/audit-paniques-flash-cache.md
+#
+# spiffs_b est reservee a une future bascule A/B du contenu web : l'OTA ecrirait la
+# partition inactive, donc une coupure laisserait le systeme de fichiers en service
+# intact. Elle est inerte tant qu'aucun code ne la monte -- mais elle doit rester
+# APRES spiffs dans cette table : SPIFFS.begin() et Update.begin(U_SPIFFS) prennent
+# tous deux la premiere partition de sous-type spiffs, sans regarder le label.
+# Les deux partitions doivent garder la meme taille : une image batie pour l'une
+# doit tenir dans l'autre.
+#
+# Fin de la table a 0xC50000 : 3,69 Mo de flash restent libres en queue.
 nvs,      data, nvs,     0x9000,   0x5000,
 otadata,  data, ota,     0xe000,   0x2000,
 app0,     app,  ota_0,   0x10000,  0x400000,
 app1,     app,  ota_1,   0x410000, 0x400000,
-spiffs,   data, spiffs,  0x810000, 0x7E0000,
-coredump, data, coredump,0xFF0000, 0x10000,
+spiffs,   data, spiffs,  0x810000, 0x200000,
+spiffs_b, data, spiffs,  0xA10000, 0x200000,
+coredump, data, coredump,0xC10000, 0x40000,

@@ -59,7 +59,22 @@ public:
     virtual uint16_t taskStackSize() const { return Limits::Core::Task::DefaultStackSize; }
     /** @brief Task priority for the FreeRTOS task. */
     virtual UBaseType_t taskPriority() const { return 1; }
-    /** @brief Memory capability flags used for the task stack allocation. */
+    /**
+     * @brief Memory capability flags used for the task stack allocation.
+     *
+     * NE JAMAIS rendre MALLOC_CAP_SPIRAM ici. `xTaskCreatePinnedToCoreWithCaps`
+     * place alors la pile *et* le TCB en memoire externe -- or la PSRAM du module
+     * S3 est octale, donc servie par le meme cache que la flash. Chaque ecriture
+     * flash coupe ce cache sur les deux coeurs et immobilise l'autre coeur par une
+     * interruption de haut niveau, laquelle s'execute sur la pile de la tache
+     * courante : une pile en PSRAM est alors inatteignable. L'ordonnanceur, lui,
+     * parcourt les TCB quel que soit le coeur.
+     *
+     * Cinq modules le faisaient sur le profil Waveshare ; un OTA ouvre ~2 140 de
+     * ces fenetres, d'ou des paniques non reproductibles, avec une tache accusee
+     * differente a chaque fois et un backtrace dans `vTaskSwitchContext`.
+     * Voir docs/notes/audit-paniques-flash-cache.md.
+     */
     virtual UBaseType_t taskStackCaps() const { return MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT; }
     /** @brief CPU core affinity for the FreeRTOS task (`0` or `1` on ESP32). */
     virtual BaseType_t taskCore() const { return 1; }

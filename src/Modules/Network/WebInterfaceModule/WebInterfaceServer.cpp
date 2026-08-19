@@ -7307,6 +7307,47 @@ void WebInterfaceModule::startServer_()
         request->send(200, "application/json", (reply[0] != '\0') ? reply : "{\"ok\":true}");
     });
 
+    // Les deux tas, separement. `heap.free` des autres routes agrege DRAM interne
+    // et PSRAM (MALLOC_CAP_8BIT) : sur ce module il reste a plusieurs Mo en
+    // permanence et ne dit rien de l'epuisement de l'interne, le seul tas qui peut
+    // reellement manquer. Observation seule -- aucun seuil ne s'appuie sur ces
+    // valeurs. Voir docs/notes/audit-paniques-flash-cache.md.
+    server_.on("/api/system/heap", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/system/heap");
+        SystemStatsSnapshot snap{};
+        SystemStats::collect(snap);
+
+        char body[384] = {0};
+        const int n = snprintf(
+            body,
+            sizeof(body),
+            "{\"ok\":true,"
+            "\"internal\":{\"free\":%lu,\"min_free\":%lu,\"largest\":%lu,\"total\":%lu,\"frag\":%u},"
+            "\"psram\":{\"free\":%lu,\"largest\":%lu,\"total\":%lu},"
+            "\"combined\":{\"free\":%lu,\"min_free\":%lu,\"largest\":%lu,\"frag\":%u}}",
+            (unsigned long)snap.heap.internalFreeBytes,
+            (unsigned long)snap.heap.internalMinFreeBytes,
+            (unsigned long)snap.heap.internalLargestFreeBlock,
+            (unsigned long)snap.heap.internalTotalBytes,
+            (unsigned)snap.heap.internalFragPercent,
+            (unsigned long)snap.heap.psramFreeBytes,
+            (unsigned long)snap.heap.psramLargestFreeBlock,
+            (unsigned long)snap.heap.psramTotalBytes,
+            (unsigned long)snap.heap.freeBytes,
+            (unsigned long)snap.heap.minFreeBytes,
+            (unsigned long)snap.heap.largestFreeBlock,
+            (unsigned)snap.heap.fragPercent);
+        if (n <= 0 || (size_t)n >= sizeof(body)) {
+            request->send(500,
+                          "application/json",
+                          "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"system.heap\"}}");
+            return;
+        }
+        AsyncWebServerResponse* response = request->beginResponse(200, "application/json", body);
+        addNoCacheHeaders_(response);
+        request->send(response);
+    });
+
     // Vidage du dernier crash. Le framework ecrit un vidage complet a chaque
     // panique, Task Watchdog compris (CONFIG_ESP_TASK_WDT_PANIC), mais rien ne le
     // lisait : la tache fautive restait inconnue sans cable USB. Le resume suffit

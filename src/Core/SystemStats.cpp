@@ -35,6 +35,36 @@ void SystemStats::collect(SystemStatsSnapshot& out) {
         if (frag > 1.0f) frag = 1.0f;
         out.heap.fragPercent = (uint8_t)(frag * 100.0f);
     }
+
+    // MALLOC_CAP_8BIT ci-dessus agrege DRAM interne et PSRAM. Les deux tas sont
+    // repris separement ici : c'est l'interne qui s'epuise, et lui seul qui rend
+    // une allocation impossible quand la PSRAM est encore a moitie vide.
+    // MALLOC_CAP_INTERNAL est croise avec MALLOC_CAP_8BIT pour ne compter que ce
+    // qu'une allocation ordinaire peut effectivement utiliser (la memoire
+    // accessible seulement par mots en est exclue).
+    constexpr uint32_t kInternalCaps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+    const uint32_t internalFree = heap_caps_get_free_size(kInternalCaps);
+    const uint32_t internalLargest = heap_caps_get_largest_free_block(kInternalCaps);
+    out.heap.internalFreeBytes = internalFree;
+    out.heap.internalMinFreeBytes = (uint32_t)heap_caps_get_minimum_free_size(kInternalCaps);
+    out.heap.internalLargestFreeBlock = internalLargest;
+    out.heap.internalTotalBytes = (uint32_t)heap_caps_get_total_size(kInternalCaps);
+
+    if (internalFree == 0U) {
+        out.heap.internalFragPercent = 100;
+    } else {
+        float ratio = (float)internalLargest / (float)internalFree;
+        float frag = 1.0f - ratio;
+        if (frag < 0.0f) frag = 0.0f;
+        if (frag > 1.0f) frag = 1.0f;
+        out.heap.internalFragPercent = (uint8_t)(frag * 100.0f);
+    }
+
+    // Rend 0 partout si aucune PSRAM n'est montee : le champ reste lisible sans
+    // garde cote appelant.
+    out.heap.psramFreeBytes = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    out.heap.psramLargestFreeBlock = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    out.heap.psramTotalBytes = (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
 }
 
 const char* SystemStats::resetReasonStr() {
