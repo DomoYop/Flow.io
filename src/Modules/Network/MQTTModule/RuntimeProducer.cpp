@@ -214,7 +214,20 @@ MqttBuildResult RuntimeProducer::buildMessage(uint16_t messageId, MqttBuildConte
     ctx.topicLen = (uint16_t)strnlen(ctx.topic, ctx.topicCapacity);
     ctx.payloadLen = (uint16_t)strnlen(ctx.payload, ctx.payloadCapacity);
     ctx.qos = 0;
-    ctx.retain = false;
+    // Un etat d'actionneur est un etat persistant, pas une mesure : le broker en
+    // garde le dernier connu pour tout abonne qui s'abonne ensuite. Sans cela,
+    // une sortie qui ne change pas d'etat n'est jamais republiee et Home
+    // Assistant l'affiche "inconnu" jusqu'au prochain basculement reel -- une
+    // filtration a l'arret peut le rester des jours.
+    //
+    // Les mesures (NumericThrottled) restent volontairement non retenues : une
+    // temperature vieille d'une semaine ne doit pas apparaitre comme actuelle,
+    // et elles se rattrapent seules a l'acquisition suivante.
+    //
+    // Ne rejoue rien vers un abonne deja connecte : le QoS reste 0, donc une
+    // perte en cours de session donne un etat perime, pas "inconnu".
+    // Voir docs/notes/sorties-ha-inconnu-retain-mqtt.md
+    ctx.retain = (route.routeClass == RuntimeRouteClass::ActuatorImmediate);
 
     route.lastBuiltTs = effectiveTs;
     return MqttBuildResult::Ready;

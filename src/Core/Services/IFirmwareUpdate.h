@@ -27,5 +27,12 @@ struct FirmwareUpdateService {
                       const char* updatePath,
                       char* errOut,
                       size_t errOutLen);
+    /**
+     * @brief Essai a blanc de l'OTA SPIFFS : telecharge, decompresse, verifie.
+     *
+     * Aucune ecriture flash, aucun redemarrage. Sert a savoir ou une mise a jour
+     * echoue sans risquer le systeme de fichiers en place.
+     */
+    bool (*startSpiffsDryRun)(void* ctx, const char* url, char* errOut, size_t errOutLen);
     void* ctx;
 };

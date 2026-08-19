@@ -190,6 +190,10 @@ private:
     void recordSource_(TimeSource source, bool available, bool valid, uint64_t epochSec, uint32_t sampledAtMs);
     void loadPersistentMeta_();
     void persistMetaIfChanged_();
+    // Attente d'une reponse SNTP reellement appliquee (et non d'une heure
+    // systeme simplement plausible : voir sntpSyncNotified_).
+    static void sntpSyncNotifyCb_(struct timeval* tv);
+    static bool waitForSntpSync_(uint32_t timeoutMs);
     void noteGoodTime_(TimeSource source, TimeQuality quality, uint64_t epochSec);
     bool ensureHmiService_();
     bool nextionRtcReadEpoch_(uint64_t& epochSec);
@@ -250,6 +254,10 @@ private:
     uint32_t _retryDelayMs = 2000; // 2s start
     bool syncedFromExternalRtc_ = false;
     bool syncedFromInternalRtc_ = false;
+    // Arme par le callback SNTP quand une reponse serveur est effectivement
+    // appliquee a l'horloge systeme. Seul temoin fiable d'une vraie synchro :
+    // l'heure systeme peut etre plausible sans qu'aucun serveur ait repondu.
+    static volatile bool sntpSyncNotified_;
     TimeSource activeSource_ = TimeSource::None;
     TimeQuality activeQuality_ = TimeQuality::Invalid;
     TimeState timeState_{};

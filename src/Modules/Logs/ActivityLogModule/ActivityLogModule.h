@@ -60,6 +60,8 @@ private:
     uint32_t epochNow_();
     void normalizeEvent_(ActivityEvent& event);
     void emitBootEvent_();
+    /** @brief Signale un vidage de crash laissé par le redémarrage précédent. */
+    void emitCoreDumpEvent_();
     void emitBootEventIfReady_();
 
     ActivityEvent* entries_ = nullptr;

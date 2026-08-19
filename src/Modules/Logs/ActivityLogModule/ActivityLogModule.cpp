@@ -7,8 +7,10 @@
 
 #include "App/FirmwareProfile.h"
 #include "Core/FirmwareVersion.h"
+#include "Core/CoreDumpInfo.h"
 #include "Core/LogModuleIds.h"
 #include "Core/Services/Services.h"
+#include "Core/SpiffsAccessLock.h"
 
 #define LOG_MODULE_ID ((LogModuleId)LogModuleIdValue::ActivityLogModule)
 #include "Core/ModuleLog.h"
@@ -207,6 +209,11 @@ bool ActivityLogModule::clear_()
 
     bool ok = true;
     if (spiffsReady_) {
+        const SpiffsAccessLock::Guard lock(200U);
+        if (!lock.held()) {
+            LOGW("Activity log clear: SPIFFS occupee, ignoree");
+            return false;
+        }
         if (SPIFFS.exists(kLogPath) && !SPIFFS.remove(kLogPath)) ok = false;
         if (SPIFFS.exists(kRotatedLogPath) && !SPIFFS.remove(kRotatedLogPath)) ok = false;
     }
@@ -368,6 +375,13 @@ bool ActivityLogModule::persist_(const ActivityEvent& event)
     char line[kLineMax] = {0};
     if (!formatLine_(event, line, sizeof(line))) return false;
 
+    // Le verrou couvre rotateIfNeeded_ ET l'ecriture : c'est un OTA SPIFFS en cours
+    // qui doit gagner l'arbitrage, pas cette persistance -- l'evenement est
+    // simplement compte en perte (persistDropCount_ cote appelant), sans consequence
+    // pour l'utilisateur au-dela d'un trou dans l'historique. Voir SpiffsAccessLock.h.
+    const SpiffsAccessLock::Guard lock(150U);
+    if (!lock.held()) return false;
+
     const size_t len = strlen(line);
     rotateIfNeeded_(len);
     File file = SPIFFS.open(kLogPath, FILE_APPEND);
@@ -395,6 +409,36 @@ void ActivityLogModule::emitBootEvent_()
              FirmwareVersion::Full,
              resetReasonStr_(esp_reset_reason()));
     copyText_(event.icon, sizeof(event.icon), "power_settings_new");
+    (void)emit_(event);
+
+    emitCoreDumpEvent_();
+}
+
+void ActivityLogModule::emitCoreDumpEvent_()
+{
+    // Un redemarrage anormal laisse un vidage en flash, Task Watchdog compris. Le
+    // signaler ici le rend consultable a distance : sans cela, il faut un cable USB
+    // pour savoir quelle tache a fauté, ce qui a fait diagnostiquer a l'aveugle les
+    // blocages OTA d'aout 2026. Le vidage n'est pas efface : seul le crash suivant
+    // l'ecrasera.
+    CoreDumpInfo::Summary dump;
+    if (!CoreDumpInfo::read(dump) || !dump.present) return;
+
+    ActivityEvent event{};
+    event.code = (uint16_t)ActivityCode::SystemCoreDump;
+    event.domain = (uint8_t)ActivityDomain::System;
+    event.source = (uint8_t)ActivitySource::Boot;
+    event.severity = (uint8_t)ActivitySeverity::Warning;
+    event.reason = (uint8_t)ActivityReason::Boot;
+    copyText_(event.title, sizeof(event.title), "Vidage de crash disponible");
+    snprintf(event.detail,
+             sizeof(event.detail),
+             "Tâche %s, PC 0x%08lX%s%s",
+             dump.task,
+             (unsigned long)dump.pc,
+             (dump.reason[0] != 0) ? ", " : "",
+             dump.reason);
+    copyText_(event.icon, sizeof(event.icon), "bug_report");
     (void)emit_(event);
 }
 

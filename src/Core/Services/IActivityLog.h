@@ -65,6 +65,7 @@ enum class ActivityReason : uint8_t {
 enum class ActivityCode : uint16_t {
     SystemBoot = 1,
     SystemConfigChanged = 2,
+    SystemCoreDump = 3,
     PoolLogicReady = 100,
     PoolLogicDisabled = 101,
     PoolLogicDeviceStartRequested = 120,

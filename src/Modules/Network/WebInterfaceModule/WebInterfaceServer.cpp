@@ -8,6 +8,8 @@
 #include "Board/BoardSpec.h"
 #include "App/BuildFlags.h"
 #include "Core/FilesystemVersion.h"
+#include "Core/CoreDumpInfo.h"
+#include "Core/SpiffsAccessLock.h"
 #include "Core/FirmwareVersion.h"
 #include "Core/Generated/RuntimeUiManifest_Generated.h"
 #include "Core/Generated/RuntimeUiManifestJson_Generated.h"
@@ -74,30 +76,48 @@ static void sanitizeJsonString_(char* s)
     }
 }
 
+/**
+ * @brief Ecrit une chaine JSON echappee, par segments.
+ *
+ * Surtout pas caractere par caractere : `AsyncResponseStream::write` agrandit son
+ * tampon de la taille exacte manquante, et `cbuf::resize` recopie alors tout le
+ * contenu deja ecrit. Un octet a la fois donne donc une recopie integrale par
+ * octet -- un cout quadratique qui a bloque la tache `async_tcp` plus de cinq
+ * secondes sur /api/activity/logs, jusqu'au reset par le Task Watchdog. Ici, seuls
+ * les caracteres a echapper coupent le segment courant.
+ * Voir docs/notes/ota-spiffs-gzip-bilan.md.
+ */
 static void printJsonEscaped_(Print& out, const char* s)
 {
-    out.print('\"');
+    out.write((uint8_t)'"');
     if (s) {
+        const char* segment = s;
         for (const char* p = s; *p != '\0'; ++p) {
+            const char* escaped = nullptr;
             switch (*p) {
-            case '\"': out.print("\\\""); break;
-            case '\\': out.print("\\\\"); break;
-            case '\b': out.print("\\b"); break;
-            case '\f': out.print("\\f"); break;
-            case '\n': out.print("\\n"); break;
-            case '\r': out.print("\\r"); break;
-            case '\t': out.print("\\t"); break;
+            case '"': escaped = "\\\""; break;
+            case '\\': escaped = "\\\\"; break;
+            case '\b': escaped = "\\b"; break;
+            case '\f': escaped = "\\f"; break;
+            case '\n': escaped = "\\n"; break;
+            case '\r': escaped = "\\r"; break;
+            case '\t': escaped = "\\t"; break;
             default:
-                if ((uint8_t)*p < 0x20U) {
-                    out.print('?');
-                } else {
-                    out.print(*p);
-                }
+                if ((uint8_t)*p < 0x20U) escaped = "?";
                 break;
             }
+            if (!escaped) continue;
+
+            if (p > segment) {
+                out.write((const uint8_t*)segment, (size_t)(p - segment));
+            }
+            out.write((const uint8_t*)escaped, strlen(escaped));
+            segment = p + 1;
         }
+        const size_t tail = strlen(segment);
+        if (tail > 0U) out.write((const uint8_t*)segment, tail);
     }
-    out.print('\"');
+    out.write((uint8_t)'"');
 }
 
 static bool parseBoolParam_(const char* in, bool fallback)
@@ -2389,6 +2409,10 @@ bool waveshareBuildStatusDomainJson_(FlowStatusDomain domain,
         time["src_id"] = dataStore ? (uint8_t)timeSource(*dataStore) : 0U;
         time["qlt"] = dataStore ? timeQualityText(*dataStore) : "invalid";
         time["qlt_id"] = dataStore ? (uint8_t)timeQuality(*dataStore) : 0U;
+        // Heure courante de l'appareil. Sans elle, l'interface n'avait que la
+        // source et la qualite a afficher, et completait avec l'horloge du
+        // navigateur : une horloge d'appareil fausse restait donc invisible.
+        time["now"] = (uint32_t)::time(nullptr);
         time["last_ntp"] = dataStore ? (uint32_t)timeLastNtpSyncUtc(*dataStore) : 0U;
         time["last_rtc"] = dataStore ? (uint32_t)timeLastRtcSyncUtc(*dataStore) : 0U;
         JsonObject heap = doc.createNestedObject("heap");
@@ -2591,6 +2615,12 @@ bool sendWaveshareStatusCompactResponse_(AsyncWebServerRequest* request,
         printJsonEscaped_(*response, timeQualityText(*dataStore));
         response->print(",\"qlt_id\":");
         response->print((unsigned)timeQuality(*dataStore));
+        // Heure courante de l'appareil : sans elle, l'interface completait avec
+        // l'horloge du navigateur et une horloge d'appareil fausse restait
+        // invisible. Doit rester en phase avec l'autre serialisation du domaine
+        // system (voir le bloc ArduinoJson plus haut dans ce fichier).
+        response->print(",\"now\":");
+        response->print((unsigned long)::time(nullptr));
         response->print(",\"last_ntp\":");
         response->print((unsigned long)timeLastNtpSyncUtc(*dataStore));
         response->print(",\"last_rtc\":");
@@ -4734,16 +4764,28 @@ void WebInterfaceModule::sendActivityLogHttpResponse_(AsyncWebServerRequest* req
         available = (stats.capacity > 0U);
     }
 
+    // Une page de 128 evenements represente ~38 Ko de JSON a tenir en RAM interne
+    // pour une seule reponse. Le client pagine deja (`next`), donc la page est
+    // ramenee a une taille que le tampon peut recevoir d'un bloc.
+    constexpr int32_t kActivityPageMax = 32;
+    constexpr int32_t kActivityPageDefault = 32;
     int32_t requestedOffset = statusOnly ? 0 : requestIntParam_(request, "offset", 0);
-    int32_t requestedLimit = statusOnly ? 0 : requestIntParam_(request, "limit", 64);
+    int32_t requestedLimit = statusOnly ? 0 : requestIntParam_(request, "limit", kActivityPageDefault);
     if (requestedOffset < 0) requestedOffset = 0;
-    if (requestedLimit <= 0) requestedLimit = statusOnly ? 0 : 64;
-    if (requestedLimit > 128) requestedLimit = 128;
+    if (requestedLimit <= 0) requestedLimit = statusOnly ? 0 : kActivityPageDefault;
+    if (requestedLimit > kActivityPageMax) requestedLimit = kActivityPageMax;
 
     const uint16_t offset = (requestedOffset > UINT16_MAX) ? UINT16_MAX : (uint16_t)requestedOffset;
     const uint16_t limit = (requestedLimit > UINT16_MAX) ? UINT16_MAX : (uint16_t)requestedLimit;
 
-    AsyncResponseStream* response = request->beginResponseStream("application/json");
+    // Tampon dimensionne d'emblee : sans cela il grandit par `cbuf::resize`, qui
+    // recopie tout le contenu deja ecrit a chaque agrandissement. C'est ce cout
+    // quadratique qui bloquait `async_tcp` au-dela de la limite du Task Watchdog.
+    // ~420 o couvre le pire cas d'un evenement (title 48, detail 128, icon 24 et
+    // les libelles), plus l'en-tete de la reponse.
+    constexpr size_t kActivityEventJsonMax = 420U;
+    const size_t streamBytes = 1024U + ((size_t)limit * kActivityEventJsonMax);
+    AsyncResponseStream* response = request->beginResponseStream("application/json", streamBytes);
     addNoCacheHeaders_(response);
     response->printf("{\"available\":%s,\"capacity\":%u,\"entries\":%u,\"dropped\":%lu,\"persisted\":%lu,\"persist_dropped\":%lu,\"psram\":%s,\"spiffs\":%s",
                      available ? "true" : "false",
@@ -5023,6 +5065,11 @@ void WebInterfaceModule::startServer_()
         const HeapForensicSnapshot forensicStartHeap = captureHeapForensicSnapshot_();
         SpiffsAssetForensicMeta localMeta{};
 #endif
+
+        // Court : ne fait qu'empecher une NOUVELLE ouverture de commencer pendant
+        // qu'un OTA SPIFFS tient le verrou pour ecrire. Voir SpiffsAccessLock.h.
+        const SpiffsAccessLock::Guard lock(50U);
+        if (!lock.held()) return nullptr;
 
         char gzipPath[128] = {0};
         const char* servedPath = assetPath;
@@ -7260,6 +7307,71 @@ void WebInterfaceModule::startServer_()
         request->send(200, "application/json", (reply[0] != '\0') ? reply : "{\"ok\":true}");
     });
 
+    // Vidage du dernier crash. Le framework ecrit un vidage complet a chaque
+    // panique, Task Watchdog compris (CONFIG_ESP_TASK_WDT_PANIC), mais rien ne le
+    // lisait : la tache fautive restait inconnue sans cable USB. Le resume suffit
+    // le plus souvent ; `/raw` sert l'image telle quelle, pour espcoredump.py.
+    // Voir docs/notes/ota-spiffs-gzip-bilan.md.
+    server_.on("/api/system/coredump", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/system/coredump");
+        // Sur le tas : le backtrace et les registres tiennent mal sur la pile de la
+        // tache du serveur. 2 Ko : backtrace (16) + regs a0-a15 (16) + epcx (<=6),
+        // chacun jusqu'a 13 caracteres JSON, plus l'en-tete du resume.
+        constexpr size_t kBodyCap = 2048U;
+        char* body = (char*)heap_caps_malloc(kBodyCap, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!body) {
+            request->send(503, "application/json",
+                          "{\"ok\":false,\"err\":{\"code\":\"NotReady\",\"where\":\"system.coredump\"}}");
+            return;
+        }
+        const bool ok = CoreDumpInfo::toJson(body, kBodyCap);
+        AsyncWebServerResponse* response =
+            request->beginResponse(ok ? 200 : 500,
+                                   "application/json",
+                                   ok ? body
+                                      : "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"system.coredump\"}}");
+        addNoCacheHeaders_(response);
+        request->send(response);
+        heap_caps_free(body);
+    });
+
+    server_.on("/api/system/coredump/raw", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/system/coredump/raw");
+        uint32_t offset = 0U;
+        uint32_t size = 0U;
+        if (!CoreDumpInfo::imageLocation(offset, size) || size == 0U) {
+            request->send(404, "application/json",
+                          "{\"ok\":false,\"err\":{\"code\":\"NotFound\",\"where\":\"system.coredump.raw\"}}");
+            return;
+        }
+        // Lu par tranches depuis la flash : l'image peut faire plusieurs dizaines de
+        // Ko, que rien ne justifie de charger en RAM d'un bloc.
+        AsyncWebServerResponse* response = request->beginResponse(
+            "application/octet-stream",
+            (size_t)size,
+            [offset, size](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
+                if (index >= size) return 0U;
+                size_t want = (size_t)(size - (uint32_t)index);
+                if (want > maxLen) want = maxLen;
+                if (!CoreDumpInfo::imageRead(offset + (uint32_t)index, buffer, want)) return 0U;
+                return want;
+            });
+        response->addHeader("Content-Disposition", "attachment; filename=coredump.bin");
+        addNoCacheHeaders_(response);
+        request->send(response);
+    });
+
+    server_.on("/api/system/coredump", HTTP_DELETE, [this](AsyncWebServerRequest* request) {
+        HttpLatencyScope latency(request, "/api/system/coredump");
+        // Effacement uniquement sur demande : un effacement automatique au demarrage
+        // detruirait la seule trace du crash qu'on cherche a comprendre.
+        const bool ok = CoreDumpInfo::erase();
+        request->send(ok ? 200 : 500,
+                      "application/json",
+                      ok ? "{\"ok\":true,\"erased\":true}"
+                         : "{\"ok\":false,\"err\":{\"code\":\"Failed\",\"where\":\"system.coredump.erase\"}}");
+    });
+
     server_.on("/api/system/factory-reset", HTTP_POST, [this](AsyncWebServerRequest* request) {
         HttpLatencyScope latency(request, "/api/system/factory-reset");
         if (!cmdSvc_ && services_) {
@@ -7459,10 +7571,29 @@ void WebInterfaceModule::handleUpdateRequest_(AsyncWebServerRequest* request, Fi
 
     char urlBuf[224] = {0};
     copyRequestParamValue_(request, "url", true, urlBuf, sizeof(urlBuf), "");
+    if (urlBuf[0] == '\0') copyRequestParamValue_(request, "url", false, urlBuf, sizeof(urlBuf), "");
     const char* url = (urlBuf[0] != '\0') ? urlBuf : nullptr;
 
+    // Essai a blanc de l'OTA SPIFFS : telecharge et verifie l'image sans rien ecrire.
+    // Reserve a cette cible, les autres n'ayant pas d'etape de verification separee.
+    char dryBuf[8] = {0};
+    if (!copyRequestParamValue_(request, "dry", false, dryBuf, sizeof(dryBuf), "")) {
+        copyRequestParamValue_(request, "dry", true, dryBuf, sizeof(dryBuf), "");
+    }
+    const bool dryRun = (dryBuf[0] == '1' || dryBuf[0] == 't' || dryBuf[0] == 'T');
+    if (dryRun && (target != FirmwareUpdateTarget::Spiffs || !fwUpdateSvc_->startSpiffsDryRun)) {
+        request->send(400,
+                      "application/json",
+                      "{\"ok\":false,\"err\":{\"code\":\"Invalid\",\"where\":\"fwupdate.start\","
+                      "\"msg\":\"dry run reserve a la cible spiffs\"}}");
+        return;
+    }
+
     char err[144] = {0};
-    if (!fwUpdateSvc_->start(fwUpdateSvc_->ctx, target, url, err, sizeof(err))) {
+    const bool started = dryRun
+                             ? fwUpdateSvc_->startSpiffsDryRun(fwUpdateSvc_->ctx, url, err, sizeof(err))
+                             : fwUpdateSvc_->start(fwUpdateSvc_->ctx, target, url, err, sizeof(err));
+    if (!started) {
         sanitizeJsonString_(err);
         char out[336] = {0};
         const int n = snprintf(out,

@@ -65,6 +65,8 @@ private:
 
     struct UpdateJob {
         bool pending = false;
+        /** Essai a blanc : tout se deroule sauf l'ecriture flash et le redemarrage. */
+        bool dryRun = false;
         FirmwareUpdateTarget target = FirmwareUpdateTarget::Waveshare;
         char url[kUrlLen] = {0};
     };
@@ -122,6 +124,9 @@ private:
     static bool cmdSpiffs_(void* userCtx, const CommandRequest& req, char* reply, size_t replyLen);
 
     bool startUpdate_(FirmwareUpdateTarget target, const char* url, char* errOut, size_t errOutLen);
+    bool startSpiffsDryRun_(const char* url, char* errOut, size_t errOutLen);
+    /** @brief Mise en file commune : `startUpdate_` et `startSpiffsDryRun_` n'en different que par le drapeau. */
+    bool queueJob_(FirmwareUpdateTarget target, const char* url, bool dryRun, char* errOut, size_t errOutLen);
     bool queueNextionReboot_(char* errOut, size_t errOutLen);
     bool statusJson_(char* out, size_t outLen);
     bool isBusy_();
@@ -136,17 +141,7 @@ private:
     bool runWaveshareUpdate_(const char* url, char* errOut, size_t errOutLen);
     bool runNextionUpdate_(const char* url, char* errOut, size_t errOutLen);
     bool runNextionReboot_(char* errOut, size_t errOutLen);
-    bool runSpiffsUpdate_(const char* url, char* errOut, size_t errOutLen);
-    /**
-     * @brief Ecrit dans la partition SPIFFS un flux gzip decompresse a la volee.
-     *
-     * L'image est padee jusqu'a la taille de la partition, donc massivement
-     * compressible : le .gz vaut ~4 % du .bin. Decompresser ici evite de
-     * transferer 7,9 Mo pour ~320 Ko de contenu utile.
-     *
-     * @param expectedOut Taille attendue en sortie (taille de la partition).
-     * @return false et failMsg renseigne si le flux est invalide ou incomplet.
-     */
+    bool runSpiffsUpdate_(const char* url, bool dryRun, char* errOut, size_t errOutLen);
     /**
      * @brief Installe un paquet web : telechargement, verification, remplacement.
      *
@@ -170,9 +165,68 @@ private:
     /** @brief true si le fichier en place a deja la taille et l'empreinte voulues. */
     static bool webPkgFileMatches_(const char* path, uint32_t size, uint32_t crcExpected);
 
-    bool runSpiffsInflate_(NetworkClient* stream,
-                           int32_t contentLength,
+    /**
+     * @brief Prend le verrou SPIFFS exclusif puis demonte, avant de reecrire la partition.
+     *
+     * Le journal d'activite y ecrit en fonctionnement et le serveur web y lit ses
+     * fichiers, chacun depuis sa propre tache : sans exclusion mutuelle, laisser le
+     * driver monte pendant l'effacement corrompt le systeme de fichiers et fait
+     * paniquer la tache qui s'en sert au mauvais moment. Voir Core/SpiffsAccessLock.h.
+     *
+     * @return false si le verrou n'a pas pu etre acquis : rien n'a ete touche,
+     *         l'appelant doit abandonner l'ecriture proprement.
+     */
+    bool unmountSpiffsForWrite_();
+
+    /** @brief Issue de la mise en tampon de l'image compressee. */
+    enum class GzStage : uint8_t {
+        Absent = 0,  ///< Pas de variante compressee publiee : l'image complete prend le relais.
+        Failed,      ///< Variante presente mais non ramenee : erreur franche, rien n'est ecrit.
+        Ok
+    };
+
+    /**
+     * @brief Ramene `<url>.gz` en PSRAM, puis ferme la connexion.
+     *
+     * C'est le coeur de la reduction d'exposition au reseau : 333 Ko au lieu de
+     * 8,26 Mo, et surtout plus aucune connexion ouverte pendant l'ecriture flash.
+     * Tant que ce transfert n'a pas abouti, rien n'a ete touche, donc il est
+     * reessaye sans risque.
+     *
+     * @param bufOut Tampon alloue par la fonction, a liberer par l'appelant.
+     */
+    GzStage spiffsStageGz_(const char* url,
+                           uint8_t** bufOut,
+                           uint32_t* lenOut,
+                           char* failMsg,
+                           size_t failMsgLen);
+    /**
+     * @brief Verifie puis, si demande, ecrit l'image compressee tenue en memoire.
+     *
+     * Deroule une passe de verification complete (decompression + CRC-32 compare au
+     * trailer gzip) avant d'ecrire quoi que ce soit. En essai a blanc, s'arrete apres
+     * cette passe.
+     */
+    bool runSpiffsFromGz_(const uint8_t* gz,
+                          uint32_t gzLen,
+                          uint32_t partitionSize,
+                          bool dryRun,
+                          char* failMsg,
+                          size_t failMsgLen);
+    /**
+     * @brief Decompresse l'image tenue en memoire, avec ou sans ecriture flash.
+     *
+     * L'entree etant complete, `TINFL_FLAG_HAS_MORE_INPUT` n'est jamais positionne :
+     * la machine a etats entrelacee avec les lectures reseau, et la classe de bugs
+     * qui allait avec, disparaissent.
+     *
+     * @param crcOut CRC-32 des octets produits, convention zlib.
+     */
+    bool spiffsInflateMem_(const uint8_t* gz,
+                           uint32_t gzLen,
                            uint32_t expectedOut,
+                           bool writeToFlash,
+                           uint32_t* crcOut,
                            char* failMsg,
                            size_t failMsgLen);
     bool resolveUrl_(FirmwareUpdateTarget target,
@@ -187,6 +241,8 @@ private:
                            char* errOut,
                            size_t errOutLen) const;
     bool parseUrlArg_(const CommandRequest& req, char* out, size_t outLen) const;
+    /** @brief Drapeau `dry` des arguments de commande : essai a blanc, sans ecriture. */
+    bool parseDryRunArg_(const CommandRequest& req) const;
     void setStatus_(UpdateState state, FirmwareUpdateTarget target, uint8_t progress, const char* msg);
     void setError_(FirmwareUpdateTarget target, const char* msg);
     void setHmiOtaCondition_(bool active);
@@ -205,6 +261,7 @@ private:
         ServiceBinding::bind<&FirmwareUpdateModule::checkManifestJsonStream_>,
         ServiceBinding::bind<&FirmwareUpdateModule::manifestUrl_>,
         ServiceBinding::bind<&FirmwareUpdateModule::setConfig_>,
+        ServiceBinding::bind<&FirmwareUpdateModule::startSpiffsDryRun_>,
         this
     };
 };

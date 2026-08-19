@@ -480,7 +480,7 @@ Points forts:
 
 - dépendances minimales: `wifi`, `loghub`
 - logique `NetworkManager` claire: Ethernet prioritaire, délai Ethernet
-  `7000 ms`, délai WiFi `12000 ms`
+  `7000 ms`, délai WiFi `45000 ms`
 - garde-fous AP: précheck heap interne, retry, délai de stabilité, grace period
   client
 - integration HMI pour état portail

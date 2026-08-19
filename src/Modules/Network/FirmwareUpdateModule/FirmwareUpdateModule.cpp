@@ -19,11 +19,16 @@
 
 // Deux variantes d'OTA SPIFFS ont ete tentees pour reduire le volume transfere :
 // l'image compressee (FLOW_OTA_SPIFFS_GZIP) et le paquet de fichiers
-// (FLOW_OTA_SPIFFS_PKG). Aucune n'aboutit sur cible a ce jour ; les deux sont donc
-// desactivees et le firmware utilise l'image complete, qui fonctionne.
-// Voir docs/notes/ota-spiffs-reduction-volume.md
+// (FLOW_OTA_SPIFFS_PKG).
+//
+// L'image compressee est active depuis le 2026-08-15 : le .gz est ramene entier en
+// memoire, la connexion est fermee, l'image est verifiee (taille et CRC-32 du trailer
+// gzip) puis ecrite sans reseau. La liaison WiFi n'a plus a tenir que le temps de
+// transferer 333 Ko au lieu de rester ouverte pendant l'ecriture des 8,26 Mo. Un
+// serveur qui ne publie pas le .gz continue de servir l'image complete, sans rien
+// changer de son cote. Voir docs/notes/ota-spiffs-reduction-volume.md
 #ifndef FLOW_OTA_SPIFFS_GZIP
-#define FLOW_OTA_SPIFFS_GZIP 0
+#define FLOW_OTA_SPIFFS_GZIP 1
 #endif
 #ifndef FLOW_OTA_SPIFFS_PKG
 #define FLOW_OTA_SPIFFS_PKG 0
@@ -33,6 +38,7 @@
 #include "Board/BoardSpec.h"
 #include "Core/ErrorCodes.h"
 #include "Core/FirmwareVersion.h"
+#include "Core/SpiffsAccessLock.h"
 #include "Core/SystemLimits.h"
 
 #include <ESPNexUpload.h>
@@ -417,6 +423,29 @@ bool FirmwareUpdateModule::parseUrlArg_(const CommandRequest& req, char* out, si
     return false;
 }
 
+bool FirmwareUpdateModule::parseDryRunArg_(const CommandRequest& req) const
+{
+    // `dry` est accepte en booleen comme en entier : les appels viennent aussi bien
+    // d'un JSON construit a la main que d'un parametre de requete converti en 1/0.
+    auto readDry = [](const StaticJsonDocument<256>& doc) -> bool {
+        JsonVariantConst v = doc["dry"];
+        if (v.isNull()) {
+            JsonVariantConst args = doc["args"];
+            if (args.is<JsonObjectConst>()) v = args["dry"];
+        }
+        if (v.isNull()) return false;
+        if (v.is<bool>()) return v.as<bool>();
+        if (v.is<int>()) return v.as<int>() != 0;
+        const char* s = v.as<const char*>();
+        return s && (s[0] == '1' || s[0] == 't' || s[0] == 'T');
+    };
+
+    StaticJsonDocument<256> doc;
+    if (parseReqJsonObject_(req.args, doc) && readDry(doc)) return true;
+    doc.clear();
+    return parseReqJsonObject_(req.json, doc) && readDry(doc);
+}
+
 bool FirmwareUpdateModule::statusJson_(char* out, size_t outLen)
 {
     if (!out || outLen == 0) return false;
@@ -603,13 +632,15 @@ bool FirmwareUpdateModule::setConfig_(const char* updateHost,
     return true;
 }
 
-bool FirmwareUpdateModule::startUpdate_(FirmwareUpdateTarget target,
-                                        const char* url,
-                                        char* errOut,
-                                        size_t errOutLen)
+bool FirmwareUpdateModule::queueJob_(FirmwareUpdateTarget target,
+                                     const char* url,
+                                     bool dryRun,
+                                     char* errOut,
+                                     size_t errOutLen)
 {
     UpdateJob job{};
     job.target = target;
+    job.dryRun = dryRun;
     if (!resolveUrl_(target, url, job.url, sizeof(job.url), errOut, errOutLen)) {
         return false;
     }
@@ -624,9 +655,22 @@ bool FirmwareUpdateModule::startUpdate_(FirmwareUpdateTarget target,
     queuedJob_.pending = true;
     portEXIT_CRITICAL(&lock_);
 
-    setStatus_(UpdateState::Queued, target, 0, "queued");
-    LOGI("Update queued target=%s url=%s", targetStr_(target), job.url);
+    setStatus_(UpdateState::Queued, target, 0, dryRun ? "queued (dry run)" : "queued");
+    LOGI("Update queued target=%s%s url=%s", targetStr_(target), dryRun ? " (dry run)" : "", job.url);
     return true;
+}
+
+bool FirmwareUpdateModule::startUpdate_(FirmwareUpdateTarget target,
+                                        const char* url,
+                                        char* errOut,
+                                        size_t errOutLen)
+{
+    return queueJob_(target, url, false, errOut, errOutLen);
+}
+
+bool FirmwareUpdateModule::startSpiffsDryRun_(const char* url, char* errOut, size_t errOutLen)
+{
+    return queueJob_(FirmwareUpdateTarget::Spiffs, url, true, errOut, errOutLen);
 }
 
 bool FirmwareUpdateModule::queueNextionReboot_(char* errOut, size_t errOutLen)
@@ -1239,14 +1283,169 @@ bool FirmwareUpdateModule::runWebPackageUpdate_(NetworkClient* stream,
     return ok;
 }
 
-bool FirmwareUpdateModule::runSpiffsInflate_(NetworkClient* stream,
-                                             int32_t contentLength,
+namespace {
+
+/** En-tete gzip minimal produit par export_binaries.py : mtime=0, FLG=0, sans nom. */
+constexpr size_t kGzHeaderBytes = 10U;
+/** Queue gzip : CRC-32 puis taille decompressee, en petit-boutiste. */
+constexpr size_t kGzTrailerBytes = 8U;
+
+}  // namespace
+
+FirmwareUpdateModule::GzStage FirmwareUpdateModule::spiffsStageGz_(const char* url,
+                                                                   uint8_t** bufOut,
+                                                                   uint32_t* lenOut,
+                                                                   char* failMsg,
+                                                                   size_t failMsgLen)
+{
+    if (!bufOut || !lenOut || !url) {
+        snprintf(failMsg, failMsgLen, "spiffs gz: appel invalide");
+        return GzStage::Failed;
+    }
+    *bufOut = nullptr;
+    *lenOut = 0U;
+
+    char gzUrl[kUrlLen] = {0};
+    const int written = snprintf(gzUrl, sizeof(gzUrl), "%s.gz", url);
+    if (written <= 0 || (size_t)written >= sizeof(gzUrl)) {
+        // Pas de place pour le suffixe : on ne peut pas demander la variante, donc
+        // elle est traitee comme absente et l'image complete prend le relais.
+        return GzStage::Absent;
+    }
+
+    uint8_t* buf = nullptr;
+    size_t bufCapacity = 0U;
+    bool retryable = true;
+
+    for (uint8_t attempt = 1U;
+         retryable && attempt <= Limits::FirmwareUpdate::Spiffs::GzDownloadRetries;
+         ++attempt) {
+        failMsg[0] = '\0';
+        HTTPClient http;
+        configureDownloadHttp_(http);
+
+        if (!http.begin(gzUrl)) {
+            snprintf(failMsg, failMsgLen, "serveur HTTP injoignable");
+        } else {
+            const int code = http.GET();
+            if (code == HTTP_CODE_NOT_FOUND) {
+                // Serveur de mise a jour qui ne publie pas la variante compressee :
+                // ce n'est pas une panne, l'image complete reste servie.
+                http.end();
+                if (buf) free(buf);
+                LOGI("SPIFFS update: pas de variante compressee (404), image complete");
+                return GzStage::Absent;
+            }
+            if (code != HTTP_CODE_OK) {
+                snprintf(failMsg, failMsgLen, "erreur HTTP %d sur l'image compressee", code);
+                http.end();
+            } else {
+                const int32_t len = http.getSize();
+                if (len <= 0) {
+                    snprintf(failMsg, failMsgLen, "taille de l'image compressee inconnue");
+                    http.end();
+                } else if ((size_t)len > Limits::FirmwareUpdate::Spiffs::GzStageMaxBytes) {
+                    snprintf(failMsg,
+                             failMsgLen,
+                             "image compressee trop grosse (%lu o)",
+                             (unsigned long)len);
+                    http.end();
+                    retryable = false;  // le fichier ne changera pas d'une tentative a l'autre
+                } else {
+                    if (bufCapacity < (size_t)len) {
+                        if (buf) free(buf);
+                        buf = (uint8_t*)heap_caps_malloc((size_t)len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+                        if (!buf) buf = (uint8_t*)malloc((size_t)len);
+                        bufCapacity = buf ? (size_t)len : 0U;
+                    }
+                    if (!buf) {
+                        snprintf(failMsg,
+                                 failMsgLen,
+                                 "pas de memoire pour %lu o",
+                                 (unsigned long)len);
+                        http.end();
+                        retryable = false;
+                    } else {
+                        portENTER_CRITICAL(&lock_);
+                        activeTotalBytes_ = (uint32_t)len;
+                        activeSentBytes_ = 0;
+                        portEXIT_CRITICAL(&lock_);
+
+                        NetworkClient* stream = http.getStreamPtr();
+                        uint32_t got = 0U;
+                        uint32_t lastReadMs = millis();
+                        uint32_t chunkCount = 0U;
+                        while (stream && got < (uint32_t)len) {
+                            // Un seul point de sortie sur le temps : teste a chaque tour
+                            // et pas seulement quand le flux est vide. Une lecture qui
+                            // rend 0 alors que `available()` reste positif ferait sinon
+                            // tourner la boucle sans fin -- le genre de blocage muet que
+                            // cette reprise cherche justement a supprimer.
+                            if ((millis() - lastReadMs) >
+                                Limits::FirmwareUpdate::Http::StreamReadTimeoutMs) {
+                                break;
+                            }
+                            const size_t avail = stream->available();
+                            if (avail == 0U) {
+                                if (!stream->connected()) break;
+                                delay(1);
+                                continue;
+                            }
+                            size_t want = (size_t)((uint32_t)len - got);
+                            if (want > avail) want = avail;
+                            const int rd = stream->readBytes((char*)(buf + got), want);
+                            if (rd <= 0) {
+                                delay(1);
+                                continue;
+                            }
+                            got += (uint32_t)rd;
+                            lastReadMs = millis();
+                            onProgressChunk_((uint32_t)rd);
+                            if ((++chunkCount % 16U) == 0U) vTaskDelay(1);
+                        }
+                        http.end();
+
+                        if (got == (uint32_t)len) {
+                            LOGI("SPIFFS update: image compressee en memoire (%lu o, tentative %u)",
+                                 (unsigned long)got,
+                                 (unsigned)attempt);
+                            *bufOut = buf;
+                            *lenOut = got;
+                            return GzStage::Ok;
+                        }
+                        snprintf(failMsg,
+                                 failMsgLen,
+                                 "telechargement incomplet (%lu/%lu o)",
+                                 (unsigned long)got,
+                                 (unsigned long)len);
+                    }
+                }
+            }
+        }
+
+        LOGW("SPIFFS update: tentative %u/%u echouee : %s",
+             (unsigned)attempt,
+             (unsigned)Limits::FirmwareUpdate::Spiffs::GzDownloadRetries,
+             failMsg[0] ? failMsg : "raison inconnue");
+        if (retryable && attempt < Limits::FirmwareUpdate::Spiffs::GzDownloadRetries) {
+            delay(Limits::FirmwareUpdate::Spiffs::GzRetryDelayMs);
+        }
+    }
+
+    if (buf) free(buf);
+    return GzStage::Failed;
+}
+
+bool FirmwareUpdateModule::spiffsInflateMem_(const uint8_t* gz,
+                                             uint32_t gzLen,
                                              uint32_t expectedOut,
+                                             bool writeToFlash,
+                                             uint32_t* crcOut,
                                              char* failMsg,
                                              size_t failMsgLen)
 {
-    if (!stream) {
-        snprintf(failMsg, failMsgLen, "spiffs inflate: no stream");
+    if (!gz || gzLen <= (uint32_t)(kGzHeaderBytes + kGzTrailerBytes)) {
+        snprintf(failMsg, failMsgLen, "spiffs inflate: flux trop court");
         return false;
     }
 
@@ -1259,89 +1458,61 @@ bool FirmwareUpdateModule::runSpiffsInflate_(NetworkClient* stream,
         return false;
     }
 
-    tinfl_decompressor decomp;
-    tinfl_init(&decomp);
+    // JAMAIS sur la pile : tinfl_decompressor porte trois tables de Huffman de
+    // 3488 octets, soit ~10,7 Ko, alors que la tache fwupdate n'a que 6144 octets
+    // de pile (FirmwareUpdateModule.h). Le declarer en local faisait paniquer le
+    // firmware des le premier appel -- c'est la cause des trois OTA compressees
+    // bloquees du 2026-08-11, longtemps imputee au Task Watchdog ou au decodeur.
+    // Prefere la DRAM interne : les tables sont lues en acces aleatoire, la PSRAM
+    // ne sert que de repli.
+    tinfl_decompressor* decomp =
+        (tinfl_decompressor*)heap_caps_malloc(sizeof(tinfl_decompressor), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!decomp) {
+        decomp = (tinfl_decompressor*)heap_caps_malloc(sizeof(tinfl_decompressor),
+                                                       MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+    if (!decomp) {
+        free(dict);
+        snprintf(failMsg, failMsgLen, "spiffs inflate: no memory for decompressor");
+        return false;
+    }
+    tinfl_init(decomp);
 
-    uint8_t in[Limits::FirmwareUpdate::Http::StreamChunkBytes];
-    size_t inFill = 0U;   // octets valides dans `in`
-    size_t inPos = 0U;    // position de lecture dans `in`
+    const uint8_t* inPtr = gz + kGzHeaderBytes;
+    size_t inLeft = (size_t)gzLen - kGzHeaderBytes - kGzTrailerBytes;
     size_t dictOfs = 0U;
     uint32_t totalOut = 0U;
+    uint32_t crc = 0xFFFFFFFFUL;
     uint32_t chunkCount = 0U;
-    size_t headerLeft = 10U;  // en-tete gzip fixe : mtime=0 et FLG=0 cote generateur
-    bool headerChecked = false;
-    int32_t remaining = contentLength;
-    uint32_t lastReadMs = millis();
-    bool inputDone = false;  // plus rien a attendre du reseau
     bool ok = true;
     bool done = false;
 
-    // tinfl doit encore etre appele une fois l'entree epuisee : c'est ce dernier
-    // appel, avec HAS_MORE_INPUT retire, qui vide sa fenetre et rend DONE. Une boucle
-    // qui ne l'appelle que tant qu'il reste des octets a consommer attend donc
-    // indefiniment des donnees qui ne viendront plus.
     while (ok && !done) {
-        if (inPos >= inFill && !inputDone) {
-            const size_t avail = stream->available();
-            if (avail == 0U) {
-                const bool noMoreExpected = (contentLength > 0) ? (remaining <= 0) : !stream->connected();
-                if (noMoreExpected) {
-                    inputDone = true;
-                } else if ((millis() - lastReadMs) > Limits::FirmwareUpdate::Http::StreamReadTimeoutMs) {
-                    snprintf(failMsg, failMsgLen, "spiffs stream timeout");
-                    ok = false;
-                    break;
-                } else {
-                    delay(1);
-                    continue;
-                }
-            } else {
-                const size_t toRead = (avail > sizeof(in)) ? sizeof(in) : avail;
-                const int rd = stream->readBytes((char*)in, toRead);
-                if (rd <= 0) {
-                    delay(1);
-                    continue;
-                }
-                lastReadMs = millis();
-                inFill = (size_t)rd;
-                inPos = 0U;
-                if (contentLength > 0) remaining -= rd;
-                onProgressChunk_((uint32_t)rd);
-
-                if (!headerChecked && inFill >= 3U) {
-                    headerChecked = true;
-                    // Le generateur produit un gzip minimal ; tout autre en-tete
-                    // signalerait une image d'une autre provenance, que ce decodeur
-                    // lirait de travers.
-                    if (in[0] != 0x1FU || in[1] != 0x8BU || in[2] != 0x08U) {
-                        snprintf(failMsg, failMsgLen, "spiffs inflate: not a gzip stream");
-                        ok = false;
-                        break;
-                    }
-                }
-                if (headerLeft > 0U) {
-                    const size_t skip = (headerLeft < inFill) ? headerLeft : inFill;
-                    inPos += skip;
-                    headerLeft -= skip;
-                }
-            }
-        }
-
-        size_t inBytes = inFill - inPos;
+        size_t inBytes = inLeft;
         size_t outBytes = TINFL_LZ_DICT_SIZE - dictOfs;
-        const mz_uint32 flags = inputDone ? 0U : TINFL_FLAG_HAS_MORE_INPUT;
+        // L'entree est entiere en memoire : TINFL_FLAG_HAS_MORE_INPUT n'est jamais
+        // pose, donc tinfl sait qu'il n'y a pas de suite a attendre et termine de
+        // lui-meme. C'est ce qu'entrelacer decompression et lecture reseau rendait
+        // fragile -- premiere hypothese de la tentative A.
         const tinfl_status status =
-            tinfl_decompress(&decomp, in + inPos, &inBytes, dict, dict + dictOfs, &outBytes, flags);
-        inPos += inBytes;
+            tinfl_decompress(decomp, inPtr, &inBytes, dict, dict + dictOfs, &outBytes, 0U);
+        inPtr += inBytes;
+        inLeft -= inBytes;
 
         if (outBytes > 0U) {
-            if (Update.write(dict + dictOfs, outBytes) != outBytes) {
-                snprintf(failMsg, failMsgLen, "spiffs write failed (%u)", (unsigned)Update.getError());
+            if (writeToFlash && Update.write(dict + dictOfs, outBytes) != outBytes) {
+                snprintf(failMsg,
+                         failMsgLen,
+                         "spiffs write failed (%u) a %lu o",
+                         (unsigned)Update.getError(),
+                         (unsigned long)totalOut);
                 ok = false;
                 break;
             }
+            crc = crc32Update_(crc, dict + dictOfs, outBytes);
             totalOut += (uint32_t)outBytes;
             dictOfs = (dictOfs + outBytes) & (TINFL_LZ_DICT_SIZE - 1U);
+            onProgressChunk_((uint32_t)outBytes);
         }
 
         if (status == TINFL_STATUS_DONE) {
@@ -1349,27 +1520,33 @@ bool FirmwareUpdateModule::runSpiffsInflate_(NetworkClient* stream,
             break;
         }
         if (status < TINFL_STATUS_DONE) {
-            snprintf(failMsg, failMsgLen, "spiffs inflate failed (%d)", (int)status);
+            snprintf(failMsg,
+                     failMsgLen,
+                     "spiffs inflate failed (%d) a %lu o",
+                     (int)status,
+                     (unsigned long)totalOut);
             ok = false;
             break;
         }
-        // Entree epuisee et plus rien a lire, sans que le flux se soit termine :
-        // l'image est tronquee. Sans ce garde-fou, la boucle tournerait a vide.
-        if (inputDone && inBytes == 0U && outBytes == 0U) {
-            snprintf(failMsg, failMsgLen, "spiffs inflate: truncated stream");
+        // Ni consomme ni produit : le flux s'arrete avant sa fin. Sans ce garde-fou,
+        // la boucle tournerait a vide.
+        if (inBytes == 0U && outBytes == 0U) {
+            snprintf(failMsg,
+                     failMsgLen,
+                     "spiffs inflate: flux tronque a %lu o",
+                     (unsigned long)totalOut);
             ok = false;
             break;
         }
 
-        // Le yield doit suivre le travail produit, pas les lectures reseau : 329 Ko
-        // d'entree rendent 7,9 Mo, donc la decompression ecrit des megaoctets entre
-        // deux lectures. Indexe sur le reseau, ce yield laisserait la tache monopoliser
-        // son coeur assez longtemps pour reveiller le Task Watchdog -- le plantage
-        // corrige en juillet, reintroduit par une autre porte. 8 tours = ~256 Ko.
-        if ((++chunkCount % 8U) == 0U) vTaskDelay(1);
+        // Le yield suit le travail produit, pas l'entree consommee : 333 Ko rendent
+        // 7,9 Mo, donc un seul tour ecrit jusqu'a 32 Ko. 4 tours = 128 Ko, de quoi
+        // rendre la main au coeur 0 bien avant le Task Watchdog.
+        if ((++chunkCount % 4U) == 0U) vTaskDelay(1);
     }
 
     free(dict);
+    free(decomp);
 
     if (ok && totalOut != expectedOut) {
         snprintf(failMsg,
@@ -1379,12 +1556,165 @@ bool FirmwareUpdateModule::runSpiffsInflate_(NetworkClient* stream,
                  (unsigned long)expectedOut);
         ok = false;
     }
+    if (crcOut) *crcOut = crc ^ 0xFFFFFFFFUL;
     return ok;
 }
 
-bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_t errOutLen)
+bool FirmwareUpdateModule::unmountSpiffsForWrite_()
 {
-    setStatus_(UpdateState::Downloading, FirmwareUpdateTarget::Spiffs, 0, "downloading");
+    // NE PAS appeler SPIFFS.end() ici -- essaye le 2026-08-18, retire le meme soir.
+    //
+    // Hypothese testee : le journal d'activite et le serveur web continuant d'
+    // utiliser SPIFFS pendant l'ecriture, il fallait demonter pour eviter une
+    // collision. Mesure : SPIFFS.end() + Update.write(U_SPIFFS) a fait planter les
+    // TROIS ecritures reelles tentees ce soir avec lui (avec et sans le verrou
+    // SpiffsAccessLock ci-dessous), toujours au meme endroit -- pas dans du code
+    // applicatif, mais dans l'ordonnanceur FreeRTOS lui-meme
+    // (_frxt_dispatch -> vTaskSwitchContext -> vPortEnterCritical), ce qui rend le
+    // nom de tache accuse par le vidage de crash (async_tcp, EventBus, mqtt --
+    // different a chaque fois) sans signification : c'est la tache que
+    // l'ordonnanceur s'appretait a activer, pas la cause.
+    //
+    // Or les deux seules ecritures reelles reussies de tout ce chantier (2026-08-15,
+    // consignees dans docs/notes/ota-spiffs-gzip-bilan.md) tournaient sur un code qui
+    // ne demontait pas SPIFFS. 0/3 avec demontage, 2/2 sans -- ce n'est pas une
+    // preuve de mecanisme, mais une correlation trop nette pour l'ignorer, et
+    // ajouter SPIFFS.end() sans l'avoir mesure est exactement l'erreur que ce
+    // chantier a deja payee une fois (cf. les cinq correctifs aveugles du
+    // 2026-08-11 dans ota-spiffs-reduction-volume.md). Revenir a l'etat mesure.
+    //
+    // Le verrou reste : il protege une course reelle et distincte (ActivityLogModule
+    // et le serveur de fichiers statiques accedant a SPIFFS pendant que l'OTA le
+    // fait), meme si elle n'est pas la cause du crash ci-dessus. Sans le demontage,
+    // le risque qu'il visait a l'origine (le driver SPIFFS parlant a un cache
+    // devenu invalide) redevient theorique -- a rouvrir seulement si une nouvelle
+    // mesure le confirme.
+    if (!SpiffsAccessLock::acquire(5000U)) {
+        LOGE("SPIFFS update: verrou SPIFFS indisponible, ecriture annulee");
+        return false;
+    }
+    return true;
+}
+
+bool FirmwareUpdateModule::runSpiffsFromGz_(const uint8_t* gz,
+                                            uint32_t gzLen,
+                                            uint32_t partitionSize,
+                                            bool dryRun,
+                                            char* failMsg,
+                                            size_t failMsgLen)
+{
+    if (gzLen < (uint32_t)(kGzHeaderBytes + kGzTrailerBytes)) {
+        snprintf(failMsg, failMsgLen, "spiffs gz: flux trop court (%lu o)", (unsigned long)gzLen);
+        return false;
+    }
+    // Le generateur produit un gzip minimal ; tout autre en-tete signalerait une
+    // image d'une autre provenance, que ce decodeur lirait de travers.
+    if (gz[0] != 0x1FU || gz[1] != 0x8BU || gz[2] != 0x08U) {
+        snprintf(failMsg, failMsgLen, "spiffs gz: ce n'est pas un flux gzip");
+        return false;
+    }
+    if (gz[3] != 0x00U) {
+        snprintf(failMsg, failMsgLen, "spiffs gz: en-tete non minimal (FLG=0x%02X)", (unsigned)gz[3]);
+        return false;
+    }
+
+    // La queue gzip porte la taille et l'empreinte de l'image decompressee : les deux
+    // sont connues avant d'ecrire le moindre octet. C'est ce qui manquait au chemin en
+    // flux, ou l'incoherence de taille n'apparaissait qu'une fois la partition
+    // detruite.
+    const uint32_t crcExpected = readLe32_(gz + gzLen - 8U);
+    const uint32_t isize = readLe32_(gz + gzLen - 4U);
+    if (isize != partitionSize) {
+        snprintf(failMsg,
+                 failMsgLen,
+                 "spiffs gz: image %lu o, partition %lu o",
+                 (unsigned long)isize,
+                 (unsigned long)partitionSize);
+        return false;
+    }
+
+    // La verification compte pour la premiere moitie de la progression, l'ecriture
+    // pour la seconde. En essai a blanc il n'y a que la verification.
+    portENTER_CRITICAL(&lock_);
+    activeTotalBytes_ = dryRun ? partitionSize : (partitionSize * 2U);
+    activeSentBytes_ = 0;
+    portEXIT_CRITICAL(&lock_);
+
+    setStatus_(UpdateState::Flashing,
+               FirmwareUpdateTarget::Spiffs,
+               0,
+               dryRun ? "dry run: verification" : "verification");
+
+    // Passe de verification : l'image entiere est decompressee et son empreinte
+    // comparee au trailer, sans qu'un octet soit ecrit. Le contenu en place n'est
+    // touche qu'ensuite, et seulement si cette passe a reussi.
+    const uint32_t startMs = millis();
+    uint32_t crc = 0U;
+    if (!spiffsInflateMem_(gz, gzLen, partitionSize, false, &crc, failMsg, failMsgLen)) {
+        return false;
+    }
+    if (crc != crcExpected) {
+        snprintf(failMsg,
+                 failMsgLen,
+                 "spiffs gz: empreinte %08lX, attendue %08lX",
+                 (unsigned long)crc,
+                 (unsigned long)crcExpected);
+        return false;
+    }
+    LOGI("SPIFFS update: image verifiee, %lu o, crc %08lX, %lu ms",
+         (unsigned long)partitionSize,
+         (unsigned long)crc,
+         (unsigned long)(millis() - startMs));
+
+    if (dryRun) return true;
+
+    setStatus_(UpdateState::Flashing, FirmwareUpdateTarget::Spiffs, 50, "ecriture");
+    if (!unmountSpiffsForWrite_()) {
+        snprintf(failMsg, failMsgLen, "spiffs busy: verrou indisponible");
+        return false;
+    }
+    if (!Update.begin((size_t)partitionSize, U_SPIFFS)) {
+        snprintf(failMsg, failMsgLen, "spiffs begin failed (%u)", (unsigned)Update.getError());
+        SPIFFS.begin(false);
+        SpiffsAccessLock::release();
+        return false;
+    }
+    if (!spiffsInflateMem_(gz, gzLen, partitionSize, true, nullptr, failMsg, failMsgLen)) {
+        // Sans abandon explicite, Update reste engage et refuse le `begin` suivant :
+        // une seule ecriture manquee condamnait toute nouvelle tentative jusqu'au
+        // redemarrage.
+        Update.abort();
+        SPIFFS.begin(false);
+        SpiffsAccessLock::release();
+        return false;
+    }
+    if (!Update.end()) {
+        snprintf(failMsg, failMsgLen, "spiffs end failed (%u)", (unsigned)Update.getError());
+        Update.abort();
+        SPIFFS.begin(false);
+        SpiffsAccessLock::release();
+        return false;
+    }
+    if (!Update.isFinished()) {
+        snprintf(failMsg, failMsgLen, "spiffs not finished");
+        Update.abort();
+        SPIFFS.begin(false);
+        SpiffsAccessLock::release();
+        return false;
+    }
+
+    // Pas de SPIFFS.begin(false) ni de liberation du verrou ici : ESP.restart() suit
+    // immediatement (appelant), et le redemarrage remet tout a plat de toute facon.
+    LOGI("SPIFFS update: %lu o ecrits depuis l'image compressee", (unsigned long)partitionSize);
+    return true;
+}
+
+bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, bool dryRun, char* errOut, size_t errOutLen)
+{
+    setStatus_(UpdateState::Downloading,
+               FirmwareUpdateTarget::Spiffs,
+               0,
+               dryRun ? "dry run: telechargement" : "downloading");
 
     const esp_partition_t* spiffsPart =
         esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
@@ -1392,20 +1722,6 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
         writeSimpleError_(errOut, errOutLen, "spiffs partition not found");
         return false;
     }
-
-    // L'image est padee jusqu'a la taille de la partition : son .gz pese ~4 % du
-    // .bin. On le demande d'abord et on retombe sur le .bin s'il est absent, ce qui
-    // evite de declarer une seconde entree dans le manifeste et garde les serveurs
-    // de mise a jour existants utilisables tels quels.
-    //
-    // Desactive par defaut : le transfert compresse n'a pas encore abouti sur cible
-    // (l'OTA reste bloque sans que le firmware soit en train de flasher, cause non
-    // identifiee a ce jour). Le chemin non compresse, lui, fonctionne. Repasser
-    // FLOW_OTA_SPIFFS_GZIP a 1 pour reprendre le diagnostic.
-    HTTPClient http;
-    configureDownloadHttp_(http);
-    bool compressed = false;
-    int code = 0;
 
     // Paquet web : meme nom de base que l'image, extension .pkg. Prefere a l'image
     // quand il existe -- il ne reecrit pas la partition, donc une coupure ne peut
@@ -1415,7 +1731,9 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     // cause n'a pas ete trouvee. Le chemin par image, lui, fonctionne. Repasser
     // FLOW_OTA_SPIFFS_PKG a 1 pour reprendre le diagnostic.
 #if FLOW_OTA_SPIFFS_PKG
-    {
+    if (!dryRun) {
+        HTTPClient http;
+        configureDownloadHttp_(http);
         char pkgUrl[kUrlLen] = {0};
         const size_t urlLen = strlen(url);
         const bool endsWithBin = (urlLen > 4U) && (strcmp(url + urlLen - 4, ".bin") == 0);
@@ -1452,35 +1770,87 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     }
 #endif
 
-#if FLOW_OTA_SPIFFS_GZIP
-    char gzUrl[kUrlLen] = {0};
-    const int gzWritten = snprintf(gzUrl, sizeof(gzUrl), "%s.gz", url);
-    if (gzWritten > 0 && (size_t)gzWritten < sizeof(gzUrl)) {
-        if (http.begin(gzUrl)) {
-            code = http.GET();
-            if (code == HTTP_CODE_OK) {
-                compressed = true;
-                LOGI("SPIFFS update: variante compressee retenue (%s)", gzUrl);
-            } else {
-                LOGI("SPIFFS update: pas de variante compressee (HTTP %d), image brute", code);
-                http.end();
+    // L'image padee se compresse a ~4 % : on la ramene entiere en memoire, on ferme
+    // la connexion, puis on ecrit sans reseau. Le gain n'est pas seulement le volume
+    // transfere : la fenetre pendant laquelle la liaison WiFi doit tenir passe de
+    // plusieurs minutes a quelques secondes, et un transfert manque se rejoue sans
+    // que rien n'ait ete touche. Decompresser en flux, au contraire, gardait la
+    // connexion ouverte pendant toute l'ecriture des 8,26 Mo.
+    //
+    // L'essai a blanc emprunte toujours ce chemin, meme si FLOW_OTA_SPIFFS_GZIP
+    // repassait a 0 : il n'ecrit rien, donc il reste mesurable sur cible sans
+    // engager la mise a jour reelle.
+    if (dryRun || (FLOW_OTA_SPIFFS_GZIP != 0)) {
+        uint8_t* gz = nullptr;
+        uint32_t gzLen = 0U;
+        char stageFail[128] = {0};
+        const GzStage stage = spiffsStageGz_(url, &gz, &gzLen, stageFail, sizeof(stageFail));
+
+        if (stage == GzStage::Failed) {
+            // Pas de repli sur l'image complete : si 333 Ko ne passent pas, 8,26 Mo
+            // passeront encore moins, et l'echec serait alors destructif.
+            LOGE("SPIFFS update: image compressee non ramenee : %s", stageFail);
+            writeSimpleError_(errOut, errOutLen, stageFail[0] ? stageFail : "image compressee indisponible");
+            return false;
+        }
+
+        if (stage == GzStage::Ok) {
+            attachWebInterfaceSvcIfNeeded_();
+            if (webInterfaceSvc_ && webInterfaceSvc_->setPaused) {
+                webInterfaceSvc_->setPaused(webInterfaceSvc_->ctx, true);
             }
+
+            char gzFail[128] = {0};
+            const bool gzOk =
+                runSpiffsFromGz_(gz, gzLen, spiffsPart->size, dryRun, gzFail, sizeof(gzFail));
+            free(gz);
+
+            if (webInterfaceSvc_ && webInterfaceSvc_->setPaused) {
+                webInterfaceSvc_->setPaused(webInterfaceSvc_->ctx, false);
+            }
+
+            if (!gzOk) {
+                LOGE("SPIFFS update: %s", gzFail);
+                writeSimpleError_(errOut, errOutLen, gzFail);
+                return false;
+            }
+
+            if (dryRun) {
+                // Le message porte le verdict : c'est lui qu'on lit dans
+                // /api/fwupdate/status une fois l'essai termine.
+                char okMsg[kMsgLen] = {0};
+                snprintf(okMsg,
+                         sizeof(okMsg),
+                         "dry run ok: %lu o produits, crc conforme",
+                         (unsigned long)spiffsPart->size);
+                setStatus_(UpdateState::Done, FirmwareUpdateTarget::Spiffs, 100, okMsg);
+                LOGI("SPIFFS dry run termine sans ecriture");
+                return true;
+            }
+
+            setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::Spiffs, 100, "rebooting");
+            delay(1800);
+            ESP.restart();
+            return true;
+        }
+
+        if (dryRun) {
+            writeSimpleError_(errOut, errOutLen, "dry run: pas de variante compressee (.gz)");
+            return false;
         }
     }
-#endif
 
-    if (!compressed) {
-        configureDownloadHttp_(http);
-        if (!http.begin(url)) {
-            writeHttpBeginFailedError_("fichier de mise a jour", url, errOut, errOutLen);
-            return false;
-        }
-        code = http.GET();
-        if (code != HTTP_CODE_OK) {
-            writeHttpCodeFailedError_("fichier de mise a jour", url, http, code, errOut, errOutLen);
-            http.end();
-            return false;
-        }
+    HTTPClient http;
+    configureDownloadHttp_(http);
+    if (!http.begin(url)) {
+        writeHttpBeginFailedError_("fichier de mise a jour", url, errOut, errOutLen);
+        return false;
+    }
+    const int code = http.GET();
+    if (code != HTTP_CODE_OK) {
+        writeHttpCodeFailedError_("fichier de mise a jour", url, http, code, errOut, errOutLen);
+        http.end();
+        return false;
     }
 
     const int32_t contentLength = http.getSize();
@@ -1489,8 +1859,7 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     // Une taille differente signifie que l'image a ete produite pour une autre table
     // de partitions : l'ecrire donnerait un systeme de fichiers illisible, donc une
     // interface web perdue jusqu'au prochain flash USB. On refuse avant d'ecrire.
-    // Comprime, c'est le total decompresse qui est verifie, en fin de flux.
-    if (!compressed && contentLength > 0 && (uint32_t)contentLength != spiffsPart->size) {
+    if (contentLength > 0 && (uint32_t)contentLength != spiffsPart->size) {
         char sizeMsg[128] = {0};
         snprintf(sizeMsg,
                  sizeof(sizeMsg),
@@ -1513,26 +1882,23 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     if (webInterfaceSvc_ && webInterfaceSvc_->setPaused) {
         webInterfaceSvc_->setPaused(webInterfaceSvc_->ctx, true);
     }
+    const bool spiffsLockHeld = unmountSpiffsForWrite_();
 
     char failMsg[128] = {0};
-    // Comprime, la taille ecrite est celle de la partition, pas celle du telechargement.
-    const size_t beginSize = compressed
-                                 ? (size_t)spiffsPart->size
-                                 : ((contentLength > 0) ? (size_t)contentLength : (size_t)UPDATE_SIZE_UNKNOWN);
-    if (!Update.begin(beginSize, U_SPIFFS)) {
+    if (!spiffsLockHeld) {
+        snprintf(failMsg, sizeof(failMsg), "spiffs busy: verrou indisponible");
+    }
+    const size_t beginSize = (contentLength > 0) ? (size_t)contentLength : (size_t)UPDATE_SIZE_UNKNOWN;
+    if (failMsg[0] == '\0' && !Update.begin(beginSize, U_SPIFFS)) {
         snprintf(failMsg, sizeof(failMsg), "spiffs begin failed (%u)", (unsigned)Update.getError());
     }
 
     auto* stream = http.getStreamPtr();
-    if (failMsg[0] == '\0' && compressed) {
-        (void)runSpiffsInflate_(stream, contentLength, spiffsPart->size, failMsg, sizeof(failMsg));
-    }
-
     uint8_t buf[Limits::FirmwareUpdate::Http::StreamChunkBytes];
     int32_t remaining = contentLength;
     uint32_t lastReadMs = millis();
     uint32_t chunkCount = 0;
-    if (failMsg[0] == '\0' && !compressed) {
+    if (failMsg[0] == '\0') {
         while (http.connected() && (contentLength <= 0 || remaining > 0)) {
             const size_t avail = stream ? stream->available() : 0;
             if (avail == 0U) {
@@ -1578,9 +1944,7 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     }
     http.end();
 
-    // Le controle de completude du mode compresse porte sur le total decompresse,
-    // deja verifie par runSpiffsInflate_ contre la taille de la partition.
-    if (failMsg[0] == '\0' && !compressed && contentLength > 0 && remaining > 0) {
+    if (failMsg[0] == '\0' && contentLength > 0 && remaining > 0) {
         snprintf(failMsg, sizeof(failMsg), "incomplete download");
     }
     if (failMsg[0] == '\0' && !Update.end()) {
@@ -1595,12 +1959,21 @@ bool FirmwareUpdateModule::runSpiffsUpdate_(const char* url, char* errOut, size_
     }
 
     if (failMsg[0] != '\0') {
+        // Symetrique de unmountSpiffsForWrite_() : remonter et liberer seulement si
+        // le verrou avait ete pris, sinon SPIFFS est deja dans l'etat ou l'echec a
+        // ete detecte (jamais demonte).
+        if (spiffsLockHeld) {
+            SPIFFS.begin(false);
+            SpiffsAccessLock::release();
+        }
         writeSimpleError_(errOut, errOutLen, failMsg);
         return false;
     }
 
-    // Rien a persister : l'image qui vient d'etre ecrite porte sa propre version
-    // dans /fsver.j, lue au boot par FilesystemVersion.
+    // Pas de remontage ni de liberation du verrou : ESP.restart() suit
+    // immediatement, et le redemarrage remet tout a plat de toute facon. Rien a
+    // persister par ailleurs : l'image qui vient d'etre ecrite porte sa propre
+    // version dans /fsver.j, lue au boot par FilesystemVersion.
     setStatus_(UpdateState::Rebooting, FirmwareUpdateTarget::Spiffs, 100, "rebooting");
     delay(1800);
     ESP.restart();
@@ -1633,7 +2006,7 @@ bool FirmwareUpdateModule::runJob_(const UpdateJob& job)
             ok = runNextionUpdate_(job.url, err, sizeof(err));
             break;
         case FirmwareUpdateTarget::Spiffs:
-            ok = runSpiffsUpdate_(job.url, err, sizeof(err));
+            ok = runSpiffsUpdate_(job.url, job.dryRun, err, sizeof(err));
             break;
         default:
             snprintf(err, sizeof(err), "unsupported target");
@@ -1728,15 +2101,22 @@ bool FirmwareUpdateModule::cmdSpiffs_(void* userCtx, const CommandRequest& req, 
 
     char url[kUrlLen] = {0};
     const char* explicitUrl = self->parseUrlArg_(req, url, sizeof(url)) ? url : nullptr;
+    const bool dryRun = self->parseDryRunArg_(req);
     char err[120] = {0};
-    if (!self->startUpdate_(FirmwareUpdateTarget::Spiffs, explicitUrl, err, sizeof(err))) {
+    const bool queued = dryRun
+                            ? self->startSpiffsDryRun_(explicitUrl, err, sizeof(err))
+                            : self->startUpdate_(FirmwareUpdateTarget::Spiffs, explicitUrl, err, sizeof(err));
+    if (!queued) {
         if (!writeErrorJson(reply, replyLen, ErrorCode::Failed, "fw.update.spiffs")) {
             snprintf(reply, replyLen, "{\"ok\":false}");
         }
         return false;
     }
 
-    snprintf(reply, replyLen, "{\"ok\":true,\"queued\":true,\"target\":\"spiffs\"}");
+    snprintf(reply,
+             replyLen,
+             "{\"ok\":true,\"queued\":true,\"target\":\"spiffs\",\"dry_run\":%s}",
+             dryRun ? "true" : "false");
     return true;
 }
 

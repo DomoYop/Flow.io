@@ -552,7 +552,6 @@ bool WifiProvisioningModule::startCaptivePortal_(NetworkPortalReason reason)
     networkManager_.setCaptivePortalRunning(true);
     setHmiCaptivePortalCondition_(true);
     staProbeActive_ = false;
-    apClientEverSeen_ = false;
     lastStaProbeStartMs_ = millis();
     nextApStartAttemptMs_ = 0;
     apStartDeferredCount_ = 0;
@@ -648,7 +647,6 @@ void WifiProvisioningModule::refreshApClientState_(uint32_t nowMs, bool fromEven
     const uint8_t count = WiFi.softAPgetStationNum();
     if (count > 0) {
         lastApClientSeenMs_ = nowMs;
-        apClientEverSeen_ = true;
     }
     if (count != apClientCount_) {
         apClientCount_ = count;
@@ -664,7 +662,6 @@ void WifiProvisioningModule::startStaProbe_(uint32_t nowMs)
 {
     if (staProbeActive_) return;
     if (!wifiEnabled_ || !wifiConfigured_) return;
-    if (!apClientEverSeen_) return;
 
     staProbeActive_ = true;
     lastStaProbeStartMs_ = nowMs;
@@ -706,10 +703,43 @@ void WifiProvisioningModule::stopStaProbe_(const char* reason)
 void WifiProvisioningModule::handleStaProbePolicy_(uint32_t nowMs)
 {
     if (!apActive_) return;
-    (void)nowMs;
-    // Keep provisioning AP in strict AP-only mode until user credentials are
-    // updated; do not probe STA in background.
-    return;
+
+    // Golden rule: never disturb a client connected to the portal. If a probe
+    // is running and a client shows up, abort it immediately (STA in APSTA
+    // can move the radio channel and drop the association).
+    if (apClientCount_ > 0U) {
+        if (staProbeActive_) stopStaProbe_("AP client present");
+        return;
+    }
+
+    // No usable STA credentials, nothing to test.
+    if (!wifiEnabled_ || !wifiConfigured_) {
+        if (staProbeActive_) stopStaProbe_("STA not configured");
+        return;
+    }
+
+    // Grace period after the last portal client left, in case it reconnects.
+    if (lastApClientSeenMs_ != 0U &&
+        (uint32_t)(nowMs - lastApClientSeenMs_) < kApClientGraceMs) {
+        return;
+    }
+
+    if (staProbeActive_) {
+        // Probe window in progress. Success is handled by loop() via
+        // hasStationNetwork_() -> stopCaptivePortal_(). Here we only handle
+        // failure: window elapsed without connecting -> back to strict AP.
+        if (!isStaConnected_() &&
+            (uint32_t)(nowMs - lastStaProbeStartMs_) >= kStaProbeWindowMs) {
+            stopStaProbe_("STA probe window elapsed");
+        }
+        return;
+    }
+
+    // No probe running: start a new one after the interval has elapsed.
+    if (lastStaProbeStartMs_ == 0U ||
+        (uint32_t)(nowMs - lastStaProbeStartMs_) >= kStaProbeIntervalMs) {
+        startStaProbe_(nowMs);
+    }
 }
 
 bool WifiProvisioningModule::isStaConnected_() const

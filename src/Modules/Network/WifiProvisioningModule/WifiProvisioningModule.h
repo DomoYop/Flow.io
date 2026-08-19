@@ -134,7 +134,7 @@ private:
     static constexpr uint32_t kApClientPollMs = 1000U;
     static constexpr uint32_t kApClientGraceMs = 120000U;
     static constexpr uint32_t kStaProbeIntervalMs = 30000U;
-    static constexpr uint32_t kStaProbeWindowMs = 6000U;
+    static constexpr uint32_t kStaProbeWindowMs = 12000U;
     static constexpr uint32_t kApStartLogIntervalMs = 5000U;
     static constexpr uint32_t kApStartRetryMs = 2000U;
     static constexpr uint32_t kApStartMinLargestInternalBytes = 24576U;
@@ -177,7 +177,6 @@ private:
     volatile uint8_t apClientDisconnectReason_ = 0;
     volatile uint32_t apProbeEventCount_ = 0;
     volatile int apProbeLastRssi_ = 0;
-    bool apClientEverSeen_ = false;
     uint8_t apClientCount_ = 0;
     uint32_t lastApClientSeenMs_ = 0;
     uint32_t lastApClientPollMs_ = 0;

@@ -16,6 +16,7 @@
 #endif
 #include <ArduinoJson.h>
 #include <time.h>
+#include <esp_sntp.h>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -29,8 +30,13 @@
 #define FLOW_TIME_MIN_YEAR 0
 #endif
 
+// Seuil de journalisation d'un recalage d'horloge vers l'avant. Il valait 300 s,
+// soit exactement l'ordre de grandeur d'une derive de RTC non resynchronise :
+// une horloge qui retardait de plusieurs minutes se faisait recaler sans laisser
+// la moindre trace, et le decalage ne se voyait que sur les horaires de
+// filtration. 5 s suffit a ignorer la gigue reseau normale.
 #ifndef TIME_LARGE_JUMP_SECONDS
-#define TIME_LARGE_JUMP_SECONDS 300
+#define TIME_LARGE_JUMP_SECONDS 5
 #endif
 
 namespace {
@@ -46,6 +52,10 @@ static constexpr uint64_t kTimeMaxPlausibleEpochSec = 4102444800ULL; // 2100-01-
 static constexpr uint32_t kTimeLargeJumpSeconds = (uint32_t)TIME_LARGE_JUMP_SECONDS;
 static constexpr uint32_t kTimeMetaMagic = 0x54494D45UL; // "TIME"
 static constexpr uint16_t kTimeMetaVersion = 1U;
+// Attente d'une reponse SNTP : couvre la resolution DNS du serveur au premier
+// essai. Bloque la tache Time d'autant, donc le tick du scheduler peut glisser
+// de ce delai -- sans effet, sa granularite est la minute.
+static constexpr uint32_t kSntpSyncTimeoutMs = 8000UL;
 static constexpr uint32_t kExternalRtcNtpRetryMs = 60000UL;
 static constexpr uint32_t kNextionRtcFallbackDelayMs = 30000U;
 static constexpr uint32_t kNextionRtcFallbackRetryMs = 10000U;
@@ -489,6 +499,27 @@ void TimeModule::setActiveSource_(TimeSource source, TimeQuality quality)
 const char* TimeModule::activeSourceName_() const
 {
     return sourceName_(activeSource_);
+}
+
+volatile bool TimeModule::sntpSyncNotified_ = false;
+
+// Appele par la pile SNTP quand une reponse serveur vient d'etre appliquee a
+// l'horloge systeme. C'est le seul evenement qui distingue une vraie synchro
+// d'une heure simplement plausible (posee par le RTC au demarrage).
+void TimeModule::sntpSyncNotifyCb_(struct timeval* tv)
+{
+    (void)tv;
+    sntpSyncNotified_ = true;
+}
+
+bool TimeModule::waitForSntpSync_(uint32_t timeoutMs)
+{
+    const uint32_t start = millis();
+    while (!sntpSyncNotified_) {
+        if ((uint32_t)(millis() - start) >= timeoutMs) return false;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+    return true;
 }
 
 void TimeModule::logTimeJump_(uint64_t oldEpochSec, uint64_t newEpochSec, TimeSource source, TimeQuality quality)
@@ -1422,10 +1453,18 @@ void TimeModule::loop() {
     case TimeSyncState::Syncing: {
         LOGI("Syncing via NTP...");
 
+        // getLocalTime() ne teste que la plausibilite de l'heure systeme
+        // (annee > 2016) : quand le RTC en a deja pose une au demarrage, il
+        // renvoie true immediatement, avant toute reponse serveur. L'heure du
+        // RTC, derivee, etait alors estampillee "ntp_synced" et settimeofday()
+        // se contentait de la reecrire a l'identique -- panne muette, sans
+        // saut d'horloge a journaliser. On attend donc la notification SNTP,
+        // seul temoin qu'un serveur a repondu.
+        sntpSyncNotified_ = false;
+        sntp_set_time_sync_notification_cb(&TimeModule::sntpSyncNotifyCb_);
         configTzTime(cfgData.tz, cfgData.server1, cfgData.server2);
 
-        struct tm timeinfo;
-        if (getLocalTime(&timeinfo, 4000)) {
+        if (waitForSntpSync_(kSntpSyncTimeoutMs)) {
             char buf[32];
             formatLocalTime_(buf, sizeof(buf));
             LOGI("Synced ok: %s", buf);
@@ -1439,7 +1478,11 @@ void TimeModule::loop() {
                 LOGI("NTP sync succeeded epoch=%llu", (unsigned long long)ntpEpoch);
             }
         } else {
-            LOGW("Sync failed -> retry in %lu ms", (unsigned long)_retryDelayMs);
+            LOGW("No NTP server reply from %s / %s after %lu ms -> retry in %lu ms",
+                 cfgData.server1,
+                 cfgData.server2,
+                 (unsigned long)kSntpSyncTimeoutMs,
+                 (unsigned long)_retryDelayMs);
             recordSource_(TimeSource::Ntp, _netReady, false, 0ULL, millis());
             if (syncedFromExternalRtc_) {
                 LOGW("Keeping RTC time after NTP failure");

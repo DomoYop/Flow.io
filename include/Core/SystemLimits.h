@@ -374,6 +374,20 @@ constexpr uint32_t StreamReadTimeoutMs = 15000U;
 /** @brief Scratch buffer size used to copy download streams chunk by chunk. */
 constexpr size_t StreamChunkBytes = 1024U;
 }  // namespace Http
+namespace Spiffs {
+/**
+ * @brief Plafond du tampon alloue a l'image SPIFFS compressee.
+ *
+ * L'image padee se compresse a ~4 % : 333 Ko pour une partition de 7,9 Mo. Le
+ * plafond laisse trois fois cette marge et refuse tout de suite un fichier qui ne
+ * serait pas la variante attendue, avant d'immobiliser la PSRAM.
+ */
+constexpr size_t GzStageMaxBytes = 1024U * 1024U;
+/** @brief Tentatives de telechargement de l'image compressee (rien n'est ecrit entre-temps). */
+constexpr uint8_t GzDownloadRetries = 3U;
+/** @brief Pause entre deux tentatives de telechargement. */
+constexpr uint32_t GzRetryDelayMs = 1500U;
+}  // namespace Spiffs
 }  // namespace FirmwareUpdate
 
 }  // namespace Limits

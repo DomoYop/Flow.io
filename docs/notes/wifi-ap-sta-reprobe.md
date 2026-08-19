@@ -1,10 +1,12 @@
 # Note de travail — Retour automatique AP → STA (re-probe WiFi)
 
-> Statut : **analyse + proposition, non implémenté**
+> Statut : **implémenté** (2026-08-18), changements 1 à 3 + l'affinement optionnel
+> (grâce `kApClientGraceMs` après départ du dernier client). Reste la validation
+> terrain (§6).
 > Date : 2026-06-27
 > Contexte : à faible réception (~-95 dBm), le firmware bascule en mode AP (portail
 > captif) mais ne revient jamais automatiquement en STA quand le signal redevient
-> exploitable. À reprendre demain.
+> exploitable.
 
 ## 1. Architecture de la connexion WiFi
 
@@ -186,10 +188,16 @@ AP actif, ≥1 client
   dernier client. La constante `kApClientGraceMs = 120000` existe déjà et pourrait
   servir via `lastApClientSeenMs_`.
 
-## 6. Reste à faire (demain)
+## 6. Reste à faire
 
-- [ ] Appliquer les changements 1 à 3.
-- [ ] Compiler `pio run -e Waveshare-ESP32-S3`.
+- [x] Appliquer les changements 1 à 3.
+- [x] Compiler `pio run -e Waveshare-ESP32-S3` (succès, flash 47,9 %).
+- [x] Ajouter la grâce `kApClientGraceMs` après départ du dernier client
+      (§5, `handleStaProbePolicy_` ignore le probe tant que
+      `nowMs - lastApClientSeenMs_ < kApClientGraceMs`).
 - [ ] Test terrain : forcer le passage AP (couper/affaiblir le signal), puis rétablir
       et vérifier le retour STA automatique en l'absence de client portail.
-- [ ] Décider si on ajoute la grâce `kApClientGraceMs` après départ du dernier client.
+
+Effet de bord du nettoyage : `apClientEverSeen_` (qui ne servait plus qu'à ce verrou)
+est devenu mort après le changement 2 et a été supprimé (champ + deux écritures),
+plutôt que laissé en `write-only`.

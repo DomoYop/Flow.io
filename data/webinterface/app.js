@@ -79,6 +79,10 @@
     let networkMode = 'none';
     let networkTransport = 'none';
     let currentFlowTimeSourceLabel = '';
+    // Ecart entre l'horloge de l'appareil et celle du navigateur, en ms. Null
+    // tant que l'appareil n'a pas fourni son heure : on retombe alors sur
+    // l'horloge locale, faute de mieux.
+    let deviceClockOffsetMs = null;
     let useRemoteMenuIcons = false;
     let remoteMenuIconFontReady = false;
     let remoteMenuIconFontPromise = null;
@@ -1189,6 +1193,16 @@
       renderHeaderReachability();
     }
 
+    // Cale l'horloge affichee sur celle de l'appareil (time.now, epoch en
+    // secondes). Un firmware anterieur ne renvoie pas ce champ : l'ecart reste
+    // alors null et l'affichage retombe sur l'horloge du navigateur.
+    function adoptDeviceClock(time) {
+      if (!time || typeof time !== 'object') return;
+      const nowSec = Number(time.now);
+      if (!Number.isFinite(nowSec) || nowSec <= 0) return;
+      deviceClockOffsetMs = (nowSec * 1000) - Date.now();
+    }
+
     function refreshAppHeaderClock() {
       if (headerClockLabel) {
         const baseLabel = tr('header.time', 'Heure');
@@ -1197,7 +1211,14 @@
           : baseLabel;
       }
       if (!headerClockStatus) return;
-      headerClockStatus.textContent = new Date().toLocaleTimeString(currentWebLocaleTag());
+      // Heure de l'appareil, pas celle du poste : c'est la premiere qui pilote
+      // filtration et planifications. Elle avance localement entre deux
+      // rafraichissements du domaine system. Le rendu utilise le fuseau du
+      // navigateur, l'ecart a surveiller etant l'instant absolu.
+      const shown = (deviceClockOffsetMs === null)
+        ? new Date()
+        : new Date(Date.now() + deviceClockOffsetMs);
+      headerClockStatus.textContent = shown.toLocaleTimeString(currentWebLocaleTag());
     }
 
     function startAppHeaderClock() {
@@ -1212,11 +1233,12 @@
           ? flowStatusDomainCache.system.data
           : null;
         const time = (systemDomain && systemDomain.time && typeof systemDomain.time === 'object') ? systemDomain.time : null;
+        adoptDeviceClock(time);
         const nextTimeLabel = flowTimeHeaderLabel(time);
         if (nextTimeLabel) {
           currentFlowTimeSourceLabel = nextTimeLabel;
-          refreshAppHeaderClock();
         }
+        refreshAppHeaderClock();
       } catch (err) {
       }
     }
@@ -2690,7 +2712,10 @@
     async function refreshActivityLog(showBusy) {
       if (!activityLogList) return;
       if (showBusy && activityLogStatus) activityLogStatus.textContent = 'Chargement du journal...';
-      const limit = 128;
+      // Aligne sur le plafond du firmware : une page plus grande y est de toute
+      // facon ramenee a cette taille, et une reponse volumineuse doit tenir d'un
+      // bloc dans le tampon du serveur. La boucle ci-dessous pagine deja.
+      const limit = 32;
       let offset = 0;
       const events = [];
       let stats = null;
@@ -4739,6 +4764,7 @@
       const mqttReady = !!mqtt.rdy;
       if (data && Object.prototype.hasOwnProperty.call(data, 'time')) {
         currentFlowTimeSourceLabel = flowTimeHeaderLabel(time);
+        adoptDeviceClock(time);
       }
       refreshAppHeaderClock();
       const mqttServer = fmtFlowStatusVal(mqtt.srv);
@@ -7023,8 +7049,11 @@
       if (!Number.isFinite(end) || end <= 0) return [];
 
       const pages = [];
-      for (let page = 0; page < 3 && end > 0; page += 1) {
-        const size = Math.min(128, end);
+      // 12 pages de 32 couvrent les memes 384 evenements que les 3 pages de 128
+      // d'avant : la taille de page a ete reduite parce qu'une reponse plus grosse
+      // doit tenir d'un bloc dans le tampon du serveur.
+      for (let page = 0; page < 12 && end > 0; page += 1) {
+        const size = Math.min(32, end);
         const offset = end - size;
         const data = await poolPhFetchActivityJson(
           '/api/activity/logs?offset=' + offset + '&limit=' + size
