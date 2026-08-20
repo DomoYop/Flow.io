@@ -62,17 +62,24 @@ public:
     /**
      * @brief Memory capability flags used for the task stack allocation.
      *
-     * NE JAMAIS rendre MALLOC_CAP_SPIRAM ici. `xTaskCreatePinnedToCoreWithCaps`
-     * place alors la pile *et* le TCB en memoire externe -- or la PSRAM du module
-     * S3 est octale, donc servie par le meme cache que la flash. Chaque ecriture
-     * flash coupe ce cache sur les deux coeurs et immobilise l'autre coeur par une
-     * interruption de haut niveau, laquelle s'execute sur la pile de la tache
-     * courante : une pile en PSRAM est alors inatteignable. L'ordonnanceur, lui,
-     * parcourt les TCB quel que soit le coeur.
+     * Rendre MALLOC_CAP_SPIRAM place la pile *et* le TCB en memoire externe
+     * (`xTaskCreatePinnedToCoreWithCaps`). Cinq modules le font sur le profil
+     * Waveshare, et ce n'est pas un oubli : la DRAM interne de cette carte est la
+     * ressource rare -- 226 Ko en tout, dont il ne restait que 7,4 Ko libres et
+     * 2,5 Ko de plus gros bloc quand ces cinq piles ont ete rapatriees en interne
+     * le 2026-08-19. Le serveur d'assets s'est mis a repondre 503 Busy
+     * (`shouldRejectAssetByFreeHeap_`, seuil 10 240 o) et l'interface web est
+     * tombee. Mesure du 2026-08-20 : plancher historique de DRAM interne libre a
+     * **272 octets**.
      *
-     * Cinq modules le faisaient sur le profil Waveshare ; un OTA ouvre ~2 140 de
-     * ces fenetres, d'ou des paniques non reproductibles, avec une tache accusee
-     * differente a chaque fois et un backtrace dans `vTaskSwitchContext`.
+     * Le risque theorique existe -- une pile en PSRAM est inatteignable pendant
+     * qu'une ecriture flash coupe le cache -- mais il a ete explicitement cherche
+     * et **non trouve** : les paniques d'aout 2026 etaient des debordements de
+     * pile (`exc_cause = 65`, exception de debogage levee par le point d'arret de
+     * fin de pile), pas des erreurs de cache (qui auraient donne 71).
+     *
+     * Donc : ne pas rapatrier ces piles en interne sans avoir d'abord verifie la
+     * marge avec `GET /api/system/heap`, et sans raison mesuree de le faire.
      * Voir docs/notes/audit-paniques-flash-cache.md.
      */
     virtual UBaseType_t taskStackCaps() const { return MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT; }

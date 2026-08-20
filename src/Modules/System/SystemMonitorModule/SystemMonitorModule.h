@@ -37,6 +37,13 @@ public:
         return 3072;
 #endif
     }
+    UBaseType_t taskStackCaps() const override {
+#if defined(FLOW_PROFILE_WAVESHARE)
+        return MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+#else
+        return Module::taskStackCaps();
+#endif
+    }
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
 

@@ -666,6 +666,51 @@ fusionnée depuis `0x0` **effacerait la NVS** (le trou 0x9000-0xe000 y est combl
 `0xFF`). Utiliser `pio run -t upload` puis `pio run -t uploadfs`, qui écrivent région par
 région et laissent la NVS intacte.
 
+## Le rapatriement des piles PSRAM a cassé l'interface web — annulé le 2026-08-20
+
+`4.4.0` flashée, `GET /webinterface` répond `{"ok":false,"err":{"code":"Busy"}}` avec
+l'en-tête `X-Flow-Busy-Reason: low_memory`. Le serveur d'assets refuse de servir un
+fichier quand la DRAM interne passe sous un seuil — `shouldRejectAssetByFreeHeap_`
+([WebInterfaceServer.cpp:699](../../src/Modules/Network/WebInterfaceModule/WebInterfaceServer.cpp)),
+10 240 o libres et 6 144 o de plus gros bloc pour un asset majeur.
+
+`GET /api/system/heap`, ajoutée la veille, donne le verdict en une commande :
+
+```json
+"internal":{"free":7356,"min_free":272,"largest":2548,"total":231808,"frag":65}
+"combined":{"free":7892888,"min_free":7866660,"largest":7864308,"frag":0}
+```
+
+Les deux critères sont sous le seuil. Coût du firmware `4.4.0` en DRAM interne :
+**18 864 o**, dont **13 824 pour le seul rapatriement** des cinq piles PSRAM — celui qui
+ne corrigeait rien.
+
+Deux enseignements, au-delà de l'incident.
+
+**La DRAM interne est la ressource rare de cette carte, pas la flash ni la PSRAM.**
+226 Ko en tout, un plancher historique à **272 octets** libres. `CLAUDE.md` désigne les
+capacités compile-time comme la vraie contrainte ; il faut y ajouter celle-ci. Les cinq
+piles en PSRAM ne sont pas un oubli, c'est ce qui rend l'ensemble tenable.
+
+**Le défaut de mesure du tas, signalé la veille, s'est matérialisé en panne.** `combined`
+affiche `free = 7 892 888` et `frag = 0 %` : c'est ce que lisent les seuils de
+`deriveMemoryPressureState_`, qui ne pouvaient donc rien voir venir, pendant que la
+réalité interne était à 7 356 libres et 65 % de fragmentation.
+
+### Ce qui est annulé, ce qui reste
+
+| | Décision |
+|---|---|
+| Rapatriement des 5 piles PSRAM (`b918ea8`) | **Annulé.** Retour à l'état éprouvé, 14 848 o rendus |
+| Agrandissement mqtt / eventbus / wifiprov | **Conservé** — le vrai correctif, +4 016 o seulement |
+| Agrandissement sysmon 3072 → 4096 | Conservé, mais **en PSRAM** : coût interne nul |
+| Partition retaillée, exposition des deux tas | Conservées, valeur propre |
+
+Le commentaire de `Module.h` disait « ne jamais rendre `MALLOC_CAP_SPIRAM` ». Il dit
+maintenant l'inverse, avec les chiffres : ces piles sont en mémoire externe
+délibérément, le risque théorique a été cherché et non trouvé, et la marge se vérifie
+par `GET /api/system/heap` avant d'y toucher.
+
 ## Point ouvert sans rapport avec les piles
 
 `Buf mqtt.payload=1515/1536@flowio/poolbox/cfg/pool` : le tampon de payload MQTT est à
