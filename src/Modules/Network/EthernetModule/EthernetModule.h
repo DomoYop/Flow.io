@@ -39,7 +39,20 @@ public:
     ModuleId moduleId() const override { return ModuleId::Ethernet; }
     const char* taskName() const override { return "ethernet"; }
     BaseType_t taskCore() const override { return 0; }
-    uint16_t taskStackSize() const override { return 6144; }
+    /**
+     * Waveshare : 6144 -> 3072. Mesure du 2026-08-20 sur cible, 5 344 octets de
+     * marge, soit 800 octets reellement consommes sur 6 144 -- la pile la plus
+     * surdimensionnee du parc. 3 072 laisse encore 74 % de marge et rend 3 Ko de
+     * DRAM interne, la ressource rare de cette carte.
+     * Voir docs/notes/audit-paniques-flash-cache.md.
+     */
+    uint16_t taskStackSize() const override {
+#if defined(FLOW_PROFILE_WAVESHARE)
+        return 3072;
+#else
+        return 6144;
+#endif
+    }
     uint32_t startDelayMs() const override { return 1500U; }
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }

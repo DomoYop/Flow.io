@@ -751,6 +751,54 @@ inerte sur ce profil au lieu de prétendre agir.
 prise avant de modifier l'autre. Le grep qui montrait ce `#if` était sous les yeux la
 veille, lu à l'envers.
 
+## Sur cette carte, une grosse pile coûte deux fois — 4.4.2 → 4.4.3
+
+`4.4.2` (pile `mqtt` portée à 7 680) a **de nouveau** fait tomber l'interface web en
+`Busy` / `low_memory`. Le relevé montre que le mécanisme n'est pas celui de `4.4.0` :
+
+| | 4.4.1 (OK) | 4.4.2 (KO) | Seuil |
+|---|---|---|---|
+| `internal.free` | 16 212 | **13 772** ✓ | 10 240 |
+| `internal.largest` | 9 716 | **5 620** ✗ | 6 144 |
+| fragmentation | 40 % | 59 % | — |
+
+**Le libre passe le seuil ; c'est la contiguïté qui manque.** Une pile FreeRTOS est
+allouée d'un seul bloc : demander 7 680 octets contigus dans un tas dont le plus gros
+bloc faisait 9 716 l'a consommé presque entièrement. `largest` est tombé de 4 096 pour
+2 560 octets réellement demandés.
+
+Conséquence à retenir pour tout dimensionnement futur sur cette carte : **une grosse
+pile coûte deux fois** — la mémoire qu'elle prend, et le plus gros bloc qu'elle détruit.
+Le garde d'assets teste les deux critères ; c'est le second qui mord en premier.
+
+### Le levier qu'il fallait regarder d'abord
+
+Les relevés du 2026-08-20 contenaient depuis le début la réponse, dans les tâches qui
+*vont bien* :
+
+| Tâche | Pile | Marge | Consommé |
+|---|---|---|---|
+| ethernet | 6 144 | 5 344 | **800** |
+| hmi | 6 144 | 4 380 | 1 764 |
+| fwupdate | 6 144 | 5 008 | 1 136 |
+
+`ethernet` utilisait 800 octets sur 6 144. Trois versions ont été passées à *ajouter* de
+la mémoire à une carte qui n'en avait plus, sans jamais regarder qui en gaspillait.
+
+`4.4.3` corrige les deux bouts :
+
+| Changement | Effet | Base mesurée |
+|---|---|---|
+| mqtt 5 120 → **6 656** | +1 536 | 5 052 consommés, marge 1 604 (24 %) |
+| ethernet 6 144 → **3 072** | −3 072 | 800 consommés, reste 74 % de marge |
+| hmi 6 144 → **4 096** | −2 048 | 1 764 consommés, reste 57 % de marge |
+
+Bilan **−3 584 octets** par rapport à `4.4.1`, et surtout deux blocs de 6 144 remplacés
+par 3 072 et 4 096, pendant que la demande de `mqtt` retombe sous le seuil destructeur.
+
+`fwupdate` est laissée à 6 144 malgré ses 5 008 de marge apparente : elle travaille
+pendant les OTA, précisément quand une mesure au repos ne dit rien.
+
 ## Points ouverts sans rapport avec les piles
 
 Deux tampons signalés par `sysmon`, même famille : la troncature silencieuse des

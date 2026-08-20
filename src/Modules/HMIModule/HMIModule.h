@@ -29,7 +29,19 @@ public:
     ModuleId moduleId() const override { return ModuleId::Hmi; }
     const char* taskName() const override { return "HMI"; }
     BaseType_t taskCore() const override { return 1; }
-    uint16_t taskStackSize() const override { return 6144; }
+    /**
+     * Waveshare : 6144 -> 4096. Mesure du 2026-08-20 sur cible, 4 380 octets de
+     * marge, soit 1 764 consommes sur 6 144. 4 096 laisse 57 % de marge et rend
+     * 2 Ko de DRAM interne.
+     * Voir docs/notes/audit-paniques-flash-cache.md.
+     */
+    uint16_t taskStackSize() const override {
+#if FLOW_BUILD_IS_WAVESHARE
+        return 4096;
+#else
+        return 6144;
+#endif
+    }
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
     uint32_t startDelayMs() const override {

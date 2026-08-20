@@ -81,16 +81,22 @@ public:
      * le 2026-08-20, la tache est restee a 76 octets de marge apres un
      * "agrandissement" qui n'agrandissait rien.
      *
-     * 5120 -> 7680. Mesure sur cible : 68 octets de marge, soit 5 052 octets
+     * 5120 -> 6656. Mesure sur cible : 68 octets de marge, soit 5 052 octets
      * consommes sur 5 120 (98,7 %), alors que le point d'arret de fin de pile
      * surveille les 32 derniers -- elle vivait a 36 octets du declenchement.
      * C'est la tache que le vidage de crash de l'essai n° 3 accusait.
-     * 7 680 laisse 2 628 octets, soit 34 % de marge.
+     * 6 656 laisse 1 604 octets, soit 24 % de marge.
+     *
+     * Pas plus : une pile est allouee d'un seul bloc, et 7 680 (essaye en 4.4.2)
+     * consommait le plus gros bloc libre de la DRAM interne. Le serveur d'assets
+     * refusait alors de servir, non par manque de memoire -- 13 772 octets
+     * libres -- mais par manque de CONTIGU : plus gros bloc tombe a 5 620 pour un
+     * seuil de 6 144. Sur cette carte, une grosse pile coute deux fois.
      * Voir docs/notes/audit-paniques-flash-cache.md.
      */
     uint16_t taskStackSize() const override {
 #if defined(FLOW_PROFILE_WAVESHARE)
-        return 7680;
+        return 6656;
 #else
         return Limits::Mqtt::TaskStackSize;
 #endif
