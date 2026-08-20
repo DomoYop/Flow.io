@@ -11,6 +11,72 @@
 
 ---
 
+## MISE À JOUR 2026-08-19 — la mesure a tranché, contre l'hypothèse de ce document
+
+**Ces paniques sont des débordements de pile.** Ce n'est pas la fenêtre cache/PSRAM de
+l'axe 1, qui est **réfutée**. Le reste du document est conservé tel quel : le
+raisonnement était cohérent, il était faux, et savoir pourquoi évite de le refaire.
+
+Relevé de `GET /api/system/coredump` (vidage de l'essai n° 3, ELF `flowios3-regs-exposed.elf`,
+`elf_sha256` `b5bc95e5e` vérifié) :
+
+```json
+{"task":"mqtt","pc":"0x403839EF","exc_cause":65,"exc_vaddr":"0x00000000",
+ "corrupted":true,"backtrace":["0x403839EF","0x40384E04","0x40383D38"],
+ "regs":["0x80384E07","0x3FCD6DB0","0x3FC9D2D4","0xFFFFFFFF", ...],
+ "epcx":["0x4037BC43","0x0","0x0","0x0","0x0","0x403839F2"]}
+```
+
+Trois faits, chacun vérifiable :
+
+1. **`a1 = 0x3FCD6DB0` est en SRAM interne** (`0x3FC8_8000–0x3FCF_FFFF`), pas en PSRAM.
+   La pile de la tâche interrompue était saine. C'était le test décisif : il dit non.
+2. **`exc_cause = 65` décode en « Unhandled debug exception ».** `XCHAL_EXCCAUSE_NUM = 64`
+   et la table `pseudo_reason[]` de l'IDF est présente dans l'ELF dans l'ordre des
+   `PANIC_RSN_*` : 64+1 = débogage. **Si l'axe 1 avait eu raison, la valeur aurait été
+   71** (`PANIC_RSN_CACHEERR`, « Cache disabled but cached memory region accessed »).
+   Le discriminant était disponible depuis le début.
+3. **`epcx[5]` (EPC6, niveau débogage) est renseigné** à `0x403839F2` — une exception de
+   débogage a bien été prise là.
+
+Or le framework est compilé avec **`CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK = 1`** :
+l'IDF pose un point d'arrêt matériel sur les 32 derniers octets de la pile de la tâche
+courante, remis à jour à chaque changement de contexte. Une écriture dans cette zone lève
+une exception de débogage, non gérée, donc panique. **C'est la signature exacte d'un
+débordement de pile**, et le point d'arrêt désigne sans ambiguïté la tâche fautive.
+
+Le lieu du crash confirme le mécanisme : `_frxt_dispatch → vTaskSwitchContext →
+xPortEnterCriticalTimeout`, c'est-à-dire précisément le moment où le changement de
+contexte écrit sur la pile (débordements de fenêtre de registres Xtensa compris).
+
+Les tâches accusées sont celles dont la pile est la plus fine : `mqtt` ici, `EventBus`
+(2 560 o) dans le relevé de 19:51. **La bonne piste était l'axe 3, pas l'axe 1.**
+
+### Ce que cela change
+
+- **Ce qui reste vrai** : le tableau des faits de la synthèse ci-dessous s'explique tout
+  aussi bien par un débordement de pile — tâche accusée variable, non-déterminisme,
+  dépendance à la charge, indifférence au type d'OTA, corruption de SPIFFS comme
+  *conséquence* d'une panique en pleine écriture.
+- **Ce qui tombe** : le mécanisme cache/PSRAM. Les piles en PSRAM restent un vrai risque
+  documenté et leur retrait se défend, mais **ce n'était pas la cause** et il ne corrige
+  rien ici.
+- **La mesure à prendre maintenant** est déjà calculée par le firmware :
+  `SystemMonitorModule` produit `Stack <module>/<tâche>@c<cœur>=<marge>` pour chaque
+  tâche — en `LOGD`. Il suffit de rendre ces lignes visibles pour savoir quelle pile
+  redimensionner, et de combien.
+- **Tension nouvelle** : agrandir des piles coûte de la DRAM interne, et le retrait des
+  piles PSRAM en a déjà repris 13,8 Ko. `GET /api/system/heap` devient le préalable, plus
+  un confort.
+
+### Leçon, la même que celle du chantier précédent
+
+Le raisonnement de l'axe 1 tenait debout, expliquait tous les faits, et désignait un
+défaut réel. Il était faux. Une valeur — `exc_cause` — le disait dès le premier relevé,
+à condition de la décoder au lieu de la ranger dans « cause pseudo, à confirmer ».
+
+---
+
 ## Synthèse
 
 La panne a une explication qui rend compte de **tous** les faits relevés le 18/08, et
@@ -40,13 +106,19 @@ Cela explique, point par point, ce que trois hypothèses successives n'expliquai
 | Deux réussites le 15/08, cinq échecs le 18/08, **à code équivalent** | Probabilité, pas déterminisme : elle suit la charge de fond, c'est-à-dire la probabilité qu'une tâche à pile PSRAM soit la tâche courante au moment de chaque fenêtre |
 | SPIFFS corrompu après chaque tentative | Conséquence, pas cause : le crash survient en pleine écriture et laisse la partition à moitié écrite |
 
-Statut : **[PLAUSIBLE]**, mais avec une mesure décisive disponible **immédiatement**,
-par HTTP, sans rien écrire — voir ci-dessous. Si elle confirme, le correctif tient en
-cinq lignes supprimées.
+Statut : **[RÉFUTÉ le 2026-08-19]** — voir la mise à jour en tête. La mesure décisive
+annoncée ci-dessous a été prise et elle dit non : `a1` était en SRAM interne, et
+`exc_cause` vaut 65 (exception de débogage) au lieu de 71 (erreur de cache). Le
+mécanisme réel est un **débordement de pile**. La suite du document est conservée telle
+qu'elle a été écrite.
 
 ---
 
 ## Le test décisif, à faire avant toute autre chose
+
+> **Fait le 2026-08-19. Résultat : négatif** — voir la mise à jour en tête. La méthode
+> ci-dessous reste valable, et il fallait y ajouter la lecture de `exc_cause`, qui
+> distingue à elle seule 65 (débogage → débordement de pile) de 71 (erreur de cache).
 
 Le vidage de crash déjà en flash porte la réponse, et `CoreDumpInfo` l'expose déjà :
 il enregistre les registres **a0-a15**, donc **a1 = le pointeur de pile au moment du
@@ -514,6 +586,13 @@ prises ensuite ont été appliquées :
 | Table de partitions **option B**, `spiffs` et `spiffs_b` à **2 Mo**, `coredump` à 256 Ko | [partitions_flowios3_ota_16mb.csv](../../partitions_flowios3_ota_16mb.csv) |
 | Exposition des deux tas, **sans toucher aux seuils** | [SystemStats.h](../../src/Core/SystemStats.h), [SystemStats.cpp](../../src/Core/SystemStats.cpp), route `GET /api/system/heap` |
 
+Le retrait des piles PSRAM **est conservé** bien qu'il ne corrige pas la panne : le
+risque qu'il traite est documenté et réel, et `sysmon` y gagne une pile en DRAM interne,
+donc un point d'arrêt de fin de pile posé sur de la mémoire directement adressable. Coût
+assumé : 13,8 Ko de DRAM interne, auxquels s'ajoutent les 5 040 octets des piles
+agrandies le lendemain. Si `GET /api/system/heap` révèle une marge interne serrée, c'est
+**le premier levier à relâcher** — il est indépendant du correctif réel.
+
 **Rien n'a été écrit sur l'appareil** : ni OTA, ni flash USB, ni la moindre requête vers
 la carte. Le firmware produit (`4.3.6+20260819.230427`) attend.
 
@@ -524,11 +603,71 @@ pas ici ; flash 47,9 % sous le plafond de 85 %), `validate_i18n.py` (pré-script
 options exactes de la CI — zéro alerte**. Non rejouables sur ce poste : `gitleaks` et
 `native-tests` (pas de `g++` hôte).
 
-### Ordre impératif pour la suite
+## La mesure qui clôt le sujet — 2026-08-20
 
-**Lire le vidage avant tout flash USB.** Un OTA firmware laisse la partition `coredump`
-intacte, mais un effacement complet en USB la détruit — et avec elle la seule preuve
-disponible. Le `curl` sur `/api/system/coredump` passe avant le fer à souder.
+`sysmon` passé en `Debug` (clé `log/levels`, module `sysmon`, réglable à chaud depuis
+l'interface — aucun code à toucher, aucun redémarrage). Les lignes `Stack …` que
+`logTaskStacks()` produisait déjà en `LOGD` deviennent visibles.
 
-Et lors du passage USB, ne pas oublier l'image du système de fichiers : `firmware.factory.bin`
-ne porte que bootloader + table + application. Sans un `uploadfs`, SPIFFS reste vide.
+Relevé stable sur ~80 s, appareil au repos. L'unité est l'**octet** — vérifiable :
+`ethernet` affiche 5 280 de marge sur 6 144 déclarés, ce qui serait impossible en mots.
+
+| Tâche | Pile | Marge | Consommé |
+|---|---|---|---|
+| **mqtt** | 5 712 | **68** ! | **98,8 %** |
+| **sysmon** | 3 072 | **104** ! | **96,6 %** |
+| **wifiprov** | 3 072 | 304 | 90,1 % |
+| **eventbus** | 2 560 | **260** ! | 89,8 % |
+| io | 2 560 | 636 | 75,2 % |
+| config | 3 072 | 784 | 74,5 % |
+| ethernet | 6 144 | 5 280 | 14,1 % |
+
+Le point d'arrêt de fin de pile surveille les **32 derniers octets** : `mqtt` vivait à
+**36 octets** du déclenchement. Et ce sont exactement les deux tâches accusées par les
+vidages — `mqtt` (essai n° 3) et `EventBus` (relevé de 19:51). Le dossier est clos.
+
+Ces valeurs sont un **plancher optimiste** : la mesure est prise au repos, alors que les
+paniques tombaient sous charge, `fwupdate` en action.
+
+Détail à retenir : `sysmon`, la tâche qui *signale* les piles basses, était la deuxième
+plus exposée — `logTaskStacks()` alloue et parcourt un instantané de toutes les tâches.
+
+### Nouvelles tailles, conditionnées au profil Waveshare
+
+| Tâche | Avant | Après | Marge visée | Où |
+|---|---|---|---|---|
+| mqtt | 5 712 | **7 680** | 2 036 (26 %) | `kWaveshareESP32S3MqttCapacity`, [WaveshareBoard.h](../../src/Board/WaveshareBoard.h) |
+| sysmon | 3 072 | **4 096** | 1 128 (27 %) | [SystemMonitorModule.h](../../src/Modules/System/SystemMonitorModule/SystemMonitorModule.h) |
+| wifiprov | 3 072 | **4 096** | 1 328 (32 %) | [WifiProvisioningModule.h](../../src/Modules/Network/WifiProvisioningModule/WifiProvisioningModule.h) |
+| eventbus | 2 560 | **3 584** | 1 284 (36 %) | [EventBusModule.h](../../src/Modules/EventBusModule/EventBusModule.h) |
+
+**+5 040 octets de DRAM interne.** Les autres profils gardent leurs valeurs : aucune
+mesure n'a été prise sur leur matériel.
+
+### Validation possible sans câble USB
+
+Un OTA **firmware** n'écrit que la partition applicative : la table de partitions en
+flash n'est pas touchée, la carte garde son SPIFFS de 8 Mo et son interface web. Et les
+paniques survenaient aussi sur OTA firmware pur (essai n° 4), donc c'est un banc valable.
+
+1. OTA firmware `4.4.0`, puis relire les marges avec `sysmon` en `Debug` : `mqtt` doit
+   passer de 68 à ~2 000, `sysmon` de 104 à ~1 100, `eventbus` de 260 à ~1 280.
+2. Enchaîner une dizaine d'OTA firmware en relevant le `reset=` — il doit rester
+   `software`.
+
+L'OTA **SPIFFS** reste refusé d'ici au passage USB : le CSV modifié produit une image de
+2 Mo que `isize != partitionSize` rejette face à la partition de 8 Mo encore en place.
+C'est le filet qui joue son rôle, pas une régression.
+
+### Lors du passage USB, plus tard
+
+`firmware.factory.bin` ne porte que bootloader + table + application, et son image
+fusionnée depuis `0x0` **effacerait la NVS** (le trou 0x9000-0xe000 y est comblé de
+`0xFF`). Utiliser `pio run -t upload` puis `pio run -t uploadfs`, qui écrivent région par
+région et laissent la NVS intacte.
+
+## Point ouvert sans rapport avec les piles
+
+`Buf mqtt.payload=1515/1536@flowio/poolbox/cfg/pool` : le tampon de payload MQTT est à
+**98,6 %** de sa capacité. C'est la troncature silencieuse que `CLAUDE.md` décrit comme
+piège des capacités compile-time. À traiter séparément.
