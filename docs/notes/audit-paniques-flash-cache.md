@@ -636,7 +636,7 @@ plus exposée — `logTaskStacks()` alloue et parcourt un instantané de toutes 
 
 | Tâche | Avant | Après | Marge visée | Où |
 |---|---|---|---|---|
-| mqtt | 5 712 | **7 680** | 2 036 (26 %) | `kWaveshareESP32S3MqttCapacity`, [WaveshareBoard.h](../../src/Board/WaveshareBoard.h) |
+| mqtt | 5 120 | **7 680** | 2 628 (34 %) | valeur **en dur** dans [MQTTModule.h](../../src/Modules/Network/MQTTModule/MQTTModule.h) — voir le piège ci-dessous |
 | sysmon | 3 072 | **4 096** | 1 128 (27 %) | [SystemMonitorModule.h](../../src/Modules/System/SystemMonitorModule/SystemMonitorModule.h) |
 | wifiprov | 3 072 | **4 096** | 1 328 (32 %) | [WifiProvisioningModule.h](../../src/Modules/Network/WifiProvisioningModule/WifiProvisioningModule.h) |
 | eventbus | 2 560 | **3 584** | 1 284 (36 %) | [EventBusModule.h](../../src/Modules/EventBusModule/EventBusModule.h) |
@@ -711,8 +711,57 @@ maintenant l'inverse, avec les chiffres : ces piles sont en mémoire externe
 délibérément, le risque théorique a été cherché et non trouvé, et la marge se vérifie
 par `GET /api/system/heap` avant d'y toucher.
 
-## Point ouvert sans rapport avec les piles
+## Résultat mesuré de `4.4.1` — trois sur quatre, et un piège
 
-`Buf mqtt.payload=1515/1536@flowio/poolbox/cfg/pool` : le tampon de payload MQTT est à
-**98,6 %** de sa capacité. C'est la troncature silencieuse que `CLAUDE.md` décrit comme
-piège des capacités compile-time. À traiter séparément.
+| Tâche | Avant | Après `4.4.1` | Verdict |
+|---|---|---|---|
+| eventbus | 260 ! | **1 336** | corrigé |
+| wifiprov | 304 | **1 360** | corrigé |
+| sysmon | 104 ! | **872 – 1 128** | corrigé |
+| **mqtt** | 68 ! | **76** ! | **inchangé** |
+
+### Le piège : deux sources pour une même valeur, une seule active
+
+`MQTTModule::taskStackSize()` rend une valeur **en dur** sous
+`#if defined(FLOW_PROFILE_WAVESHARE)`, et ne lit `Limits::Mqtt::TaskStackSize` — donc le
+champ `taskStackSize` de `kWaveshareESP32S3MqttCapacity` — que dans sa branche `#else` :
+
+```cpp
+uint16_t taskStackSize() const override {
+#if defined(FLOW_PROFILE_WAVESHARE)
+    return 5120;              // <- la valeur qui compte sur ce profil
+#else
+    return Limits::Mqtt::TaskStackSize;
+#endif
+}
+```
+
+Modifier la capacité de carte sans toucher au `#if` **n'a aucun effet**. C'est l'erreur
+commise le 2026-08-20 : la tâche est restée à 76 octets de marge après un
+« agrandissement » qui n'agrandissait rien.
+
+Corollaire à retenir : la pile réelle valait **5 120**, pas 5 712. Les 68 octets de marge
+représentaient donc 5 052 octets consommés, soit **98,7 %**.
+
+Corrigé dans `4.4.2`, avec le piège documenté aux deux endroits — `MQTTModule.h` porte la
+valeur active, et le commentaire de `WaveshareBoard.h` dit désormais que son champ est
+inerte sur ce profil au lieu de prétendre agir.
+
+**Leçon** : quand un `#if` de profil existe sur une valeur, vérifier quelle branche est
+prise avant de modifier l'autre. Le grep qui montrait ce `#if` était sous les yeux la
+veille, lu à l'envers.
+
+## Points ouverts sans rapport avec les piles
+
+Deux tampons signalés par `sysmon`, même famille : la troncature silencieuse des
+capacités compile-time que `CLAUDE.md` décrit comme la vraie contrainte dure.
+
+- `mqtt.payload = 1515/1536` sur `flowio/poolbox/cfg/pool` — **98,6 %**.
+- `pooldev.slots = 4/4 !` sur `init` — **100 %**, marqueur d'alerte posé.
+
+À traiter séparément, une fois les piles closes.
+
+Point ouvert également : `internal.min_free` descend à **3 996 octets** en
+fonctionnement. Un `Ctrl+F5` sur l'interface complète ne le fait **pas** bouger —
+l'hypothèse « c'est le service des assets qui creuse » est donc écartée. La cause du
+creux reste à identifier, sans urgence tant que le régime établi tient à ~16 200 libres.

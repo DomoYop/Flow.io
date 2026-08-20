@@ -73,9 +73,24 @@ public:
     }
     void onStart(ConfigStore& cfg, ServiceRegistry& services) override;
     void loop() override;
+    /**
+     * ATTENTION : sur Waveshare c'est cette valeur en dur qui compte, PAS
+     * `Limits::Mqtt::TaskStackSize` (donc pas `kWaveshareESP32S3MqttCapacity`
+     * dans WaveshareBoard.h), qui n'est lu que par la branche #else. Modifier
+     * la capacite de carte sans toucher ici n'a aucun effet -- erreur commise
+     * le 2026-08-20, la tache est restee a 76 octets de marge apres un
+     * "agrandissement" qui n'agrandissait rien.
+     *
+     * 5120 -> 7680. Mesure sur cible : 68 octets de marge, soit 5 052 octets
+     * consommes sur 5 120 (98,7 %), alors que le point d'arret de fin de pile
+     * surveille les 32 derniers -- elle vivait a 36 octets du declenchement.
+     * C'est la tache que le vidage de crash de l'essai n° 3 accusait.
+     * 7 680 laisse 2 628 octets, soit 34 % de marge.
+     * Voir docs/notes/audit-paniques-flash-cache.md.
+     */
     uint16_t taskStackSize() const override {
 #if defined(FLOW_PROFILE_WAVESHARE)
-        return 5120;
+        return 7680;
 #else
         return Limits::Mqtt::TaskStackSize;
 #endif
