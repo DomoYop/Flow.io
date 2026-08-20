@@ -799,6 +799,46 @@ par 3 072 et 4 096, pendant que la demande de `mqtt` retombe sous le seuil destr
 `fwupdate` est laissée à 6 144 malgré ses 5 008 de marge apparente : elle travaille
 pendant les OTA, précisément quand une mesure au repos ne dit rien.
 
+## Résultat final mesuré — `4.4.3`, 2026-08-20 15:21
+
+**Plus aucun marqueur d'alerte dans les lignes `Stack`.**
+
+| Tâche | Avant | Après | Pile | Prédit |
+|---|---|---|---|---|
+| **mqtt** | 68 ! | **1 580** | 6 656 | ~1 600 |
+| sysmon | 104 ! | **1 160** | 4 096 | ~1 100 |
+| eventbus | 260 ! | **1 336** | 3 584 | ~1 280 |
+| wifiprov | 304 | **1 408** | 4 096 | ~1 330 |
+| ethernet | 5 344 | **2 320** | 3 072 | ~2 270 |
+| hmi | 4 380 | **2 332** | 4 096 | ~2 330 |
+
+Tas interne : `free = 20 220`, `largest = 11 252`, `min_free = 8 096` — meilleur état
+mesuré de toute la séquence, y compris par rapport à `4.4.1`. Marge aux seuils du garde
+d'assets : 9 980 sur le libre, 5 108 sur le plus gros bloc.
+
+Marges les plus basses restantes, toutes largement au-dessus du seuil d'alerte de 300 :
+`wifi` 684, `io` 700, `config` 864. Ce sont les prochaines à regarder si le sujet
+revenait.
+
+**Ce qui est établi** : les quatre piles qui débordaient ne débordent plus, et la carte
+n'est plus au bord de l'épuisement mémoire. **Ce qui reste à confirmer** : l'absence de
+panique dans la durée. Une dizaine d'OTA firmware en relevant le `reset=`, qui doit
+rester `software`, donnera la preuve statistique que le taux est tombé à zéro.
+
+Ne pas oublier de repasser `sysmon` sur `Info` une fois les relevés terminés.
+
+### Les quatre versions qu'il a fallu
+
+| | Ce qu'elle a apporté |
+|---|---|
+| `4.4.0` | Piles agrandies (3 sur 4 seulement) **et** piles rapatriées de PSRAM → interface web tombée en `low_memory` |
+| `4.4.1` | Rapatriement annulé, interface rétablie ; `mqtt` toujours à 76 |
+| `4.4.2` | `mqtt` agrandie là où c'est lu, mais à 7 680 → interface retombée, par manque de **contiguïté** |
+| `4.4.3` | `mqtt` à 6 656 et 5 Ko récupérés sur `ethernet` et `hmi` → tout rentre |
+
+Trois de ces quatre versions corrigent une erreur d'analyse, pas un défaut du firmware.
+Le correctif utile tient en quatre valeurs ; c'est le chemin pour y arriver qui a coûté.
+
 ## Points ouverts sans rapport avec les piles
 
 Deux tampons signalés par `sysmon`, même famille : la troncature silencieuse des
