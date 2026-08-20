@@ -23,7 +23,20 @@ public:
     const char* taskName() const override { return "sysmon"; }
     /** @brief Pin monitoring module on core 0. */
     BaseType_t taskCore() const override { return 0; }
-    uint16_t taskStackSize() const override { return 3072; }
+    /**
+     * Waveshare : 3072 -> 4096. Mesure du 2026-08-20 sur cible, 104 octets de
+     * marge (96,6 % consommes) -- la tache qui signale les piles basses etait
+     * elle-meme la deuxieme plus exposee. logTaskStacks() alloue et parcourt un
+     * instantane de toutes les taches, c'est le poste couteux.
+     * Voir docs/notes/audit-paniques-flash-cache.md.
+     */
+    uint16_t taskStackSize() const override {
+#if defined(FLOW_PROFILE_WAVESHARE)
+        return 4096;
+#else
+        return 3072;
+#endif
+    }
     uint8_t taskCount() const override { return 1; }
     const ModuleTaskSpec* taskSpecs() const override { return singleLoopTaskSpec(); }
 

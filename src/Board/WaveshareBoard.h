@@ -79,7 +79,13 @@ inline constexpr IoCapacitySpec kWaveshareESP32S3IoCapacity{24, 8, 12, 24, 8, 12
  *   settings such as broker host, port, credentials, base topic, and enabled
  *   state are separate module config values stored in NVS.
  */
-inline constexpr MqttCapacitySpec kWaveshareESP32S3MqttCapacity{5712, 8, 8, 48, 24, 16, 2, 192, 80, 80, 128};
+// taskStackSize : 5712 -> 7680. Mesure du 2026-08-20 sur cible : la tache mqtt
+// tombait a 68 octets de marge sur 5712, soit 98,8 % consommes, et le point
+// d'arret de fin de pile (CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK) surveille les
+// 32 derniers octets -- elle passait donc a 36 octets du declenchement. C'est
+// elle que le vidage de crash accusait. 7680 laisse ~2 Ko, soit 26 % de marge.
+// Voir docs/notes/audit-paniques-flash-cache.md.
+inline constexpr MqttCapacitySpec kWaveshareESP32S3MqttCapacity{7680, 8, 8, 48, 24, 16, 2, 192, 80, 80, 128};
 
 /*
  * MQTT string/payload buffer sizes in bytes.

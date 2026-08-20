@@ -99,9 +99,17 @@ public:
     ModuleId moduleId() const override { return ModuleId::WifiProvisioning; }
     const char* taskName() const override { return "wifiprov"; }
     BaseType_t taskCore() const override { return 0; }
+    /**
+     * Waveshare : 3072 -> 4096. Mesure du 2026-08-20 sur cible, 304 octets de
+     * marge (90,1 % consommes). Juste au-dessus du seuil d'alerte, donc jamais
+     * signalee, mais dans la meme zone de risque que mqtt et sysmon.
+     * Voir docs/notes/audit-paniques-flash-cache.md.
+     */
     uint16_t taskStackSize() const override {
 #if defined(FLOW_PROFILE_FLOW_CONNECT_DISPLAY)
         return 5120;
+#elif defined(FLOW_PROFILE_WAVESHARE)
+        return 4096;
 #else
         return 3072;
 #endif
