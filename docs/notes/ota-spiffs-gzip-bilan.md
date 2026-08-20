@@ -1,10 +1,19 @@
 # Bilan — OTA SPIFFS compressé : où on en est, et par où reprendre
 
-> Statut au 2026-08-18 au soir : **NE PAS écrire en flash sans nécessité** (ni OTA
-> SPIFFS, ni OTA firmware). Cause non trouvée d'une instabilité qui corrompt le
-> système de fichiers et, au moins une fois, a fait paniquer un simple OTA firmware.
-> Voir « Panne non résolue » plus bas — c'est la section qui prime sur tout ce qui
-> suit, écrit avant qu'elle ne soit découverte.
+> **Statut au 2026-08-20 : résolu. L'avertissement qui figurait ici est levé.**
+> L'OTA firmware et l'OTA SPIFFS sont fiables depuis la version `4.4.3`.
+>
+> La « panne non résolue » décrite plus bas — cinq écritures, cinq corruptions,
+> `PC=0xFFFFFFFE`, tâche accusée variable — n'était **pas** un défaut du chemin
+> d'écriture ni un problème de cache flash. C'étaient des **débordements de pile** :
+> `mqtt` vivait à 36 octets du déclenchement du point d'arrêt de fin de pile, et la
+> corruption du système de fichiers était la *conséquence* d'une panique survenue en
+> pleine écriture, pas sa cause. Diagnostic, mesures et correctif dans
+> [audit-paniques-flash-cache.md](audit-paniques-flash-cache.md).
+>
+> Les sections qui suivent sont conservées telles qu'elles ont été écrites, y compris
+> le raisonnement réfuté : il était cohérent, il expliquait tous les faits, et il était
+> faux. Savoir pourquoi évite de le refaire.
 >
 > Détail technique et historique complet :
 > [ota-spiffs-reduction-volume.md](ota-spiffs-reduction-volume.md) et
@@ -327,7 +336,14 @@ validé. Enchaîner une dizaine d'OTA SPIFFS (≈1 min chacun) en relevant à ch
 `reset=` du journal donne une base statistique — et, une fois la cause corrigée, la
 preuve que le taux tombe à zéro.
 
-## Panne non résolue — nuit du 2026-08-18, à reprendre en priorité
+## ~~Panne non résolue~~ — RÉSOLUE le 2026-08-20, section conservée pour l'historique
+
+> **Élucidée** : débordements de pile, pas un défaut du chemin d'écriture.
+> Voir [audit-paniques-flash-cache.md](audit-paniques-flash-cache.md). Tout ce qui suit
+> décrit l'état des connaissances de la nuit du 18/08, y compris des conclusions depuis
+> réfutées — notamment la piste `PC=0xFFFFFFFE` / cache flash, qui était fausse.
+
+### Ce qui était écrit alors — nuit du 2026-08-18, à reprendre en priorité
 
 **C'est la partie qui compte.** Tout ce qui précède dans ce document (gzip, dry run,
 `tinfl`, `async_tcp`/journal d'activité, rafales `task_wdt`) est résolu et vérifié.
