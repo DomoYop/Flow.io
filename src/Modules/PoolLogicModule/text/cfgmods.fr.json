@@ -318,7 +318,8 @@
         {
           "module": "pdm/pd0",
           "fields": [
-            "pressure_low_th",
+            "pressure_ref",
+            "pressure_fouling_dlt",
             "pressure_high_th",
             "pressure_start_dly_s"
           ],

@@ -23,13 +23,19 @@
         "eq": true
       }
     },
+    "pdm/pd0/pressure_fouling_dlt": {
+      "visible_if": {
+        "path": "pdm/pd0/enabled",
+        "eq": true
+      }
+    },
     "pdm/pd0/pressure_high_th": {
       "visible_if": {
         "path": "pdm/pd0/enabled",
         "eq": true
       }
     },
-    "pdm/pd0/pressure_low_th": {
+    "pdm/pd0/pressure_ref": {
       "visible_if": {
         "path": "pdm/pd0/enabled",
         "eq": true

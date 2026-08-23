@@ -53,7 +53,7 @@ private:
         AlarmId alarmId;
         const char* key;
     };
-    static const RuntimeUiAlarmEntry kRuntimeUiAlarms[9];
+    static const RuntimeUiAlarmEntry kRuntimeUiAlarms[11];
 
     struct AlarmSlot {
         bool used = false;

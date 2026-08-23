@@ -197,7 +197,10 @@ private:
     enum class HeatAssistReason : uint8_t {
         Disabled = 0,
         ManualMode,
-        PressureBlocked,
+        // Coupure hydraulique : surpression mecanique ou manque de debit. Le nom
+        // a change avec le sens (la pression basse ne bloque plus rien), la
+        // valeur numerique non -- c'est un enum Runtime UI.
+        HydraulicBlocked,
         SetpointInvalid,
         TempUnavailable,
         ProbeWait30m,
@@ -217,6 +220,17 @@ private:
      * (dly_pid_min, 5 min par defaut).
      */
     static constexpr uint16_t kSensorHoldSettleMaxSec = 240U;
+
+    /** @brief Marche stable exigee avant d'apprendre la pression de reference. */
+    static constexpr uint32_t kPressureLearnRunMs = 10UL * 60UL * 1000UL;
+    /** @brief Duree de moyennage de l'apprentissage. */
+    static constexpr uint32_t kPressureLearnWindowMs = 60UL * 1000UL;
+    /** @brief Marge gardee entre l'alerte de lavage et la coupure mecanique. */
+    static constexpr float kFoulingTripMarginBar = 0.15f;
+    /** @brief Sous cette pression, debit confirme, c'est le capteur qui ment. */
+    static constexpr float kPressureSensorFaultBar = 0.05f;
+    /** @brief Re-trips consecutifs de surpression avant verrouillage franc. */
+    static constexpr uint8_t kPressureRetripLock = 3U;
 
     static constexpr uint8_t SLOT_DAILY_RECALC = 3;
     static constexpr uint8_t SLOT_FILTR_WINDOW_BASE = 4;  // slots 4..6, un par segment planifie
@@ -287,7 +301,11 @@ private:
     IoId coverClosedIoId_ = IO_ID_INVALID;
 
     // Thresholds / delays
-    float pressureLowThreshold_ = PoolDefaults::PressureLow;
+    // Pression de service filtre propre. 0 = non calibree : updatePressureReference_
+    // l'apprend a la premiere marche stable. Ne declenche aucune coupure -- c'est
+    // la reference de l'alerte d'encrassement, pas un seuil d'alarme.
+    float pressureRefBar_ = PoolDefaults::PressureRef;
+    float pressureFoulingDeltaBar_ = PoolDefaults::PressureFoulingDelta;
     float pressureHighThreshold_ = PoolDefaults::PressureHigh;
     float winterStartTempC_ = PoolDefaults::WinterStartTempC;
     float freezeHoldTempC_ = PoolDefaults::FreezeHoldTempC;
@@ -419,7 +437,16 @@ private:
     bool startupActivityPending_ = false;
     uint32_t startupActivitySinceMs_ = 0;
 
-    bool pressureError_ = false;
+    // Coupures hydrauliques : surpression mecanique et manque de debit confirme.
+    // Ce sont les deux seules causes qui arretent la pompe -- la pression basse
+    // n'en fait plus partie, elle ne signale qu'un capteur muet.
+    bool pressureTrip_ = false;
+    bool noFlowTrip_ = false;
+    bool hydraulicTrip_ = false;
+    // Re-trips consecutifs de la surpression apres rearmement : au-dela de
+    // kPressureRetripLock, on cesse de reproposer un demarrage qui echoue.
+    uint8_t pressureRetripCount_ = 0;
+    bool pressureTripLocked_ = false;
     bool phTankLowError_ = false;
     bool chlorineTankLowError_ = false;
     bool cleaningDone_ = false;
@@ -434,6 +461,18 @@ private:
     bool flowCopyOutState_ = false;
     bool coverClosedState_ = false;
     bool noFlowError_ = false;
+
+    // Apprentissage de la pression de reference : accumulateur d'une moyenne sur
+    // kPressureLearnWindowMs, arme apres kPressureLearnRunMs de marche stable.
+    uint32_t pressureLearnStartMs_ = 0;
+    float pressureLearnSum_ = 0.0f;
+    uint16_t pressureLearnCount_ = 0;
+    // Encrassement publie : pourcentage du chemin parcouru entre la reference et
+    // le seuil de lavage. Negatif impossible, borne haute non plafonnee a 100
+    // pour que « tres encrasse » reste lisible.
+    float foulingPct_ = 0.0f;
+    float foulingThresholdBar_ = 0.0f;
+    bool foulingThresholdClamped_ = false;
 
     // Gel des mesures : dernier etat pousse a IOModule, et IoId marques (pour
     // les liberer si l'utilisateur rebinde un role sur un autre slot).
@@ -529,8 +568,10 @@ private:
     ConfigVariable<bool,0> flowPresentVar_{NVS_KEY(NvsKeys::PoolLogic::FlowSwitchPresent), "flow_present", "poollogic/sensors", ConfigType::Bool,
                                            &flowPresent_, ConfigPersistence::Persistent, 0};
 
-    ConfigVariable<float,0> pressureLowVar_{NVS_KEY(NvsKeys::PoolLogic::PressureLow), "pressure_low_th", "poollogic/safety", ConfigType::Float,
-                                       &pressureLowThreshold_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> pressureRefVar_{NVS_KEY(NvsKeys::PoolLogic::PressureRef), "pressure_ref", "poollogic/safety", ConfigType::Float,
+                                       &pressureRefBar_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<float,0> pressureFoulingDeltaVar_{NVS_KEY(NvsKeys::PoolLogic::PressureFoulingDelta), "pressure_fouling_dlt", "poollogic/safety", ConfigType::Float,
+                                       &pressureFoulingDeltaBar_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> pressureHighVar_{NVS_KEY(NvsKeys::PoolLogic::PressureHigh), "pressure_high_th", "poollogic/safety", ConfigType::Float,
                                         &pressureHighThreshold_, ConfigPersistence::Persistent, 0};
     ConfigVariable<float,0> winterStartVar_{NVS_KEY(NvsKeys::PoolLogic::WinterStart), "winter_start_t", "poollogic/safety", ConfigType::Float,
@@ -674,8 +715,10 @@ private:
                                          uint8_t* durationOut = nullptr);
 
     // Control
-    static AlarmCondState condPressureLowStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condPressureSensorFaultStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condFilterFoulingStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPressureHighStatic_(void* ctx, uint32_t nowMs);
+    static AlarmCondState condNoFlowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhTankLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condChlorineTankLowStatic_(void* ctx, uint32_t nowMs);
     static AlarmCondState condPhDoseNoEffectStatic_(void* ctx, uint32_t nowMs);
@@ -717,6 +760,43 @@ private:
     void updateSensorHold_(bool haveFlow, bool flowOn);
     /** @brief Vrai quand les mesures publiees sont figees (etat affichable). */
     bool sensorHoldActive_() const;
+    /**
+     * @brief Apprend la pression de service filtre propre.
+     *
+     * N'agit que si `pressure_ref` vaut 0 (non calibree) : une valeur non nulle,
+     * apprise ou saisie a la main, n'est jamais ecrasee. Exige une marche stable
+     * (kPressureLearnRunMs), un debit confirme et aucune coupure hydraulique,
+     * puis moyenne kPressureLearnWindowMs avant d'ecrire en NVS.
+     *
+     * Limite assumee : une reference apprise sur un filtre deja sale sera trop
+     * haute et l'alerte sonnera tard. Le geste correctif est « Filtre lave »,
+     * qui remet la reference a zero.
+     */
+    void updatePressureReference_(bool havePressure, float pressure, uint32_t nowMs);
+    /**
+     * @brief Seuil d'alerte d'encrassement, borne sous la securite mecanique.
+     *
+     * `pressure_ref + delta` peut depasser `pressure_high_th` sur une
+     * installation a forte pression de service : l'arret d'urgence sonnerait
+     * alors avant l'invitation a laver le filtre. Le seuil est donc plafonne a
+     * `pressure_high_th - kFoulingTripMarginBar`, avec un LOGW au premier
+     * bornage.
+     *
+     * Retourne 0 quand la reference n'est pas calibree : l'alerte est inactive.
+     * `clampedOut` recoit le fait que le plafonnement s'est applique.
+     *
+     * Const et sans effet de bord : la condition d'alarme l'appelle depuis la
+     * tache d'evaluation, le LOGW et la publication restent dans la boucle.
+     */
+    float computeFoulingThreshold_(bool* clampedOut = nullptr) const;
+    /**
+     * @brief Debit reellement constate par le flowswitch.
+     *
+     * « Declare installe » compte autant que l'etat lu : une entree TOR libre
+     * est en pull-up et lit « pas de debit » a vide. Sans declaration, la
+     * reponse est false -- on ne conclut rien d'une entree qu'on ne suit pas.
+     */
+    bool readFlowConfirmed_() const;
     void resetTemporalPidState_(TemporalPidState& st, uint32_t nowMs);
     void stepTemporalPid_(TemporalPidState& st,
                           float input,
@@ -745,6 +825,8 @@ private:
     float phEffectiveGainMlPerM3_() const;
     /** @brief Publie l'etat du dosage pH dans le DataStore (no-op sans DataStore). */
     void publishPhDosingRuntime_() const;
+    /** @brief Publie reference, seuil de lavage et taux d'encrassement. */
+    void publishPressureRuntime_() const;
     /**
      * @brief Variation de pH attendue du lot en cours, signee selon le produit.
      *

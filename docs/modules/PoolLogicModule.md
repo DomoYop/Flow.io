@@ -12,7 +12,7 @@ Il:
 - pilote un protocole de **chauffage assisté** (`heat_assist`) quand la température d'eau dépend de la filtration
 - expose des snapshots runtime MQTT (`rt/poollogic/ph`, `rt/poollogic/orp`, `rt/poollogic/heat_assist`, `rt/poollogic/disinfection`)
 - enregistre des commandes métier et des entités Home Assistant
-- surveille la pression via `AlarmService`
+- surveille la pression et le débit via `AlarmService` : encrassement du filtre, capteur suspect, surpression mécanique et manque de débit
 
 Type: module actif.
 
@@ -58,7 +58,7 @@ Le protocole `heat_assist` résout ce point: il fait d'abord un cycle court de f
 
 - `auto_mode` activé
 - `heater_auto_mode` activé
-- pas d'alarme pression bloquante
+- pas de coupure hydraulique (surpression mécanique ou manque de débit)
 
 Si une de ces conditions n'est pas remplie, `heat_assist` reste inactif.
 
@@ -83,7 +83,7 @@ Si une de ces conditions n'est pas remplie, `heat_assist` reste inactif.
 
 - `DISABLED`: mode auto chauffage désactivé.
 - `MANUAL_MODE`: mode auto global désactivé.
-- `PRESSURE_BLOCKED`: chauffage bloqué par la sécurité pression.
+- `HYDRAULIC_BLOCKED`: chauffage bloqué par une coupure hydraulique (surpression mécanique ou manque de débit).
 - `SETPOINT_INVALID`: consigne chauffage invalide.
 - `TEMP_UNAVAILABLE`: température indisponible au moment de la décision.
 - `PROBE_WAIT_30M`: attente avant le prochain sondage (cadence normale).
@@ -121,7 +121,7 @@ Les conditions principales sont:
 - `auto_mode=true`
 - `disinfection_type=2` (`Oxygène actif`)
 - heure système synchronisée
-- pas de défaut pression bloquant
+- pas de coupure hydraulique
 - niveau de bidon désinfection OK (`chl_lvl_io_id`, réutilisé pour le bidon O2)
 - débit de la pompe de désinfection configuré dans PoolDevice (`flow_l_h`)
 - filtration en marche depuis au moins `min_filter_run_min`
@@ -250,7 +250,7 @@ Les raisons de blocage les plus utiles sont:
 
 - `inactive`: mode O2 non actif ou mode auto désactivé
 - `time_unsynced`: heure non synchronisée
-- `pressure`: défaut pression
+- `pressure`: coupure hydraulique (surpression ou manque de débit)
 - `tank_low`: bidon désinfection bas
 - `flow_invalid`: débit pompe non configuré ou invalide
 - `filtration_wait`: filtration pas encore prête
@@ -571,7 +571,7 @@ Convention logique des capteurs digitaux de niveau (règle harmonisée):
 
 Ordre de décision appliqué à chaque cycle (`200 ms`):
 1. état réel et capteurs relus (`syncDeviceState_`, IO analog/digital)
-2. statut sécurité pression recalculé (`pressureError_`)
+2. coupures hydrauliques recalculées (`pressureTrip_`, `noFlowTrip_` → `hydraulicTrip_`)
 3. si `pressureError_==true` -> **filtration forcée OFF**, même en manuel
 4. sinon:
    - mode manuel (`auto_mode=false`): consigne manuelle conservée
@@ -582,9 +582,9 @@ Ordre de décision appliqué à chaque cycle (`200 ms`):
 
 Logique principale:
 - filtration:
-  - sécurité pression prioritaire: coupe sur erreur pression (auto **et** manuel)
+  - sécurité hydraulique prioritaire: coupe sur surpression mécanique ou manque de débit (auto **et** manuel). Une pression basse ne coupe rien.
   - en auto: suit fenêtre scheduler, mode hiver et freeze-hold
-  - en manuel (`auto_mode=false`): `PoolLogic` n'impose pas de demande auto hors sécurité pression
+  - en manuel (`auto_mode=false`): `PoolLogic` n'impose pas de demande auto hors sécurité hydraulique
 - robot:
   - démarre après `robot_delay_min` de filtration
   - s'arrête après `robot_dur_min`
@@ -598,17 +598,58 @@ Logique principale:
   - démarre si `Pool Level` est actif (`pool_lvl_io_id == true`)
   - respecte un minimum de marche `fill_min_on_s`
 
-### Alarmes pression
+### Alarmes pression et débit
 
-- `AlarmId::PoolPressureLow`
-  - latched
-  - délai ON `2000 ms`, OFF `1000 ms`, répétition `60000 ms`
-  - condition active seulement si filtration ON et `runSec > pressure_start_dly_s`
-- `AlarmId::PoolPressureHigh`
-  - latched
-  - sévérité critique
-  - délai ON `0 ms`, OFF `1000 ms`, répétition `60000 ms`
+Le manomètre ne dit rien d'utile en absolu : une installation tourne à 0,5 bar,
+une autre à 1,2. Ce qui se lit, c'est l'écart à la **pression de service filtre
+propre** (`pressure_ref`). L'ancienne alarme de pression basse, héritée de
+PoolMaster où il n'y avait pas de flowswitch, servait de détecteur de débit par
+défaut ; ce rôle revient au flowswitch, qui mesure au lieu de déduire.
+
+- `AlarmId::PoolPressureSensorFault` (1000) — *ex-`PoolPressureLow`*
+  - sévérité `Warning`, **non latchée**, délai ON `30 s`, OFF `5 s`
+  - condition : filtration ON depuis `> pressure_start_dly_s`, **débit confirmé
+    par le flowswitch**, et pression `< 0,05 bar`
+  - sans flowswitch déclaré, la condition reste `False` : « pompe désamorcée » et
+    « capteur mort » ne sont pas distinguables, on ne tranche pas
+  - **ne coupe rien**
+- `AlarmId::PoolFilterFouling` (1009)
+  - sévérité `Warning`, non latchée, délai ON `5 min`, OFF `60 s`
+  - condition : pression `> min(pressure_ref + pressure_fouling_dlt,
+    pressure_high_th - 0,15)`
+  - inactive tant que `pressure_ref` vaut 0 (référence non calibrée)
+  - **ne coupe rien** : c'est une invitation à laver le filtre
+- `AlarmId::PoolPressureHigh` (1001)
+  - latched, sévérité critique, délai ON `0 ms`, OFF `1000 ms`
   - condition active seulement si filtration ON
+  - **seule alarme de pression qui coupe la pompe** : sécurité mécanique
+- `AlarmId::PoolNoFlow` (1010)
+  - latched, sévérité `Alarm`, délai ON `2 s`, OFF `1 s`
+  - condition : `flow_interlock` actif, filtration ON depuis
+    `> pressure_start_dly_s`, flowswitch à « pas de débit »
+  - **coupe la pompe, le chauffage et les traitements** : marche à sec
+
+### Pression de service : apprentissage
+
+`pressure_ref = 0` signifie « non calibrée ». Au premier créneau de marche stable
+— filtration ON depuis 10 min, débit confirmé, aucune coupure — le firmware
+moyenne la pression sur 60 s et l'écrit en NVS. Une valeur non nulle, apprise ou
+saisie à la main, n'est **jamais** écrasée.
+
+La commande `poollogic.filter_washed` (bouton HA « Filter Washed ») la remet à 0
+et relance l'apprentissage.
+
+Une moyenne inférieure à 0,05 bar n'est pas retenue : ce serait figer une
+référence issue d'un capteur muet, qui désactiverait l'alerte pour toujours.
+
+### Bornage du seuil de lavage
+
+`pressure_ref + pressure_fouling_dlt` peut dépasser `pressure_high_th` sur une
+installation à forte pression de service. L'arrêt d'urgence sonnerait alors avant
+l'invitation à laver le filtre. Le seuil est donc plafonné à
+`pressure_high_th - 0,15`, avec un `LOGW` au premier bornage. Si la référence
+apprise dépasse ~1,3 bar avec le défaut de 1,80, relever `pressure_high_th`
+devient nécessaire pour que l'alerte garde une marge utile.
 
 ### Alarmes niveau cuves dosage
 
@@ -651,21 +692,28 @@ L'alarme n'est pas latched : elle retombe seule dès que la mesure revient et n'
 donc jamais besoin d'être acquittée. (La limite historique de 8 slots du champ
 packé, qui motivait aussi ce choix, n'existe plus.)
 
-### Réarmement pression
+### Réarmement des coupures hydrauliques
 
-- source de vérité en nominal: `alarmSvc->isActive(PoolPressureLow|PoolPressureHigh)`
-- tant qu'une alarme pression latched reste `active`, `pressureError_` reste vrai et la filtration est bloquée
-- si la condition est redevenue fausse, un `reset` manuel est alors autorisé pour clear l'alarme
-- si la filtration est redémarrée alors que la pression reste anormale:
-  - `pressure_high` peut reraiser immédiatement
-  - `pressure_low` reraisera après `pressure_start_dly_s` (délai de démarrage)
+- source de vérité en nominal: `alarmSvc->isActive(PoolPressureHigh|PoolNoFlow)`
+- tant qu'une des deux reste `active`, `hydraulicTrip_` est vrai et la filtration
+  est bloquée, y compris en mode manuel
+- la condition redevient fausse dès que la pompe est arrêtée : un `reset` manuel
+  est alors autorisé
+- **les deux alarmes sont auto-verrouillantes par construction** : couper la pompe
+  supprime la grandeur mesurée. C'est voulu — une vanne fermée ou une marche à sec
+  exigent une intervention. Le garde-fou est ailleurs : trois re-trips consécutifs
+  de la surpression après réarmement déclenchent un verrouillage franc
+  (`pressureTripLocked_`) avec un `LOGW` explicite, au lieu d'un cycle infini. Une
+  marche saine au-delà de `pressure_start_dly_s` remet le compteur à zéro.
 
 ### Mode dégradé sans `AlarmService`
 
-Si le service alarmes est indisponible, `PoolLogic` applique un latch local pression minimal:
-- détection locale `pression < low` (après délai de démarrage) ou `pression > high`
-- `pressureError_` passe à vrai
-- pas de clear automatique local (mode dégradé conservatif)
+Si le service alarmes est indisponible, `PoolLogic` applique un latch local
+minimal, réduit à la **seule surpression** :
+- détection locale `pression > pressure_high_th`
+- `pressureTrip_` passe à vrai, pas de clear automatique local
+- l'encrassement et le diagnostic capteur ne sont pas rejoués : ils sont
+  informatifs, les dupliquer dans un chemin dégradé n'aurait protégé personne
 
 ## Régulation pH : dosage volumétrique par lots
 
@@ -778,7 +826,7 @@ Le mode PID est autorisé seulement si:
 
 Le calcul et la commande sont ensuite conditionnés par:
 - capteur disponible (`dis_io_id`)
-- pas de défaut pression latched (`pressureError_==false`)
+- pas de coupure hydraulique latchée (`hydraulicTrip_==false`)
 - pas de niveau bas cuve actif (`chlorineTankLowError_==false`)
 - `disinfection_type == 1` (en mode électrolyse ou oxygène actif, la régulation ORP liquide est inhibée)
 

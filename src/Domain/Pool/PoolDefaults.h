@@ -51,7 +51,14 @@ constexpr uint16_t FiltrWin1StopMinute = (uint16_t)FiltrationStopMaxHour * 60u;
 constexpr uint16_t FiltrWin2StartMinute = 23u * 60u + 30u;
 constexpr uint16_t FiltrWin2StopMinute = 7u * 60u + 30u;
 
-constexpr float PressureLow = 0.15f;
+// Pression de service filtre propre. 0 = non calibree : la valeur est apprise a
+// la premiere marche stable (cf. PoolLogicModule::updatePressureReference_).
+// Un defaut fixe serait faux partout : une installation tourne a 0,5 bar, une
+// autre a 1,2, et un seuil d'encrassement absolu n'a donc aucun sens.
+constexpr float PressureRef = 0.0f;
+// Ecart de lavage, valeur de metier usuelle (+0,3 a +0,5 bar au-dessus du
+// filtre propre).
+constexpr float PressureFoulingDelta = 0.40f;
 constexpr float PressureHigh = 1.80f;
 constexpr float WinterStartTempC = -2.0f;
 constexpr float FreezeHoldTempC = 2.0f;
@@ -130,7 +137,8 @@ inline constexpr PoolLogicDefaultsSpec kLogicDefaults{
     TempHigh,
     FiltrationStartMinHour,
     FiltrationStopMaxHour,
-    PressureLow,
+    PressureRef,
+    PressureFoulingDelta,
     PressureHigh,
     WinterStartTempC,
     FreezeHoldTempC,

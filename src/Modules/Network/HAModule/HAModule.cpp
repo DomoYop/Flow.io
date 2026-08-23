@@ -352,7 +352,18 @@ bool HAModule::addSensorEntry(const HASensorEntry& entry)
         }
     }
 
-    if (sensorCount_ >= MAX_HA_SENSORS) return false;
+    // Les tables number/button/select signalaient deja leur saturation ; sensors
+    // et binary_sensors la subissaient en silence, alors que ce sont les deux qui
+    // approchent leur plafond. Une entite qui disparait sans un mot cote Home
+    // Assistant est indebuggable.
+    if (sensorCount_ >= MAX_HA_SENSORS) {
+        LOGW("HA sensor table full (%u/%u) reject=%s/%s",
+             (unsigned)sensorCount_,
+             (unsigned)MAX_HA_SENSORS,
+             entry.ownerId ? entry.ownerId : "?",
+             entry.objectSuffix ? entry.objectSuffix : "?");
+        return false;
+    }
     sensors_[sensorCount_++] = entry;
     BufferUsageTracker::note(TrackedBufferId::HaEntityTables,
                              entityTableUsedBytes_(),
@@ -379,7 +390,14 @@ bool HAModule::addBinarySensorEntry(const HABinarySensorEntry& entry)
         }
     }
 
-    if (binarySensorCount_ >= MAX_HA_BINARY_SENSORS) return false;
+    if (binarySensorCount_ >= MAX_HA_BINARY_SENSORS) {
+        LOGW("HA binary_sensor table full (%u/%u) reject=%s/%s",
+             (unsigned)binarySensorCount_,
+             (unsigned)MAX_HA_BINARY_SENSORS,
+             entry.ownerId ? entry.ownerId : "?",
+             entry.objectSuffix ? entry.objectSuffix : "?");
+        return false;
+    }
     binarySensors_[binarySensorCount_++] = entry;
     BufferUsageTracker::note(TrackedBufferId::HaEntityTables,
                              entityTableUsedBytes_(),

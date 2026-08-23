@@ -11,7 +11,11 @@ enum class AlarmId : uint16_t {
     None = 0,
 
     // PoolLogic domain
-    PoolPressureLow = 1000,
+    // 1000 portait « pression basse », un detecteur de debit par defaut herite de
+    // PoolMaster (pas de flowswitch la-bas). Le flowswitch tient desormais ce
+    // role : ce qu'une pression quasi nulle signale alors qu'un debit est
+    // confirme, c'est un capteur muet, pas une pompe desamorcee.
+    PoolPressureSensorFault = 1000,
     PoolPressureHigh = 1001,
     PoolPhTankLow = 1002,
     PoolChlorineTankLow = 1003,
@@ -24,6 +28,12 @@ enum class AlarmId : uint16_t {
     // bascule sur son plan de repli. Sans cette alarme, la degradation n'est
     // visible que dans les logs serie.
     PoolWaterTemperatureUnavailable = 1008,
+    // Encrassement du filtre : mesure relative a la pression de service filtre
+    // propre (pressure_ref). Purement informative, ne coupe rien.
+    PoolFilterFouling = 1009,
+    // Manque de debit confirme par le flowswitch, pompe en marche. Coupe la
+    // pompe : marche a sec.
+    PoolNoFlow = 1010,
 
     // Log pipeline domain
     LogWarningSeen = 1100,

@@ -42,6 +42,8 @@ constexpr DataKey HaDeviceId = 12;
 
 /** @brief PoolLogic runtime key: pH batch-dosing state (`PoolLogicRuntime`). */
 constexpr DataKey PoolPhDosing = 13;
+/** @brief PoolLogic runtime key: filter pressure reference and fouling (`PoolLogicRuntime`). */
+constexpr DataKey PoolPressure = 14;
 
 /** @brief Reserved base for IO endpoint runtime keys (`IORuntime`). */
 constexpr DataKey IoBase = 40;

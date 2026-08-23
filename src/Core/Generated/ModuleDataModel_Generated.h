@@ -28,4 +28,5 @@ struct RuntimeData {
     WifiRuntimeData wifi;
     PoolDeviceRuntimeData pool;
     PoolLogicPhDosingRuntimeData poolPhDosing;
+    PoolLogicPressureRuntimeData poolPressure;
 };

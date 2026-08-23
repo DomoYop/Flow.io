@@ -445,6 +445,25 @@ bool PoolLogicModule::cmdMqttControl_(const CommandRequest& req, char* reply, si
         return queueRobotManualValue(where, !current);
     };
 
+    // « Filtre lave » : remet la pression de reference a zero, ce qui relance
+    // l'apprentissage a la prochaine marche stable. Un seul geste apres un
+    // lavage, au lieu d'un releve au manometre a ressaisir a la main.
+    if (strcmp(cmdName, "poollogic.filter_washed") == 0) {
+        pressureRefBar_ = 0.0f;
+        pressureLearnStartMs_ = 0U;
+        pressureLearnSum_ = 0.0f;
+        pressureLearnCount_ = 0U;
+        foulingPct_ = 0.0f;
+        foulingThresholdBar_ = 0.0f;
+        foulingThresholdClamped_ = false;
+        if (cfgStore_) {
+            (void)cfgStore_->set(pressureRefVar_, pressureRefBar_);
+        }
+        LOGI("Filter washed: pressure reference cleared, relearning on next stable run");
+        snprintf(reply, replyLen, "{\"ok\":true,\"relearning\":true}");
+        return true;
+    }
+
     if (strcmp(cmdName, "poollogic.auto_mode.toggle") == 0) {
         return toggleModeValue("poollogic.auto_mode.toggle", autoModeVar_, autoMode_);
     }

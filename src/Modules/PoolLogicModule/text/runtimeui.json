@@ -252,6 +252,30 @@
       "order": 30,
       "label_t": "runtimeui.poollogic.v16.label",
       "group_t": "runtimeui.poollogic.v16.group"
+    },
+    {
+      "valueId": 17,
+      "key": "pool.filter_fouling_pct",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "%",
+      "decimals": 0,
+      "order": 200,
+      "label_t": "runtimeui.poollogic.v17.label",
+      "group_t": "runtimeui.poollogic.v17.group"
+    },
+    {
+      "valueId": 18,
+      "key": "pool.pressure_ref",
+      "type": "float",
+      "domain": "sondes",
+      "display": "value",
+      "unit": "bar",
+      "decimals": 2,
+      "order": 210,
+      "label_t": "runtimeui.poollogic.v18.label",
+      "group_t": "runtimeui.poollogic.v17.group"
     }
   ]
 }

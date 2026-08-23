@@ -3,7 +3,7 @@
   "values": [
     {
       "valueId": 11,
-      "key": "alarms.pressure_low",
+      "key": "alarms.pressure_sensor_fault",
       "type": "enum",
       "domain": "alarm",
       "display": "badge",
@@ -15,7 +15,7 @@
         "4_t": "runtimeui.alarms.state.unavailable"
       },
       "order": 10,
-      "label_t": "runtimeui.alarms.pressure_low.label",
+      "label_t": "runtimeui.alarms.pressure_sensor_fault.label",
       "group_t": "runtimeui.alarms.group"
     },
     {
@@ -152,6 +152,40 @@
       },
       "order": 90,
       "label_t": "runtimeui.alarms.water_temp_unavailable.label",
+      "group_t": "runtimeui.alarms.group"
+    },
+    {
+      "valueId": 20,
+      "key": "alarms.filter_fouling",
+      "type": "enum",
+      "domain": "alarm",
+      "display": "badge",
+      "enum": {
+        "0_t": "runtimeui.alarms.state.normal",
+        "1_t": "runtimeui.alarms.state.active",
+        "2_t": "runtimeui.alarms.state.acked",
+        "3_t": "runtimeui.alarms.state.cleared",
+        "4_t": "runtimeui.alarms.state.unavailable"
+      },
+      "order": 100,
+      "label_t": "runtimeui.alarms.filter_fouling.label",
+      "group_t": "runtimeui.alarms.group"
+    },
+    {
+      "valueId": 21,
+      "key": "alarms.no_flow",
+      "type": "enum",
+      "domain": "alarm",
+      "display": "badge",
+      "enum": {
+        "0_t": "runtimeui.alarms.state.normal",
+        "1_t": "runtimeui.alarms.state.active",
+        "2_t": "runtimeui.alarms.state.acked",
+        "3_t": "runtimeui.alarms.state.cleared",
+        "4_t": "runtimeui.alarms.state.unavailable"
+      },
+      "order": 110,
+      "label_t": "runtimeui.alarms.no_flow.label",
       "group_t": "runtimeui.alarms.group"
     }
   ]

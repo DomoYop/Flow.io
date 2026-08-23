@@ -100,7 +100,12 @@ struct PoolLogicDefaultsSpec {
     float tempHigh;
     uint8_t filtrationStartMinHour;
     uint8_t filtrationStopMaxHour;
-    float pressureLow;
+    // Pression de service filtre propre, en bar. 0 = non calibree : PoolLogic
+    // l'apprend a la premiere marche stable. Ne declenche aucune coupure.
+    float pressureRef;
+    // Ecart au-dessus de pressureRef declenchant l'alerte de lavage de filtre.
+    float pressureFoulingDelta;
+    // Securite mecanique : au-dela, la pompe est coupee et l'alarme latchee.
     float pressureHigh;
     float winterStartTempC;
     float freezeHoldTempC;

@@ -194,12 +194,18 @@ constexpr char PhLevelIoId[] = "pl_phli"; // Pool logic module persisted key for
 constexpr char DisLevelIoId[] = "pl_disli"; // IoId capteur de niveau bas du bidon de desinfectant.
 constexpr char FlowSwitchIoId[] = "pl_fsiid"; // IoId capteur flowswitch (entree debit).
 constexpr char CoverClosedIoId[] = "pl_cciid"; // IoId capteur volet ferme.
-// Seuils d'alarme de pression, en bar. Renommes psi -> pr en version 3 du schema
-// (le capteur ne s'exprime plus en PSI) ; les anciennes cles sont migrees puis
-// effacees par mig_2_to_3, et les AlarmId 1000/1001 restent inchanges.
-constexpr char PressureLow[] = "pl_prlow"; // Seuil de pression basse (bar) declenchant l'alarme.
-constexpr char PressureHigh[] = "pl_prhigh"; // Seuil de pression haute (bar) declenchant l'alarme.
-constexpr char PressureLowLegacy[] = "pl_psil"; // Ancien nom de PressureLow, lu par mig_2_to_3 seulement.
+// Reglages de pression, en bar. Renommes psi -> pr en version 3 du schema (le
+// capteur ne s'exprime plus en PSI) ; les anciennes cles sont migrees puis
+// effacees par mig_2_to_3.
+//
+// pl_prlow a change de sens en version 4 : c'etait le seuil de pression basse
+// qui coupait la filtration, c'est maintenant la pression de service filtre
+// propre, qui ne declenche rien. La cle binaire est conservee -- une valeur
+// heritee serait absurde dans le nouveau role, mig_3_to_4 la remet a zero.
+constexpr char PressureRef[] = "pl_prlow"; // Pression de service filtre propre (bar). 0 = non calibree.
+constexpr char PressureFoulingDelta[] = "pl_prdlt"; // Ecart au-dessus de PressureRef alertant sur l'encrassement (bar).
+constexpr char PressureHigh[] = "pl_prhigh"; // Securite mecanique (bar) : au-dela, la pompe est coupee.
+constexpr char PressureLowLegacy[] = "pl_psil"; // Ancien nom de PressureRef, lu par mig_2_to_3 seulement.
 constexpr char PressureHighLegacy[] = "pl_psih"; // Ancien nom de PressureHigh, lu par mig_2_to_3 seulement.
 constexpr char WinterStart[] = "pl_wstr"; // Pool logic module persisted key for field `pl_wstr`.
 constexpr char FreezeHold[] = "pl_whld"; // Pool logic module persisted key for field `pl_whld`.
@@ -231,7 +237,7 @@ constexpr char DisWindowMs[] = "pl_diswms"; // Desinfection : fenetre PWM du PID
 // (caracteristique de la pompe / du reglage), plus mutualisees.
 constexpr char DisMinOnMs[] = "pl_dismon"; // Desinfection : duree ON minimale du PID.
 constexpr char DisSampleMs[] = "pl_dissmp"; // Desinfection : periode d'echantillonnage du PID.
-constexpr char PressureDelay[] = "pl_prdelay"; // Delai (s) apres demarrage filtration avant de surveiller la pression.
+constexpr char PressureDelay[] = "pl_prdelay"; // Delai (s) apres demarrage filtration avant de surveiller pression ET debit (le temps d'amorcage de la pompe).
 constexpr char PressureDelayLegacy[] = "pl_psdt"; // Ancien nom de PressureDelay, lu par mig_2_to_3 seulement.
 constexpr char DelayPids[] = "pl_dpds"; // Pool logic module persisted key for field `pl_dpds`.
 constexpr char DelayElectro[] = "pl_delt"; // Pool logic module persisted key for field `pl_delt`.

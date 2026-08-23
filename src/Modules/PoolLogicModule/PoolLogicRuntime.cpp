@@ -206,6 +206,20 @@ void PoolLogicModule::publishPhDosingRuntime_() const
     (void)setPoolPhDosingRuntime(*dataStore_, out);
 }
 
+void PoolLogicModule::publishPressureRuntime_() const
+{
+    if (!dataStore_) return;
+
+    PoolLogicPressureRuntimeData out{};
+    out.referenceBar = pressureRefBar_;
+    out.foulingThresholdBar = foulingThresholdBar_;
+    out.foulingPct = foulingPct_;
+    out.calibrated = (pressureRefBar_ > 0.0f);
+    out.thresholdClamped = foulingThresholdClamped_;
+    out.learning = (pressureLearnStartMs_ != 0U);
+    (void)setPoolPressureRuntime(*dataStore_, out);
+}
+
 bool PoolLogicModule::phExpectedBatchDelta_(float& deltaOut) const
 {
     deltaOut = 0.0f;
@@ -389,7 +403,7 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
             switch (heatAssistReason_) {
                 case HeatAssistReason::Disabled: return "DISABLED";
                 case HeatAssistReason::ManualMode: return "MANUAL_MODE";
-                case HeatAssistReason::PressureBlocked: return "PRESSURE_BLOCKED";
+                case HeatAssistReason::HydraulicBlocked: return "HYDRAULIC_BLOCKED";
                 case HeatAssistReason::SetpointInvalid: return "SETPOINT_INVALID";
                 case HeatAssistReason::TempUnavailable: return "TEMP_UNAVAILABLE";
                 case HeatAssistReason::ProbeWait30m: return "PROBE_WAIT_30M";
@@ -435,15 +449,23 @@ bool PoolLogicModule::buildRuntimeSnapshot(uint8_t idx, char* out, size_t len, u
         // et interlock securite (no_flow). Consomme par les binary_sensor HA.
         // `hold` s'y ajoute : c'est la meme question physique (l'eau circule-t-elle),
         // et il dit pourquoi les courbes pH/Redox sont plates.
+        // L'encrassement du filtre s'y ajoute : c'est encore de l'hydraulique, et
+        // publier un snapshot de plus couterait une route MQTT pour trois nombres.
+        // `fouling_pct` vaut -1 tant que la reference n'est pas calibree, ce qu'un
+        // 0 % ne saurait pas dire -- Home Assistant le traduit en « unavailable ».
         const int wrote = snprintf(out,
                                    len,
                                    "{\"flow_copy\":%s,\"cover\":%s,\"no_flow\":%s,\"hold\":%s,"
-                                   "\"delay_s\":%u,\"t\":%lu}",
+                                   "\"delay_s\":%u,\"p_ref\":%.2f,\"p_wash\":%.2f,"
+                                   "\"fouling_pct\":%.0f,\"t\":%lu}",
                                    flowCopyOutState_ ? "true" : "false",
                                    coverClosedState_ ? "true" : "false",
                                    noFlowError_ ? "true" : "false",
                                    sensorHoldActive_() ? "true" : "false",
                                    (unsigned)flowCopyDelaySec_,
+                                   (double)pressureRefBar_,
+                                   (double)foulingThresholdBar_,
+                                   (pressureRefBar_ > 0.0f) ? (double)foulingPct_ : -1.0,
                                    (unsigned long)nowMs);
         if (wrote < 0 || (size_t)wrote >= len) return false;
         maxTsOut = nowMs ? nowMs : 1U;

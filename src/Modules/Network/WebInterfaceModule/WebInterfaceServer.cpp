@@ -1933,7 +1933,7 @@ struct WaveshareAlarmRuntimeValue {
 };
 
 constexpr WaveshareAlarmRuntimeValue kWaveshareAlarmRuntimeValues[] = {
-    {11, AlarmId::PoolPressureLow, "alarms.pressure_low"},
+    {11, AlarmId::PoolPressureSensorFault, "alarms.pressure_sensor_fault"},
     {12, AlarmId::PoolPressureHigh, "alarms.pressure_high"},
     {13, AlarmId::PoolPhTankLow, "alarms.ph_tank_low"},
     {14, AlarmId::PoolChlorineTankLow, "alarms.chlorine_tank_low"},
@@ -1942,6 +1942,8 @@ constexpr WaveshareAlarmRuntimeValue kWaveshareAlarmRuntimeValues[] = {
     {17, AlarmId::PoolWaterLevelLow, "alarms.water_level_low"},
     {18, AlarmId::PoolPhDoseNoEffect, "alarms.ph_dose_no_effect"},
     {19, AlarmId::PoolWaterTemperatureUnavailable, "alarms.water_temp_unavailable"},
+    {20, AlarmId::PoolFilterFouling, "alarms.filter_fouling"},
+    {21, AlarmId::PoolNoFlow, "alarms.no_flow"},
 };
 
 AlarmId waveshareAlarmIdForRuntimeValueId_(uint8_t valueId)
@@ -2226,6 +2228,27 @@ bool appendWaveshareLocalRuntimeValue_(Print& out,
             // que le module lui-meme -- pas une temporisation recalculee ici.
             printRuntimeBool_(out, firstValue, id, "pool.sensor_hold", ioAnyEndpointHeld(*dataStore));
             return true;
+        case 2417: {
+            // Encrassement du filtre. Tant que la pression de service n'est pas
+            // calibree, il n'y a rien a comparer : « indisponible » dit la verite,
+            // la ou un 0 % se lirait comme un filtre propre.
+            const PoolLogicPressureRuntimeData& pr = poolPressureRuntime(*dataStore);
+            if (!pr.calibrated) {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            } else {
+                printRuntimeF32_(out, firstValue, id, "pool.filter_fouling_pct", pr.foulingPct, "%");
+            }
+            return true;
+        }
+        case 2418: {
+            const PoolLogicPressureRuntimeData& pr = poolPressureRuntime(*dataStore);
+            if (!pr.calibrated) {
+                wavesharePrintUnavailableByManifestType_(out, firstValue, id);
+            } else {
+                printRuntimeF32_(out, firstValue, id, "pool.pressure_ref", pr.referenceBar, "bar");
+            }
+            return true;
+        }
         case 2205: {
             // Compteur d'eau : 4e entree TOR du domaine.
             const IoId counterIoId = ioIdFromSlot(digitalInputSlot(3));

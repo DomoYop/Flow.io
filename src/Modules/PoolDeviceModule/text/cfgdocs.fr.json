@@ -45,16 +45,22 @@
       "help_t": "cfgdocs.wildcard.tank_init_ml.help",
       "unit": "mL"
     },
+    "pdm/pd0/pressure_fouling_dlt": {
+      "type": "Float",
+      "label_t": "cfgdocs.pdm.pd0.pressure_fouling_dlt.label",
+      "help_t": "cfgdocs.pdm.pd0.pressure_fouling_dlt.help",
+      "unit": "bar"
+    },
     "pdm/pd0/pressure_high_th": {
       "type": "Float",
       "label_t": "cfgdocs.pdm.pd0.pressure_high_th.label",
       "help_t": "cfgdocs.pdm.pd0.pressure_high_th.help",
       "unit": "bar"
     },
-    "pdm/pd0/pressure_low_th": {
+    "pdm/pd0/pressure_ref": {
       "type": "Float",
-      "label_t": "cfgdocs.pdm.pd0.pressure_low_th.label",
-      "help_t": "cfgdocs.pdm.pd0.pressure_low_th.help",
+      "label_t": "cfgdocs.pdm.pd0.pressure_ref.label",
+      "help_t": "cfgdocs.pdm.pd0.pressure_ref.help",
       "unit": "bar"
     },
     "pdm/pd0/pressure_start_dly_s": {

@@ -83,15 +83,19 @@ def _is_included_by_src_filter(rel_path, rules):
             included = allow
     return included
 
-def _parse_entry(path: Path):
-    # Expect a line like: // MODULE_DATA_MODEL: TypeName memberName
+def _parse_entries(path: Path):
+    # Expect lines like: // MODULE_DATA_MODEL: TypeName memberName
+    # Un module peut en declarer plusieurs : rien n'impose qu'il ne contribue
+    # qu'un seul bloc runtime, et les fusionner de force melangerait des sujets
+    # sans rapport dans une meme struct.
     pattern = re.compile(r"^\s*//\s*MODULE_DATA_MODEL:\s*([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*$")
+    found = []
     with path.open("r", encoding="utf-8", errors="ignore") as f:
         for line in f:
             match = pattern.match(line)
             if match:
-                return match.group(1), match.group(2)
-    return None
+                found.append((match.group(1), match.group(2)))
+    return found
 
 
 def _has_runtime_public_marker(path: Path):
@@ -164,17 +168,17 @@ def main():
         rel = path.relative_to(src_root).as_posix()
         if not _is_included_by_src_filter(rel, src_filter_rules):
             continue
-        entry = _parse_entry(path)
-        if not entry:
+        file_entries = _parse_entries(path)
+        if not file_entries:
             # Skip files without a declaration marker
             continue
-        type_name, member_name = entry
-        if member_name in seen_members:
-            raise RuntimeError(f"Duplicate RuntimeData member '{member_name}' in {path}")
-        seen_members.add(member_name)
+        for type_name, member_name in file_entries:
+            if member_name in seen_members:
+                raise RuntimeError(f"Duplicate RuntimeData member '{member_name}' in {path}")
+            seen_members.add(member_name)
+            entries.append((type_name, member_name))
 
         rel_includes.append(rel)
-        entries.append((type_name, member_name))
 
     _write_generated(out_path, rel_includes, entries)
 

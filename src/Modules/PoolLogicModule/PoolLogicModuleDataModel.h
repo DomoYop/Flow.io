@@ -39,4 +39,27 @@ struct PoolLogicPhDosingRuntimeData {
     float gainMlPerM3 = 0.0f;
 };
 
+/**
+ * @brief Etat de la pression de filtration : reference, seuil et encrassement.
+ *
+ * Le manometre ne dit rien d'utile en absolu -- une installation tourne a
+ * 0,5 bar, une autre a 1,2. Ce qui se lit, c'est l'ecart a la pression de
+ * service filtre propre, et c'est ce que ce bloc publie.
+ */
+struct PoolLogicPressureRuntimeData {
+    /** @brief Pression de service filtre propre (bar). 0 = pas encore calibree. */
+    float referenceBar = 0.0f;
+    /** @brief Seuil d'alerte de lavage retenu (bar), plafonnement compris. 0 = inactif. */
+    float foulingThresholdBar = 0.0f;
+    /** @brief Chemin parcouru entre le filtre propre et le lavage, en %. Peut depasser 100. */
+    float foulingPct = 0.0f;
+    /** @brief La reference est posee : l'alerte d'encrassement est operante. */
+    bool calibrated = false;
+    /** @brief Le seuil a ete rabaisse sous la securite mecanique (marge trop faible). */
+    bool thresholdClamped = false;
+    /** @brief Apprentissage en cours : marche stable en train d'etre moyennee. */
+    bool learning = false;
+};
+
 // MODULE_DATA_MODEL: PoolLogicPhDosingRuntimeData poolPhDosing
+// MODULE_DATA_MODEL: PoolLogicPressureRuntimeData poolPressure

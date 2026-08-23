@@ -237,7 +237,7 @@ static bool isConfigPageCode_(uint8_t pageId)
 static uint32_t alarmMaskFromId_(AlarmId id)
 {
     switch (id) {
-        case AlarmId::PoolPressureLow: return 1UL;
+        case AlarmId::PoolPressureSensorFault: return 1UL;
         case AlarmId::PoolPressureHigh: return 2UL;
         case AlarmId::PoolPhTankLow: return 4UL;
         case AlarmId::PoolChlorineTankLow: return 8UL;
@@ -245,6 +245,8 @@ static uint32_t alarmMaskFromId_(AlarmId id)
         case AlarmId::PoolChlorinePumpMaxUptime: return 32UL;
         case AlarmId::PoolWaterLevelLow: return 64UL;
         case AlarmId::PoolPhDoseNoEffect: return 128UL;
+        case AlarmId::PoolFilterFouling: return 256UL;
+        case AlarmId::PoolNoFlow: return 512UL;
         default: return 0UL;
     }
 }
@@ -1133,7 +1135,12 @@ uint32_t HMIModule::buildHomeAlarmBits_() const
     if (isAlarmActive_(AlarmId::PoolChlorineTankLow)) bits |= (1UL << HMI_HOME_ALARM_CHLORINE_TANK_LOW);
     if (isAlarmActive_(AlarmId::PoolPhPumpMaxUptime)) bits |= (1UL << HMI_HOME_ALARM_PH_PUMP_RUNTIME);
     if (isAlarmActive_(AlarmId::PoolChlorinePumpMaxUptime)) bits |= (1UL << HMI_HOME_ALARM_ORP_PUMP_RUNTIME);
-    if (isAlarmActive_(AlarmId::PoolPressureLow) || isAlarmActive_(AlarmId::PoolPressureHigh)) {
+    // Voyant d'accueil : « quelque chose ne va pas cote hydraulique ». Il ne
+    // distingue pas la cause -- c'est la page alarmes qui le fait.
+    if (isAlarmActive_(AlarmId::PoolPressureHigh) ||
+        isAlarmActive_(AlarmId::PoolNoFlow) ||
+        isAlarmActive_(AlarmId::PoolFilterFouling) ||
+        isAlarmActive_(AlarmId::PoolPressureSensorFault)) {
         bits |= (1UL << HMI_HOME_ALARM_PRESSURE);
     }
     return bits;
@@ -1683,7 +1690,10 @@ void HMIModule::applyLedMask_(bool force)
     if (dsSvc_ && dsSvc_->store) mqttConnected = mqttReady(*dsSvc_->store);
     (void)readPoolLogicModeFlags_(modes.autoMode, modes.winterMode, modes.phAutoMode, modes.orpAutoMode);
     const bool waterLevelLow = isWaterLevelLow_();
-    const bool pressureAlarm = isAlarmActive_(AlarmId::PoolPressureLow) || isAlarmActive_(AlarmId::PoolPressureHigh);
+    const bool pressureAlarm = isAlarmActive_(AlarmId::PoolPressureHigh) ||
+                               isAlarmActive_(AlarmId::PoolNoFlow) ||
+                               isAlarmActive_(AlarmId::PoolFilterFouling) ||
+                               isAlarmActive_(AlarmId::PoolPressureSensorFault);
     const bool phTankLowAlarm = isAlarmActive_(AlarmId::PoolPhTankLow);
     const bool chlorineTankLowAlarm = isAlarmActive_(AlarmId::PoolChlorineTankLow);
     const bool phPumpRuntimeAlarm = isAlarmActive_(AlarmId::PoolPhPumpMaxUptime);
@@ -1861,7 +1871,9 @@ void HMIModule::onEvent_(const Event& e)
             id == AlarmId::PoolPhPumpMaxUptime ||
             id == AlarmId::PoolChlorinePumpMaxUptime ||
             id == AlarmId::PoolWaterLevelLow ||
-            id == AlarmId::PoolPressureLow ||
+            id == AlarmId::PoolPressureSensorFault ||
+            id == AlarmId::PoolFilterFouling ||
+            id == AlarmId::PoolNoFlow ||
             id == AlarmId::PoolPressureHigh) {
             ledDirty = true;
             homePublishMask |= kHomePublishAlarmBits;
@@ -2520,8 +2532,10 @@ const char* HMIModule::alarmLabelShortForId_(AlarmId id) const
 {
     const bool en = runtimeUiIsEnglishLang(localeLang_);
     switch (id) {
-        case AlarmId::PoolPressureLow: return en ? "Low pressure" : "Pression basse";
+        case AlarmId::PoolPressureSensorFault: return en ? "Sensor suspect" : "Capteur suspect";
         case AlarmId::PoolPressureHigh: return en ? "High pressure" : "Pression haute";
+        case AlarmId::PoolFilterFouling: return en ? "Wash filter" : "Laver filtre";
+        case AlarmId::PoolNoFlow: return en ? "No flow" : "Pas de debit";
         case AlarmId::PoolPhTankLow: return en ? "pH empty" : "pH vide";
         case AlarmId::PoolChlorineTankLow: return en ? "Chlorine empty" : "Chlore vide";
         case AlarmId::PoolPhPumpMaxUptime: return en ? "pH uptime" : "pH uptime";

@@ -65,13 +65,13 @@ Responsabilités:
 
 - calcule la fenêtre de filtration (selon température eau + bornes horaires)
 - arbitre mode auto/manuel/hiver
-- applique sécurités pression
+- applique les sécurités hydrauliques (surpression mécanique, manque de débit)
 - pilote robot, électrolyse, remplissage
 - exécute la régulation temporelle PID pH et ORP (pompes péristaltiques)
 - exécute le protocole oxygène actif liquide par volume calculé quand `disinfection_type=2`
 - publie la configuration `cfg/poollogic/*` et snapshots `rt/poollogic/ph|orp`
 
-Important: en mode manuel (`auto_mode=false`), la filtration reste pilotée manuellement **sauf sécurité pression** (qui garde priorité et peut couper).
+Important: en mode manuel (`auto_mode=false`), la filtration reste pilotée manuellement **sauf sécurité hydraulique** — surpression mécanique ou manque de débit — qui garde priorité et peut couper. Une pression basse ne coupe rien.
 
 ## 3.2 `PoolDeviceModule` (device manager / couche d’exécution)
 
@@ -112,7 +112,7 @@ Responsabilités:
 
 - `PoolLogic` n’impose plus de logique auto de filtration
 - un ordre manuel filtration (`poollogic.filtration.write`) force explicitement `auto_mode=false`
-- les sécurités pression restent actives (coupure possible)
+- les sécurités hydrauliques restent actives (coupure possible)
 
 ## 4.3 Hiver (`winter_mode=true`)
 
@@ -125,7 +125,7 @@ Responsabilités:
 
 Décision finale (priorité):
 
-1. sécurité pression (stop)
+1. sécurité hydraulique (stop)
 2. manuel (conserver état manuel)
 3. auto (fenêtre de filtration / hiver / freeze-hold)
 
@@ -138,7 +138,7 @@ Conditions d’autorisation:
 - filtration demandée ON
 - PID pH armé (`ph_auto_mode` + délai post-filtration)
 - mesure pH disponible
-- pas d’erreur pression
+- pas de coupure hydraulique
 - cuve pH non vide
 
 Le PID est temporel (sortie en `outputOnMs` dans une fenêtre), avec minimum ON configurable (`pid_min_on_ms`).
@@ -152,7 +152,7 @@ Conditions d’autorisation:
 - filtration demandée ON
 - PID désinfection armé (`dis_auto_mode` + délai post-filtration)
 - mesure ORP disponible
-- pas d’erreur pression
+- pas de coupure hydraulique
 - cuve chlore non vide
 - **et** `disinfection_type=0` (`Chlore/Brome`; la pompe ORP automatique est inhibée en mode électrolyse, oxygène actif ou désactivé)
 
@@ -211,13 +211,15 @@ En auto:
 
 Alarmes métier déclarées:
 
-- `PoolPressureLow` (pression basse)
-- `PoolPressureHigh` (pression haute)
+- `PoolPressureSensorFault` (capteur de pression suspect — informative)
+- `PoolFilterFouling` (filtre à laver — informative)
+- `PoolPressureHigh` (surpression mécanique — **coupe la pompe**)
+- `PoolNoFlow` (manque de débit — **coupe la pompe**)
 - `PoolWaterLevelLow` (niveau bassin bas)
 - `PoolPhTankLow`
 - `PoolChlorineTankLow`
 
-Si le service alarme n’est pas disponible, `PoolLogic` utilise un fallback local conservatif (latch pression local).
+Si le service alarme n’est pas disponible, `PoolLogic` utilise un fallback local conservatif, réduit à la seule surpression.
 
 ## 7) Variables ConfigStore importantes
 

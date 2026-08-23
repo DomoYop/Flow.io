@@ -379,7 +379,7 @@ void PoolLogicModule::fillPhDosingInput_(DosingInput& in,
     // L'armement conserve la temporisation historique : filtration en marche
     // depuis delayPidsMin, hors mode hiver.
     in.regulationArmed = phPidEnabled_;
-    in.interlockBlocked = pressureError_ || noFlowError_;
+    in.interlockBlocked = hydraulicTrip_ || noFlowError_;
     in.tankLow = phTankLowError_;
     in.circulating = filtrationFsm_.on;
 
@@ -760,7 +760,140 @@ bool PoolLogicModule::stepO2Protocol_(bool filtrationDesired,
 
 // Alarm conditions intentionally stay close to the control helpers because they
 // read the same live IO/runtime state and should evolve together.
-AlarmCondState PoolLogicModule::condPressureLowStatic_(void* ctx, uint32_t nowMs)
+bool PoolLogicModule::readFlowConfirmed_() const
+{
+    if (!flowPresent_ && !flowInterlockEnabled_) return false;
+    bool flowOn = false;
+    if (!loadDigitalSensor_(flowSwitchIoId_, flowOn)) return false;
+    return flowOn;
+}
+
+float PoolLogicModule::computeFoulingThreshold_(bool* clampedOut) const
+{
+    if (clampedOut) *clampedOut = false;
+    // Reference non calibree : rien a comparer, l'alerte reste muette plutot que
+    // de se declencher sur une valeur inventee.
+    if (!(pressureRefBar_ > 0.0f)) return 0.0f;
+    if (!(pressureFoulingDeltaBar_ > 0.0f)) return 0.0f;
+
+    const float wanted = pressureRefBar_ + pressureFoulingDeltaBar_;
+    const float ceiling = pressureHighThreshold_ - kFoulingTripMarginBar;
+    if (!(ceiling > 0.0f)) return 0.0f;
+    if (wanted <= ceiling) return wanted;
+
+    if (clampedOut) *clampedOut = true;
+    return ceiling;
+}
+
+// Publie l'etat d'encrassement et apprend la pression de service quand elle
+// n'est pas encore connue. Appelee a chaque pas de controle : tout y est
+// recalcule a partir de la config, pour que l'interface reflete un changement de
+// reglage sans attendre un evenement.
+void PoolLogicModule::updatePressureReference_(bool havePressure, float pressure, uint32_t nowMs)
+{
+    bool clamped = false;
+    const float threshold = computeFoulingThreshold_(&clamped);
+    foulingThresholdBar_ = threshold;
+    if (clamped && !foulingThresholdClamped_) {
+        // Le trip mecanique passe devant l'alerte de lavage : sur une
+        // installation a forte pression de service, l'arret d'urgence sonnerait
+        // avant l'invitation a laver le filtre. Le dire une fois, avec les trois
+        // valeurs, evite d'avoir a le deduire depuis l'interface.
+        LOGW("Fouling threshold clamped to %.2f bar (ref %.2f + delta %.2f exceeds trip %.2f)",
+             (double)threshold,
+             (double)pressureRefBar_,
+             (double)pressureFoulingDeltaBar_,
+             (double)pressureHighThreshold_);
+    }
+    foulingThresholdClamped_ = clamped;
+
+    // Chemin parcouru entre le filtre propre et le lavage. Non plafonne a 100 :
+    // « 140 % » dit quelque chose qu'un plafond effacerait.
+    if (havePressure && (threshold > pressureRefBar_)) {
+        const float span = threshold - pressureRefBar_;
+        const float pct = ((pressure - pressureRefBar_) / span) * 100.0f;
+        foulingPct_ = (pct < 0.0f) ? 0.0f : pct;
+    } else {
+        foulingPct_ = 0.0f;
+    }
+
+    auto resetLearning = [this]() {
+        pressureLearnStartMs_ = 0U;
+        pressureLearnSum_ = 0.0f;
+        pressureLearnCount_ = 0U;
+    };
+
+    // Une reference deja posee -- apprise ou saisie a la main -- n'est jamais
+    // ecrasee. C'est ce qui rend le champ modifiable sans que l'apprentissage
+    // vienne le reprendre au passage suivant.
+    if (pressureRefBar_ > 0.0f) {
+        resetLearning();
+        return;
+    }
+
+    // Marche stable, debit confirme, aucune coupure : les trois conditions pour
+    // qu'une pression instantanee vaille comme pression de service.
+    const bool eligible = havePressure && filtrationFsm_.on && !hydraulicTrip_ &&
+                          readFlowConfirmed_() &&
+                          (stateUptimeSec_(filtrationFsm_, nowMs) >= (kPressureLearnRunMs / 1000UL));
+    if (!eligible) {
+        resetLearning();
+        return;
+    }
+
+    if (pressureLearnStartMs_ == 0U) {
+        pressureLearnStartMs_ = nowMs;
+        pressureLearnSum_ = 0.0f;
+        pressureLearnCount_ = 0U;
+    }
+    if (pressureLearnCount_ < 0xFFFFU) {
+        pressureLearnSum_ += pressure;
+        ++pressureLearnCount_;
+    }
+    if ((uint32_t)(nowMs - pressureLearnStartMs_) < kPressureLearnWindowMs) return;
+    if (pressureLearnCount_ == 0U) return;
+
+    const float learned = pressureLearnSum_ / (float)pressureLearnCount_;
+    resetLearning();
+    // Un capteur muet moyenne a zero : l'apprendre figerait une reference qui
+    // desactive l'alerte pour toujours.
+    if (!(learned > kPressureSensorFaultBar)) {
+        LOGW("Pressure reference not learned: mean %.3f bar looks like a dead sensor", (double)learned);
+        return;
+    }
+
+    pressureRefBar_ = learned;
+    if (cfgStore_) {
+        (void)cfgStore_->set(pressureRefVar_, pressureRefBar_);
+    }
+    LOGI("Pressure reference learned: %.2f bar (clean filter)", (double)pressureRefBar_);
+}
+
+// Une pression quasi nulle pendant que le flowswitch annonce du debit ne peut
+// pas etre une pompe desamorcee : c'est la mesure qui manque. Sans flowswitch
+// declare, le cas reste ambigu et on ne tranche pas -- c'est precisement
+// l'ambiguite qui faisait couper la filtration a tort avant la refonte.
+AlarmCondState PoolLogicModule::condPressureSensorFaultStatic_(void* ctx, uint32_t nowMs)
+{
+    PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
+    if (!self || !self->enabled_) return AlarmCondState::False;
+    if (!self->filtrationFsm_.on) return AlarmCondState::False;
+    const uint32_t runSec = self->stateUptimeSec_(self->filtrationFsm_, nowMs);
+    if (runSec <= self->pressureStartupDelaySec_) return AlarmCondState::False;
+    if (!self->readFlowConfirmed_()) return AlarmCondState::False;
+
+    float pressure = 0.0f;
+    if (!self->loadAnalogSensor_(self->pressureIoId_, pressure)) {
+        return AlarmCondState::Unknown;
+    }
+
+    return (pressure < kPressureSensorFaultBar) ? AlarmCondState::True : AlarmCondState::False;
+}
+
+// Encrassement du filtre : seule lecture utile d'un manometre de filtration, et
+// elle est relative. Le seuil absolu qui existait avant ne voulait rien dire
+// d'une installation a l'autre.
+AlarmCondState PoolLogicModule::condFilterFoulingStatic_(void* ctx, uint32_t nowMs)
 {
     PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
     if (!self || !self->enabled_) return AlarmCondState::False;
@@ -768,12 +901,15 @@ AlarmCondState PoolLogicModule::condPressureLowStatic_(void* ctx, uint32_t nowMs
     const uint32_t runSec = self->stateUptimeSec_(self->filtrationFsm_, nowMs);
     if (runSec <= self->pressureStartupDelaySec_) return AlarmCondState::False;
 
+    const float threshold = self->computeFoulingThreshold_();
+    if (!(threshold > 0.0f)) return AlarmCondState::False;
+
     float pressure = 0.0f;
     if (!self->loadAnalogSensor_(self->pressureIoId_, pressure)) {
         return AlarmCondState::Unknown;
     }
 
-    return (pressure < self->pressureLowThreshold_) ? AlarmCondState::True : AlarmCondState::False;
+    return (pressure > threshold) ? AlarmCondState::True : AlarmCondState::False;
 }
 
 AlarmCondState PoolLogicModule::condPressureHighStatic_(void* ctx, uint32_t)
@@ -788,6 +924,26 @@ AlarmCondState PoolLogicModule::condPressureHighStatic_(void* ctx, uint32_t)
     }
 
     return (pressure > self->pressureHighThreshold_) ? AlarmCondState::True : AlarmCondState::False;
+}
+
+// Marche a sec : le flowswitch mesure ce que la pression basse ne faisait que
+// deviner. Meme temporisation que la pression -- c'est le temps d'amorcage de la
+// pompe, pas un reglage propre au capteur de debit.
+AlarmCondState PoolLogicModule::condNoFlowStatic_(void* ctx, uint32_t nowMs)
+{
+    PoolLogicModule* self = static_cast<PoolLogicModule*>(ctx);
+    if (!self || !self->enabled_) return AlarmCondState::False;
+    if (!self->flowInterlockEnabled_) return AlarmCondState::False;
+    if (!self->filtrationFsm_.on) return AlarmCondState::False;
+    const uint32_t runSec = self->stateUptimeSec_(self->filtrationFsm_, nowMs);
+    if (runSec <= self->pressureStartupDelaySec_) return AlarmCondState::False;
+
+    bool flowOn = false;
+    if (!self->loadDigitalSensor_(self->flowSwitchIoId_, flowOn)) {
+        return AlarmCondState::Unknown;
+    }
+
+    return flowOn ? AlarmCondState::False : AlarmCondState::True;
 }
 
 AlarmCondState PoolLogicModule::condPhTankLowStatic_(void* ctx, uint32_t)
@@ -1400,48 +1556,73 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
 
     // Prefer centralized alarm state when available; otherwise fall back to a
     // local safety latch so standalone behavior remains conservative.
+    //
+    // Deux coupures hydrauliques seulement : la surpression mecanique et le
+    // manque de debit. La pression basse n'en fait plus partie -- elle signalait
+    // une pompe desamorcee faute de capteur de debit, role que le flowswitch
+    // tient directement et sans ambiguite.
     const bool phTankLowBefore = phTankLowError_;
+    const bool pressureTripBefore = pressureTrip_;
     if (alarmSvc_ && alarmSvc_->isActive) {
-        const bool pressureLow = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPressureLow);
-        const bool pressureHigh = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPressureHigh);
-        const bool phTankLowAlarm = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPhTankLow);
-        const bool chlorineTankLowAlarm = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolChlorineTankLow);
-        pressureError_ = pressureLow || pressureHigh;
-        phTankLowError_ = phTankLowAlarm;
-        chlorineTankLowError_ = chlorineTankLowAlarm;
+        pressureTrip_ = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPressureHigh);
+        noFlowTrip_ = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolNoFlow);
+        phTankLowError_ = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolPhTankLow);
+        chlorineTankLowError_ = alarmSvc_->isActive(alarmSvc_->ctx, AlarmId::PoolChlorineTankLow);
     } else {
+        // Mode degrade : seule la surpression est refaite en local. L'encrassement
+        // et le diagnostic capteur sont informatifs -- les dupliquer ici n'aurait
+        // protege personne.
         phTankLowError_ = havePhTankLow && phTankLow;
         chlorineTankLowError_ = haveChlorineTankLow && chlorineTankLow;
-        if (filtrationFsm_.on && havePressure) {
-            const uint32_t runSec = stateUptimeSec_(filtrationFsm_, nowMs);
-            const bool underPressure = (runSec > pressureStartupDelaySec_) && (pressure < pressureLowThreshold_);
-            const bool overPressure = (pressure > pressureHighThreshold_);
-            if ((underPressure || overPressure) && !pressureError_) {
-                pressureError_ = true;
-                LOGW("Pressure error latched (pressure=%.3f low=%.3f high=%.3f)",
+        noFlowTrip_ = false;
+        if (filtrationFsm_.on && havePressure && (pressure > pressureHighThreshold_) && !pressureTrip_) {
+            pressureTrip_ = true;
+            LOGW("Pressure trip latched locally (pressure=%.3f high=%.3f)",
+                 (double)pressure,
+                 (double)pressureHighThreshold_);
+            char detail[128] = {0};
+            snprintf(detail,
+                     sizeof(detail),
+                     "Pression %.3f bar au-dessus de la limite %.3f bar.",
                      (double)pressure,
-                     (double)pressureLowThreshold_,
                      (double)pressureHighThreshold_);
-                char detail[128] = {0};
-                snprintf(detail,
-                         sizeof(detail),
-                         "Pression %.3f bar hors plage %.3f-%.3f bar.",
-                         (double)pressure,
-                         (double)pressureLowThreshold_,
-                         (double)pressureHighThreshold_);
-                emitActivity_(ActivityCode::PoolLogicSafetyPressureLatched,
-                              ActivitySource::Safety,
-                              ActivitySeverity::Warning,
-                              ActivityRole::Filtration,
-                              ActivityState::None,
-                              ActivityReason::Safety,
-                              filtrationDeviceSlot_,
-                              "Sécurité pression piscine activée",
-                              detail,
-                              "warning");
-            }
+            emitActivity_(ActivityCode::PoolLogicSafetyPressureLatched,
+                          ActivitySource::Safety,
+                          ActivitySeverity::Warning,
+                          ActivityRole::Filtration,
+                          ActivityState::None,
+                          ActivityReason::Safety,
+                          filtrationDeviceSlot_,
+                          "Sécurité pression piscine activée",
+                          detail,
+                          "warning");
         }
     }
+
+    // Re-trips consecutifs : une vanne restee fermee refait tripper la pompe a
+    // chaque rearmement. Au-dela du seuil on cesse de rejouer le cycle et on le
+    // dit -- c'est le garde-fou qui manquait a l'ancienne alarme de pression.
+    if (pressureTrip_ && !pressureTripBefore) {
+        if (pressureRetripCount_ < 0xFFU) ++pressureRetripCount_;
+        if (!pressureTripLocked_ && pressureRetripCount_ >= kPressureRetripLock) {
+            pressureTripLocked_ = true;
+            LOGW("Pressure trip locked after %u consecutive re-trips: check valves and filter",
+                 (unsigned)pressureRetripCount_);
+        }
+    }
+    // Une marche saine efface le compteur : le verrou ne doit pas survivre a un
+    // probleme reellement resolu.
+    if (!pressureTrip_ && filtrationFsm_.on &&
+        (stateUptimeSec_(filtrationFsm_, nowMs) > pressureStartupDelaySec_) &&
+        (pressureRetripCount_ != 0U || pressureTripLocked_)) {
+        pressureRetripCount_ = 0U;
+        pressureTripLocked_ = false;
+    }
+
+    hydraulicTrip_ = pressureTrip_ || noFlowTrip_;
+
+    updatePressureReference_(havePressure, pressure, nowMs);
+    publishPressureRuntime_();
 
     // Bidon pH reapprovisionne : c'est la cause n°1 d'un dosage sans effet et le
     // geste naturel de l'utilisateur. Le front descendant leve donc le latch,
@@ -1573,8 +1754,10 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     // Filtration arbitration intentionally applies safety, then manual mode,
     // then automatic scheduling/winter logic in that order.
     bool filtrationDesiredBase = filtrationFsm_.on;
-    if (pressureError_) {
-        // Safety first: pressure alarms must stop filtration even in manual mode.
+    if (hydraulicTrip_) {
+        // Safety first: surpression mecanique et manque de debit arretent la
+        // pompe, y compris en mode manuel. Ce sont les deux seules causes -- une
+        // pression basse ne coupe plus rien.
         filtrationDesiredBase = false;
     } else if (!autoMode_) {
         // Legacy-like manual mode: when auto_mode is off, keep filtration fully manual.
@@ -1683,10 +1866,13 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
     } else if (!autoMode_) {
         resetHeatAssistSession();
         setHeatAssistReason(HeatAssistReason::ManualMode);
-    } else if (pressureError_) {
+    } else if (hydraulicTrip_) {
+        // Un rechauffeur alimente sans debit est le cas le plus dangereux du
+        // lot : le manque de debit le coupe desormais aussi, alors qu'il n'etait
+        // couvert que par ricochet de la pression.
         resetHeatAssistSession();
         heaterDesired = false;
-        setHeatAssistReason(HeatAssistReason::PressureBlocked);
+        setHeatAssistReason(HeatAssistReason::HydraulicBlocked);
     } else if (!std::isfinite(heaterSetpoint_)) {
         resetHeatAssistSession();
         heaterDesired = false;
@@ -1849,7 +2035,7 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
 
     // La desinfection liquide conserve le PID temporel par fenetre.
     const bool orpAllowed = orpAutoMode_ && filtrationDesired && orpPidEnabled_ && haveOrp &&
-                            isDisinfectionType_(DisinfectionChlorineBromine) && !pressureError_ &&
+                            isDisinfectionType_(DisinfectionChlorineBromine) && !hydraulicTrip_ &&
                             !chlorineTankLowError_;
     if (orpAllowed) {
         uint32_t outMs = 0;
@@ -1881,12 +2067,12 @@ void PoolLogicModule::runControlLoop_(uint32_t nowMs)
                               stateUptimeSec_(filtrationFsm_, nowMs) / 60U,
                               haveWaterTemp,
                               waterTemp,
-                              pressureError_,
+                              hydraulicTrip_,
                               chlorineTankLowError_,
                               nowMs,
                               o2RequestFiltration,
                               o2PumpDesired);
-        if (o2RequestFiltration && !pressureError_) {
+        if (o2RequestFiltration && !hydraulicTrip_) {
             filtrationDesired = true;
         }
         orpPumpDesired = o2PumpDesired;

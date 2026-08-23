@@ -17,7 +17,7 @@ struct RuntimeUiManifestItem {
 };
 
 inline constexpr RuntimeUiManifestItem kRuntimeUiManifestItems[] = {
-    {911, "alarms.pressure_low", "enum", nullptr},
+    {911, "alarms.pressure_sensor_fault", "enum", nullptr},
     {912, "alarms.pressure_high", "enum", nullptr},
     {913, "alarms.ph_tank_low", "enum", nullptr},
     {914, "alarms.chlorine_tank_low", "enum", nullptr},
@@ -26,6 +26,8 @@ inline constexpr RuntimeUiManifestItem kRuntimeUiManifestItems[] = {
     {917, "alarms.water_level_low", "enum", nullptr},
     {918, "alarms.ph_dose_no_effect", "enum", nullptr},
     {919, "alarms.water_temp_unavailable", "enum", nullptr},
+    {920, "alarms.filter_fouling", "enum", nullptr},
+    {921, "alarms.no_flow", "enum", nullptr},
     {2301, "pool.filtration_on", "bool", nullptr},
     {2302, "pool.ph_pump_on", "bool", nullptr},
     {2303, "pool.chlorine_pump_on", "bool", nullptr},
@@ -61,6 +63,8 @@ inline constexpr RuntimeUiManifestItem kRuntimeUiManifestItems[] = {
     {2407, "pool.air_temp", "float", "\302\260C"},
     {2203, "pool.ph", "float", nullptr},
     {2204, "pool.orp", "float", "mV"},
+    {2417, "pool.filter_fouling_pct", "float", "%"},
+    {2418, "pool.pressure_ref", "float", "bar"},
     {2416, "pool.sensor_hold", "bool", nullptr},
     {2205, "pool.water_counter", "float", "L"},
     {2206, "pool.pressure", "float", "bar"},

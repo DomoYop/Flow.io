@@ -291,6 +291,9 @@
     "runtimeui.poollogic.v16.display.activeText": "Held (no flow)",
     "runtimeui.poollogic.v16.display.inactiveText": "Live",
     "runtimeui.poollogic.v16.group": "Probes",
-    "runtimeui.poollogic.v16.label": "Readings held"
+    "runtimeui.poollogic.v16.label": "Readings held",
+    "runtimeui.poollogic.v17.group": "Filtration",
+    "runtimeui.poollogic.v17.label": "Filter fouling",
+    "runtimeui.poollogic.v18.label": "Clean filter pressure"
   }
 }

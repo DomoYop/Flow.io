@@ -199,7 +199,7 @@ constexpr uint8_t kDashboardDefaultColorIds[TFTModuleS3::DashboardSlotCount] = {
 };
 
 constexpr uint16_t kAlarmDefaultIds[TFTModuleS3::AlarmDashboardSlotCount] = {
-    (uint16_t)AlarmId::PoolPressureLow,
+    (uint16_t)AlarmId::PoolPressureSensorFault,
     (uint16_t)AlarmId::PoolPressureHigh,
     (uint16_t)AlarmId::PoolPhTankLow,
     (uint16_t)AlarmId::PoolChlorineTankLow,
@@ -1646,8 +1646,10 @@ uint16_t TFTModuleS3::dashboardColor_(uint8_t colorId, uint8_t slot) const
 const char* TFTModuleS3::alarmIdLabel_(uint16_t alarmId) const
 {
     switch ((AlarmId)alarmId) {
-        case AlarmId::PoolPressureLow: return "Pression basse";
+        case AlarmId::PoolPressureSensorFault: return "Capteur pression suspect";
         case AlarmId::PoolPressureHigh: return "Pression haute";
+        case AlarmId::PoolFilterFouling: return "Filtre a laver";
+        case AlarmId::PoolNoFlow: return "Pas de debit";
         case AlarmId::PoolPhTankLow: return "pH vide";
         case AlarmId::PoolChlorineTankLow: return "Chlore vide";
         case AlarmId::PoolPhPumpMaxUptime: return "pH uptime";

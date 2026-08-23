@@ -160,7 +160,8 @@ void PoolLogicModule::applyDomainDefaults(const DomainSpec& domain)
         filtrWinStop_[0] = (uint16_t)d->filtrationStopMaxHour * 60u;
         filtrationCalcStart_ = d->filtrationStartMinHour;
         filtrationCalcStop_ = d->filtrationStopMaxHour;
-        pressureLowThreshold_ = d->pressureLow;
+        pressureRefBar_ = d->pressureRef;
+        pressureFoulingDeltaBar_ = d->pressureFoulingDelta;
         pressureHighThreshold_ = d->pressureHigh;
         winterStartTempC_ = d->winterStartTempC;
         freezeHoldTempC_ = d->freezeHoldTempC;
@@ -276,7 +277,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     flowPresentVar_.moduleName = kCfgModuleSensors;
     coverClosedIdVar_.moduleName = kCfgModuleSensors;
 
-    pressureLowVar_.moduleName = kCfgModulePd0;
+    pressureRefVar_.moduleName = kCfgModulePd0;
+    pressureFoulingDeltaVar_.moduleName = kCfgModulePd0;
     pressureHighVar_.moduleName = kCfgModulePd0;
     winterStartVar_.moduleName = kCfgModuleSafety;
     freezeHoldVar_.moduleName = kCfgModuleSafety;
@@ -385,7 +387,8 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(flowPresentVar_, kCfgModuleId, kCfgBranchSensors);
     cfg.registerVar(coverClosedIdVar_, kCfgModuleId, kCfgBranchSensors);
 
-    cfg.registerVar(pressureLowVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(pressureRefVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(pressureFoulingDeltaVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(pressureHighVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(winterStartVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(freezeHoldVar_, kCfgModuleId, kCfgBranchSafety);
@@ -648,7 +651,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "h"
         };
         static const char* kHeatAssistStatusFrTemplate =
-            R"({% set st = value_json.ri | default('UNKNOWN', true) %}{% if st == 'DISABLED' %}Désactivé{% elif st == 'MANUAL_MODE' %}Mode manuel{% elif st == 'PRESSURE_BLOCKED' %}Pression bloquée{% elif st == 'SETPOINT_INVALID' %}Consigne invalide{% elif st == 'TEMP_UNAVAILABLE' %}Température indisponible{% elif st == 'PROBE_WAIT_30M' %}Attente sonde 30 min{% elif st == 'PROBE_WAIT_20M' %}Attente sonde 20 min{% elif st == 'PROBE_RUNNING' %}Sondage en cours{% elif st == 'HEATING' %}Chauffe active{% elif st == 'IDLE_PUMP_ON' %}Pompe active sans chauffe{% elif st == 'SETPOINT_REACHED' %}Consigne atteinte{% else %}Inconnu{% endif %})";
+            R"({% set st = value_json.ri | default('UNKNOWN', true) %}{% if st == 'DISABLED' %}Désactivé{% elif st == 'MANUAL_MODE' %}Mode manuel{% elif st == 'HYDRAULIC_BLOCKED' %}Sécurité hydraulique{% elif st == 'SETPOINT_INVALID' %}Consigne invalide{% elif st == 'TEMP_UNAVAILABLE' %}Température indisponible{% elif st == 'PROBE_WAIT_30M' %}Attente sonde 30 min{% elif st == 'PROBE_WAIT_20M' %}Attente sonde 20 min{% elif st == 'PROBE_RUNNING' %}Sondage en cours{% elif st == 'HEATING' %}Chauffe active{% elif st == 'IDLE_PUMP_ON' %}Pompe active sans chauffe{% elif st == 'SETPOINT_REACHED' %}Consigne atteinte{% else %}Inconnu{% endif %})";
         const HASensorEntry heatAssistStatus{
             "poollogic",
             "pl_has_rsn",
@@ -754,6 +757,21 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:water-thermometer",
             "\xC2\xB0""C"
         };
+        // Encrassement du filtre : la seule lecture utile d'un manometre de
+        // filtration, et elle n'existait nulle part avant cette refonte. -1 dit
+        // « reference pas encore calibree », ce qu'un 0 % confondrait avec un
+        // filtre propre.
+        const HASensorEntry filterFouling{
+            "poollogic",
+            "pl_filter_fouling",
+            "Filter Fouling",
+            "rt/poollogic/flow",
+            "{% if value_json.fouling_pct | float(-1) >= 0 %}{{ value_json.fouling_pct | float | round(0) }}{% else %}unavailable{% endif %}",
+            nullptr,
+            "mdi:air-filter",
+            "%"
+        };
+
         const HASensorEntry airTemperature{
             "poollogic",
             "io_air_tmp",
@@ -769,6 +787,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         (void)haSvc->addSensor(haSvc->ctx, &filtrationStart);
         (void)haSvc->addSensor(haSvc->ctx, &filtrationStop);
         (void)haSvc->addSensor(haSvc->ctx, &heatAssistStatus);
+        (void)haSvc->addSensor(haSvc->ctx, &filterFouling);
         // Les 7 sensors du protocole O2 sont exactement la marge qui manquait au
         // profil (≈ 45 entrees pour MaxSensors = 48, debordement muet) : hors
         // oxygene actif, ils ne sont plus declares du tout.
@@ -1154,6 +1173,20 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "mdi:refresh"
         };
         (void)haSvc->addButton(haSvc->ctx, &filtrationRecalc);
+
+        // Un seul geste apres un lavage : la pression de reference repart a zero
+        // et se reapprend a la prochaine marche stable, au lieu d'un releve au
+        // manometre a ressaisir a la main.
+        const HAButtonEntry filterWashed{
+            "poollogic",
+            "pl_filter_washed",
+            "Filter Washed",
+            MqttTopics::SuffixCmd,
+            "{\\\"cmd\\\":\\\"poollogic.filter_washed\\\"}",
+            "config",
+            "mdi:air-filter"
+        };
+        (void)haSvc->addButton(haSvc->ctx, &filterWashed);
     }
     if (haSvc && haSvc->addBinarySensor) {
         // Etat logique des 2 sorties indicatrices + interlock, publie sur le
@@ -1206,6 +1239,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
             "poollogic.winter_mode.set",
             "poollogic.winter_mode.toggle",
             "poollogic.filtration.toggle",
+            "poollogic.filter_washed",
             "poollogic.ph_pump.write",
             "poollogic.ph_pump.toggle",
             "poollogic.orp_pump.write",
@@ -1228,19 +1262,47 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     // PoolLogic owns the alarm definitions but delegates evaluation to the
     // shared alarm module through static condition callbacks.
     if (alarmSvc_ && alarmSvc_->registerAlarm) {
-        const AlarmRegistration pressureLowAlarm{
-            AlarmId::PoolPressureLow,
-            AlarmSeverity::Alarm,
-            true,
-            2000,
-            1000,
-            60000,
-            "pressure_low",
-            "Low pressure",
+        // Capteur muet : une pression quasi nulle alors que le flowswitch annonce
+        // du debit ne peut pas etre une pompe desamorcee. Purement informative,
+        // et non latchee -- elle retombe seule des que la mesure revient.
+        const AlarmRegistration pressureSensorFaultAlarm{
+            AlarmId::PoolPressureSensorFault,
+            AlarmSeverity::Warning,
+            false,
+            30000,
+            5000,
+            600000,
+            "pressure_sensor_fault",
+            "Pressure sensor suspect",
             "poollogic"
         };
-        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &pressureLowAlarm, &PoolLogicModule::condPressureLowStatic_, this)) {
-            LOGW("PoolLogic failed to register AlarmId::PoolPressureLow");
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx,
+                                      &pressureSensorFaultAlarm,
+                                      &PoolLogicModule::condPressureSensorFaultStatic_,
+                                      this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolPressureSensorFault");
+        }
+
+        // Encrassement : mesure relative a la pression de service filtre propre.
+        // Ne coupe rien -- c'est une invitation a laver le filtre, pas un defaut.
+        // 5 min de confirmation : la pression bouge avec le demarrage du robot ou
+        // d'un balai, sans que le filtre soit en cause.
+        const AlarmRegistration filterFoulingAlarm{
+            AlarmId::PoolFilterFouling,
+            AlarmSeverity::Warning,
+            false,
+            300000,
+            60000,
+            21600000,
+            "filter_fouling",
+            "Filter needs backwash",
+            "poollogic"
+        };
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx,
+                                      &filterFoulingAlarm,
+                                      &PoolLogicModule::condFilterFoulingStatic_,
+                                      this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolFilterFouling");
         }
 
         const AlarmRegistration pressureHighAlarm{
@@ -1256,6 +1318,30 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
         };
         if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &pressureHighAlarm, &PoolLogicModule::condPressureHighStatic_, this)) {
             LOGW("PoolLogic failed to register AlarmId::PoolPressureHigh");
+        }
+
+        // Manque de debit : la seule protection contre la marche a sec, et la
+        // raison pour laquelle la pression basse n'a plus a couper la pompe.
+        //
+        // Latchee volontairement. Cela reproduit la forme du defaut qu'on vient
+        // de corriger -- couper la pompe rend la condition fausse, mais la
+        // filtration reste arretee jusqu'au reset. La difference est de fond :
+        // le flowswitch mesure le debit au lieu de le deduire, donc il ne
+        // produit pas de faux positifs a repetition, et une marche a sec exige
+        // reellement une intervention (prefiltre, amorcage).
+        const AlarmRegistration noFlowAlarm{
+            AlarmId::PoolNoFlow,
+            AlarmSeverity::Alarm,
+            true,
+            2000,
+            1000,
+            60000,
+            "no_flow",
+            "No water flow",
+            "poollogic"
+        };
+        if (!alarmSvc_->registerAlarm(alarmSvc_->ctx, &noFlowAlarm, &PoolLogicModule::condNoFlowStatic_, this)) {
+            LOGW("PoolLogic failed to register AlarmId::PoolNoFlow");
         }
 
         const AlarmRegistration phTankLowAlarm{

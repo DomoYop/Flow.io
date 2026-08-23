@@ -290,6 +290,9 @@
     "runtimeui.poollogic.v16.display.activeText": "Figées (sans circulation)",
     "runtimeui.poollogic.v16.display.inactiveText": "En direct",
     "runtimeui.poollogic.v16.group": "Sondes",
-    "runtimeui.poollogic.v16.label": "Mesures figées"
+    "runtimeui.poollogic.v16.label": "Mesures figées",
+    "runtimeui.poollogic.v17.group": "Filtration",
+    "runtimeui.poollogic.v17.label": "Encrassement du filtre",
+    "runtimeui.poollogic.v18.label": "Pression filtre propre"
   }
 }

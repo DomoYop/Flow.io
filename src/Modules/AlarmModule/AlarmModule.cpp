@@ -45,7 +45,7 @@ static constexpr HABinarySensorEntry kAlarmAnyActiveBinarySensor{
 // Le suffixe de topic contient l'AlarmId en dur : les static_assert ci-dessous
 // cassent le build si un identifiant change sans que la table suive.
 static constexpr HABinarySensorEntry kAlarmBinarySensors[] = {
-    {"alarms", "alm_pressure_low", "Low Pressure", "rt/alarms/id1000",
+    {"alarms", "alm_pressure_sensor_fault", "Pressure Sensor Suspect", "rt/alarms/id1000",
      kAlarmActiveValueTemplate, "problem", nullptr, "mdi:gauge-low"},
     {"alarms", "alm_pressure_high", "High Pressure", "rt/alarms/id1001",
      kAlarmActiveValueTemplate, "problem", nullptr, "mdi:gauge-full"},
@@ -63,9 +63,18 @@ static constexpr HABinarySensorEntry kAlarmBinarySensors[] = {
      kAlarmActiveValueTemplate, "problem", nullptr, "mdi:water-alert-outline"},
     {"alarms", "alm_water_temp_unavailable", "Water Temperature Unavailable", "rt/alarms/id1008",
      kAlarmActiveValueTemplate, "problem", nullptr, "mdi:thermometer-alert"},
+    {"alarms", "alm_filter_fouling", "Filter Needs Backwash", "rt/alarms/id1009",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:air-filter"},
+    {"alarms", "alm_no_flow", "No Water Flow", "rt/alarms/id1010",
+     kAlarmActiveValueTemplate, "problem", nullptr, "mdi:water-pump-off"},
 };
 
-static_assert((uint16_t)AlarmId::PoolPressureLow == 1000, "rt/alarms/id1000 must stay PoolPressureLow");
+// L'id 1000 a change de sens en meme temps que la refonte pression : il portait
+// « pression basse », un detecteur de debit par defaut, il porte desormais le
+// diagnostic du capteur. Le topic reste rt/alarms/id1000 et l'entite HA garde
+// une place voisine ; c'est la valeur numerique qui ne doit plus bouger.
+static_assert((uint16_t)AlarmId::PoolPressureSensorFault == 1000,
+              "rt/alarms/id1000 must stay PoolPressureSensorFault");
 static_assert((uint16_t)AlarmId::PoolPressureHigh == 1001, "rt/alarms/id1001 must stay PoolPressureHigh");
 static_assert((uint16_t)AlarmId::PoolPhTankLow == 1002, "rt/alarms/id1002 must stay PoolPhTankLow");
 static_assert((uint16_t)AlarmId::PoolChlorineTankLow == 1003, "rt/alarms/id1003 must stay PoolChlorineTankLow");
@@ -75,6 +84,8 @@ static_assert((uint16_t)AlarmId::PoolWaterLevelLow == 1006, "rt/alarms/id1006 mu
 static_assert((uint16_t)AlarmId::PoolPhDoseNoEffect == 1007, "rt/alarms/id1007 must stay PoolPhDoseNoEffect");
 static_assert((uint16_t)AlarmId::PoolWaterTemperatureUnavailable == 1008,
               "rt/alarms/id1008 must stay PoolWaterTemperatureUnavailable");
+static_assert((uint16_t)AlarmId::PoolFilterFouling == 1009, "rt/alarms/id1009 must stay PoolFilterFouling");
+static_assert((uint16_t)AlarmId::PoolNoFlow == 1010, "rt/alarms/id1010 must stay PoolNoFlow");
 
 // LogWarningSeen (1100) et LogErrorSeen (1101) ne sont volontairement pas
 // declarees : LogAlarmSinkModule est exclu du build_src_filter de ce profil,
@@ -86,7 +97,7 @@ static_assert((uint16_t)AlarmId::PoolWaterTemperatureUnavailable == 1008,
 // « Acquitter » couvre les deux gestes utiles -- effacer si la cause a disparu,
 // faire taire sinon -- ce qui evite un second bouton par alarme.
 static constexpr HAButtonEntry kAlarmAckButtons[] = {
-    {"alarms", "alm_ack_pressure_low", "Acknowledge Low Pressure", MqttTopics::SuffixCmd,
+    {"alarms", "alm_ack_pressure_sensor_fault", "Acknowledge Pressure Sensor Suspect", MqttTopics::SuffixCmd,
      "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1000}}", "diagnostic", "mdi:gauge-low"},
     {"alarms", "alm_ack_pressure_high", "Acknowledge High Pressure", MqttTopics::SuffixCmd,
      "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1001}}", "diagnostic", "mdi:gauge-full"},
@@ -104,12 +115,20 @@ static constexpr HAButtonEntry kAlarmAckButtons[] = {
      "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1007}}", "diagnostic", "mdi:water-alert-outline"},
     {"alarms", "alm_ack_water_temp_unavailable", "Acknowledge Water Temperature Unavailable", MqttTopics::SuffixCmd,
      "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1008}}", "diagnostic", "mdi:thermometer-alert"},
+    {"alarms", "alm_ack_filter_fouling", "Acknowledge Filter Needs Backwash", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1009}}", "diagnostic", "mdi:air-filter"},
+    {"alarms", "alm_ack_no_flow", "Acknowledge No Water Flow", MqttTopics::SuffixCmd,
+     "{\"cmd\":\"alarms.ack\",\"args\":{\"id\":1010}}", "diagnostic", "mdi:water-pump-off"},
 };
 
 // Entites de l'ancien modele par slot, republiees en pierre tombale (discovery
 // vide) pour que Home Assistant les retire au lieu de les laisser orphelines.
 // Supprimables apres une release : elles occupent une place de bouton chacune.
+// `alm_ack_pressure_low` a disparu avec l'alarme du meme nom : sans pierre
+// tombale, Home Assistant garderait un bouton orphelin pointant sur un id qui ne
+// veut plus dire la meme chose.
 static constexpr HAButtonEntry kAlarmRetiredButtons[] = {
+    {"alarms", "alm_ack_pressure_low", "Acknowledge Low Pressure", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
     {"alarms", "alm_reset_slot_0", "Reset Alarm Slot 0", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
     {"alarms", "alm_reset_slot_1", "Reset Alarm Slot 1", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
     {"alarms", "alm_reset_slot_2", "Reset Alarm Slot 2", MqttTopics::SuffixCmd, "{}", "diagnostic", nullptr, true},
@@ -805,8 +824,8 @@ bool AlarmModule::buildAlarmState_(AlarmId id, char* out, size_t len) const
 
 // L'ordre de cette table n'a aucune importance fonctionnelle : chaque entree porte
 // son AlarmId. C'est precisement ce que les anciens masques ne garantissaient pas.
-const AlarmModule::RuntimeUiAlarmEntry AlarmModule::kRuntimeUiAlarms[9] = {
-    {11, AlarmId::PoolPressureLow, "alarms.pressure_low"},
+const AlarmModule::RuntimeUiAlarmEntry AlarmModule::kRuntimeUiAlarms[11] = {
+    {11, AlarmId::PoolPressureSensorFault, "alarms.pressure_sensor_fault"},
     {12, AlarmId::PoolPressureHigh, "alarms.pressure_high"},
     {13, AlarmId::PoolPhTankLow, "alarms.ph_tank_low"},
     {14, AlarmId::PoolChlorineTankLow, "alarms.chlorine_tank_low"},
@@ -815,6 +834,8 @@ const AlarmModule::RuntimeUiAlarmEntry AlarmModule::kRuntimeUiAlarms[9] = {
     {17, AlarmId::PoolWaterLevelLow, "alarms.water_level_low"},
     {18, AlarmId::PoolPhDoseNoEffect, "alarms.ph_dose_no_effect"},
     {19, AlarmId::PoolWaterTemperatureUnavailable, "alarms.water_temp_unavailable"},
+    {20, AlarmId::PoolFilterFouling, "alarms.filter_fouling"},
+    {21, AlarmId::PoolNoFlow, "alarms.no_flow"},
 };
 
 bool AlarmModule::writeRuntimeUiValue(uint8_t valueId, IRuntimeUiWriter& writer) const
