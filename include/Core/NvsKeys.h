@@ -256,6 +256,7 @@ constexpr char FlowCopyDelay[] = "pl_fscdl"; // Flowswitch copy output activatio
 constexpr char FlowInterlock[] = "pl_flilk"; // Flowswitch safety interlock enable (block dosing/electrolysis when no flow).
 constexpr char FlowSwitchPresent[] = "pl_fspres"; // Flowswitch reellement installe : son etat fait alors foi pour la circulation.
 constexpr char SensorHold[] = "pl_shold"; // Gel des mesures en ligne (pH/ORP) tant que l'eau ne circule pas.
+constexpr char SensorHoldRefAge[] = "pl_shrfa"; // Age (s) vise pour la valeur figee : la reference est permutee a cet intervalle.
 constexpr char SensorHoldSettle[] = "pl_shsdl"; // Delai (s) de reprise des mesures apres redemarrage de la filtration.
 constexpr char SensorHoldWaterTemp[] = "pl_shwat"; // Inclut la sonde d'eau dans le gel (sonde montee en ligne).
 }  // namespace PoolLogic

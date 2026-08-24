@@ -1220,6 +1220,14 @@ void PoolLogicModule::applySensorHoldBindings_()
         return;
     }
 
+    // Pousse a chaque rejeu (demarrage et ConfigChanged sur sensors/safety) :
+    // le reglage doit prendre effet pompe en marche, sans attendre le prochain
+    // front de circulation.
+    if (ioSvc_->setAnalogHoldRefAge) {
+        (void)ioSvc_->setAnalogHoldRefAge(ioSvc_->ctx,
+                                          sensorHoldEnabled_ ? sensorHoldRefAgeSec_ : 0U);
+    }
+
     IoId wanted[kSensorHoldMax] = {IO_ID_INVALID, IO_ID_INVALID, IO_ID_INVALID};
     if (sensorHoldEnabled_) {
         // pH et ORP sont toujours en ligne : leur sonde est dans le

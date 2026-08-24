@@ -220,6 +220,9 @@ private:
      * (dly_pid_min, 5 min par defaut).
      */
     static constexpr uint16_t kSensorHoldSettleMaxSec = 240U;
+    // Au-dela, la valeur figee (un a deux fois cet age) cesse de decrire l'eau
+    // du bassin au moment de l'arret.
+    static constexpr uint16_t kSensorHoldRefAgeMaxSec = 300U;
 
     /** @brief Marche stable exigee avant d'apprendre la pression de reference. */
     static constexpr uint32_t kPressureLearnRunMs = 10UL * 60UL * 1000UL;
@@ -364,6 +367,7 @@ private:
     // ce qui derive, c'est ce qui est publie -- Home Assistant, ecran, web.
     bool sensorHoldEnabled_ = PoolDefaults::SensorHold;
     uint16_t sensorHoldSettleSec_ = PoolDefaults::SensorHoldSettleSec;
+    uint16_t sensorHoldRefAgeSec_ = PoolDefaults::SensorHoldRefAgeSec;
     // La sonde de temperature d'eau peut etre en ligne (elle derive) ou
     // immergee dans le bassin (elle reste juste) : c'est un fait de montage,
     // pas une preference, d'ou le reglage separe.
@@ -680,6 +684,8 @@ private:
                                           &sensorHoldEnabled_, ConfigPersistence::Persistent, 0};
     ConfigVariable<uint16_t,0> sensorHoldSettleVar_{NVS_KEY(NvsKeys::PoolLogic::SensorHoldSettle), "sensor_hold_settle_s", "poollogic/safety", ConfigType::UInt16,
                                                     &sensorHoldSettleSec_, ConfigPersistence::Persistent, 0};
+    ConfigVariable<uint16_t,0> sensorHoldRefAgeVar_{NVS_KEY(NvsKeys::PoolLogic::SensorHoldRefAge), "sensor_hold_ref_age_s", "poollogic/safety", ConfigType::UInt16,
+                                                    &sensorHoldRefAgeSec_, ConfigPersistence::Persistent, 0};
     ConfigVariable<bool,0> sensorHoldWatVar_{NVS_KEY(NvsKeys::PoolLogic::SensorHoldWaterTemp), "sensor_hold_wat", "poollogic/safety", ConfigType::Bool,
                                              &sensorHoldWaterTemp_, ConfigPersistence::Persistent, 0};
 

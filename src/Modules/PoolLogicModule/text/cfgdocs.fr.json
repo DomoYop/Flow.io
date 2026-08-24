@@ -397,6 +397,12 @@
       "label_t": "cfgdocs.poollogic.safety.sensor_hold.label",
       "help_t": "cfgdocs.poollogic.safety.sensor_hold.help"
     },
+    "poollogic/safety/sensor_hold_ref_age_s": {
+      "type": "UInt16",
+      "unit": "s",
+      "label_t": "cfgdocs.poollogic.safety.sensor_hold_ref_age_s.label",
+      "help_t": "cfgdocs.poollogic.safety.sensor_hold_ref_age_s.help"
+    },
     "poollogic/safety/sensor_hold_settle_s": {
       "type": "UInt16",
       "unit": "s",

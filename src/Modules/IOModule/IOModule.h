@@ -202,8 +202,11 @@ private:
     IoStatus ioBackendInfo_(uint8_t backend, uint8_t* outEnabled, uint8_t* outConfigurable) const;
     IoStatus ioSetAnalogHold_(IoId id, uint8_t hold);
     IoStatus ioSetCirculating_(uint8_t circulating, uint16_t settleSec);
+    IoStatus ioSetAnalogHoldRefAge_(uint16_t seconds);
     /** Vrai tant que les endpoints marques doivent republier leur valeur figee. */
     bool analogHoldActive_(uint32_t nowMs) const;
+    /** Entretient la reference de gel pendant que l'eau circule. */
+    void updateHoldReference_(AnalogSlot& slot, float rounded, uint32_t nowMs);
 
     bool setLedMask_(uint8_t mask, uint32_t tsMs);
     bool turnLedOn_(uint8_t bit, uint32_t tsMs);
@@ -387,13 +390,21 @@ private:
         bool lastRoundedValid = false;
         float lastRounded = 0.0f;
         // Gel hors circulation (voir IOServiceV2::setAnalogHold). `heldValue`
-        // est la derniere valeur acquise pompe en marche : c'est elle qu'on
-        // republie tant que l'eau est immobile.
+        // est la valeur republiee tant que l'eau est immobile : pas la derniere
+        // acquise, mais le contenu de `heldPending` a la permutation precedente
+        // -- elle a donc entre une et deux fois holdRefAgeMs_, ce qui la met
+        // hors d'atteinte du transitoire d'arret de pompe.
         bool holdWhenIdle = false;
         bool held = false;
         bool heldValid = false;
         float heldValue = 0.0f;
         uint32_t heldSinceMs = 0;
+        // Etage jeune : ce que la sonde vient de lire, en attente de devenir la
+        // reference. Invalide tant que la circulation courante n'a pas produit
+        // son premier echantillon.
+        float heldPending = 0.0f;
+        bool heldPendingValid = false;
+        uint32_t heldRotateMs = 0;
     };
     enum DigitalSlotKind : uint8_t {
         DIGITAL_SLOT_INPUT = 0,
@@ -485,12 +496,16 @@ private:
         ServiceBinding::bind<&IOModule::ioBackendInfo_>,
         ServiceBinding::bind<&IOModule::ioSetAnalogHold_>,
         ServiceBinding::bind<&IOModule::ioSetCirculating_>,
+        ServiceBinding::bind<&IOModule::ioSetAnalogHoldRefAge_>,
         this
     };
     // Etat hydraulique pousse par le metier. Vrai par defaut : un profil sans
     // PoolLogic (ou le temps que celui-ci demarre) ne doit rien geler.
     bool circulating_ = true;
     uint32_t holdSettleUntilMs_ = 0;
+    // Age vise pour la valeur figee. Zero par defaut : un profil sans PoolLogic
+    // garde le comportement d'origine (on fige la derniere acquisition).
+    uint32_t holdRefAgeMs_ = 0;
     StatusLedsService statusLedsSvc_{
         ServiceBinding::bind<&IOModule::setLedMask_>,
         ServiceBinding::bind<&IOModule::getLedMaskSvc_>,

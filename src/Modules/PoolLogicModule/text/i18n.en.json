@@ -143,6 +143,8 @@
     "cfgdocs.poollogic.safety.freeze_hold_t.label": "Frost protection hold threshold (C)",
     "cfgdocs.poollogic.safety.sensor_hold.help": "With the pump stopped, the pH and ORP probes only read the still water trapped in the probe holder, and the value drifts away from the pool. The last reading taken while circulating stays displayed and published, flagged as held. Control loops are unaffected: they already wait for filtration. Pressure is never frozen.",
     "cfgdocs.poollogic.safety.sensor_hold.label": "Freeze readings without flow",
+    "cfgdocs.poollogic.safety.sensor_hold_ref_age_s.help": "How old the reading kept when circulation stops should be. The reference is rotated at this interval, so the frozen value is between one and two times this age. An in-line probe jumps at the very moment the pump stops: at 0 s that jump is what gets frozen instead of the steady value before it. Maximum 300 s.",
+    "cfgdocs.poollogic.safety.sensor_hold_ref_age_s.label": "Held value age",
     "cfgdocs.poollogic.safety.sensor_hold_settle_s.help": "Time allowed after filtration restarts before live readings are shown again: probe holder flush and filter window refill. Too short and the value coming back is still the stagnant one.",
     "cfgdocs.poollogic.safety.sensor_hold_settle_s.label": "Reading resume delay",
     "cfgdocs.poollogic.safety.sensor_hold_wat.help": "Enable when the temperature probe is fitted on the pipework: stopped, it tracks the plant room. Leave off when the probe sits in the pool, where it stays correct at all times.",

@@ -471,7 +471,8 @@
             "winter_start_t",
             "sensor_hold",
             "sensor_hold_wat",
-            "sensor_hold_settle_s"
+            "sensor_hold_settle_s",
+            "sensor_hold_ref_age_s"
           ],
           "label_t": "cfgmods.piscine.securite.label"
         }
@@ -587,6 +588,12 @@
     },
     "poollogic/ph/ph_last_dose_ts": {
       "hidden": true
+    },
+    "poollogic/safety/sensor_hold_ref_age_s": {
+      "visible_if": {
+        "path": "poollogic/safety/sensor_hold",
+        "eq": true
+      }
     },
     "poollogic/safety/sensor_hold_settle_s": {
       "visible_if": {

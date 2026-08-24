@@ -891,6 +891,9 @@ void IOModule::invalidateAnalogSlot_(AnalogSlot& slot, uint32_t nowMs)
 
     slot.endpoint->update(slot.lastRounded, false, nowMs);
     slot.lastRoundedValid = false;
+    // L'etage jeune ne survit pas a une sonde muette : au retour, la reference
+    // se reamorce sur une mesure vraie plutot que sur celle d'avant la panne.
+    slot.heldPendingValid = false;
     // Une sonde muette n'est pas une sonde gelee : le marqueur tombe avec la
     // validite, sans effacer heldValue (utile si la sonde revient a l'arret).
     if (slot.held) {
@@ -934,6 +937,49 @@ IoStatus IOModule::ioSetAnalogHold_(IoId id, uint8_t hold)
     return IO_OK;
 }
 
+IoStatus IOModule::ioSetAnalogHoldRefAge_(uint16_t seconds)
+{
+    const uint32_t wanted = (uint32_t)seconds * 1000UL;
+    if (wanted == holdRefAgeMs_) return IO_OK;
+    holdRefAgeMs_ = wanted;
+    LOGI("Sensor hold reference age set to %us", (unsigned)seconds);
+    return IO_OK;
+}
+
+// Entretient la reference de gel pendant que l'eau circule.
+//
+// `heldValue` ne suit pas la derniere acquisition : elle recopie un etage
+// intermediaire permute toutes les holdRefAgeMs_. La valeur figee a donc entre
+// une et deux fois cet age et echappe au transitoire de l'arret de pompe, qui
+// deplace la mesure d'une sonde en ligne dans les secondes encadrant la coupure
+// -- soit exactement l'instant ou la reference se fige.
+void IOModule::updateHoldReference_(AnalogSlot& slot, float rounded, uint32_t nowMs)
+{
+    if (holdRefAgeMs_ == 0U || !slot.heldPendingValid) {
+        // Age nul : comportement d'origine, on fige la derniere acquisition.
+        // Premiere acquisition du cycle de circulation : elle sort du delai de
+        // reprise, donc d'une circulation deja etablie. L'adopter tout de suite
+        // vaut mieux que de garder la reference de l'arret precedent, qui peut
+        // dater de la veille.
+        slot.heldValue = rounded;
+        slot.heldValid = true;
+        slot.heldPending = rounded;
+        slot.heldPendingValid = true;
+        slot.heldRotateMs = nowMs;
+        return;
+    }
+
+    // Entre deux permutations l'etage jeune ne bouge pas : c'est ce qui donne
+    // son age a la reference. Le reecrire a chaque acquisition ramenerait
+    // `heldValue` a la mesure du cycle precedent, transitoire compris.
+    if ((uint32_t)(nowMs - slot.heldRotateMs) < holdRefAgeMs_) return;
+
+    slot.heldValue = slot.heldPending;
+    slot.heldValid = true;
+    slot.heldPending = rounded;
+    slot.heldRotateMs = nowMs;
+}
+
 IoStatus IOModule::ioSetCirculating_(uint8_t circulating, uint16_t settleSec)
 {
     const bool on = (circulating != 0U);
@@ -957,6 +1003,10 @@ IoStatus IOModule::ioSetCirculating_(uint8_t circulating, uint16_t settleSec)
             if (!slot.used || !slot.holdWhenIdle) continue;
             slot.median.clear();
             slot.lastSampleSeqValid = false;
+            // Meme raison que la fenetre mediane : garder l'etage jeune ferait
+            // poser une valeur d'avant l'arret comme reference a la premiere
+            // permutation, alors qu'on vient de passer des heures sans debit.
+            slot.heldPendingValid = false;
         }
     }
     holdSettleUntilMs_ = nowMs + ((uint32_t)settleSec * 1000UL);
@@ -1054,8 +1104,7 @@ bool IOModule::processAnalogDefinition_(uint8_t idx, uint32_t nowMs)
     // cette garde, un boot pompe a l'arret figerait sur le premier echantillon
     // d'eau immobile en le presentant comme la derniere mesure vraie.
     if (!holdWindow) {
-        slot.heldValue = rounded;
-        slot.heldValid = true;
+        updateHoldReference_(slot, rounded, nowMs);
     }
 
     if (!slot.lastRoundedValid || rounded != slot.lastRounded) {

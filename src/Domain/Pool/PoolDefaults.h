@@ -108,6 +108,9 @@ constexpr uint8_t DelayPidsMin = 5;
 // (11 echantillons) meme pour les sources lentes.
 constexpr bool SensorHold = true;
 constexpr uint16_t SensorHoldSettleSec = 90;
+// 30 s suffisent a sortir du transitoire d'arret de pompe (quelques secondes)
+// sans remonter a une eau dont la chimie aurait eu le temps de bouger.
+constexpr uint16_t SensorHoldRefAgeSec = 30;
 constexpr bool SensorHoldWaterTemp = true;
 constexpr uint8_t DelayElectroMin = 10;
 constexpr uint8_t RobotDelayMin = 30;

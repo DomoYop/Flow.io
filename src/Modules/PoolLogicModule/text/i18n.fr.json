@@ -142,6 +142,8 @@
     "cfgdocs.poollogic.safety.freeze_hold_t.label": "Seuil maintien hors gel (C)",
     "cfgdocs.poollogic.safety.sensor_hold.help": "Pompe à l'arrêt, les sondes pH et Redox ne mesurent plus que l'eau immobile du porte-sondes : la valeur dérive sans rien dire du bassin. La dernière mesure prise en circulation reste alors affichée et publiée, marquée comme figée. Les régulations ne sont pas concernées : elles attendent déjà la filtration. La pression n'est jamais figée.",
     "cfgdocs.poollogic.safety.sensor_hold.label": "Figer les mesures sans circulation",
+    "cfgdocs.poollogic.safety.sensor_hold_ref_age_s.help": "Ancienneté de la mesure retenue au moment où la circulation s'arrête. La référence est permutée à cet intervalle : la valeur figée a donc entre une et deux fois cet âge. Une sonde montée en ligne saute à l'instant précis où la pompe se coupe — à 0 s, c'est ce sursaut qui se fige plutôt que la valeur stable qui le précède. Maximum 300 s.",
+    "cfgdocs.poollogic.safety.sensor_hold_ref_age_s.label": "Âge de la valeur figée",
     "cfgdocs.poollogic.safety.sensor_hold_settle_s.help": "Temps laissé après le redémarrage de la filtration avant de réafficher les mesures réelles : purge du porte-sondes et renouvellement du filtre. Trop court, la valeur qui réapparaît est encore celle de l'eau stagnante.",
     "cfgdocs.poollogic.safety.sensor_hold_settle_s.label": "Délai de reprise des mesures",
     "cfgdocs.poollogic.safety.sensor_hold_wat.help": "À activer si la sonde de température est montée sur la tuyauterie : à l'arrêt elle suit le local technique. À laisser inactif si la sonde est immergée dans le bassin, où elle reste juste en permanence.",

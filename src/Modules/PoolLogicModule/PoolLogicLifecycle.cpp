@@ -446,6 +446,7 @@ void PoolLogicModule::init(ConfigStore& cfg, ServiceRegistry& services)
     cfg.registerVar(flowInterlockVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(sensorHoldVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(sensorHoldSettleVar_, kCfgModuleId, kCfgBranchSafety);
+    cfg.registerVar(sensorHoldRefAgeVar_, kCfgModuleId, kCfgBranchSafety);
     cfg.registerVar(sensorHoldWatVar_, kCfgModuleId, kCfgBranchSafety);
 
     const EventBusService* ebSvc = services.get<EventBusService>(ServiceId::EventBus);
@@ -1551,6 +1552,13 @@ void PoolLogicModule::onConfigLoaded(ConfigStore&, ServiceRegistry& services)
         sensorHoldSettleSec_ = kSensorHoldSettleMaxSec;
         if (cfgStore_) (void)cfgStore_->set(sensorHoldSettleVar_, sensorHoldSettleSec_);
     }
+    if (sensorHoldRefAgeSec_ > kSensorHoldRefAgeMaxSec) {
+        LOGW("PoolLogic sensor hold reference age %us > %us, clamped",
+             (unsigned)sensorHoldRefAgeSec_,
+             (unsigned)kSensorHoldRefAgeMaxSec);
+        sensorHoldRefAgeSec_ = kSensorHoldRefAgeMaxSec;
+        if (cfgStore_) (void)cfgStore_->set(sensorHoldRefAgeVar_, sensorHoldRefAgeSec_);
+    }
 
     LOGI("PoolLogic pH dosing mode=%s", phDosePlus_ ? "pH+" : "pH-");
     LOGI("PoolLogic disinfection=%s (config=%s) swg_control=%s",
@@ -1818,6 +1826,13 @@ void PoolLogicModule::onEvent_(const Event& e)
                      (unsigned)kSensorHoldSettleMaxSec);
                 sensorHoldSettleSec_ = kSensorHoldSettleMaxSec;
                 if (cfgStore_) (void)cfgStore_->set(sensorHoldSettleVar_, sensorHoldSettleSec_);
+            }
+            if (sensorHoldRefAgeSec_ > kSensorHoldRefAgeMaxSec) {
+                LOGW("PoolLogic sensor hold reference age %us > %us, clamped",
+                     (unsigned)sensorHoldRefAgeSec_,
+                     (unsigned)kSensorHoldRefAgeMaxSec);
+                sensorHoldRefAgeSec_ = kSensorHoldRefAgeMaxSec;
+                if (cfgStore_) (void)cfgStore_->set(sensorHoldRefAgeVar_, sensorHoldRefAgeSec_);
             }
             portENTER_CRITICAL(&pendingMux_);
             sensorHoldPending_ = true;

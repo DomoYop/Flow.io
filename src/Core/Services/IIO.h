@@ -194,6 +194,19 @@ struct IOServiceV2 {
      * de la fenetre du filtre median, videe au front montant.
      */
     IoStatus (*setCirculating)(void* ctx, uint8_t circulating, uint16_t settleSec);
+    /**
+     * Age minimal de la valeur figee, en secondes (0 = figer la derniere
+     * acquisition, comportement d'origine).
+     *
+     * La reference etant rafraichie a chaque cycle tant que l'eau circule, elle
+     * capture le transitoire de l'arret de pompe : sur une sonde montee en
+     * ligne, la disparition du potentiel d'ecoulement et le changement de
+     * reference de masse deplacent la mesure dans les secondes qui encadrent la
+     * coupure -- exactement quand la reference se fige. Deux etages permutes
+     * toutes les `seconds` la decalent : la valeur gelee a alors entre une et
+     * deux fois cet age, prise en circulation etablie.
+     */
+    IoStatus (*setAnalogHoldRefAge)(void* ctx, uint16_t seconds);
 
     /** Opaque implementation context. */
     void* ctx;

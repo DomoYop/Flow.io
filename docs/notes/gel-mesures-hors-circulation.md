@@ -62,6 +62,7 @@ Assistant consomme.
 |---|---|
 | `setAnalogHold(id, hold)` | marque un endpoint comme gelable |
 | `setCirculating(circulating, settleSec)` | publie l'état hydraulique |
+| `setAnalogHoldRefAge(seconds)` | âge visé pour la valeur figée |
 
 **Ce que voit l'utilisateur pendant le gel** : la dernière valeur acquise pompe
 en marche, `available` toujours vrai (pas de trou dans l'historique, pas de
@@ -71,6 +72,38 @@ La tuile « Mesures figées » du tableau de bord porte `invertSeverity` dans so
 `displayConfig` : le rendu booléen colore `true` en vert par défaut, or ici
 `true` est une dégradation. Le drapeau est générique et réutilisable pour tout
 état dont le « vrai » est la mauvaise nouvelle.
+
+### La référence est retardée, sinon elle fige le transitoire
+
+Première version : `heldValue` était rafraîchie à chaque acquisition tant que
+l'eau circulait, donc la valeur figée était **la toute dernière avant la
+bascule**. C'est précisément le pire échantillon du cycle. Une sonde pH montée
+en ligne saute au moment où le moteur s'arrête — disparition du potentiel
+d'écoulement sur l'électrode de verre, changement de la référence de masse quand
+la pompe n'est plus alimentée — et le flowswitch, lui, met encore un instant à
+retomber. Relevé du 13/08/2026 : pH stable à **7,4 pendant neuf minutes**, puis
+**7,6** dans les secondes encadrant l'arrêt, et c'est ce 7,6 qui restait affiché
+douze heures. Le gel s'armait au bon moment, il figeait la mauvaise valeur.
+
+Deux étages par slot corrigent cela : `heldPending` capture la mesure du moment,
+`heldValue` reçoit son contenu à chaque permutation, toutes les
+`sensor_hold_ref_age_s`. Entre deux permutations l'étage jeune **ne bouge pas** —
+le réécrire à chaque acquisition ramènerait la référence à un âge d'un cycle
+(125 ms) et rendrait le mécanisme inopérant. La valeur figée a donc entre une et
+deux fois cet âge, prise en pleine circulation établie.
+
+Deux cas où l'âge n'est pas tenu, tous deux voulus :
+
+- **premier échantillon après le délai de reprise** : il est adopté
+  immédiatement, faute de mieux. Il sort déjà de 90 s de circulation, et
+  l'alternative — garder la référence de l'arrêt précédent — figerait une valeur
+  de la veille. Une pompe qui s'arrête moins de 30 s après la fin du settle fige
+  donc une valeur jeune ;
+- **sonde muette** : l'étage jeune est invalidé avec la validité, la référence
+  se réamorce sur une mesure vraie plutôt que sur celle d'avant la panne.
+
+Coût : douze octets par slot analogique, pris en PSRAM (`allocPsramArray_`), pas
+sur les 226 Ko de DRAM interne.
 
 ### Trois décisions qui ne sont pas des détails
 
@@ -116,6 +149,7 @@ autre entrée déplace le gel avec lui, sans redémarrage
 |---|---|---|
 | `sensor_hold` (`pl_shold`) | activé | interrupteur global |
 | `sensor_hold_settle_s` (`pl_shsdl`) | 90 s | **borné à 240 s** |
+| `sensor_hold_ref_age_s` (`pl_shrfa`) | 30 s | âge visé pour la valeur figée, **borné à 300 s** ; 0 fige la dernière acquisition |
 | `sensor_hold_wat` (`pl_shwat`) | activé | sonde d'eau montée en ligne |
 
 Plus, dans **Piscine → Sondes**, `flow_present` (`pl_fspres`, défaut inactif) :
@@ -148,7 +182,11 @@ réécrite en NVS, avec un log.
 ## À vérifier sur cible
 
 1. Arrêt de filtration : le pH doit se figer et `binary_sensor.pl_sensor_hold`
-   passer à ON dans la minute.
+   passer à ON dans la minute. La valeur retenue doit être celle du **plateau
+   stable**, pas le dernier point avant l'arrêt — c'est le test de la référence
+   retardée. Attention en lisant les horodatages Home Assistant : les mesures et
+   les entrées TOR sont publiées en `NumericThrottled`, soit jusqu'à 10 s de
+   retard (`NumericThrottleMs`), et le payload est construit à la publication.
 2. Redémarrage : la valeur doit rester figée ~90 s, puis repartir **sans
    à-coup** (c'est le test de la purge du filtre médian).
 3. Nuit complète : vérifier que l'alarme « température d'eau indisponible » ne
